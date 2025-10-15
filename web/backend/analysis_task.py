@@ -314,12 +314,9 @@ def run_analysis_task(
         send_log('info', '👨‍💼 分析师团队开始工作...', 'system', '分析师团队', 10.0, '分析师团队')
         
         # 初始化状态
-        # 使用非空默认值，避免传给 create_initial_state None
-        _ticker = request_data.get('ticker') or 'UNKNOWN'
-        _analysis_date = request_data.get('analysis_date') or datetime.now().strftime('%Y-%m-%d')
         init_agent_state = graph.propagator.create_initial_state(
-            _ticker,
-            _analysis_date
+            request_data.get('ticker'),
+            request_data.get('analysis_date')
         )
         args = graph.propagator.get_graph_args()
         
@@ -382,9 +379,6 @@ def run_analysis_task(
         step_num = 0
         last_agent = None
         current_agent = None
-        # 预先定义，避免在空字典路径下未绑定
-        node_name = None
-        node_data = None
         
         # 用于跟踪从日志中检测到的智能体
         log_detected_agent = None
@@ -528,12 +522,8 @@ def run_analysis_task(
         
         # 使用日志捕获
         with LogCapture(on_log_captured):
-            # 使用 stream_mode="updates" 来获取节点信
             try:
-                stream_mode = "updates"  # 获取每个节点的更新
-                # 避免与 **args 中的 'stream_mode' 重复传参
-                args.pop("stream_mode", None)
-                stream_iterator = graph.graph.stream(init_agent_state, stream_mode=stream_mode, **args)
+                stream_iterator = graph.graph.stream(init_agent_state, **args)
                 
                 for chunk in stream_with_interrupt_check(stream_iterator):
                     # 每步检查是否中断
@@ -612,8 +602,23 @@ def run_analysis_task(
                                     agent_display_name = agent_name_map.get(current_agent, current_agent)
                                     progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent))
                                     send_log('info', f'🔍 {agent_display_name} 开始分析...', current_agent, '开始', progress, '分析阶段')
-                                    analysis_record.progress_percentage = progress
-                                    db.commit()
+                                    # 使用独立会话更新进度，避免跨线程共享会话提交冲突
+                                    try:
+                                        db2 = SessionLocal()
+                                        db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).update({
+                                            AnalysisRecord.progress_percentage: progress
+                                        })
+                                        db2.commit()
+                                    except Exception:
+                                        try:
+                                            db2.rollback()
+                                        except Exception:
+                                            pass
+                                    finally:
+                                        try:
+                                            db2.close()
+                                        except Exception:
+                                            pass
                                 
                                 # 更新 last_agent
                                 last_agent = detected_agent
@@ -766,8 +771,23 @@ def run_analysis_task(
                                 agent_display_name = agent_name_map.get(current_agent, current_agent)
                                 progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent))
                                 send_log('info', f'🔍 {agent_display_name} 开始分析...', current_agent, '开始', progress, '分析阶段')
-                                analysis_record.progress_percentage = progress
-                                db.commit()
+                                # 使用独立会话更新进度，避免跨线程共享会话提交冲突
+                                try:
+                                    db2 = SessionLocal()
+                                    db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).update({
+                                        AnalysisRecord.progress_percentage: progress
+                                    })
+                                    db2.commit()
+                                except Exception:
+                                    try:
+                                        db2.rollback()
+                                    except Exception:
+                                        pass
+                                finally:
+                                    try:
+                                        db2.close()
+                                    except Exception:
+                                        pass
                             
                             # 更新 last_agent
                             last_agent = detected_agent
@@ -841,35 +861,55 @@ def run_analysis_task(
         send_log('info', '分析流程完成', 'system', '完成', 90.0, '完成阶段')
         check_stop()
         
-        # 保存结果
+        # 保存结果（使用独立会话，避免主会话事务污染导致的重连错误）
         send_log('info', '💾 保存分析结果...', 'system', '保存结果', 95.0, '完成阶段')
         
-        analysis_record.status = "completed"
-        analysis_record.current_step = "分析成功完成"
-        analysis_record.progress_percentage = 100.0
-        analysis_record.completed_at = datetime.utcnow()
-        
-        if final_state:
-            # 清理状态对象,移除不可序列化的对象
-            cleaned_state = serialize_state(final_state)
-            analysis_record.final_state = cleaned_state
-            analysis_record.market_analysis = final_state.get("market_report", "")
-            analysis_record.sentiment_analysis = final_state.get("sentiment_report", "")
-            analysis_record.news_analysis = final_state.get("news_report", "")
-            analysis_record.fundamentals_analysis = final_state.get("fundamentals_report", "")
-            analysis_record.risk_assessment = final_state.get("risk_assessment", "")
-        
-        if decision:
-            analysis_record.trading_decision = str(decision)
-        
+        # 构造更新字段
+        _cleaned_state = serialize_state(final_state) if final_state else None
+        _update_fields = {
+            AnalysisRecord.status: "completed",
+            AnalysisRecord.current_step: "分析成功完成",
+            AnalysisRecord.progress_percentage: 100.0,
+            AnalysisRecord.completed_at: datetime.utcnow(),
+            AnalysisRecord.final_state: _cleaned_state,
+            AnalysisRecord.market_analysis: final_state.get("market_report", "") if final_state else "",
+            AnalysisRecord.sentiment_analysis: final_state.get("sentiment_report", "") if final_state else "",
+            AnalysisRecord.news_analysis: final_state.get("news_report", "") if final_state else "",
+            AnalysisRecord.fundamentals_analysis: final_state.get("fundamentals_report", "") if final_state else "",
+            AnalysisRecord.risk_assessment: final_state.get("risk_assessment", "") if final_state else "",
+            AnalysisRecord.trading_decision: str(decision) if decision else None,
+        }
         try:
-            db.commit()
+            db2 = SessionLocal()
+            db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).update(_update_fields)
+            db2.commit()
         except Exception as e:
             print(f"保存分析结果失败: {e}")
-            db.rollback()
-            # 尝试只保存基本信息
-            analysis_record.final_state = None
-            db.commit()
+            try:
+                db2.rollback()
+            except Exception:
+                pass
+            # 尝试只保存基本信息（不包含 final_state）
+            try:
+                db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).update({
+                    AnalysisRecord.status: "completed",
+                    AnalysisRecord.current_step: "分析成功完成",
+                    AnalysisRecord.progress_percentage: 100.0,
+                    AnalysisRecord.completed_at: datetime.utcnow(),
+                    AnalysisRecord.final_state: None,
+                    AnalysisRecord.trading_decision: str(decision) if decision else None,
+                })
+                db2.commit()
+            except Exception:
+                try:
+                    db2.rollback()
+                except Exception:
+                    pass
+        finally:
+            try:
+                db2.close()
+            except Exception:
+                pass
         
         # 发送完成消息
         send_log('info', f'分析完成!交易决 {decision}', 'system', '完成', 100.0, '完成阶段')
@@ -890,11 +930,30 @@ def run_analysis_task(
     except InterruptedError as e:
         # 任务被中断
         print(f"⚠️  任务 {analysis_id} 被中断")
-        if analysis_record:
-            analysis_record.status = "interrupted"
-            analysis_record.current_step = "任务已中断"
-            analysis_record.error_message = str(e)
+        analysis_record.status = "interrupted"
+        analysis_record.current_step = "任务已中断"
+        analysis_record.error_message = str(e)
+        try:
             db.commit()
+        except Exception:
+            # 会话可能已关闭/失败，回滚并使用新会话兜底更新
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            try:
+                db2 = SessionLocal()
+                db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).update({
+                    AnalysisRecord.status: "interrupted",
+                    AnalysisRecord.current_step: "任务已中断",
+                    AnalysisRecord.error_message: str(e)
+                })
+                db2.commit()
+            finally:
+                try:
+                    db2.close()
+                except Exception:
+                    pass
         
         # 发送中断消息到前端
         loop = asyncio.new_event_loop()
@@ -923,9 +982,10 @@ def run_analysis_task(
         
         # 提取关键错误信息(避免发送整个堆栈)
         # 对于 OpenAI 错误,提取 error 字段
-        if hasattr(e, 'response') and hasattr(e.response, 'json'):
+        resp = getattr(e, 'response', None)
+        if resp is not None and hasattr(resp, 'json'):
             try:
-                error_data = e.response.json()
+                error_data = resp.json()
                 if 'error' in error_data and isinstance(error_data['error'], dict):
                     error_msg = error_data['error'].get('message', error_msg)
             except:
@@ -969,30 +1029,32 @@ def run_analysis_task(
             else:
                 user_friendly_error = error_msg
         
-        # 先回滚当前事务，防止对已关闭/异常事务继续操作
-        try:
-            db.rollback()
-        except Exception:
-            pass
-
-        if analysis_record:
-            analysis_record.status = "error"
-            analysis_record.current_step = f"错误: {user_friendly_error}"
-            analysis_record.error_message = user_friendly_error
-            analysis_record.error_traceback = error_trace
-
-        # 安全提交；如果失败则使用新的会话回写错误状态
+        analysis_record.status = "error"
+        analysis_record.current_step = f"错误: {user_friendly_error}"
+        analysis_record.error_message = user_friendly_error
+        analysis_record.error_traceback = error_trace
         try:
             db.commit()
         except Exception:
-            with SessionLocal() as db2:
-                rec = db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).first()
-                if rec:
-                    rec.status = "error"
-                    rec.current_step = f"错误: {user_friendly_error}"
-                    rec.error_message = user_friendly_error
-                    rec.error_traceback = error_trace
-                    db2.commit()
+            # 会话可能已关闭/失败，回滚并使用新会话兜底更新
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            try:
+                db2 = SessionLocal()
+                db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).update({
+                    AnalysisRecord.status: "error",
+                    AnalysisRecord.current_step: f"错误: {user_friendly_error}",
+                    AnalysisRecord.error_message: user_friendly_error,
+                    AnalysisRecord.error_traceback: error_trace
+                })
+                db2.commit()
+            finally:
+                try:
+                    db2.close()
+                except Exception:
+                    pass
         
         # 发送错误消息到前端
         print(f"📤 发送错误消息到前端: {user_friendly_error}")

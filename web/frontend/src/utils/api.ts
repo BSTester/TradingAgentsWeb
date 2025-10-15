@@ -2,7 +2,7 @@ import axios from 'axios';
 import { ApiResponse } from '@/types';
 
 // API base URL - will be configured via environment variables
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/+$/, '');
 
 // API endpoints
 export const API_ENDPOINTS = {
@@ -100,7 +100,8 @@ export const buildApiUrl = (endpoint: string): string => {
 
 // WebSocket URL builder
 export const buildWebSocketUrl = (endpoint: string): string => {
-  const wsProtocol = API_BASE_URL.startsWith('https') ? 'wss' : 'ws';
-  const baseUrl = API_BASE_URL.replace(/^https?/, wsProtocol);
-  return `${baseUrl}${endpoint}`;
+  const base = (process.env.NEXT_PUBLIC_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/+$/, '');
+  const wsProtocol = base.startsWith('https') ? 'wss' : 'ws';
+  const wsBase = base.replace(/^https?/i, wsProtocol);
+  return `${wsBase}${endpoint}`;
 };

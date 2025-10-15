@@ -15,6 +15,7 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
 import time
+import socket
 
 # Add the project root to the path
 project_root = Path(__file__).parent.parent.parent
@@ -32,6 +33,14 @@ import uvicorn
 import json
 import asyncio
 from typing import Dict, List
+
+# Windows asyncio 修复：使用 Selector 事件循环，避免 Proactor 写管道断言
+try:
+    import os as _os
+    if _os.name == "nt":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+except Exception:
+    pass
 
 # Load environment variables
 load_dotenv()
@@ -61,17 +70,34 @@ async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown"""
     # Startup
     try:
-        # Initialize database tables
-        init_db()
-        print("✅ Database tables initialized successfully")
-        
-        # 清理运行中的任务（服务重启时）
-        cleanup_running_tasks()
-        print("✅ Running tasks cleaned up")
-        
-        # Start task monitor
-        monitor_task = asyncio.create_task(task_monitor())
-        print("✅ Task monitor started")
+        # Leader election via local TCP sentinel to avoid duplicate startup work across workers
+        LEADER_PORT = int(os.getenv("TASK_MONITOR_LEADER_PORT", "8001"))  # avoid conflict with service port 8000
+        leader_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        leader_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            leader_sock.bind(("127.0.0.1", LEADER_PORT))
+            leader_sock.listen(1)
+            app.state.is_leader = True
+            app.state.leader_sock = leader_sock
+            
+            # 仅 leader 执行启动任务
+            # Initialize database tables (leader only)
+            init_db()
+            print("✅ Database tables initialized successfully")
+            
+            cleanup_running_tasks()
+            print("✅ Running tasks cleaned up")
+            
+            app.state.monitor_task = asyncio.create_task(task_monitor())
+            print("✅ Task monitor started (leader)")
+        except OSError:
+            # 已有 leader 存在，作为 follower 跳过启动任务
+            app.state.is_leader = False
+            try:
+                leader_sock.close()
+            except Exception:
+                pass
+            print("ℹ️ Task monitor not started (follower)")
             
     except Exception as e:
         print(f"❌ Database initialization failed: {e}")
@@ -80,8 +106,16 @@ async def lifespan(app: FastAPI):
     
     # Shutdown (cleanup if needed)
     print("🔌 Shutting down...")
-    if 'monitor_task' in locals():
-        monitor_task.cancel()
+    if getattr(app.state, "is_leader", False):
+        monitor_task = getattr(app.state, "monitor_task", None)
+        if monitor_task:
+            monitor_task.cancel()
+        leader_sock = getattr(app.state, "leader_sock", None)
+        if leader_sock:
+            try:
+                leader_sock.close()
+            except Exception:
+                pass
 
 
 def cleanup_running_tasks():
@@ -166,25 +200,41 @@ class ConnectionManager:
     
     async def send_message(self, message: dict, analysis_id: str):
         if analysis_id in self.active_connections:
-            for connection in self.active_connections[analysis_id]:
+            for connection in list(self.active_connections[analysis_id]):
                 try:
                     await connection.send_text(json.dumps(message))
-                except:
-                    # Remove dead connections
-                    self.active_connections[analysis_id].remove(connection)
+                except (ConnectionResetError, BrokenPipeError, OSError, RuntimeError):
+                    # Windows/网络层连接已断，静默移除
+                    try:
+                        self.active_connections[analysis_id].remove(connection)
+                    except Exception:
+                        pass
+                except Exception as e:
+                    # 其它异常保留日志，并移除失效连接
+                    print(f"⚠️ 发送消息失败: {e}")
+                    try:
+                        self.active_connections[analysis_id].remove(connection)
+                    except Exception:
+                        pass
     
     async def close_connections(self, analysis_id: str):
         """Close all WebSocket connections for a specific analysis"""
         if analysis_id in self.active_connections:
-            connections = self.active_connections[analysis_id].copy()
+            connections = list(self.active_connections[analysis_id])
             for connection in connections:
                 try:
                     await connection.close(code=1000, reason="Analysis stopped by user")
                     print(f"🔌 Closed WebSocket connection for {analysis_id}")
+                except (ConnectionResetError, BrokenPipeError, OSError, RuntimeError):
+                    # 已被远端关闭或管道断开，静默忽略
+                    pass
                 except Exception as e:
                     print(f"❌ Error closing WebSocket: {e}")
-            # Clear the connections list
-            del self.active_connections[analysis_id]
+            # 清理连接列表
+            try:
+                del self.active_connections[analysis_id]
+            except Exception:
+                self.active_connections[analysis_id] = []
 
 manager = ConnectionManager()
 
@@ -207,6 +257,29 @@ class TaskManager:
     def submit_task(self, analysis_id: str, user_id: int, func, *args, **kwargs):
         """Submit a task to the executor with user-level queuing"""
         with self.lock:
+            # 幂等去重：同一 analysis_id 仅允许存在一次（运行中或队列中）
+            if analysis_id in self.active_tasks:
+                print(f"ℹ️ 任务 {analysis_id} 已在运行，忽略重复提交")
+                return False
+            # 检查全局等待队列
+            try:
+                from collections import deque
+                queued = list(self.task_queue.queue)  # type: ignore[attr-defined]
+            except Exception:
+                queued = []
+            if any(item and item[0] == analysis_id for item in queued):
+                print(f"ℹ️ 任务 {analysis_id} 已在全局队列中，忽略重复提交")
+                return False
+            # 检查该用户的等待队列
+            if user_id in self.user_task_queues:
+                try:
+                    user_q_items = list(self.user_task_queues[user_id].queue)  # type: ignore[attr-defined]
+                except Exception:
+                    user_q_items = []
+                if any(item and item[0] == analysis_id for item in user_q_items):
+                    print(f"ℹ️ 任务 {analysis_id} 已在用户队列中，忽略重复提交")
+                    return False
+
             # 检查该用户是否已有运行中的任务
             if user_id in self.user_running_tasks:
                 # 用户已有运行中的任务，加入用户队列
@@ -495,6 +568,5 @@ if __name__ == "__main__":
         "web.backend.app_v2:app",
         host="0.0.0.0",
         port=8000,
-        reload=True,
         log_level="info"
     )

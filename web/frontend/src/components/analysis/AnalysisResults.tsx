@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { buildApiUrl, API_ENDPOINTS } from '../../utils/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -38,7 +39,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
           return;
         }
 
-        const response = await fetch(`http://localhost:8000/api/analysis/${analysisId}/results`, {
+        const response = await fetch(buildApiUrl(API_ENDPOINTS.ANALYSIS.RESULTS(analysisId)), {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -86,7 +87,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
         // 导出 Markdown
         onShowToast('正在生成 Markdown...', 'info');
 
-        const response = await fetch(`http://localhost:8000/api/analysis/${analysisId}/markdown`, {
+        const response = await fetch(buildApiUrl(API_ENDPOINTS.ANALYSIS.MARKDOWN(analysisId)), {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'

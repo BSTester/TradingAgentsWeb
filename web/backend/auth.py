@@ -65,19 +65,22 @@ def get_user_by_username(db: Session, username: str) -> Optional[User]:
     """
     Get user by username
     """
-    return db.query(User).filter(User.username == username).first()
+    users = db.query(User).filter(User.username == username).order_by(User.id).all()
+    return users[0] if users else None
 
 def get_user_by_email(db: Session, email: str) -> Optional[User]:
     """
     Get user by email
     """
-    return db.query(User).filter(User.email == email).first()
+    users = db.query(User).filter(User.email == email).order_by(User.id).all()
+    return users[0] if users else None
 
 def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
     """
     Get user by ID
     """
-    return db.query(User).filter(User.id == user_id).first()
+    users = db.query(User).filter(User.id == user_id).order_by(User.id).all()
+    return users[0] if users else None
 
 def authenticate_user(db: Session, username: str, password: str) -> Union[User, bool]:
     """
@@ -133,8 +136,8 @@ def get_current_user_from_token(token: str, db: Session) -> Optional[User]:
     if payload is None:
         return None
     
-    username: str = payload.get("sub")
-    if username is None:
+    username = payload.get("sub")
+    if not isinstance(username, str) or not username:
         return None
     
     user = get_user_by_username(db, username)

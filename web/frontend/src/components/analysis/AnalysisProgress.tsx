@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { buildApiUrl, buildWebSocketUrl, API_ENDPOINTS } from '../../utils/api';
 
 interface AnalysisProgressProps {
   analysisId: string;
@@ -55,7 +56,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
     setIsStopping(true);
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`http://localhost:8000/api/analysis/${analysisId}/stop`, {
+      const response = await fetch(buildApiUrl(`/api/analysis/${analysisId}/stop`), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -155,7 +156,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
       
       // 构建 WebSocket URL
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.hostname}:8000/ws/analysis/${analysisId}`;
+      const wsUrl = buildWebSocketUrl(API_ENDPOINTS.WS.ANALYSIS(analysisId));
       
       console.log('🔌 Attempting to connect to WebSocket:', wsUrl);
       console.log('Protocol:', protocol);

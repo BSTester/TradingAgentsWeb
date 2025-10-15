@@ -201,8 +201,16 @@ async def get_analysis_results(
     # 构建 phases 数据结构（包含4个阶段）
     phases = []
     
-    # 从 final_state 中提取数据
+    # 从 final_state 中提取数据（健壮化：统一解析为 dict）
     final_state = analysis.final_state or {}
+    if isinstance(final_state, str):
+        try:
+            import json
+            final_state = json.loads(final_state)
+        except Exception:
+            final_state = {}
+    if not isinstance(final_state, dict):
+        final_state = {}
     
     # 阶段1：分析师团队
     analyst_agents = []
@@ -393,6 +401,14 @@ async def get_analysis_markdown(
         raise HTTPException(status_code=400, detail=f"分析状态: {analysis.status}")
     
     final_state = analysis.final_state or {}
+    if isinstance(final_state, str):
+        try:
+            import json
+            final_state = json.loads(final_state)
+        except Exception:
+            final_state = {}
+    if not isinstance(final_state, dict):
+        final_state = {}
     
     # 构建完整的 Markdown 内容，按阶段顺序
     markdown_parts = []

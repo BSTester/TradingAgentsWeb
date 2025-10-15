@@ -23,9 +23,9 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt pyproject.toml setup.py ./
 
 # 安装 Python 依赖
-RUN pip install --upgrade pip && \
-    pip install -r requirements.txt && \
-    pip install "uvicorn[standard]" "websockets"
+RUN pip install --upgrade pip -i https://mirrors.aliyun.com/pypi/simple && \
+    pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple && \
+    pip install "uvicorn[standard]" "websockets" -i https://mirrors.aliyun.com/pypi/simple
 
 # 复制项目文件
 COPY tradingagents/ ./tradingagents/
@@ -40,7 +40,8 @@ RUN pip install -e .
 
 # 创建必要的目录
 RUN mkdir -p eval_results assets web/static web/templates
-
+# 时区改成上海
+RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 # 暴露端口
 EXPOSE 8000
 

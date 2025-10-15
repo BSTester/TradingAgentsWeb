@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { buildApiUrl, API_ENDPOINTS } from '../../utils/api';
 
 
 interface AnalysisHistoryProps {
@@ -48,7 +49,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
     setDeleting(analysisId);
     try {
       const token = localStorage.getItem('access_token');
-      const response = await fetch(`http://localhost:8000/api/analysis/${analysisId}`, {
+      const response = await fetch(buildApiUrl(`/api/analysis/${analysisId}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -82,7 +83,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
           return;
         }
 
-        const response = await fetch(`http://localhost:8000/api/analyses?page=${page}&limit=${limit}`, {
+        const response = await fetch(buildApiUrl(`${API_ENDPOINTS.ANALYSIS.LIST}?page=${page}&limit=${limit}`), {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
