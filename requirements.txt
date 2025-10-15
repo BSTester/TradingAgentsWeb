@@ -1,0 +1,67 @@
+# Core dependencies
+typing-extensions
+setuptools
+
+# LangChain and AI
+langchain-openai
+langchain-experimental
+langchain_anthropic
+langchain-google-genai
+langgraph
+
+# Data science and analysis
+pandas>=1.3.0
+numpy>=1.21.0
+
+# Stock data providers
+yfinance>=0.2.0          # Yahoo Finance API (全球股票数据)
+akshare>=1.9.0           # AKShare (A股、港股、美股数据)
+baostock>=0.8.8          # BaoStock (A股专业数据)
+tushare                  # Tushare (财经数据)
+eodhd                    # EOD Historical Data
+finnhub-python           # Finnhub API
+
+# Technical analysis
+stockstats>=0.5.0        # Technical indicators (技术指标计算)
+backtrader               # Backtesting framework
+
+# Web scraping and parsing
+requests>=2.25.0
+praw                     # Reddit API
+feedparser               # RSS feed parser
+parsel                   # Web scraping
+beautifulsoup4>=4.9.0    # HTML/XML parsing
+lxml>=4.6.0              # XML/HTML parsing
+
+# Date and time handling
+python-dateutil>=2.8.0
+pytz
+
+# Database and storage
+chromadb
+redis
+sqlalchemy>=1.4.0       # ORM for database operations
+alembic>=1.7.0           # Database migrations
+
+# Web framework and authentication
+fastapi>=0.68.0          # Web framework
+uvicorn>=0.15.0          # ASGI server
+python-multipart>=0.0.5 # Form data parsing
+jinja2>=3.0.0            # Template engine
+python-jose[cryptography]>=3.3.0  # JWT token handling
+passlib[bcrypt]==1.7.4   # Password hashing
+bcrypt==4.0.1            # Compatible bcrypt version
+python-dotenv>=0.19.0    # Environment variables
+
+# File handling
+openpyxl>=3.0.0          # Excel file support
+
+# UI and CLI
+chainlit
+rich
+questionary
+tqdm
+
+# Development and testing
+pytest>=6.0.0           # Testing framework
+pytest-cov>=2.10.0      # Coverage testing

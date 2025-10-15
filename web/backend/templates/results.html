@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分析结果 - TradingAgents</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+    <style>
+        .results-container {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+        
+        .analysis-header {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 123, 255, 0.2);
+        }
+        
+        .status-badge {
+            font-size: 0.9rem;
+            padding: 8px 16px;
+            border-radius: 25px;
+            font-weight: 600;
+        }
+        
+        .status-running {
+            background: linear-gradient(135deg, #ffc107 0%, #f57c00 100%);
+            color: white;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-completed {
+            background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+            color: white;
+        }
+        
+        .status-error {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .progress-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+        
+        .results-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+        
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .config-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .config-label {
+            font-weight: 600;
+            color: #495057;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+        
+        .config-value {
+            color: #007bff;
+            font-weight: 500;
+            font-size: 1rem;
+        }
+        
+        .result-card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        
+        .result-card-header {
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            color: white;
+            padding: 20px;
+            border: none;
+        }
+        
+        .decision-badge {
+            font-size: 1.2rem;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .decision-buy {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+        }
+        
+        .decision-sell {
+            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+            color: white;
+        }
+        
+        .decision-hold {
+            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+            color: white;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="results-container">
+        <!-- Header -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+            <div class="container">
+                <a class="navbar-brand" href="/">
+                    <i class="fas fa-chart-line me-2"></i>
+                    TradingAgents
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="/">
+                        <i class="fas fa-home me-1"></i>
+                        新分析
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <!-- Analysis Header -->
+            <div class="analysis-header">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h1 class="mb-2">
+                            <i class="fas fa-chart-area me-3"></i>
+                            分析结果
+                        </h1>
+                        <p class="mb-0 fs-5" id="analysis-summary">正在加载分析详情...</p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <div class="status-badge" id="status-badge">
+                            <i class="fas fa-spinner fa-spin me-2"></i>
+                            正在加载...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configuration Section -->
+            <div class="results-section">
+                <h3 class="mb-4">
+                    <i class="fas fa-cog me-2 text-primary"></i>
+                    分析配置
+                </h3>
+                <div class="config-grid" id="config-grid">
+                    <!-- Configuration items will be populated here -->
+                </div>
+            </div>
+
+            <!-- Progress Section -->
+            <div class="progress-section" id="progress-section" style="display: none;">
+                <h4 class="mb-3">
+                    <i class="fas fa-tasks me-2 text-warning"></i>
+                    分析进度
+                </h4>
+                <div class="d-flex align-items-center">
+                    <div class="loading-spinner me-3"></div>
+                    <div>
+                        <p class="mb-1" id="current-step">正在初始化分析...</p>
+                        <small class="text-muted" id="step-description">请等待智能体处理您的请求。</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div id="results-content">
+                <!-- Results will be populated here -->
+            </div>
+
+            <!-- Error Section -->
+            <div id="error-section" style="display: none;">
+                <div class="error-message">
+                    <h5><i class="fas fa-exclamation-triangle me-2"></i>分析错误</h5>
+                    <p id="error-message">分析过程中出现错误。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        class ResultsApp {
+            constructor() {
+                this.analysisId = "{{ analysis_id }}";
+                this.pollInterval = null;
+                this.init();
+            }
+
+            init() {
+                this.startPolling();
+            }
+
+            startPolling() {
+                this.checkStatus();
+                this.pollInterval = setInterval(() => {
+                    this.checkStatus();
+                }, 3000); // Check every 3 seconds
+            }
+
+            stopPolling() {
+                if (this.pollInterval) {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+                }
+            }
+
+            async checkStatus() {
+                try {
+                    // First check if analysis is active
+                    const statusResponse = await fetch(`/api/analysis/${this.analysisId}/status`);
+                    
+                    if (statusResponse.ok) {
+                        const statusData = await statusResponse.json();
+                        this.updateProgress(statusData);
+                        
+                        if (statusData.status === 'completed') {
+                            this.loadResults();
+                        } else if (statusData.status === 'error') {
+                            this.showError('分析失败。请检查您的配置并再试一次。');
+                            this.stopPolling();
+                        }
+                    } else {
+                        // If status not found, try to load results directly
+                        this.loadResults();
+                    }
+                } catch (error) {
+                    console.error('Error checking status:', error);
+                }
+            }
+
+            updateProgress(statusData) {
+                const statusBadge = document.getElementById('status-badge');
+                const progressSection = document.getElementById('progress-section');
+                const currentStep = document.getElementById('current-step');
+
+                if (statusData.status === 'running' || statusData.status === 'initializing') {
+                    progressSection.style.display = 'block';
+                    currentStep.textContent = statusData.current_step || '正在处理...';
+                    
+                    statusBadge.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>运行中';
+                    statusBadge.className = 'status-badge status-running';
+                }
+            }
+
+            async loadResults() {
+                try {
+                    const response = await fetch(`/api/analysis/${this.analysisId}/results`);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const results = await response.json();
+                    
+                    if (results.status === 'completed') {
+                        this.displayResults(results);
+                        this.stopPolling();
+                    } else if (results.status === 'error') {
+                        this.showError(results.error?.message || 'Unknown error occurred');
+                        this.stopPolling();
+                    }
+
+                } catch (error) {
+                    console.error('Failed to load results:', error);
+                    this.showError('无法加载分析结果。请尝试刷新页面。');
+                }
+            }
+
+            displayResults(results) {
+                // Update status badge
+                const statusBadge = document.getElementById('status-badge');
+                statusBadge.innerHTML = '<i class="fas fa-check me-2"></i>已完成';
+                statusBadge.className = 'status-badge status-completed';
+
+                // Hide progress section
+                document.getElementById('progress-section').style.display = 'none';
+
+                // Update analysis summary
+                const request = results.request;
+                document.getElementById('analysis-summary').innerHTML = 
+                    `对 <strong>${request.ticker}</strong> 的分析已于 ${new Date(results.timestamp).toLocaleString()} 完成`;
+
+                // Display configuration
+                this.displayConfiguration(request);
+
+                // Display results
+                this.displayAnalysisResults(results);
+            }
+
+            displayConfiguration(request) {
+                const configGrid = document.getElementById('config-grid');
+                
+                const configItems = [
+                    { label: '股票代码', value: request.ticker },
+                    { label: '分析日期', value: request.analysis_date },
+                    { label: 'LLM服务商', value: request.llm_provider },
+                    { label: '快速思维器', value: request.shallow_thinker },
+                    { label: '深度思维器', value: request.deep_thinker },
+                    { label: '研究深度', value: `等级 ${request.research_depth}` },
+                    { label: '选中的分析师', value: request.analysts.join(', ') }
+                ];
+
+                configGrid.innerHTML = configItems.map(item => `
+                    <div class="config-item">
+                        <div class="config-label">${item.label}</div>
+                        <div class="config-value">${item.value}</div>
+                    </div>
+                `).join('');
+            }
+
+            displayAnalysisResults(results) {
+                const resultsContent = document.getElementById('results-content');
+                
+                let decisionsHtml = '';
+                if (results.decision && results.decision !== 'No decision available') {
+                    const decision = results.decision.toLowerCase();
+                    let badgeClass = 'decision-hold';
+                    let icon = 'fas fa-pause';
+                    
+                    if (decision.includes('buy')) {
+                        badgeClass = 'decision-buy';
+                        icon = 'fas fa-arrow-up';
+                    } else if (decision.includes('sell')) {
+                        badgeClass = 'decision-sell';
+                        icon = 'fas fa-arrow-down';
+                    }
+                    
+                    decisionsHtml = `
+                        <div class="results-section">
+                            <h3 class="mb-4">
+                                <i class="fas fa-bullseye me-2 text-success"></i>
+                                交易决策
+                            </h3>
+                            <div class="text-center">
+                                <div class="decision-badge ${badgeClass}">
+                                    <i class="${icon} me-2"></i>
+                                    ${results.decision}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                let finalStateHtml = '';
+                if (results.final_state && Object.keys(results.final_state).length > 0) {
+                    finalStateHtml = `
+                        <div class="results-section">
+                            <h3 class="mb-4">
+                                <i class="fas fa-brain me-2 text-info"></i>
+                                分析详情
+                            </h3>
+                            <div class="row">
+                                ${Object.entries(results.final_state).map(([key, value]) => `
+                                    <div class="col-md-6 mb-3">
+                                        <div class="result-card">
+                                            <div class="result-card-header">
+                                                <h6 class="mb-0">${this.formatKey(key)}</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <p class="card-text">${this.formatValue(value)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                resultsContent.innerHTML = decisionsHtml + finalStateHtml;
+            }
+
+            formatKey(key) {
+                return key.replace(/_/g, ' ')
+                         .replace(/\b\w/g, l => l.toUpperCase());
+            }
+
+            formatValue(value) {
+                if (typeof value === 'string' && value.length > 200) {
+                    return `<div style="max-height: 150px; overflow-y: auto;">${value}</div>`;
+                }
+                return value;
+            }
+
+            showError(message) {
+                const statusBadge = document.getElementById('status-badge');
+                statusBadge.innerHTML = '<i class="fas fa-times me-2"></i>错误';
+                statusBadge.className = 'status-badge status-error';
+
+                document.getElementById('progress-section').style.display = 'none';
+                document.getElementById('error-section').style.display = 'block';
+                document.getElementById('error-message').textContent = message;
+            }
+        }
+
+        // Initialize the app
+        const app = new ResultsApp();
+    </script>
+</body>
+</html>

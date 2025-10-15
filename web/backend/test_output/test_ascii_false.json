@@ -1,0 +1,14 @@
+{
+    "2025-10-13": {
+        "user_id": 1,
+        "analysis_id": "test_123",
+        "ticker": "AAPL",
+        "company_of_interest": "苹果公司",
+        "trade_date": "2025-10-13",
+        "market_report": "市场分析：当前市场处于上升趋势，技术指标显示买入信号。",
+        "sentiment_report": "情绪分析：社交媒体情绪积极，投资者信心较强。",
+        "news_report": "新闻分析：最新财报超预期，产品发布会获得好评。",
+        "fundamentals_report": "基本面分析：公司财务状况良好，盈利能力强。",
+        "final_trade_decision": "买入"
+    }
+}

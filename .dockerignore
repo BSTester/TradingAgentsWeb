@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.kiro/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Environment (保留 .env.example)
+.env
+.env.local
+
+# Node modules (前端会单独构建)
+node_modules/
+web/frontend/node_modules/
+web/frontend/.next/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Test and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+test_output/
+
+# Evaluation results
+eval_results/
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Documentation (保留重要文档)
+# *.md
+LICENSE
+
+# Lock files
+uv.lock
+
+# Docker files (避免递归)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Scripts
+start.sh
+start.bat
+Makefile
+
+# Assets (如果不需要)
+# assets/
