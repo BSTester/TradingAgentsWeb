@@ -314,9 +314,12 @@ def run_analysis_task(
         send_log('info', '👨‍💼 分析师团队开始工作...', 'system', '分析师团队', 10.0, '分析师团队')
         
         # 初始化状态
+        # 使用非空默认值，避免传给 create_initial_state None
+        _ticker = request_data.get('ticker') or 'UNKNOWN'
+        _analysis_date = request_data.get('analysis_date') or datetime.now().strftime('%Y-%m-%d')
         init_agent_state = graph.propagator.create_initial_state(
-            request_data.get('ticker'),
-            request_data.get('analysis_date')
+            _ticker,
+            _analysis_date
         )
         args = graph.propagator.get_graph_args()
         
@@ -379,6 +382,9 @@ def run_analysis_task(
         step_num = 0
         last_agent = None
         current_agent = None
+        # 预先定义，避免在空字典路径下未绑定
+        node_name = None
+        node_data = None
         
         # 用于跟踪从日志中检测到的智能体
         log_detected_agent = None
@@ -525,6 +531,8 @@ def run_analysis_task(
             # 使用 stream_mode="updates" 来获取节点信
             try:
                 stream_mode = "updates"  # 获取每个节点的更新
+                # 避免与 **args 中的 'stream_mode' 重复传参
+                args.pop("stream_mode", None)
                 stream_iterator = graph.graph.stream(init_agent_state, stream_mode=stream_mode, **args)
                 
                 for chunk in stream_with_interrupt_check(stream_iterator):
@@ -613,9 +621,11 @@ def run_analysis_task(
                                 # 同一个智能体继续工作
                                 current_agent = detected_agent
                         
-                        # 提取消息
-                        messages = node_data.get("messages", []) if isinstance(node_data, dict) else []
-                        if messages:
+                        # 提取消息（加守卫避免未绑定/非字典）
+                        messages = []
+                        if node_data is not None and isinstance(node_data, dict):
+                            messages = node_data.get("messages", [])
+                        if messages and node_name is not None:
                             trace.append({node_name: node_data})
                             
                             # 辅助检测:通过工具调用推断智能体
@@ -880,10 +890,11 @@ def run_analysis_task(
     except InterruptedError as e:
         # 任务被中断
         print(f"⚠️  任务 {analysis_id} 被中断")
-        analysis_record.status = "interrupted"
-        analysis_record.current_step = "任务已中断"
-        analysis_record.error_message = str(e)
-        db.commit()
+        if analysis_record:
+            analysis_record.status = "interrupted"
+            analysis_record.current_step = "任务已中断"
+            analysis_record.error_message = str(e)
+            db.commit()
         
         # 发送中断消息到前端
         loop = asyncio.new_event_loop()
@@ -958,11 +969,30 @@ def run_analysis_task(
             else:
                 user_friendly_error = error_msg
         
-        analysis_record.status = "error"
-        analysis_record.current_step = f"错误: {user_friendly_error}"
-        analysis_record.error_message = user_friendly_error
-        analysis_record.error_traceback = error_trace
-        db.commit()
+        # 先回滚当前事务，防止对已关闭/异常事务继续操作
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+        if analysis_record:
+            analysis_record.status = "error"
+            analysis_record.current_step = f"错误: {user_friendly_error}"
+            analysis_record.error_message = user_friendly_error
+            analysis_record.error_traceback = error_trace
+
+        # 安全提交；如果失败则使用新的会话回写错误状态
+        try:
+            db.commit()
+        except Exception:
+            with SessionLocal() as db2:
+                rec = db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).first()
+                if rec:
+                    rec.status = "error"
+                    rec.current_step = f"错误: {user_friendly_error}"
+                    rec.error_message = user_friendly_error
+                    rec.error_traceback = error_trace
+                    db2.commit()
         
         # 发送错误消息到前端
         print(f"📤 发送错误消息到前端: {user_friendly_error}")
