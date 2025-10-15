@@ -28,10 +28,10 @@ const eslintConfig = [
       "react/jsx-no-undef": "error",
       "react/no-children-prop": "error",
       "react/no-unescaped-entities": "error",
-      "react-hooks/exhaustive-deps": "warn",
+      "react-hooks/exhaustive-deps": "off", // 关闭 hooks 依赖检查警告
       
       // General code quality rules
-      "no-console": "warn",
+      "no-console": "off", // 允许 console 语句,生产构建时会自动移除
       "no-debugger": "error",
       "no-duplicate-imports": "error",
       "prefer-const": "error",

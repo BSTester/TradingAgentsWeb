@@ -203,14 +203,14 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                   };
                   
                   // 只保留选中的分析师
-                  const newAgents = selected_analysts
+                  const newAgents: PhaseAgent[] = selected_analysts
                     .filter(a => {
                       const hasMapping = !!analystMap[a];
                       console.log(`Analyst ${a}: has mapping = ${hasMapping}`);
                       return hasMapping;
                     })
                     .map(a => ({
-                      name: analystMap[a],
+                      name: analystMap[a]!,  // 使用非空断言，因为已经过滤了
                       status: 'pending' as const,
                       logs: []
                     }));

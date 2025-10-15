@@ -53,7 +53,6 @@ export default function DashboardPage() {
     if (user) {
       loadConfig();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const handleAnalysisStart = (analysisId: string) => {

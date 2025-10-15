@@ -8,7 +8,8 @@ services:
       dockerfile: Dockerfile
       target: backend
     container_name: tradingagents-backend
-
+    ports:
+      - "8080:8000"
     env_file:
       - ./.env
     volumes:
@@ -26,7 +27,7 @@ services:
       dockerfile: Dockerfile
     container_name: tradingagents-frontend
     ports:
-      - "8080:80"
+      - "8000:80"
     env_file:
       - ./.env
     depends_on:

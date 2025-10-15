@@ -8,6 +8,9 @@ if [ -z "$FRONTEND_API_BASE_URL" ]; then
 fi
 
 envsubst '\$FRONTEND_API_BASE_URL' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
+# Ensure nginx run directory exists
+mkdir -p /run/nginx
+chown -R nginx:nginx /run/nginx || true
 
 # Start Nginx in foreground
 echo "Starting Nginx (static site + /api proxy to $FRONTEND_API_BASE_URL)..."

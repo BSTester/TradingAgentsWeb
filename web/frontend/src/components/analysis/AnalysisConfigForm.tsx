@@ -44,6 +44,12 @@ interface Model {
   label: string;
 }
 
+interface AnalysisResponse {
+  analysis_id: string;
+  status: string;
+  message?: string;
+}
+
 const CACHE_KEY = 'trading_agents_config_cache';
 
 export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: AnalysisConfigFormProps) {
@@ -117,7 +123,6 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     if (loaded) {
       onShowToast('已加载上次配置', 'info');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const availableAnalysts: Analyst[] = config?.analysts || [
@@ -316,7 +321,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       }
 
       // 调用后端API启动分析
-      const response = await analysisAPI.startAnalysis(requestData);
+      const response: AnalysisResponse = await analysisAPI.startAnalysis(requestData);
       
       console.log('=== Analysis Started ===');
       console.log('Response:', response);
