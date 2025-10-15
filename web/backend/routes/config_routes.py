@@ -27,7 +27,7 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
             {"value": 5, "label": "深入", "description": "全面研究，深入的辨论和策略讨论"}
         ],
         "llm_providers": [
-            {"value": "openai", "label": "OpenAI", "description": "GPT系列模型", "url": "https://api.bstester.com/v1"},
+            {"value": "openai", "label": "OpenAI", "description": "GPT系列模型", "url": "https://api.openai.com/v1"},
             # {"value": "anthropic", "label": "Anthropic", "description": "Claude系列模型", "url": "https://api.anthropic.com/"},
             # {"value": "google", "label": "Google", "description": "Gemini系列模型", "url": "https://generativelanguage.googleapis.com/v1"},
             # {"value": "openrouter", "label": "OpenRouter", "description": "多模型聚合平台", "url": "https://openrouter.ai/api/v1"},
