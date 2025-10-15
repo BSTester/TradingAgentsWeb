@@ -28,10 +28,10 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
         ],
         "llm_providers": [
             {"value": "openai", "label": "OpenAI", "description": "GPT系列模型", "url": "https://api.openai.com/v1"},
-            # {"value": "anthropic", "label": "Anthropic", "description": "Claude系列模型", "url": "https://api.anthropic.com/"},
-            # {"value": "google", "label": "Google", "description": "Gemini系列模型", "url": "https://generativelanguage.googleapis.com/v1"},
-            # {"value": "openrouter", "label": "OpenRouter", "description": "多模型聚合平台", "url": "https://openrouter.ai/api/v1"},
-            # {"value": "ollama", "label": "Ollama", "description": "本地模型服务", "url": "http://localhost:11434/v1"}
+            {"value": "anthropic", "label": "Anthropic", "description": "Claude系列模型", "url": "https://api.anthropic.com/"},
+            {"value": "google", "label": "Google", "description": "Gemini系列模型", "url": "https://generativelanguage.googleapis.com/v1"},
+            {"value": "openrouter", "label": "OpenRouter", "description": "多模型聚合平台", "url": "https://openrouter.ai/api/v1"},
+            {"value": "ollama", "label": "Ollama", "description": "本地模型服务", "url": "http://localhost:11434/v1"}
         ],
         "models": {
             "openai": {
@@ -90,16 +90,16 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
                     {"value": "deepseek/deepseek-chat-v3-0324:free", "label": "Deepseek - 旗舰聊天模型系列的最新迭代"}
                 ]
             },
-            # "ollama": {
-            #     "shallow": [
-            #         {"value": "llama3.1", "label": "llama3.1 本地"},
-            #         {"value": "llama3.2", "label": "llama3.2 本地"}
-            #     ],
-            #     "deep": [
-            #         {"value": "llama3.1", "label": "llama3.1 本地"},
-            #         {"value": "qwen3", "label": "qwen3"}
-            #     ]
-            # }
+            "ollama": {
+                "shallow": [
+                    {"value": "llama3.1", "label": "llama3.1 本地"},
+                    {"value": "llama3.2", "label": "llama3.2 本地"}
+                ],
+                "deep": [
+                    {"value": "llama3.1", "label": "llama3.1 本地"},
+                    {"value": "qwen3", "label": "qwen3"}
+                ]
+            }
         }
     }
 
