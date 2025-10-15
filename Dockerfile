@@ -24,7 +24,8 @@ COPY requirements.txt pyproject.toml setup.py ./
 
 # 安装 Python 依赖
 RUN pip install --upgrade pip && \
-    pip install -r requirements.txt
+    pip install -r requirements.txt && \
+    pip install "uvicorn[standard]" "websockets"
 
 # 复制项目文件
 COPY tradingagents/ ./tradingagents/
@@ -44,4 +45,4 @@ RUN mkdir -p eval_results assets web/static web/templates
 EXPOSE 8000
 
 # 默认启动后端服务
-CMD ["uvicorn", "web.backend.app_v2:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "web.backend.app_v2:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
