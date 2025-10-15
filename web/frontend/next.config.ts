@@ -2,17 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  output: 'standalone',
+  output: 'export',
   
-  // API 重写配置（开发环境）
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: process.env.NEXT_PUBLIC_API_BASE_URL + '/api/:path*',
-      },
-    ];
-  },
+  // 生产环境通过 Nginx 反代 /api，无需 Next 内部重写
 };
 
 export default nextConfig;

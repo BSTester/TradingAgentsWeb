@@ -1,0 +1,63 @@
+user  nginx;
+worker_processes  auto;
+
+error_log  /var/log/nginx/error.log warn;
+pid        /run/nginx/nginx.pid;
+
+events {
+  worker_connections  1024;
+}
+
+http {
+  include       /etc/nginx/mime.types;
+  default_type  application/octet-stream;
+
+  log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for"';
+  access_log  /var/log/nginx/access.log  main;
+
+  sendfile        on;
+  tcp_nopush      on;
+  keepalive_timeout  65;
+  gzip on;
+  gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript image/svg+xml;
+
+  server {
+    listen       80;
+    server_name  _;
+
+    root /usr/share/nginx/html;
+
+    # Proxy API to backend service
+    location /api/ {
+      proxy_pass         ${FRONTEND_API_BASE_URL}/api/;
+      proxy_http_version 1.1;
+      proxy_set_header   Host $host;
+      proxy_set_header   X-Real-IP $remote_addr;
+      proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+
+    # Static Next assets
+    location /_next/ {
+      try_files $uri $uri/ =404;
+      expires 1y;
+      access_log off;
+      add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # Public assets
+    location ~* \.(?:ico|png|jpg|jpeg|gif|svg|css|js)$ {
+      try_files $uri =404;
+      expires 30d;
+      access_log off;
+      add_header Cache-Control "public, max-age=2592000";
+    }
+
+    # Fallback to index.html for client-side routing
+    location / {
+      try_files $uri $uri/ /index.html;
+    }
+  }
+}

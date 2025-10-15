@@ -1,63 +1,33 @@
-# Next.js 前端 Dockerfile
-FROM node:20-alpine AS base
-
+# Frontend (Next.js static export) served by Nginx
 # ============================================
-# 依赖安装阶段
-# ============================================
-FROM base AS deps
-
+# deps stage
+FROM node:20-alpine AS deps
 WORKDIR /app
-
-# 复制依赖文件
 COPY package*.json ./
-
-# 安装依赖
 RUN npm ci
 
 # ============================================
-# 构建阶段
-# ============================================
-FROM base AS builder
-
+# build stage
+FROM node:20-alpine AS builder
 WORKDIR /app
-
-# 从 deps 阶段复制 node_modules
 COPY --from=deps /app/node_modules ./node_modules
-
-# 复制源代码
 COPY . .
-
-# 设置环境变量
-ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 ENV NODE_ENV=production
-
-# 构建应用
-RUN npm run build
+# Build and static export to /app/out
+RUN npm run build && npx next export -o out
 
 # ============================================
-# 运行阶段
-# ============================================
-FROM base AS runner
-
-WORKDIR /app
-
-ENV NODE_ENV=production
-
-# 创建非 root 用户
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
-
-# 复制必要文件
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-USER nextjs
-
-EXPOSE 3000
-
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-CMD ["node", "server.js"]
+# nginx runtime (pure static)
+FROM nginx:alpine AS runner
+# Install gettext for envsubst
+RUN apk add --no-cache gettext
+# Copy static site
+COPY --from=builder /app/out /usr/share/nginx/html
+# Nginx config template and startup script
+COPY nginx.conf.template /etc/nginx/nginx.conf.template
+COPY start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
+# API backend base URL (e.g., http://backend:8000)
+ENV FRONTEND_API_BASE_URL="http://localhost:8000"
+EXPOSE 80
+CMD ["/usr/local/bin/start.sh"]
