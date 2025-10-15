@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  /* Bootstrap 5 compatible styles */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors px-4 py-2 border border-transparent;
+  }
+
+  .btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-600 text-white hover:bg-gray-700;
+  }
+
+  .btn-outline {
+    @apply border border-gray-300 text-gray-700 hover:bg-gray-50;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700;
+  }
+
+  .form-control {
+    @apply flex h-10 w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm;
+  }
+
+  .form-label {
+    @apply text-sm font-medium leading-none;
+  }
+
+  .card {
+    @apply rounded-lg border border-gray-200 bg-white shadow-sm;
+  }
+
+  .card-header {
+    @apply flex flex-col space-y-1.5 p-6;
+  }
+
+  .card-title {
+    @apply text-2xl font-semibold leading-none tracking-tight;
+  }
+
+  .card-body {
+    @apply p-6 pt-0;
+  }
+
+  .alert {
+    @apply relative w-full rounded-lg border p-4;
+  }
+
+  .alert-info {
+    @apply border-blue-200 bg-blue-50 text-blue-900;
+  }
+
+  .alert-success {
+    @apply border-green-200 bg-green-50 text-green-900;
+  }
+
+  .alert-warning {
+    @apply border-yellow-200 bg-yellow-50 text-yellow-900;
+  }
+
+  .alert-danger {
+    @apply border-red-200 bg-red-50 text-red-900;
+  }
+
+  .progress {
+    @apply relative h-4 w-full overflow-hidden rounded-full bg-gray-200;
+  }
+
+  .progress-bar {
+    @apply h-full bg-blue-600 transition-all;
+  }
+
+  .table {
+    @apply w-full caption-bottom text-sm;
+  }
+
+  .table th {
+    @apply border-b px-4 py-3 text-left align-middle font-medium text-gray-500;
+  }
+
+  .table td {
+    @apply border-b px-4 py-3 align-middle;
+  }
+
+  .spinner-border {
+    @apply inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent;
+  }
+}
+
+@layer base {
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 6px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+  }
+}
