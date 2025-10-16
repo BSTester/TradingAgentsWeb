@@ -236,20 +236,12 @@ docker-compose up --build -d
 
 ---
 
-## 5. 开发与扩展建议
-- 数据源扩展：在 `tradingagents/dataflows` 新增数据源模块并在 `default_config.py` 中配置供应商策略
-- 智能体扩展：在 `tradingagents/agents` 下新增角色或细化分析流程，并在 `graph/trading_graph.py` 引入新阶段
-- 前端模块：在 `web/frontend/src` 下新增页面/组件，保持 UI/UX 一致性与类型安全（TypeScript + Zod）
-- 后端路由：在 `web/backend/routes` 中添加新 API，注意鉴权与分页/筛选
-
----
-
-## 6. 许可证
+## 5. 许可证
 本项目基于仓库内 LICENSE 文件所述条款发布，请遵循相关许可。
 
 ---
 
-## 7. 参考与致谢
+## 6. 参考与致谢
 - TradingAgents 原版框架与多智能体设计
 - FastAPI / SQLAlchemy / Jinja2 / Uvicorn
 - Next.js / React / Tailwind
