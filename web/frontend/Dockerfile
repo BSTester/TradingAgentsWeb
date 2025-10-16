@@ -14,6 +14,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NODE_ENV=production
 # Build and static export to /app/out
+# Build and static export to /app/out (output: 'export' 会在 build 时自动生成 out)
 RUN npm run build
 
 # ============================================

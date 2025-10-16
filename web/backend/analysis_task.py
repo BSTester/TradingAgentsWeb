@@ -318,7 +318,7 @@ def run_analysis_task(
             request_data.get('ticker'),
             request_data.get('analysis_date')
         )
-        args = graph.propagator.get_graph_args()
+        args = graph.propagator.get_graph_args(stream_mode="updates")
         
         # 计算进度分配
         # 总进度: 10% -> 90%, 共 80% 的进度空间
@@ -523,7 +523,7 @@ def run_analysis_task(
         # 使用日志捕获
         with LogCapture(on_log_captured):
             try:
-                stream_iterator = graph.graph.stream(init_agent_state, **args)
+                stream_iterator = graph.graph.stream(init_agent_state, stream_mode="updates", **args)
                 
                 for chunk in stream_with_interrupt_check(stream_iterator):
                     # 每步检查是否中断
@@ -687,7 +687,9 @@ def run_analysis_task(
                 # 如果 stream_mode 不支持,回退到默认模式
                 print(f"⚠️  Stream mode 'updates' not supported, falling back to default mode: {e}")
                 
-                stream_iterator = graph.graph.stream(init_agent_state, **args)
+                # 使用 values 模式作为回退，提升兼容性
+                args_values = graph.propagator.get_graph_args(stream_mode="values")
+                stream_iterator = graph.graph.stream(init_agent_state, **args_values)
                 for chunk in stream_with_interrupt_check(stream_iterator):
                     check_stop()
                     step_num += 1

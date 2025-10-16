@@ -29,6 +29,9 @@ http {
 
     root /usr/share/nginx/html;
 
+    # SPA/CSR 路由统一回退（防止刷新深链接白屏）
+    error_page 404 /index.html;
+
     # Proxy API to backend service
     location /api/ {
       proxy_pass         ${FRONTEND_API_BASE_URL}/api/;
@@ -39,9 +42,10 @@ http {
       proxy_set_header   X-Forwarded-Proto $scheme;
     }
 
-    # Static Next assets
-    location /_next/ {
-      try_files $uri $uri/ =404;
+    # Static Next assets (明确 static 子路径，确保 chunk 命中)
+    location /_next/static/ {
+      root /usr/share/nginx/html;
+      try_files $uri =404;
       expires 1y;
       access_log off;
       add_header Cache-Control "public, max-age=31536000, immutable";
