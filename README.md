@@ -1,446 +1,258 @@
-<p align="center">
-  <img src="assets/TauricResearch.png" style="width: 60%; height: auto;">
-</p>
+# TradingAgentsWeb
 
-<div align="center" style="line-height: 1;">
-  <a href="https://arxiv.org/abs/2412.20138" target="_blank"><img alt="arXiv" src="https://img.shields.io/badge/arXiv-2412.20138-B31B1B?logo=arxiv"/></a>
-  <a href="https://discord.com/invite/hk9PGKShPK" target="_blank"><img alt="Discord" src="https://img.shields.io/badge/Discord-TradingResearch-7289da?logo=discord&logoColor=white&color=7289da"/></a>
-  <a href="./assets/wechat.png" target="_blank"><img alt="WeChat" src="https://img.shields.io/badge/WeChat-TauricResearch-brightgreen?logo=wechat&logoColor=white"/></a>
-  <a href="https://x.com/TauricResearch" target="_blank"><img alt="X Follow" src="https://img.shields.io/badge/X-TauricResearch-white?logo=x&logoColor=white"/></a>
-  <br>
-  <a href="https://github.com/TauricResearch/" target="_blank"><img alt="Community" src="https://img.shields.io/badge/Join_GitHub_Community-TauricResearch-14C290?logo=discourse"/></a>
-</div>
+一个基于 TradingAgents 多智能体量化分析框架的现代化 Web 版本，实现了从原版仅支持美股扩展到同时支持美股、港股与 A 股的全栈改造。后端采用 FastAPI，前端采用 Next.js（App Router + Tailwind），支持实时任务管理、WebSocket 推送、用户认证、分析历史与结果导出。
 
-<div align="center">
-  <!-- 请保留这些链接。翻译版本会随 README 自动更新。 -->
-  <a href="https://www.readme-i18n.com/TauricResearch/TradingAgents?lang=de">Deutsch</a> | 
-  <a href="https://www.readme-i18n.com/TauricResearch/TradingAgents?lang=es">Español</a> | 
-  <a href="https://www.readme-i18n.com/TauricResearch/TradingAgents?lang=fr">français</a> | 
-  <a href="https://www.readme-i18n.com/TauricResearch/TradingAgents?lang=ja">日本語</a> | 
-  <a href="https://www.readme-i18n.com/TauricResearch/TradingAgents?lang=ko">한국어</a> | 
-  <a href="https://www.readme-i18n.com/TauricResearch/TradingAgents?lang=pt">Português</a> | 
-  <a href="https://www.readme-i18n.com/TauricResearch/TradingAgents?lang=ru">Русский</a> | 
-  <a href="https://www.readme-i18n.com/TauricResearch/TradingAgents?lang=zh">中文</a>
-</div>
+GitHub 仓库：https://github.com/BSTester/TradingAgentsWeb.git
 
 ---
 
-# TradingAgents：多智能体 LLM 金融交易框架
+## 1. 项目介绍
 
-> 🎉 TradingAgents 正式开源！我们收到了很多关于该工作的询问，感谢社区的热情关注。
->
-> 因此我们决定完全开源该框架。期待与大家一起共建有影响力的项目！
+### 1.1 原版 TradingAgents 项目概述
+TradingAgents 是一个“多智能体 + 交易推理图”的金融分析框架，核心思路是将分析任务拆分到不同角色的智能体，由图驱动数据采集、分析推理、风控与交易建议的生成。其核心特征包括：
+- 多智能体架构
+  - Analysts 团队：市场分析（技术指标/趋势）、社交舆情、新闻情绪、基本面分析
+  - Researchers 团队：多轮研究与论证
+  - Trader 团队：策略生成与决策建议
+  - Risk Management 团队：风险评估与反驳/辩论（保守/中性/激进）
+- 图式执行引擎
+  - tradingagents/graph/trading_graph.py、signal_processing.py、conditional_logic.py 等组成“推理与传播”图，用于阶段性执行与状态传递
+- 数据流模块化
+  - tradingagents/dataflows 下集成多数据源：yfinance、alpha_vantage、akshare、baostock、tushare、EODHD、Finnhub 等，提供行情、指标、基本面、新闻/舆情等数据
+- 配置与供应商选择
+  - default_config.py 中通过 data_vendors、tool_vendors、market_vendors 统一管理供应商优先级与回退策略，便于跨市场与多源融合
+- 技术栈
+  - Python 3.10+
+  - LangChain/LangGraph（智能体与工作流）
+  - Pandas/Numpy/Stockstats/Backtrader（数据与技术指标、回测）
+  - FastAPI（在 Web 版本中作为后端与 API）
+  - SQLAlchemy/Alembic（在 Web 版本中用于持久化）
 
-<div align="center">
-<a href="https://www.star-history.com/#TauricResearch/TradingAgents&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=TauricResearch/TradingAgents&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=TauricResearch/TradingAgents&type=Date" />
-   <img alt="TradingAgents Star History" src="https://api.star-history.com/svg?repos=TauricResearch/TradingAgents&type=Date" style="width: 80%; height: auto;" />
- </picture>
-</a>
-</div>
+### 1.2 本项目（Web 版）定位
+TradingAgentsWeb 是原版 TradingAgents 的 Web 化改造与扩展：
+- 后端：FastAPI + SQLAlchemy + JWT 认证，提供 REST API、WebSocket 推送、任务队列与分析进度监控
+- 前端：Next.js 15 + React 19 + Tailwind，提供交互式配置、实时分析进度与结果展示、导出能力
+- 市场支持：在原版美股的基础上，统一支持美股（US）、港股（HK）与 A 股（CN），并在默认配置中对不同市场选择合适的数据供应商与回退策略
 
-<div align="center">
+---
 
-🚀 `<a href="#tradingagents-框架概览">`TradingAgents 框架 `</a>` | ⚡ `<a href="#安装与-cli">`安装与 CLI `</a>` | 🎬 `<a href="https://www.youtube.com/watch?v=90gr5lwjIho" target="_blank">`演示视频 `</a>` | 📦 `<a href="#作为-package-使用">`包用法 `</a>` | 🧭 `<a href="#部署">`部署 `</a>` | 🤝 `<a href="#参与贡献">`参与贡献 `</a>` | 📄 `<a href="#引用">`引用 `</a>`
+## 2. 改造内容说明
 
-</div>
+### 2.1 市场扩展的技术实现
+在 `tradingagents/default_config.py` 中新增并强化了“市场-供应商偏好”与“工具级别供应商覆盖”：
+- 市场级供应商偏好（market_vendors）
+  - A_STOCK（A 股）：primary=akshare；fallback=baostock,yfinance
+  - HK_STOCK（港股）：primary=akshare；fallback=yfinance
+  - US_STOCK（美股）：primary=akshare（遇到失败时优先 yfinance，再回退 alpha_vantage）
+- 工具级供应商覆盖（tool_vendors）
+  - get_stock_data：akshare
+  - get_indicators：yfinance,akshare（先算技术指标，如遇数据缺失回退）
+  - get_news / get_global_news：akshare,openai 或 openai,akshare（多源融合）
+- 数据流模块适配
+  - tradingagents/dataflows 下针对不同供应商提供独立实现（如 akshare_stock.py、baostock_stock.py、y_finance.py、alpha_vantage_stock.py 等）
+  - 根据股票代码自动判定市场（示例：A 股一般为 6 位代码，港股可用 4~5 位代码或加 “.HK” 后缀，美股为常见英文代码），随后由 market_vendors 决定供应商与回退链路
 
-## TradingAgents 框架概览
+该策略使得：
+- 不同市场的行情、技术指标、基本面、新闻/舆情均可通过合适的数据源获取
+- 当主源不可用或数据缺失时，自动回退到备选供应商以提高鲁棒性
 
-TradingAgents 是一个模拟真实交易公司协作方式的多智能体交易框架。通过部署专业的、由大语言模型驱动的智能体（基本面分析师、情绪分析师、新闻分析师、技术分析师、交易员、风险管理团队等），平台以协作方式评估市场状况并为交易决策提供依据。上述智能体还会进行动态讨论，以凝聚最优策略。
+### 2.2 与原版的主要区别与改进
+- 架构升级为前后端分离：
+  - 原版多为 CLI/脚本驱动；Web 版提供完整的 REST API + WebSocket 推送 + 前端 UI
+- 任务调度与实时监控：
+  - `web/backend/app_v2.py` 内置线程池与队列（TaskManager），支持用户级排队、全局并发控制、停滞任务自动中断与 WebSocket 实时日志
+- 用户认证与持久化：
+  - `web/backend/README_v2.md` 与后端模型 `web/backend/models.py` 支持用户注册/登录、JWT 认证、分析记录/日志与导出记录持久化到 SQLite（默认，也可换成 PostgreSQL）
+- 部署与工程化：
+  - Dockerfile 与 docker-compose.yml 提供一键构建与编排（前端 Nginx 静态托管并反代后端 `/api`）
+- 市场扩展与配置统一：
+  - default_config + dataflows 形成统一的跨市场数据策略，显著提升在港股/A 股场景下的可用性
 
-<p align="center">
-  <img src="assets/schema.png" style="width: 100%; height: auto;">
-</p>
+---
 
-> TradingAgents 框架用于研究目的。交易表现受多种因素影响，包括所选底座模型、模型温度、交易区间、数据质量及其他非确定性因素。该项目不构成任何金融/投资/交易建议：https://tauric.ai/disclaimer/
+## 3. 安装构建指南
 
-我们的框架将复杂的交易任务分解到专业角色，获得稳健、可扩展的市场分析与决策流程。
+### 3.1 环境要求
+- 操作系统：Windows / macOS / Linux
+- 后端：
+  - Python 3.10+
+  - 建议安装虚拟环境（venv 或 conda）
+- 前端：
+  - Node.js 18+（Next.js 15 推荐）
+  - npm 或 pnpm/yarn/bun（任选其一）
+- 数据源：
+  - 如需使用 Tushare/Finnhub/EODHD 等，需在 `.env` 中配置各自 API Key
+- 数据库：
+  - 默认 SQLite（无需额外安装），也支持 PostgreSQL 等（通过 `DATABASE_URL` 配置）
 
-### 分析师团队（Analyst Team）
-
-- 基本面分析师：评估公司财务与经营指标，识别内在价值与潜在风险。
-- 情绪分析师：使用情感评分算法分析社交媒体与舆情，把握短期市场情绪。
-- 新闻分析师：监控全球新闻与宏观指标，解读事件对市场的影响。
-- 技术分析师：利用技术指标（如 MACD、RSI）识别交易形态并预测价格走势。
-
-<p align="center">
-  <img src="assets/analyst.png" width="100%" style="display: inline-block; margin: 0 2%;">
-</p>
-
-### 研究团队（Researcher Team）
-
-- 由多空研究员组成，对分析师团队的观点进行批判性评估。通过结构化辩论，在潜在收益与内在风险之间取得平衡。
-
-<p align="center">
-  <img src="assets/researcher.png" width="70%" style="display: inline-block; margin: 0 2%;">
-</p>
-
-### 交易智能体（Trader Agent）
-
-- 汇总分析师与研究员的结论，形成交易决策；据此确定交易时机与仓位规模。
-
-<p align="center">
-  <img src="assets/trader.png" width="70%" style="display: inline-block; margin: 0 2%;">
-</p>
-
-### 风险管理与投资组合经理（Risk Management & PM）
-
-- 持续评估投资组合风险（波动率、流动性等）；风险团队提出评估报告，交由投资组合经理最终裁决。
-- 投资组合经理批准/驳回交易提案；若批准，指令将发送至模拟交易所执行。
-
-<p align="center">
-  <img src="assets/risk.png" width="70%" style="display: inline-block; margin: 0 2%;">
-</p>
-
-## 安装与 CLI
-
-### 安装
-
-克隆仓库：
-
+### 3.2 克隆代码
 ```bash
-git clone https://github.com/TauricResearch/TradingAgents.git
-cd TradingAgents
+git clone https://github.com/BSTester/TradingAgentsWeb.git
+cd TradingAgentsWeb
 ```
 
-创建虚拟环境（示例使用 conda）：
-
+### 3.3 后端安装
 ```bash
-conda create -n tradingagents python=3.13
-conda activate tradingagents
-```
+# 创建并激活虚拟环境（示例）
+python -m venv .venv
+# Windows
+.\.venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
 
-安装依赖：
-
-```bash
+# 安装依赖
 pip install -r requirements.txt
+
+# 可编辑安装项目（方便二次开发）
+pip install -e .
 ```
 
-### 必需的 API
-
-需要为智能体提供 OpenAI API；默认配置下，基本面与新闻数据使用 Alpha Vantage API（可在配置中替换）。
-
-```bash
-export OPENAI_API_KEY=$YOUR_OPENAI_API_KEY
-export ALPHA_VANTAGE_API_KEY=$YOUR_ALPHA_VANTAGE_API_KEY
-```
-
-也可以在项目根目录创建 `.env`（参考 `.env.example`）：
-
-```bash
-cp .env.example .env
-# 编辑 .env 填入真实 API Key
-```
-
-注：我们与 Alpha Vantage 合作，TradingAgents 源请求拥有更高的速率限制（每分钟 60 次，无日配额）。默认配置也支持使用 OpenAI 作为数据源，你可在 `tradingagents/default_config.py` 调整数据供应商。
-
-### CLI 用法
-
-直接运行 CLI：
-
-```bash
-python -m cli.main
-```
-
-你将看到可选择标的、日期、LLM、研究深度等的界面，并可实时查看各智能体的运行进度与输出。
-
-<p align="center">
-  <img src="assets/cli/cli_init.png" width="100%" style="display: inline-block; margin: 0 2%;">
-</p>
-
-<p align="center">
-  <img src="assets/cli/cli_news.png" width="100%" style="display: inline-block; margin: 0 2%;">
-</p>
-
-<p align="center">
-  <img src="assets/cli/cli_transaction.png" width="100%" style="display: inline-block; margin: 0 2%;">
-</p>
-
-## 作为 Package 使用
-
-### 实现要点
-
-我们基于 LangGraph 构建 TradingAgents 以保证灵活与模块化。实验中使用了不同类型的模型作为“深度思考/快速思考”LLM。为节省成本，建议在本地测试时使用轻量模型，因为框架在一次完整流程中会进行较多 API 调用。
-
-### Python 代码示例
-
-在你的代码中引入 `tradingagents` 模块并初始化 `TradingAgentsGraph()`；`.propagate()` 会返回一次决策。你也可以直接运行 `main.py`。
-
-```python
-from tradingagents.graph.trading_graph import TradingAgentsGraph
-from tradingagents.default_config import DEFAULT_CONFIG
-
-ta = TradingAgentsGraph(debug=True, config=DEFAULT_CONFIG.copy())
-
-# forward propagate
-_, decision = ta.propagate("NVDA", "2024-05-10")
-print(decision)
-```
-
-可复制默认配置并定制 LLM、辩论轮数、数据供应商等：
-
-```python
-from tradingagents.graph.trading_graph import TradingAgentsGraph
-from tradingagents.default_config import DEFAULT_CONFIG
-
-# 自定义配置
-config = DEFAULT_CONFIG.copy()
-config["deep_think_llm"] = "gpt-4.1-nano"
-config["quick_think_llm"] = "gpt-4.1-nano"
-config["max_debate_rounds"] = 1
-
-# 配置数据供应商（默认：yfinance + Alpha Vantage）
-config["data_vendors"] = {
-    "core_stock_apis": "yfinance",      # 可选：yfinance, alpha_vantage, local
-    "technical_indicators": "yfinance", # 可选：yfinance, alpha_vantage, local
-    "fundamental_data": "alpha_vantage",# 可选：openai, alpha_vantage, local
-    "news_data": "alpha_vantage",       # 可选：openai, alpha_vantage, google, local
-}
-
-ta = TradingAgentsGraph(debug=True, config=config)
-
-# forward propagate
-_, decision = ta.propagate("NVDA", "2024-05-10")
-print(decision)
-```
-
-> 默认使用 yfinance 获取行情与技术指标，Alpha Vantage 获取基本面与新闻。若用于生产或遇到限速，建议升级到 Alpha Vantage Premium 以获得更稳定的数据。我们也在打磨本地数据源（Tauric TradingDB）以支持离线实验，敬请期待。
-
-完整配置见 `tradingagents/default_config.py`。
-
-## 部署WEB版
-
-提示：使用 Docker Compose 启动的是“Web 多用户版本”（内置用户注册/登录、JWT 鉴权、每用户分析历史、受保护 API、任务管理与结果导出），适合团队/多用户场景。若只需单机 CLI，可直接运行 python -m cli.main 或以容器方式运行 CLI。
-
-本节整合 docker-compose.yml 与 README.Docker.md 的实际配置，提供本地与生产环境的推荐做法。
-
-### 1. 准备环境
-
-- 复制并编辑环境变量：
-
-```bash
-cp .env.example .env
-cp web/frontend/.env.local.example web/frontend/.env.local
-```
-
-- 按需填写：
-
-```env
-# .env（后台使用）
-OPENAI_API_KEY=your_openai_api_key_here
-ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key_here
-# 下列为可选
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-GOOGLE_API_KEY=your_google_api_key_here
-
-# web/frontend/.env.local（前端使用）
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-```
-
-### 2. 使用 Docker Compose（建议）
-
-一键启动前后端（前端为 Nginx 静态托管并反代 /api 到后端）：
-
-```bash
-docker-compose up -d
-```
-
-- 访问前端 UI（Nginx）：http://localhost:8000
-- 访问后端 API（FastAPI）：http://localhost:8080
-- OpenAPI 文档：http://localhost:8080/docs
-
-查看日志：
-
-```bash
-docker-compose logs -f       # 全部
-docker-compose logs -f backend
-docker-compose logs -f frontend
-```
-
-停止：
-
-```bash
-docker-compose down
-```
-
-端口与卷（来自 docker-compose.yml）：
-
-- frontend: 8000 -> 80（Nginx 提供静态前端与反向代理）
-- backend: 8080 -> 8000（FastAPI）
-- 挂载卷：
-  - ./tradingagents.db:/app/tradingagents.db
-  - ./eval_results:/app/eval_results
-- env_file: ./.env（加载后端所需密钥等）
-
-如发生端口冲突，可在 docker-compose.yml 修改主机映射，例如：
-
-```yaml
-services:
-  backend:
-    ports:
-      - "18080:8000"
-  frontend:
-    ports:
-      - "18000:80"
-```
-
-### 3. 分别构建并运行（非 Compose）
-
-后端：
-
-```bash
-docker build -t tradingagents-backend:latest .
-docker run -d \
-  --name tradingagents-backend \
-  -p 8000:8000 \
-  -v $(pwd)/.env:/app/.env \
-  -v $(pwd)/tradingagents.db:/app/tradingagents.db \
-  -v $(pwd)/eval_results:/app/eval_results \
-  tradingagents-backend:latest
-```
-
-前端（Next.js 开发/独立运行，端口 3000）：
-
+### 3.4 前端安装
 ```bash
 cd web/frontend
-docker build -t tradingagents-frontend:latest .
-docker run -d \
-  --name tradingagents-frontend \
-  -p 3000:3000 \
-  -e NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 \
-  tradingagents-frontend:latest
+npm install
+# 或 pnpm install / yarn install / bun install
 ```
 
-访问：
+### 3.5 环境变量配置
+在仓库根目录创建 `.env`（可拷贝 `.env.example`）：
+```ini
+# 数据库（默认 SQLite）
+DATABASE_URL=sqlite:///./tradingagents.db
 
-- 前端（独立 Next.js）：http://localhost:3000
-- 后端（FastAPI）：http://localhost:8000
-- API 文档：http://localhost:8000/docs
+# 可选：LLM 与数据源密钥（按需填写）
+OPENAI_API_KEY=...
+ANTHROPIC_API_KEY=...
+GOOGLE_API_KEY=...
+OPENROUTER_API_KEY=...
 
-### 4. CLI / 脚本模式（容器内运行）
+# 任务监控 Leader 端口（避免与服务端口冲突）
+TASK_MONITOR_LEADER_PORT=8001
+```
+说明：
+- 使用 SQLite 时会在根目录生成 `tradingagents.db`
+- 更换 PostgreSQL 示例：`DATABASE_URL=postgresql://user:pass@host:5432/dbname`
 
-CLI：
-
+### 3.6 初始化数据库（可选）
 ```bash
-docker run -it --rm \
-  -v $(pwd)/.env:/app/.env \
-  -v $(pwd)/eval_results:/app/eval_results \
-  tradingagents-backend:latest \
-  python cli/main.py
+# v2 版本会在应用启动生命周期中自动 init_db
+# 如果需要预置用户或在启动前初始化，可执行：
+python web/backend/init_db.py
 ```
 
-自定义脚本：
-
+### 3.7 本地启动（开发模式）
+- 启动后端（带认证与数据库集成）：
 ```bash
-docker run -it --rm \
-  -v $(pwd)/.env:/app/.env \
-  tradingagents-backend:latest \
-  python main.py
+# 在仓库根目录
+python web/backend/app_v2.py
+# 默认监听 8000 端口
 ```
-
-### 5. 生产环境要点
-
-- 反向代理与 HTTPS：可使用外部 Nginx/Traefik/Caddy；如使用仓库内 `nginx.conf`，请为证书准备 `ssl/` 目录并启用相应段落。
-- 外部数据库：在 docker-compose.yml 增加 PostgreSQL，并将后端 `DATABASE_URL` 指向该服务。
-- Redis 缓存：按需启用 Redis 服务，用于加速热点数据。
-- 资源限制与日志轮转：为各服务配置 CPU/内存限制与日志滚动策略。
-- 健康检查/监控：暴露健康检查端点（后端 /health），配合容器编排监控指标与日志。
-
-示例（截取）：
-
-```yaml
-services:
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: tradingagents
-      POSTGRES_USER: tradingagents
-      POSTGRES_PASSWORD: your_password
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-
-  backend:
-    environment:
-      - DATABASE_URL=postgresql://tradingagents:your_password@postgres:5432/tradingagents
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-```
-
-### 6. 故障排查
-
-- 日志：
-
+- 启动前端（开发服务器）：
 ```bash
-docker-compose logs -f --tail=100
+cd web/frontend
+npm run dev
+# 默认监听 3000 端口
 ```
+- 访问：
+  - 前端 UI：http://localhost:3000
+  - 后端 API：http://localhost:8000
 
-- 进入容器：
-
+### 3.8 Docker 构建与运行
 ```bash
-docker exec -it tradingagents-backend bash
-docker exec -it tradingagents-frontend sh
+# 构建并启动后端与前端（compose）
+docker-compose up --build -d
+# 前端: http://localhost:8000
+# 后端: http://localhost:8080 (反代到 8000)
 ```
+- docker-compose.yml 说明：
+  - backend 服务暴露 8080:8000，挂载 SQLite 文件与分析结果目录
+  - frontend 服务暴露 8000:80，Nginx 静态托管并反代后端 `/api`
 
-- 重建镜像：
+---
 
-```bash
-docker-compose build --no-cache
-docker-compose up -d
-```
+## 4. 使用说明
 
-- 健康检查：
+### 4.1 项目启动与运行
+- 开发模式：
+  - 后端：`python web/backend/app_v2.py`
+  - 前端：`npm run dev`（在 web/frontend）
+- 生产或容器模式：
+  - `docker-compose up -d` 后即可通过浏览器访问前端与接口
 
-```bash
-curl http://localhost:8080/health   # 后端（Compose 映射）
-curl http://localhost:8080/docs     # 后端文档
-curl http://localhost:8000          # 前端（Compose 映射）
-```
+### 4.2 主要功能模块
+- 前端（web/frontend）
+  - App Router 页面：分析配置页、进度监控、结果展示、历史记录、用户登录/注册等
+  - 组件：UI 表单、WebSocket 实时日志、结果 Markdown 渲染与导出（PDF/Markdown/JSON）
+  - 脚本：`npm run dev | build | start | export | lint`
+- 后端（web/backend）
+  - FastAPI 应用：`app_v2.py`（含 lifespan、CORS、LoggingMiddleware）
+  - 路由模块：`routes/analysis_routes.py, config_routes.py, task_routes.py, page_routes.py, websocket_routes.py, export_routes.py`
+  - 认证模块：`auth_routes.py`（注册、登录、JWT 刷新）
+  - 数据库模块：`database.py, models.py, init_db.py`（SQLite 默认）
+  - 任务调度：`TaskManager`（线程池、用户级队列、异常任务中断）
+  - WebSocket：实时推送分析进度/日志至前端
 
-### 7. 环境变量摘要
+### 4.3 API 与页面
+- REST API（部分示例，详见后端 routes 与 README）
+  - `POST /api/auth/register` 注册
+  - `POST /api/auth/login` 登录
+  - `POST /api/analyze` 发起分析（受保护，需携带 JWT）
+  - `GET /api/analysis/{id}/status` 查询状态
+  - `GET /api/analysis/{id}/results` 获取结果
+  - `GET /api/analyses` 列出当前用户分析
+  - `GET /api/config` 获取可选项（分析师、研究深度、LLM 供应商/模型等）
+- 页面
+  - 配置页：选择标的、日期、分析师团队、研究深度、LLM 与模型、后端地址等
+  - 进度页：实时进度条、阶段状态、日志流（WebSocket）
+  - 结果页：最终交易建议、分项报告（市场/基本面/舆情/新闻/风险）、一键导出
+  - 历史页：按用户维度存储与检索分析历史
 
-后端（.env）：
+### 4.4 配置选项详解
+- 标的代码与市场识别
+  - 美股：例如 AAPL、MSFT
+  - 港股：支持纯数字代码（如 0700）或带后缀 `.HK` 的格式（如 0700.HK）
+  - A 股：常见 6 位代码，部分数据源需带交易所后缀（如 603777.SH / 600000.SS），系统会结合供应商策略做兼容
+- 研究深度（默认 1/3/5）
+  - 控制多智能体“辩论/讨论”轮次与风控评估深度
+- LLM 与模型
+  - OpenAI / Anthropic / Google / OpenRouter / Ollama（本地）
+  - 前端 `GET /api/config` 会返回模型清单与说明
+- 数据源与供应商策略
+  - default_config 内置 `data_vendors / tool_vendors / market_vendors`，可在需要时调整优先级与回退链路
+- 环境变量
+  - `DATABASE_URL`：默认 SQLite，可切换至 PostgreSQL
+  - `OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY / OPENROUTER_API_KEY`：按需设置
+  - `TASK_MONITOR_LEADER_PORT`：多进程/多实例时用于 leader 选举，避免重复初始化
 
-- OPENAI_API_KEY（必需）
-- ALPHA_VANTAGE_API_KEY（可选，默认配置使用）
-- ANTHROPIC_API_KEY（可选）
-- GOOGLE_API_KEY（可选）
-- DATABASE_URL（可选，默认 sqlite:///./tradingagents.db）
+### 4.5 常见问题
+- 端口占用
+  - 后端默认 8000，前端默认 3000；Docker 前端为 8000，后端反代 8080
+- 数据源失败或缺失
+  - 按供应商策略自动回退；必要时检查网络、API Key 与供应商限额
+- 分析卡住
+  - TaskManager 每 60 秒检查日志停滞，连续 5 次无日志会自动中断；也可通过任务接口手动停止
+- 权限与认证
+  - v2 版本默认开启 JWT；调用受保护 API 时需附带 Authorization: Bearer <token>
 
-前端（web/frontend/.env.local）：
+---
 
-- NEXT_PUBLIC_API_BASE_URL（必需，默认 http://localhost:8000）
+## 5. 开发与扩展建议
+- 数据源扩展：在 `tradingagents/dataflows` 新增数据源模块并在 `default_config.py` 中配置供应商策略
+- 智能体扩展：在 `tradingagents/agents` 下新增角色或细化分析流程，并在 `graph/trading_graph.py` 引入新阶段
+- 前端模块：在 `web/frontend/src` 下新增页面/组件，保持 UI/UX 一致性与类型安全（TypeScript + Zod）
+- 后端路由：在 `web/backend/routes` 中添加新 API，注意鉴权与分页/筛选
 
-### 8. 端口对照
+---
 
-- Compose：
-  - 前端（Nginx）：8000 -> 80
-  - 后端（FastAPI）：8080 -> 8000
-- 独立容器：
-  - 前端（Next.js）：3000
-  - 后端（FastAPI）：8000
+## 6. 许可证
+本项目基于仓库内 LICENSE 文件所述条款发布，请遵循相关许可。
 
-## 参与贡献
+---
 
-欢迎以任何方式参与贡献：修复 Bug、改进文档、提出新特性建议等。若你对这条研究方向感兴趣，欢迎加入我们的开源金融 AI 社区 `<a href="https://tauric.ai/" target="_blank">`Tauric Research `</a>`。
+## 7. 参考与致谢
+- TradingAgents 原版框架与多智能体设计
+- FastAPI / SQLAlchemy / Jinja2 / Uvicorn
+- Next.js / React / Tailwind
+- yfinance / akshare / baostock / tushare / EODHD / Finnhub 等数据源生态
 
-## 引用
-
-如果 TradingAgents 对你的工作有帮助，欢迎引用我们的论文：
-
-```
-@misc{xiao2025tradingagentsmultiagentsllmfinancial,
-      title={TradingAgents: Multi-Agents LLM Financial Trading Framework}, 
-      author={Yijia Xiao and Edward Sun and Di Luo and Wei Wang},
-      year={2025},
-      eprint={2412.20138},
-      archivePrefix={arXiv},
-      primaryClass={q-fin.TR},
-      url={https://arxiv.org/abs/2412.20138}, 
-}
-```
+如有问题或建议，欢迎在 GitHub 提交 Issue 或 PR。
