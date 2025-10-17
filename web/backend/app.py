@@ -114,7 +114,7 @@ async def get_config():
             {"value": 5, "label": "深入", "description": "全面研究，深入的辨论和策略讨论"}
         ],
         "llm_providers": [
-            {"value": "OpenAI", "label": "OpenAI", "url": "https://api.bstester.com/v1"},
+            {"value": "OpenAI", "label": "OpenAI", "url": "https://api.openai.com/v1"},
             {"value": "Anthropic", "label": "Anthropic", "url": "https://api.anthropic.com/"},
             {"value": "Google", "label": "Google", "url": "https://generativelanguage.googleapis.com/v1"},
             {"value": "Openrouter", "label": "OpenRouter", "url": "https://openrouter.ai/api/v1"},
