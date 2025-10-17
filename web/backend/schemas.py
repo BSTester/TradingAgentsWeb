@@ -14,6 +14,9 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    # 服务端验证码（防绕过前端）
+    captcha_id: Optional[str] = None
+    captcha_answer: Optional[str] = None
     
     @validator('username')
     def validate_username(cls, v):
@@ -32,6 +35,9 @@ class UserCreate(UserBase):
 class UserLogin(BaseModel):
     username: str
     password: str
+    # 服务端验证码（防绕过前端）
+    captcha_id: Optional[str] = None
+    captcha_answer: Optional[str] = None
 
 class User(UserBase):
     id: int
@@ -43,6 +49,11 @@ class User(UserBase):
 
 class UserInDB(User):
     hashed_password: str
+
+# Captcha
+class CaptchaResponse(BaseModel):
+    captcha_id: str
+    seed: str
 
 # Token schemas
 class Token(BaseModel):

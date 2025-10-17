@@ -27,6 +27,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
   const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activePhase, setActivePhase] = useState(-1); // -1 表示显示最终分析说明
+  const [systemDomain, setSystemDomain] = useState('');
 
   useEffect(() => {
     // 获取分析结果
@@ -75,11 +76,88 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
     fetchResults();
   }, [analysisId]);
 
-  const handleExport = async (format: 'pdf' | 'markdown') => {
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const origin = window.location.origin.replace(/\/+$/, '');
+        setSystemDomain(origin);
+      } catch {}
+    }
+  }, []);
+
+  const handleExport = async (format: 'pdf' | 'markdown' | 'image') => {
     try {
       const token = localStorage.getItem('access_token');
       if (!token) {
         onShowToast('请先登录', 'error');
+        return;
+      }
+
+      // 新增：导出为图片（PNG）
+      if (format === 'image') {
+        try {
+          onShowToast('正在生成图片，请稍候...', 'info');
+
+          // 动态导入 html2canvas
+          const html2canvas = (await import('html2canvas')).default;
+
+          // 使用与 PDF 相同的完整内容容器
+          const exportContent = document.querySelector('.pdf-export-content') as HTMLElement;
+          if (!exportContent) {
+            throw new Error('找不到导出内容区域');
+          }
+
+          // 克隆内容到临时容器以便完整渲染
+          const tempContainer = document.createElement('div');
+          tempContainer.style.position = 'absolute';
+          tempContainer.style.left = '-9999px';
+          tempContainer.style.top = '0';
+          tempContainer.style.width = '794px'; // A4 宽度对应的像素基准
+          tempContainer.style.backgroundColor = 'white';
+          tempContainer.style.padding = '40px';
+
+          const clonedContent = exportContent.cloneNode(true) as HTMLElement;
+          clonedContent.style.display = 'block';
+          clonedContent.style.position = 'static';
+          clonedContent.style.width = '100%';
+
+          tempContainer.appendChild(clonedContent);
+          document.body.appendChild(tempContainer);
+
+          // 等待渲染稳定
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          const canvas = await html2canvas(tempContainer, {
+            useCORS: true,
+            logging: true,
+            backgroundColor: '#ffffff',
+            scale: 2,
+            windowWidth: 874, // 794 + 80 padding
+            allowTaint: true,
+          } as any);
+
+          // 移除临时容器
+          document.body.removeChild(tempContainer);
+
+          if (canvas.width === 0 || canvas.height === 0) {
+            throw new Error('内容渲染失败，请重试');
+          }
+
+          // 生成 PNG 并下载
+          const imgData = canvas.toDataURL('image/png');
+          const link = document.createElement('a');
+          const filename = `${results?.ticker || 'analysis'}_${results?.analysis_date || 'report'}.png`;
+          link.href = imgData;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+
+          onShowToast('图片已下载', 'success');
+        } catch (error) {
+          console.error('Image generation error:', error);
+          onShowToast(`图片生成失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error');
+        }
         return;
       }
 
@@ -1038,6 +1116,11 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
               </div>
             </div>
           </div>
+
+          {/* PDF 导出页尾显示平台地址 */}
+          <div className="mt-2 text-right text-xs text-gray-500">
+            平台地址：{systemDomain}
+          </div>
         </div>
 
         {/* 底部操作按钮 */}
@@ -1049,6 +1132,13 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
             >
               <i className="fas fa-file-pdf mr-2" />
               导出为PDF
+            </button>
+            <button
+              onClick={() => handleExport('image')}
+              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center font-medium"
+            >
+              <i className="fas fa-image mr-2" />
+              导出为图片
             </button>
             <button
               onClick={() => handleExport('markdown')}

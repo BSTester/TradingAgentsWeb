@@ -109,5 +109,5 @@ export const DEFAULTS = {
   ANALYSIS_DATE: () => new Date().toISOString().split('T')[0],
   RESEARCH_DEPTH: 2,
   LLM_PROVIDER: LLM_PROVIDERS.OPENAI,
-  BACKEND_URL: 'http://localhost:8000',
+  BACKEND_URL: (typeof window !== 'undefined' ? window.location.origin : ''),
 } as const;

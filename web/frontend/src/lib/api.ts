@@ -2,7 +2,7 @@
  * API client for TradingAgents backend
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { API_BASE_URL, buildApiUrl, buildWebSocketUrl } from '@/utils/api';
 
 // Get auth token from localStorage
 const getAuthToken = (): string | null => {
@@ -25,7 +25,7 @@ async function apiRequest<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(buildApiUrl(endpoint), {
     ...options,
     headers,
   });
@@ -168,8 +168,8 @@ export class AnalysisWebSocket {
   }
 
   connect() {
-    const wsUrl = API_BASE_URL.replace('http', 'ws');
-    this.ws = new WebSocket(`${wsUrl}/ws/analysis/${this.analysisId}`);
+
+    this.ws = new WebSocket(buildWebSocketUrl(`/ws/analysis/${this.analysisId}`));
 
     this.ws.onopen = () => {
       console.log('WebSocket connected');

@@ -194,9 +194,16 @@ class ConnectionManager:
     
     def disconnect(self, websocket: WebSocket, analysis_id: str):
         if analysis_id in self.active_connections:
-            self.active_connections[analysis_id].remove(websocket)
-            if not self.active_connections[analysis_id]:
-                del self.active_connections[analysis_id]
+            connections = self.active_connections[analysis_id]
+            # 幂等安全移除：仅当存在时移除，避免 list.remove 抛错
+            if websocket in connections:
+                connections.remove(websocket)
+            # 若列表已空则清理该 analysis_id
+            if not connections:
+                try:
+                    del self.active_connections[analysis_id]
+                except Exception:
+                    self.active_connections[analysis_id] = []
     
     async def send_message(self, message: dict, analysis_id: str):
         if analysis_id in self.active_connections:

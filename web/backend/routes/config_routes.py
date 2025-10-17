@@ -28,10 +28,11 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
         ],
         "llm_providers": [
             {"value": "openai", "label": "OpenAI", "description": "GPT系列模型", "url": "https://api.openai.com/v1"},
+            {"value": "openai", "label": "OpenAI代理", "description": "GPT系列模型", "url": "https://api.bstester.com/v1"},
             {"value": "anthropic", "label": "Anthropic", "description": "Claude系列模型", "url": "https://api.anthropic.com/"},
             {"value": "google", "label": "Google", "description": "Gemini系列模型", "url": "https://generativelanguage.googleapis.com/v1"},
             {"value": "openrouter", "label": "OpenRouter", "description": "多模型聚合平台", "url": "https://openrouter.ai/api/v1"},
-            {"value": "ollama", "label": "Ollama", "description": "本地模型服务", "url": "http://localhost:11434/v1"}
+            # {"value": "ollama", "label": "Ollama", "description": "本地模型服务", "url": "http://localhost:11434/v1"}
         ],
         "models": {
             "openai": {

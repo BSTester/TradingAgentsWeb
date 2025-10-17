@@ -4,11 +4,11 @@ Authentication routes for TradingAgents Web Interface
 """
 
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from web.backend.database import get_db
-from web.backend.schemas import UserCreate, UserLogin, AuthResponse, User as UserSchema, Token
+from web.backend.schemas import UserCreate, UserLogin, AuthResponse, User as UserSchema, Token, CaptchaResponse
 from web.backend.auth import (
     authenticate_user, 
     create_user, 
@@ -20,6 +20,60 @@ from web.backend.models import User
 
 # Create router
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
+
+# 简单内存级限流与失败计数（生产可替换为Redis等）
+from collections import defaultdict, deque
+from typing import Deque, Dict
+import time
+
+_CAPTCHA_REQUESTS: Dict[str, Deque[float]] = defaultdict(deque)  # 每IP的验证码请求时间戳
+_FAILED_ATTEMPTS: Dict[str, Deque[float]] = defaultdict(deque)   # 每IP的失败时间戳
+
+CAPTCHA_RATE_LIMIT = 20          # 每分钟最多获取20次验证码/每IP
+CAPTCHA_RATE_WINDOW = 60         # 秒
+FAIL_WINDOW = 600                # 10分钟
+FAIL_LIMIT = 5                   # 10分钟内最多失败5次
+
+def _prune(dq: Deque[float], window: int):
+    now = time.time()
+    while dq and now - dq[0] > window:
+        dq.popleft()
+
+def _check_rate(ip: str) -> bool:
+    dq = _CAPTCHA_REQUESTS[ip]
+    _prune(dq, CAPTCHA_RATE_WINDOW)
+    return len(dq) < CAPTCHA_RATE_LIMIT
+
+def _note_captcha_request(ip: str):
+    dq = _CAPTCHA_REQUESTS[ip]
+    _prune(dq, CAPTCHA_RATE_WINDOW)
+    dq.append(time.time())
+
+def _note_fail(ip: str):
+    dq = _FAILED_ATTEMPTS[ip]
+    _prune(dq, FAIL_WINDOW)
+    dq.append(time.time())
+
+def _too_many_fails(ip: str) -> bool:
+    dq = _FAILED_ATTEMPTS[ip]
+    _prune(dq, FAIL_WINDOW)
+    return len(dq) >= FAIL_LIMIT
+
+@router.post("/captcha/new", response_model=CaptchaResponse)
+async def new_captcha(request: Request):
+    """
+    Create new captcha challenge and return seed and id (frontend draws image via Canvas using seed)
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    if not _check_rate(client_ip):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="验证码请求过于频繁，请稍后再试")
+    try:
+        from web.backend.captcha import create_captcha
+        cid, seed = create_captcha()
+        _note_captcha_request(client_ip)
+        return {"captcha_id": cid, "seed": seed}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"生成验证码失败: {str(e)}")
 
 # Security scheme
 security = HTTPBearer()
@@ -55,11 +109,20 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
     return current_user
 
 @router.post("/register", response_model=AuthResponse)
-async def register(user_data: UserCreate, db: Session = Depends(get_db)):
+async def register(user_data: UserCreate, db: Session = Depends(get_db), request: Request = None):
     """
-    Register a new user
+    Register a new user (requires captcha)
     """
     try:
+        # 验证服务端验证码（防止绕过前端）
+        from web.backend.captcha import verify_captcha
+        client_ip = request.client.host if request and request.client else "unknown"
+        if _too_many_fails(client_ip):
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="尝试次数过多，请稍后再试")
+        if not user_data.captcha_id or not user_data.captcha_answer or not verify_captcha(user_data.captcha_id, user_data.captcha_answer):
+            _note_fail(client_ip)
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="验证码无效或已过期")
+
         # Create user
         user = create_user(
             db=db,
@@ -93,10 +156,19 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
         )
 
 @router.post("/login", response_model=AuthResponse)
-async def login(user_data: UserLogin, db: Session = Depends(get_db)):
+async def login(user_data: UserLogin, db: Session = Depends(get_db), request: Request = None):
     """
-    Login user and return access token
+    Login user and return access token (requires captcha)
     """
+    # 验证服务端验证码（防止绕过前端）
+    from web.backend.captcha import verify_captcha
+    client_ip = request.client.host if request and request.client else "unknown"
+    if _too_many_fails(client_ip):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="尝试次数过多，请稍后再试")
+    if not user_data.captcha_id or not user_data.captcha_answer or not verify_captcha(user_data.captcha_id, user_data.captcha_answer):
+        _note_fail(client_ip)
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="验证码无效或已过期")
+
     # Authenticate user
     user = authenticate_user(db, user_data.username, user_data.password)
     

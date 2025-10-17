@@ -127,3 +127,19 @@
     background: #a8a8a8;
   }
 }
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    /* 适配刘海屏等安全区 */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    touch-action: manipulation;
+  }
+  /* 媒体默认自适应容器宽度 */
+  img, video, canvas, svg {
+    max-width: 100%;
+    height: auto;
+  }
+}

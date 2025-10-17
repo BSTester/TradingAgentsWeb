@@ -3,6 +3,7 @@ version: '3.8'
 services:
   # 后端服务 (FastAPI)
   backend:
+    image: registry.cn-shenzhen.aliyuncs.com/ai_creator/tradingagents-backend
     build:
       context: .
       dockerfile: Dockerfile
@@ -22,6 +23,7 @@ services:
 
   # 前端服务 (Nginx 静态托管 + /api 反代后端)
   frontend:
+    image: registry.cn-shenzhen.aliyuncs.com/ai_creator/tradingagents-frontend
     build:
       context: ./web/frontend
       dockerfile: Dockerfile

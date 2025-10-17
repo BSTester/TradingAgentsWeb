@@ -21,20 +21,20 @@ export function AuthLayout({
   toggleLinkText 
 }: AuthLayoutProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex flex-col justify-center py-8 px-4 sm:py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-3 rounded-full shadow-lg">
             <i className="fas fa-robot text-white text-3xl" />
           </div>
         </div>
-        <h1 className="mt-4 text-center text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+        <h1 className="mt-4 text-center text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
           TradingAgents
         </h1>
         <p className="mt-1 text-center text-sm text-gray-500">
           多智能体大语言模型金融交易框架
         </p>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+        <h2 className="mt-6 text-center text-2xl md:text-3xl font-extrabold text-gray-900">
           {title}
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">

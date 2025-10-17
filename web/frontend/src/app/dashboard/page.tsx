@@ -93,7 +93,7 @@ export default function DashboardPage() {
                 </h1>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center flex-wrap gap-2 sm:space-x-4">
               <button
                 onClick={() => setCurrentView('history')}
                 className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
@@ -120,19 +120,19 @@ export default function DashboardPage() {
       </nav>
 
       {/* 主要内容区域 */}
-      <div className="flex-1 max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+      <div className="flex-1 max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 w-full">
         {/* 欢迎横幅 */}
         {currentView === 'config' && (
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-6 mb-6 text-white">
             <div className="text-center">
-              <h1 className="text-3xl font-bold mb-2">
+              <h1 className="text-2xl md:text-3xl font-bold mb-2">
                 <i className="fas fa-robot mr-3" />
                 TradingAgents
               </h1>
-              <p className="text-xl mb-2">多智能体大语言模型金融交易框架</p>
-              <p className="text-lg">
+              <p className="text-lg md:text-xl mb-2">多智能体大语言模型金融交易框架</p>
+              <p className="text-base md:text-lg">
                 <strong>工作流程：</strong>
-                分析师团队 → 研究团队 → 交易员 → 风险管理 → 组合管理
+                分析师团队 → 研究团队 → 交易员 → 风险管理 → 投资组合分析
               </p>
             </div>
           </div>

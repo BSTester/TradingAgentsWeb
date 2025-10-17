@@ -54,7 +54,7 @@ const CACHE_KEY = 'trading_agents_config_cache';
 
 export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: AnalysisConfigFormProps) {
   const [formData, setFormData] = useState<FormData>({
-    ticker: 'SPY',
+    ticker: '',
     analysis_date: new Date().toISOString().split('T')[0] || '',
     analysts: [],
     research_depth: 1,
@@ -378,7 +378,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
               value={formData.ticker}
               onChange={handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="例如：SPY, AAPL, NVDA"
+              placeholder="例如：TSLA, AAPL, NVDA"
               required
             />
           </div>
