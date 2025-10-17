@@ -160,6 +160,7 @@ export default function DashboardPage() {
           <AnalysisResults
             analysisId={currentAnalysisId}
             onBackToConfig={() => setCurrentView('config')}
+            onBackToHistory={() => setCurrentView('history')}
             onShowToast={showToast}
           />
         )}

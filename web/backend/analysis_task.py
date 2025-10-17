@@ -318,7 +318,7 @@ def run_analysis_task(
             request_data.get('ticker'),
             request_data.get('analysis_date')
         )
-        args = graph.propagator.get_graph_args(stream_mode="updates")
+        args = graph.propagator.get_graph_args(stream_mode="values")
         
         # 计算进度分配
         # 总进度: 10% -> 90%, 共 80% 的进度空间
@@ -441,7 +441,7 @@ def run_analysis_task(
                     elif level == 'DECISION':
                         agent_display_name = agent_name_map.get(agent, agent)
                         progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent) + (progress_per_agent * 0.8))
-                        send_log('info', f'🎯 {agent_display_name} 决策: {message}', agent, '决策', progress, '分析阶段')
+                        send_log('info', f'🎯 {agent_display_name} {message}', agent, '决策', progress, '分析阶段')
                     
                     # 记录工具调用
                     elif level == 'TOOL':
@@ -524,172 +524,6 @@ def run_analysis_task(
         with LogCapture(on_log_captured):
             try:
                 stream_iterator = graph.graph.stream(init_agent_state, **args)
-                
-                for chunk in stream_with_interrupt_check(stream_iterator):
-                    # 每步检查是否中断
-                    check_stop()
-                    
-                    step_num += 1
-                    # 每 10 步输出一次调试信息
-                    if step_num % 10 == 0:
-                        print(f"🔄 Step {step_num}: stop_event.is_set() = {stop_event.is_set()}")
-                    
-                    # 优先使用日志检测的智能体
-                    if log_detected_agent:
-                        detected_agent = log_detected_agent
-                        # 重置日志检测标志,等待下一次检测
-                        # log_detected_agent = None  # 不重置,保持当前智能体
-                    else:
-                        detected_agent = None
-                    
-                    # chunk 格式: {node_name: {state_updates}}
-                    if isinstance(chunk, dict):
-                        for node_name, node_data in chunk.items():
-                            print(f"🔍 Step {step_num}: Node = {node_name}")
-                            
-                            # 如果日志没有检测到智能体,使用节点名称检测(回退方案)
-                            if not detected_agent:
-                                # 映射节点名称到智能体
-                                # 节点名称格式: "Market Analyst", "Bull Researcher", "Trader", etc.
-                                node_lower = node_name.lower()
-                                
-                                # 跳过工具节点和消息清理节点
-                                if 'tools_' in node_lower or 'msg clear' in node_lower:
-                                    continue
-                                
-                                # 分析师节点 (Analyst)
-                                if 'market' in node_lower and 'analyst' in node_lower:
-                                    detected_agent = 'market'
-                                elif 'social' in node_lower and 'analyst' in node_lower:
-                                    detected_agent = 'social'
-                                elif 'news' in node_lower and 'analyst' in node_lower:
-                                    detected_agent = 'news'
-                                elif 'fundamental' in node_lower and 'analyst' in node_lower:
-                                    detected_agent = 'fundamentals'
-                                # 研究员节点 (Researcher)
-                                elif 'bull' in node_lower and 'researcher' in node_lower:
-                                    detected_agent = 'bull'
-                                elif 'bear' in node_lower and 'researcher' in node_lower:
-                                    detected_agent = 'bear'
-                                elif 'research' in node_lower and 'manager' in node_lower:
-                                    detected_agent = 'invest_judge'
-                                # 交易员节点
-                                elif node_lower == 'trader':
-                                    detected_agent = 'trader'
-                                # 风险分析节点
-                                elif 'risky' in node_lower and 'analyst' in node_lower:
-                                    detected_agent = 'risky'
-                                elif 'neutral' in node_lower and 'analyst' in node_lower:
-                                    detected_agent = 'neutral'
-                                elif 'safe' in node_lower and 'analyst' in node_lower:
-                                    detected_agent = 'safe'
-                                elif 'risk' in node_lower and 'judge' in node_lower:
-                                    detected_agent = 'risk_manager'
-                            
-                            # 如果检测到新智能体(且不是通过日志START检测的,避免重复)
-                            if detected_agent and detected_agent != last_agent and detected_agent != last_log_agent:
-                                # 只有在日志没有处理过这个切换时才处理
-                                # 上一个智能体完成
-                                if last_agent and last_agent != last_log_agent:
-                                    agent_display_name = agent_name_map.get(last_agent, last_agent)
-                                    progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent))
-                                    send_log('info', f'{agent_display_name} 完成分析', last_agent, '完成', progress, '分析阶段')
-                                    current_analyst_index += 1
-                                
-                                # 新智能体开始(如果日志还没有报告)
-                                if detected_agent != last_log_agent:
-                                    current_agent = detected_agent
-                                    agent_display_name = agent_name_map.get(current_agent, current_agent)
-                                    progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent))
-                                    send_log('info', f'🔍 {agent_display_name} 开始分析...', current_agent, '开始', progress, '分析阶段')
-                                    # 使用独立会话更新进度，避免跨线程共享会话提交冲突
-                                    try:
-                                        db2 = SessionLocal()
-                                        db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).update({
-                                            AnalysisRecord.progress_percentage: progress
-                                        })
-                                        db2.commit()
-                                    except Exception:
-                                        try:
-                                            db2.rollback()
-                                        except Exception:
-                                            pass
-                                    finally:
-                                        try:
-                                            db2.close()
-                                        except Exception:
-                                            pass
-                                
-                                # 更新 last_agent
-                                last_agent = detected_agent
-                            elif detected_agent:
-                                # 同一个智能体继续工作
-                                current_agent = detected_agent
-                        
-                        # 提取消息（加守卫避免未绑定/非字典）
-                        messages = []
-                        if node_data is not None and isinstance(node_data, dict):
-                            messages = node_data.get("messages", [])
-                        if messages and node_name is not None:
-                            trace.append({node_name: node_data})
-                            
-                            # 辅助检测:通过工具调用推断智能体
-                            for msg in messages:
-                                # 检查工具调用
-                                if hasattr(msg, 'tool_calls') and msg.tool_calls:
-                                    for tool_call in msg.tool_calls:
-                                        tool_name = tool_call.get('name', '') if isinstance(tool_call, dict) else getattr(tool_call, 'name', '')
-                                        
-                                        # 根据工具名称推断智能体
-                                        if tool_name in ['get_stock_data', 'get_indicators', 'get_realtime_data']:
-                                            # 技术分析工市场分析师
-                                            if not detected_agent:
-                                                detected_agent = 'market'
-                                        elif tool_name in ['get_fundamentals', 'get_balance_sheet', 'get_cashflow', 'get_income_statement', 'get_dividend_data']:
-                                            # 基本面工基本面分析师
-                                            if not detected_agent:
-                                                detected_agent = 'fundamentals'
-                                        elif tool_name in ['get_news', 'get_global_news']:
-                                            # 新闻工具 新闻分析师
-                                            if not detected_agent:
-                                                detected_agent = 'news'
-                                        elif tool_name in ['get_insider_sentiment', 'get_insider_transactions']:
-                                            # 内部交易工具 社交分析中
-                                            if not detected_agent:
-                                                detected_agent = 'social'
-                                        
-                                        print(f"  🔧 Tool call: {tool_name} Agent: {detected_agent}")
-                            
-                            # 如果通过工具检测到了智能体,更current_agent
-                            if detected_agent and detected_agent != current_agent:
-                                current_agent = detected_agent
-                            
-                            for msg in messages:
-                                if hasattr(msg, 'content') and msg.content:
-                                    content = str(msg.content)
-                                    
-                                    if len(content) > 20:
-                                        # 输出智能体分析结果内容到控制台(00字符
-                                        agent_to_use = current_agent if current_agent else 'system'
-                                        # 避免递归日志捕获，直接写入原始 stdout
-                                        # agent_display_name = agent_name_map.get(agent_to_use, agent_to_use)
-                                        # sys.__stdout__.write(f"📝 {agent_display_name} 输出内容: {content[:200]}...\n")
-                                        # sys.__stdout__.flush()
-                                        
-                                        progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent) + (progress_per_agent * 0.5))
-                                        send_log('info', truncate_message(content, 150), agent_to_use, '分析中', progress, '分析阶段')
-                                        break  # 每个节点只发送一条消息
-        
-            except InterruptedError:
-                # 任务被中断，直接向上抛出
-                raise
-            except Exception as e:
-                # 如果 stream_mode 不支持,回退到默认模式
-                print(f"⚠️  Stream mode 'updates' not supported, falling back to default mode: {e}")
-                
-                # 使用 values 模式作为回退，提升兼容性
-                args_values = graph.propagator.get_graph_args(stream_mode="values")
-                stream_iterator = graph.graph.stream(init_agent_state, **args_values)
                 for chunk in stream_with_interrupt_check(stream_iterator):
                     check_stop()
                     step_num += 1
@@ -814,13 +648,21 @@ def run_analysis_task(
                                         progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent) + (progress_per_agent * 0.5))
                                         send_log('info', truncate_message(content, 150), agent_to_use, '分析中', progress, '分析阶段')
                                         break
+              
+            except InterruptedError:
+                # 任务被中断，直接向上抛出
+                raise
+            except Exception as e:
+                # 如果 stream_mode 不支持,回退到默认模式
+                print(f"⚠️  Stream mode not supported, falling back to default mode: {e}")
+                
         # 日志捕获结束
         
         check_stop()
         
         # 获取最终状态
-        final_state = trace[-1] if trace else graph.graph.invoke(init_agent_state, **args)
-        decision = graph.process_signal(final_state.get("final_trade_decision", "HOLD"))
+        final_state = trace[-1]
+        decision = graph.process_signal(final_state.get("final_trade_decision", "UNKNOWN"))
         
         # 获取股票代码(确保不为 None)
         ticker = request_data.get('ticker', 'UNKNOWN')

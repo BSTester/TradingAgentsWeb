@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { buildApiUrl, API_ENDPOINTS } from '../../utils/api';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 
 
 interface AnalysisHistoryProps {
@@ -26,6 +27,10 @@ interface AnalysisRecord {
 }
 
 export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress, onShowToast }: AnalysisHistoryProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -38,6 +43,25 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
     analysisId: '',
     ticker: ''
   });
+
+  // 初始化时从 URL 查询参数恢复分页
+  useEffect(() => {
+    const pageParam = searchParams.get('page');
+    const initialPage = pageParam ? Math.max(1, parseInt(pageParam, 10) || 1) : 1;
+    if (initialPage !== page) {
+      setPage(initialPage);
+    }
+    // 仅在首次渲染时读取
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // 当分页变化时，将当前分页写入 URL（不增加历史记录）
+  useEffect(() => {
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.set('page', String(page));
+    router.replace(`${pathname}?${sp.toString()}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   const handleDeleteClick = (analysisId: string, ticker: string) => {
     setDeleteConfirm({ show: true, analysisId, ticker });

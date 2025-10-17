@@ -14,7 +14,7 @@ services:
     env_file:
       - ./.env
     volumes:
-      - ./tradingagents.db:/app/tradingagents.db
+      - ./db:/app/db
       - ./eval_results:/app/eval_results
     restart: unless-stopped
     networks:

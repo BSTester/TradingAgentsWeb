@@ -28,14 +28,31 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
         ],
         "llm_providers": [
             {"value": "openai", "label": "OpenAI", "description": "GPT系列模型", "url": "https://api.openai.com/v1"},
-            {"value": "openai", "label": "OpenAI代理", "description": "GPT系列模型", "url": "https://api.bstester.com/v1"},
             {"value": "anthropic", "label": "Anthropic", "description": "Claude系列模型", "url": "https://api.anthropic.com/"},
             {"value": "google", "label": "Google", "description": "Gemini系列模型", "url": "https://generativelanguage.googleapis.com/v1"},
             {"value": "openrouter", "label": "OpenRouter", "description": "多模型聚合平台", "url": "https://openrouter.ai/api/v1"},
+            {"value": "oneai", "label": "OpenAI代理", "description": "GPT系列模型", "url": "https://api.bstester.com/v1"},
             # {"value": "ollama", "label": "Ollama", "description": "本地模型服务", "url": "http://localhost:11434/v1"}
         ],
         "models": {
             "openai": {
+                "shallow": [
+                    {"value": "gpt-4o-mini", "label": "GPT-4o-mini - 快速高效，适合快速任务"},
+                    {"value": "gpt-4.1-nano", "label": "GPT-4.1-nano - 超轻量模型，适合基本操作"},
+                    {"value": "gpt-4.1-mini", "label": "GPT-4.1-mini - 紧凑模型，性能良好"},
+                    {"value": "gpt-4o", "label": "GPT-4o - 标准模型，能力稳定"},
+                ],
+                "deep": [
+                    {"value": "gpt-4.1-nano", "label": "GPT-4.1-nano - 超轻量模型，适合基本操作"},
+                    {"value": "gpt-4.1-mini", "label": "GPT-4.1-mini - 紧凑模型，性能良好"},
+                    {"value": "gpt-4o", "label": "GPT-4o - 标准模型，能力稳定"},
+                    {"value": "o4-mini", "label": "o4-mini - 专业推理模型（紧凑版）"},
+                    {"value": "o3-mini", "label": "o3-mini - 高级推理模型（轻量级）"},
+                    {"value": "o3", "label": "o3 - 完整高级推理模型"},
+                    {"value": "o1", "label": "o1 - 首屈一指的推理和问题解决模型"},
+                ]
+            },
+            "oneai": {
                 "shallow": [
                     {"value": "gpt-4o-mini", "label": "GPT-4o-mini - 快速高效，适合快速任务"},
                     {"value": "gpt-4.1-nano", "label": "GPT-4.1-nano - 超轻量模型，适合基本操作"},
@@ -116,7 +133,7 @@ async def validate_api_key(request: dict, current_user: User = Depends(get_curre
     
     try:
         # Basic validation - just check if key format looks valid
-        if provider == "openai":
+        if provider in ("openai", "oneai"):
             if not api_key.startswith("sk-"):
                 raise HTTPException(status_code=400, detail="无效的OpenAI API密钥格式")
         elif provider == "anthropic":

@@ -9,6 +9,7 @@ import remarkBreaks from 'remark-breaks';
 interface AnalysisResultsProps {
   analysisId: string;
   onBackToConfig: () => void;
+  onBackToHistory: () => void;
   onShowToast: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
@@ -23,7 +24,7 @@ interface PhaseResult {
   }[];
 }
 
-export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: AnalysisResultsProps) {
+export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, onShowToast }: AnalysisResultsProps) {
   const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activePhase, setActivePhase] = useState(-1); // -1 表示显示最终分析说明
@@ -402,7 +403,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
               </div>
             </div>
             <button
-              onClick={onBackToConfig}
+              onClick={onBackToHistory}
               className="text-gray-500 hover:text-gray-700 no-print"
             >
               <i className="fas fa-times text-xl" />

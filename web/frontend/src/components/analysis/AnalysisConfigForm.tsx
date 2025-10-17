@@ -310,7 +310,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       };
 
       // 根据提供商添加对应的API密钥
-      if (formData.llm_provider === 'openai') {
+      if (formData.llm_provider === 'openai' || formData.llm_provider === 'oneai') {
         requestData.openai_api_key = formData.api_key;
       } else if (formData.llm_provider === 'anthropic') {
         requestData.anthropic_api_key = formData.api_key;
