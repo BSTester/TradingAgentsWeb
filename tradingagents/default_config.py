@@ -10,8 +10,8 @@ DEFAULT_CONFIG = {
     ),
     # LLM settings
     "llm_provider": "openai",
-    "deep_think_llm": "o4-mini",
-    "quick_think_llm": "gpt-4o",
+    "deep_think_llm": os.getenv("DEEP_THINK_LLM", "o4-mini"),
+    "quick_think_llm": os.getenv("QUICK_THINK_LLM", "gpt-4o"),
     "backend_url": os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
     # Debate and discussion settings
     "max_debate_rounds": 3,
