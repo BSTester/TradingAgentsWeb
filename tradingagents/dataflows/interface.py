@@ -315,7 +315,7 @@ def route_to_vendor(method: str, *args, **kwargs):
     # Debug: Print fallback ordering
     primary_str = " → ".join(primary_vendors)
     fallback_str = " → ".join(fallback_vendors)
-    print(f"DEBUG: {method} - Primary: [{primary_str}] | Full fallback order: [{fallback_str}]")
+
 
     # Track results and execution state
     results = []
@@ -339,12 +339,12 @@ def route_to_vendor(method: str, *args, **kwargs):
 
         # Debug: Print current attempt
         vendor_type = "PRIMARY" if is_primary_vendor else "FALLBACK"
-        print(f"DEBUG: Attempting {vendor_type} vendor '{vendor}' for {method} (attempt #{vendor_attempt_count})")
+
 
         # Handle list of methods for a vendor
         if isinstance(vendor_impl, list):
             vendor_methods = [(impl, vendor) for impl in vendor_impl]
-            print(f"DEBUG: Vendor '{vendor}' has multiple implementations: {len(vendor_methods)} functions")
+
         else:
             vendor_methods = [(vendor_impl, vendor)]
 
@@ -352,7 +352,7 @@ def route_to_vendor(method: str, *args, **kwargs):
         vendor_results = []
         for impl_func, vendor_name in vendor_methods:
             try:
-                print(f"DEBUG: Calling {impl_func.__name__} from vendor '{vendor_name}'...")
+
                 result = impl_func(*args, **kwargs)
                 vendor_results.append(result)
                 print(f"SUCCESS: {impl_func.__name__} from vendor '{vendor_name}' completed successfully")
@@ -360,7 +360,7 @@ def route_to_vendor(method: str, *args, **kwargs):
             except AlphaVantageRateLimitError as e:
                 if vendor == "alpha_vantage":
                     print(f"RATE_LIMIT: Alpha Vantage rate limit exceeded, falling back to next available vendor")
-                    print(f"DEBUG: Rate limit details: {e}")
+
                 # Continue to next vendor for fallback
                 continue
             except (ConnectionError, ConnectionAbortedError, 
@@ -412,7 +412,7 @@ def route_to_vendor(method: str, *args, **kwargs):
                 )
                 
                 if stop_after_first_success:
-                    print(f"DEBUG: Stopping after successful vendor '{vendor}' (fallback mode)")
+
                     break
         else:
             print(f"FAILED: Vendor '{vendor}' produced no results")

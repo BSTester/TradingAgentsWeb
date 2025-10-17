@@ -844,7 +844,7 @@ def run_analysis():
             selections["ticker"], selections["analysis_date"]
         )
         args = graph.propagator.get_graph_args()
-
+        args["stream_mode"] = 'values'
         # Stream the analysis
         trace = []
         for chunk in graph.graph.stream(init_agent_state, **args):

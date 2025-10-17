@@ -523,7 +523,7 @@ def run_analysis_task(
         # 使用日志捕获
         with LogCapture(on_log_captured):
             try:
-                stream_iterator = graph.graph.stream(init_agent_state, stream_mode="updates", **args)
+                stream_iterator = graph.graph.stream(init_agent_state, **args)
                 
                 for chunk in stream_with_interrupt_check(stream_iterator):
                     # 每步检查是否中断
