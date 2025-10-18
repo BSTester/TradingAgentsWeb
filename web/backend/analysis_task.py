@@ -245,7 +245,8 @@ def run_analysis_task(
         elif request_data.get('google_api_key') and request_data.get('llm_provider', '').lower() == "google":
             os.environ["GOOGLE_API_KEY"] = request_data['google_api_key']
         elif request_data.get('openrouter_api_key') and request_data.get('llm_provider', '').lower() == "openrouter":
-            os.environ["OPENROUTER_API_KEY"] = request_data['openrouter_api_key']
+            # os.environ["OPENROUTER_API_KEY"] = request_data['openrouter_api_key']
+            os.environ["OPENAI_API_KEY"] = request_data['openrouter_api_key']
         
         # 准备配置
         send_log('info', '⚙️ 准备分析配置...', 'system', '配置', 4.0, '准备阶段')
@@ -653,8 +654,8 @@ def run_analysis_task(
                 # 任务被中断，直接向上抛出
                 raise
             except Exception as e:
-                # 如果 stream_mode 不支持,回退到默认模式
-                print(f"⚠️  Stream mode not supported, falling back to default mode: {e}")
+                print(f"⚠️  Error: {e}")
+                raise
                 
         # 日志捕获结束
         

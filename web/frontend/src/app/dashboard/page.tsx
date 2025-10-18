@@ -67,6 +67,12 @@ export default function DashboardPage() {
     setCurrentView('results');
   };
 
+  const handleBackToTop = () => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   // 如果正在认证检查或加载配置，显示加载状态
   if (authLoading || isLoading || !user) {
     return (
@@ -180,6 +186,18 @@ export default function DashboardPage() {
           />
         )}
       </div>
+
+      {/* 回到顶部按钮，仅在查看报告页面显示 */}
+      {currentView === 'results' && (
+        <button
+          onClick={handleBackToTop}
+          aria-label="回到顶部"
+          className="fixed bottom-6 right-6 z-50 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg p-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          title="回到顶部"
+        >
+          <i className="fas fa-arrow-up" />
+        </button>
+      )}
 
       {/* 页面底部版权信息 */}
       <footer className="bg-white border-t border-gray-200 mt-auto">

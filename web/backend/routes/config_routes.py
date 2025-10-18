@@ -107,7 +107,7 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
                     {"value": "anthropic/claude-3.7-sonnet", "label": "Claude 3.7 Sonnet - 用于对话和推理的强大模型"},
                     {"value": "anthropic/claude-3.5-sonnet", "label": "Claude 3.5 Sonnet - 用于对话和推理的强大模型"},
                     {"value": "x-ai/grok-4-fast", "label": "Grok 4 Fast 是 xAI 最新的多模态模型"},
-                    {"value": "x-ai/grok-3-mini", "label": "一个轻量级模型，在响应之前会思考"}
+                    {"value": "x-ai/grok-3-mini", "label": "Grok 3 Mini 一个轻量级模型，在响应之前会思考"}
                 ],
                 "deep": [
                     {"value": "deepseek/deepseek-chat-v3.1:free", "label": "DeepSeek V3.1 - 685B参数，混合专家模型"},
@@ -119,7 +119,7 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
                     {"value": "anthropic/claude-sonnet-4", "label": "Claude Sonnet 4 显着增强了其前身 Sonnet 3.7 的功能"},
                     {"value": "anthropic/claude-opus-4.1", "label": "Claude Opus 4.1 是 Anthropic 旗舰模型的更新版本"},
                     {"value": "x-ai/grok-4", "label": "Grok 4 是 xAI 的最新推理模型"},
-                    {"value": "x-ai/grok-3", "label": "在金融、医疗保健、法律和科学方面拥有深厚的领域知识"}
+                    {"value": "x-ai/grok-3", "label": "Grok 3 是 xAI 的先进的人工智能模型"}
                 ]
             },
             "ollama": {
