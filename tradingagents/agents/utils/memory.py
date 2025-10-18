@@ -7,12 +7,15 @@ import os
 class FinancialSituationMemory:
     def __init__(self, name, config):
         base_url = config["backend_url"]
+        api_key = os.getenv("EMBEDDING_KEY", "")
         if base_url == "http://localhost:11434/v1":
             self.embedding = "nomic-embed-text"
+        elif base_url == "https://api.openai.com/v1":
+            self.embedding = "text-embedding-3-small"
+            api_key = os.getenv("OPENAI_API_KEY")
         else:
             self.embedding = os.getenv("EMBEDDING_LLM", "text-embedding-3-small")
             base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-        api_key = os.getenv("EMBEDDING_KEY", "")
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.chroma_client = chromadb.Client(Settings(allow_reset=True))
         self.situation_collection = self.chroma_client.get_or_create_collection(name=name)
