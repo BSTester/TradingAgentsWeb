@@ -408,7 +408,15 @@ def route_to_vendor(method: str, *args, **kwargs):
                 # For news aggregation tools, may want to collect from multiple sources
                 stop_after_first_success = (
                     len(primary_vendors) == 1 or 
-                    method in ['get_indicators', 'get_stock_data']  # Add methods that should use fallback-only mode
+                    method in [
+                        'get_indicators',
+                        'get_stock_data',
+                        # 基础财务数据：首次成功即停止
+                        'get_balance_sheet',
+                        'get_cashflow',
+                        'get_income_statement',
+                        'get_fundamentals'
+                    ]
                 )
                 
                 if stop_after_first_success:

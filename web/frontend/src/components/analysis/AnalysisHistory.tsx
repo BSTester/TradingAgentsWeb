@@ -178,12 +178,17 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
   };
 
   const getRecommendationColor = (recommendation?: string) => {
-    switch (recommendation) {
+    const rec = recommendation?.trim().toLowerCase();
+    switch (rec) {
       case '买入':
+      case 'buy':
         return 'text-green-600 bg-green-50';
       case '持有':
+      case '观望':
+      case 'hold':
         return 'text-blue-600 bg-blue-50';
       case '卖出':
+      case 'sell':
         return 'text-red-600 bg-red-50';
       default:
         return 'text-gray-600 bg-gray-50';
@@ -191,12 +196,17 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
   };
 
   const getRecommendationIcon = (recommendation?: string) => {
-    switch (recommendation) {
+    const rec = recommendation?.trim().toLowerCase();
+    switch (rec) {
       case '买入':
+      case 'buy':
         return 'fa-arrow-up';
       case '持有':
+      case '观望':
+      case 'hold':
         return 'fa-minus';
       case '卖出':
+      case 'sell':
         return 'fa-arrow-down';
       default:
         return 'fa-question';
