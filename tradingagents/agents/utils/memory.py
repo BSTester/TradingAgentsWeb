@@ -10,6 +10,9 @@ class FinancialSituationMemory:
         api_key = os.getenv("EMBEDDING_KEY", "")
         if base_url == "http://localhost:11434/v1":
             self.embedding = "nomic-embed-text"
+        elif base_url == "https://api.openai.com/v1":
+            self.embedding = "text-embedding-3-small"
+            api_key = os.getenv("OPENAI_API_KEY")
         else:
             self.embedding = os.getenv("EMBEDDING_LLM", "text-embedding-3-small")
             base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
