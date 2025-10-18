@@ -245,7 +245,7 @@ def run_analysis_task(
         elif request_data.get('google_api_key') and request_data.get('llm_provider', '').lower() == "google":
             os.environ["GOOGLE_API_KEY"] = request_data['google_api_key']
         elif request_data.get('openrouter_api_key') and request_data.get('llm_provider', '').lower() == "openrouter":
-            os.environ["OPENROUTER_API_KEY"] = request_data['openrouter_api_key']
+            os.environ["OPENAI_API_KEY"] = request_data['openrouter_api_key']
         
         # 准备配置
         send_log('info', '⚙️ 准备分析配置...', 'system', '配置', 4.0, '准备阶段')
