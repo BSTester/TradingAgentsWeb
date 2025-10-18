@@ -26,8 +26,9 @@ interface AnalysisPhase {
 }
 
 interface WebSocketMessage {
-  type: 'log' | 'complete' | 'error' | 'interrupted' | 'config';
+  type: 'log' | 'complete' | 'error' | 'interrupted' | 'config' | 'pong';
   timestamp: string;
+  analysis_id?: string;
   data: {
     level?: string;
     message?: string;
@@ -154,16 +155,19 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
         return;
       }
       
-      // 构建 WebSocket URL
+      // 构建 WebSocket URL，附带鉴权 token
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = buildWebSocketUrl(API_ENDPOINTS.WS.ANALYSIS(analysisId));
+      const baseWsUrl = buildWebSocketUrl(API_ENDPOINTS.WS.ANALYSIS(analysisId));
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+      const wsUrl = baseWsUrl; // 使用子协议传递 token
+      const subprotocol = token ? `jwt.${token}` : undefined;
       
       console.log('🔌 Attempting to connect to WebSocket:', wsUrl);
       console.log('Protocol:', protocol);
       console.log('Hostname:', window.location.hostname);
       
       try {
-        const ws = new WebSocket(wsUrl);
+        const ws = subprotocol ? new WebSocket(wsUrl, [subprotocol]) : new WebSocket(wsUrl);
         wsRef.current = ws;
         console.log('WebSocket object created:', ws);
 
@@ -176,6 +180,12 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
           try {
             const message: WebSocketMessage = JSON.parse(event.data);
             console.log('📨 WebSocket message received:', message);
+
+          // 过滤非当前分析的消息
+          if (message.analysis_id && message.analysis_id !== analysisId) {
+            console.log('🔇 Ignored message for different analysis_id:', message.analysis_id);
+            return;
+          }
 
           if (message.type === 'config') {
             // 接收配置信息，更新显示的智能体

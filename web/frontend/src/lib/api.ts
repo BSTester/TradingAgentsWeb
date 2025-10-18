@@ -169,7 +169,10 @@ export class AnalysisWebSocket {
 
   connect() {
 
-    this.ws = new WebSocket(buildWebSocketUrl(`/ws/analysis/${this.analysisId}`));
+    const baseUrl = buildWebSocketUrl(`/ws/analysis/${this.analysisId}`);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    const subprotocol = token ? `jwt.${token}` : undefined;
+    this.ws = subprotocol ? new WebSocket(baseUrl, [subprotocol]) : new WebSocket(baseUrl);
 
     this.ws.onopen = () => {
       console.log('WebSocket connected');
@@ -181,6 +184,11 @@ export class AnalysisWebSocket {
     this.ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        // 过滤非当前分析的消息
+        if (data && data.analysis_id && data.analysis_id !== this.analysisId) {
+          console.log('Ignored WS message for different analysis_id:', data.analysis_id);
+          return;
+        }
         this.onMessage(data);
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error);

@@ -765,7 +765,6 @@ def run_analysis_task(
             'type': 'complete',
             'timestamp': datetime.utcnow().isoformat(),
             'data': {
-                'analysis_id': analysis_id,
                 'status': 'completed',
                 'trading_decision': str(decision)
             }
@@ -807,7 +806,6 @@ def run_analysis_task(
             'type': 'interrupted',
             'timestamp': datetime.utcnow().isoformat(),
             'data': {
-                'analysis_id': analysis_id,
                 'status': 'interrupted',
                 'message': '分析任务已被中断'
             }
@@ -909,7 +907,6 @@ def run_analysis_task(
             'type': 'error',
             'timestamp': datetime.utcnow().isoformat(),
             'data': {
-                'analysis_id': analysis_id,
                 'status': 'error',
                 'error': user_friendly_error
             }

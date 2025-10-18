@@ -186,8 +186,9 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, List[WebSocket]] = {}
     
-    async def connect(self, websocket: WebSocket, analysis_id: str):
-        await websocket.accept()
+    async def connect(self, websocket: WebSocket, analysis_id: str, subprotocol: str | None = None):
+        # Accept with optional subprotocol for auth negotiation
+        await websocket.accept(subprotocol=subprotocol)
         if analysis_id not in self.active_connections:
             self.active_connections[analysis_id] = []
         self.active_connections[analysis_id].append(websocket)
@@ -206,6 +207,11 @@ class ConnectionManager:
                     self.active_connections[analysis_id] = []
     
     async def send_message(self, message: dict, analysis_id: str):
+        # Ensure analysis_id is present at top-level
+        if not isinstance(message, dict):
+            message = { 'type': 'log', 'timestamp': datetime.utcnow().isoformat(), 'message': str(message) }
+        message['analysis_id'] = analysis_id
+
         if analysis_id in self.active_connections:
             for connection in list(self.active_connections[analysis_id]):
                 try:

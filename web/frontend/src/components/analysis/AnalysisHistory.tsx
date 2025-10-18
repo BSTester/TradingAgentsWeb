@@ -87,6 +87,25 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
 
       // 从列表中移除已删除的分析
       setAnalyses(prev => prev.filter(a => a.id !== analysisId));
+      
+      // 更新总数和总页数，并在当前页删除后为空时回退上一页
+      setTotal(prevTotal => {
+        const newTotal = Math.max(0, prevTotal - 1);
+        const newTotalPages = Math.max(1, Math.ceil(newTotal / limit));
+        setTotalPages(newTotalPages);
+        
+        // 如果当前页码大于新总页数，或者当前页已经没有数据且页码>1，则自动回退
+        setAnalyses(current => {
+          if (current.length === 0 && page > 1) {
+            setPage(p => p - 1);
+          }
+          return current;
+        });
+        
+        // 同步 URL 中的页码（如果需要回退会在 useEffect 更新）
+        return newTotal;
+      });
+
       onShowToast('分析已删除', 'success');
     } catch (error) {
       console.error('Delete error:', error);
