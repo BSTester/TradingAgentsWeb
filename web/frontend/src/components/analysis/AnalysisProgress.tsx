@@ -129,8 +129,8 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
       status: 'pending',
       agents: [
         { name: '激进风险分析师', status: 'pending', logs: [] },
-        { name: '中性风险分析师', status: 'pending', logs: [] },
         { name: '保守风险分析师', status: 'pending', logs: [] },
+        { name: '中性风险分析师', status: 'pending', logs: [] },
         { name: '风险管理评审', status: 'pending', logs: [] }
       ]
     }
