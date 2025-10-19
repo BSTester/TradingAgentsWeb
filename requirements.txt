@@ -40,8 +40,11 @@ pytz
 # Database and storage
 chromadb
 redis
-sqlalchemy>=1.4.0       # ORM for database operations
+sqlalchemy[asyncio]>=2.0.0  # ORM for database operations with async support
 alembic>=1.7.0           # Database migrations
+aiomysql>=0.2.0          # Async MySQL driver (for API routes)
+pymysql>=1.0.0           # Sync MySQL driver (for background tasks)
+aiosqlite>=0.19.0        # Async SQLite driver (for development/testing)
 
 # Web framework and authentication
 fastapi>=0.68.0          # Web framework

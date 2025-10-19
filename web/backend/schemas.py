@@ -41,6 +41,7 @@ class UserLogin(BaseModel):
 
 class User(UserBase):
     id: int
+    role: str
     is_active: bool
     created_at: datetime
     
@@ -79,6 +80,8 @@ class AnalysisRequest(BaseModel):
     backend_url: str
     shallow_thinker: str
     deep_thinker: str
+    # Privacy settings
+    is_public: bool = False  # Whether to show in public leaderboard
     # API Keys
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None

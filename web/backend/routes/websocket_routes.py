@@ -47,11 +47,12 @@ async def websocket_endpoint(websocket: WebSocket, analysis_id: str):
         return
 
     from web.backend.auth import get_current_user_from_token
-    from web.backend.database import SessionLocal
+    from web.backend.database import AsyncSessionLocal
     from web.backend.models import AnalysisRecord
-    db = SessionLocal()
-    try:
-        user = get_current_user_from_token(token, db)
+    from sqlalchemy import select
+    
+    async with AsyncSessionLocal() as db:
+        user = await get_current_user_from_token(token, db)
         if user is None or not user.is_active:
             try:
                 await websocket.close(code=1008)
@@ -60,10 +61,12 @@ async def websocket_endpoint(websocket: WebSocket, analysis_id: str):
             print("❌ WebSocket invalid token, connection rejected")
             return
         # 细粒度：校验 analysis_id 归属
-        analysis = db.query(AnalysisRecord).filter(
+        stmt = select(AnalysisRecord).filter(
             AnalysisRecord.analysis_id == analysis_id,
             AnalysisRecord.user_id == user.id
-        ).first()
+        )
+        result = await db.execute(stmt)
+        analysis = result.scalars().first()
         if not analysis:
             try:
                 await websocket.close(code=1008)
@@ -71,8 +74,6 @@ async def websocket_endpoint(websocket: WebSocket, analysis_id: str):
                 pass
             print("❌ WebSocket access denied: analysis not found or not owned by user")
             return
-    finally:
-        db.close()
 
     try:
         await manager.connect(websocket, analysis_id, subprotocol=chosen_subprotocol)

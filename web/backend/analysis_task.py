@@ -80,7 +80,7 @@ def run_analysis_task(
         manager: WebSocket 连接管理器
     """
     
-    # 创建新的数据库会话
+    # 创建新的数据库会话（同步，用于后台任务）
     db = SessionLocal()
     
     try:

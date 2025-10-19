@@ -292,8 +292,20 @@ def get_fundamentals(
         
         if market == 'A_STOCK':
             # A股基本面信息
-            clean_symbol = formatted_symbol.replace('sz', '').replace('sh', '')
-            em_symbol = formatted_symbol.upper()
+            # 确保股票代码带有 SH 或 SZ 前缀
+            clean_symbol = formatted_symbol.replace('sz', '').replace('sh', '').replace('SZ', '').replace('SH', '')
+            
+            # 根据股票代码判断交易所并添加前缀
+            if clean_symbol.startswith(('000', '002', '003', '30')):
+                # 深交所
+                em_symbol = f'SZ{clean_symbol}'
+            elif clean_symbol.startswith(('60', '68')):
+                # 上交所
+                em_symbol = f'SH{clean_symbol}'
+            else:
+                # 其他情况，尝试使用原格式
+                em_symbol = formatted_symbol.upper()
+            
             basic_info = getattr(ak, "stock_individual_basic_info_xq")(symbol=em_symbol)
             
             # 转换为更易读的格式
@@ -312,7 +324,9 @@ def get_fundamentals(
             
         elif market == 'HK_STOCK':
             # 香港个股基本信息（雪球）
-            hk_code = ''.join([c for c in formatted_symbol if c.isdigit()]) or symbol
+            # 去掉 .HK 后缀，只保留数字部分
+            hk_code = symbol.upper().replace('.HK', '')
+            hk_code = ''.join([c for c in hk_code if c.isdigit()]) or symbol
             hk_code = hk_code.zfill(5)
             basic_info = getattr(ak, "stock_individual_basic_info_hk_xq")(symbol=hk_code)
             # 转换为更易读的格式

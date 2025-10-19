@@ -1,39 +1,108 @@
 #!/usr/bin/env python3
 """
 Database configuration and session management for TradingAgents Web Interface
+Hybrid async/sync implementation for optimal performance
 """
 
 import os
+from typing import AsyncGenerator
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 # Database URL - use SQLite by default
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./tradingagents.db")
-
-# Create engine
-if DATABASE_URL.startswith("sqlite"):
-    # SQLite specific configuration
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-        echo=False  # Set to True for SQL debugging
-    )
-else:
-    # PostgreSQL or other databases
-    engine = create_engine(DATABASE_URL, echo=False)
-
-# Create SessionLocal class
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./tradingagents.db")
 
 # Create Base class for models
 Base = declarative_base()
 
-def get_db():
+# Determine database type and create appropriate engines
+if DATABASE_URL.startswith("mysql+aiomysql"):
+    # MySQL with async support for API routes
+    async_engine = create_async_engine(
+        DATABASE_URL,
+        echo=False,
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
+    )
+    
+    AsyncSessionLocal = async_sessionmaker(
+        async_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
+    
+    # Sync engine for background tasks and init_db
+    sync_database_url = DATABASE_URL.replace("+aiomysql", "+pymysql")
+    sync_engine = create_engine(
+        sync_database_url,
+        echo=False,
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
+    )
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
+    
+elif DATABASE_URL.startswith("sqlite+aiosqlite"):
+    # SQLite with async support
+    async_engine = create_async_engine(
+        DATABASE_URL,
+        echo=False,
+        connect_args={"check_same_thread": False},
+    )
+    
+    AsyncSessionLocal = async_sessionmaker(
+        async_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
+    
+    # Sync SQLite for background tasks
+    sync_database_url = DATABASE_URL.replace("+aiosqlite", "")
+    sync_engine = create_engine(
+        sync_database_url,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+        echo=False
+    )
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
+    
+else:
+    # Fallback to sync only
+    sync_engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
+        poolclass=StaticPool if "sqlite" in DATABASE_URL else None,
+        echo=False
+    )
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
+    async_engine = None
+    AsyncSessionLocal = None
+
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
-    Dependency to get database session
+    Async dependency to get database session (for FastAPI routes)
+    """
+    if AsyncSessionLocal is None:
+        raise RuntimeError("Async database not configured")
+    
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
+
+
+def get_sync_db():
+    """
+    Sync dependency to get database session (for background tasks)
     """
     db = SessionLocal()
     try:
@@ -41,20 +110,26 @@ def get_db():
     finally:
         db.close()
 
-def init_db():
+
+async def init_db():
     """
-    Initialize database tables
+    Initialize database tables (async operation)
     """
     # Import all models to ensure they are registered with Base
     from web.backend.models import User, AnalysisRecord, AnalysisLog, ExportRecord
     
-    # Create all tables
-    Base.metadata.create_all(bind=engine)
-    print("Database tables created successfully")
+    # Create all tables using async engine
+    async with async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    
+    print("✅ Database tables created successfully")
 
-def drop_db():
+
+async def drop_db():
     """
     Drop all database tables (for development/testing)
     """
-    Base.metadata.drop_all(bind=engine)
-    print("Database tables dropped successfully")
+    async with async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    
+    print("✅ Database tables dropped successfully")

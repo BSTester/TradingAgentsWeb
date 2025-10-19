@@ -1,6 +1,30 @@
 version: '3.8'
 
 services:
+  # MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: tradingagents-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-tradingagents123}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-tradingagents}
+      MYSQL_USER: ${MYSQL_USER:-tradingagents}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-tradingagents123}
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: unless-stopped
+    networks:
+      - tradingagents-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-tradingagents123}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # 后端服务 (FastAPI)
   backend:
     image: registry.cn-shenzhen.aliyuncs.com/ai_creator/tradingagents-backend
@@ -9,31 +33,49 @@ services:
       dockerfile: Dockerfile
       target: backend
     container_name: tradingagents-backend
-    ports:
-      - "8080:8000"
+    # ports:
+    #   - "8080:8000"
     env_file:
       - ./.env
     volumes:
       - ./db:/app/db
       - ./eval_results:/app/eval_results
+    depends_on:
+      mysql:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - tradingagents-network
 
-
-  # 前端服务 (Nginx 静态托管 + /api 反代后端)
-  frontend:
-    image: registry.cn-shenzhen.aliyuncs.com/ai_creator/tradingagents-frontend
+  # Next.js 服务
+  nextjs:
+    image: registry.cn-shenzhen.aliyuncs.com/ai_creator/tradingagents-nextjs
     build:
       context: ./web/frontend
       dockerfile: Dockerfile
-    container_name: tradingagents-frontend
+      target: nextjs
+    container_name: tradingagents-nextjs
+    env_file:
+      - ./.env
+    restart: unless-stopped
+    networks:
+      - tradingagents-network
+
+  # Nginx 反向代理
+  nginx:
+    image: registry.cn-shenzhen.aliyuncs.com/ai_creator/tradingagents-nginx
+    build:
+      context: ./web/frontend
+      dockerfile: Dockerfile
+      target: nginx
+    container_name: tradingagents-nginx
     ports:
       - "8000:80"
     env_file:
       - ./.env
     depends_on:
       - backend
+      - nextjs
     restart: unless-stopped
     networks:
       - tradingagents-network
@@ -41,3 +83,6 @@ services:
 networks:
   tradingagents-network:
     driver: bridge
+
+volumes:
+  mysql_data:

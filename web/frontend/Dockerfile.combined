@@ -1,0 +1,49 @@
+# Combined: Next.js + Nginx in one container
+# ============================================
+# deps stage
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+
+# ============================================
+# build stage
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+ENV NODE_ENV=production
+RUN npm run build
+
+# ============================================
+# Runtime: Node.js + Nginx + Supervisor
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+# Install nginx and supervisor
+RUN apk add --no-cache nginx supervisor gettext
+
+# Copy Next.js app
+ENV NODE_ENV=production
+COPY --from=builder /app/next.config.ts ./
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/node_modules ./node_modules
+
+# Copy Nginx config
+COPY nginx-combined.conf.template /etc/nginx/nginx.conf.template
+
+# Create supervisor config
+RUN mkdir -p /var/log/supervisor
+COPY supervisord.conf /etc/supervisord.conf
+
+# Copy startup script
+COPY start-combined.sh /usr/local/bin/start-combined.sh
+RUN sed -i 's/\r$//' /usr/local/bin/start-combined.sh && chmod +x /usr/local/bin/start-combined.sh
+
+# Environment variables
+ENV BACKEND_URL="http://backend:8000"
+
+EXPOSE 80
+CMD ["/usr/local/bin/start-combined.sh"]

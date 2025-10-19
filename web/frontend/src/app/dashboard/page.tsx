@@ -73,6 +73,18 @@ export default function DashboardPage() {
     }
   };
 
+  // 返回顶部按钮显示逻辑
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 300);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   // 如果正在认证检查或加载配置，显示加载状态
   if (authLoading || isLoading || !user) {
     return (
@@ -92,7 +104,7 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 cursor-pointer" onClick={() => router.push('/')}>
                 <h1 className="text-white text-xl font-bold">
                   <i className="fas fa-chart-line mr-2" />
                   TradingAgents
@@ -107,10 +119,24 @@ export default function DashboardPage() {
                 <i className="fas fa-history mr-1" />
                 分析历史
               </button>
+              {user?.role === 'admin' && (
+                <button
+                  onClick={() => router.push('/admin/users')}
+                  className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  <i className="fas fa-users-cog mr-1" />
+                  用户管理
+                </button>
+              )}
               <div className="relative">
                 <button className="text-gray-300 hover:text-white flex items-center">
-                  <i className="fas fa-user-circle mr-2" />
+                  <i className={`fas ${user?.role === 'admin' ? 'fa-crown' : 'fa-user-circle'} mr-2`} />
                   {user?.username}
+                  {user?.role === 'admin' && (
+                    <span className="ml-2 px-2 py-0.5 bg-yellow-500 text-gray-900 text-xs font-bold rounded">
+                      管理员
+                    </span>
+                  )}
                 </button>
               </div>
               <button
@@ -187,15 +213,14 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* 回到顶部按钮，仅在查看报告页面显示 */}
-      {currentView === 'results' && (
+      {/* 回到顶部按钮，仅在查看报告页面且滚动超过300px时显示 */}
+      {currentView === 'results' && showBackToTop && (
         <button
           onClick={handleBackToTop}
-          aria-label="回到顶部"
-          className="fixed bottom-6 right-6 z-50 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg p-3 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          title="回到顶部"
+          className="fixed bottom-8 right-8 bg-blue-600 text-white w-12 h-12 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-300 flex items-center justify-center z-50 hover:scale-110"
+          aria-label="返回顶部"
         >
-          <i className="fas fa-arrow-up" />
+          <i className="fas fa-arrow-up text-xl" />
         </button>
       )}
 

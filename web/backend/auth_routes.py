@@ -6,7 +6,7 @@ Authentication routes for TradingAgents Web Interface
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from web.backend.database import get_db
 from web.backend.schemas import UserCreate, UserLogin, AuthResponse, User as UserSchema, Token, CaptchaResponse
 from web.backend.auth import (
@@ -78,15 +78,15 @@ async def new_captcha(request: Request):
 # Security scheme
 security = HTTPBearer()
 
-def get_current_user(
+async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ) -> User:
     """
     Dependency to get current authenticated user
     """
     token = credentials.credentials
-    user = get_current_user_from_token(token, db)
+    user = await get_current_user_from_token(token, db)
     
     if user is None:
         raise HTTPException(
@@ -109,7 +109,7 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
     return current_user
 
 @router.post("/register", response_model=AuthResponse)
-async def register(user_data: UserCreate, db: Session = Depends(get_db), request: Request = None):
+async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db), request: Request = None):
     """
     Register a new user (requires captcha)
     """
@@ -124,7 +124,7 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db), request
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="验证码无效或已过期")
 
         # Create user
-        user = create_user(
+        user = await create_user(
             db=db,
             username=user_data.username,
             email=user_data.email,
@@ -156,7 +156,7 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db), request
         )
 
 @router.post("/login", response_model=AuthResponse)
-async def login(user_data: UserLogin, db: Session = Depends(get_db), request: Request = None):
+async def login(user_data: UserLogin, db: AsyncSession = Depends(get_db), request: Request = None):
     """
     Login user and return access token (requires captcha)
     """
@@ -170,7 +170,7 @@ async def login(user_data: UserLogin, db: Session = Depends(get_db), request: Re
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="验证码无效或已过期")
 
     # Authenticate user
-    user = authenticate_user(db, user_data.username, user_data.password)
+    user = await authenticate_user(db, user_data.username, user_data.password)
     
     if not user:
         raise HTTPException(
