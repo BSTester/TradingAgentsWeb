@@ -9,7 +9,7 @@ import asyncio
 import json
 import threading
 import re
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict
 
@@ -743,11 +743,14 @@ def run_analysis_task(
         
         # 构造更新字段
         _cleaned_state = serialize_state(final_state) if final_state else None
+        # 使用北京时间 (UTC+8)
+        beijing_tz = timezone(timedelta(hours=8))
+        completed_time = datetime.now(beijing_tz)
         _update_fields = {
             AnalysisRecord.status: "completed",
             AnalysisRecord.current_step: "分析成功完成",
             AnalysisRecord.progress_percentage: 100.0,
-            AnalysisRecord.completed_at: datetime.utcnow(),
+            AnalysisRecord.completed_at: completed_time,
             AnalysisRecord.final_state: _cleaned_state,
             AnalysisRecord.market_analysis: final_state.get("market_report", "") if final_state else "",
             AnalysisRecord.sentiment_analysis: final_state.get("sentiment_report", "") if final_state else "",
@@ -772,7 +775,7 @@ def run_analysis_task(
                     AnalysisRecord.status: "completed",
                     AnalysisRecord.current_step: "分析成功完成",
                     AnalysisRecord.progress_percentage: 100.0,
-                    AnalysisRecord.completed_at: datetime.utcnow(),
+                    AnalysisRecord.completed_at: completed_time,
                     AnalysisRecord.final_state: None,
                     AnalysisRecord.trading_decision: str(decision) if decision else None,
                 })
