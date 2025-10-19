@@ -11,6 +11,53 @@ from .baostock_common import (
 )
 
 
+def _parse_year_parameter(year_input):
+    """
+    解析年份参数，支持多种格式
+    
+    Args:
+        year_input: 年份输入，可以是整数、字符串数字或日期字符串
+        
+    Returns:
+        int: 解析后的年份，如果解析失败则返回当前年份
+    """
+    if year_input is None:
+        return datetime.now().year
+    
+    # 如果已经是整数，直接返回
+    if isinstance(year_input, int):
+        return year_input
+    
+    # 转换为字符串处理
+    year_str = str(year_input).strip()
+    
+    # 尝试直接转换为整数
+    try:
+        return int(year_str)
+    except ValueError:
+        pass
+    
+    # 尝试解析日期格式
+    date_formats = [
+        '%Y-%m-%d',
+        '%Y/%m/%d',
+        '%Y%m%d',
+        '%Y-%m-%d %H:%M:%S',
+        '%Y/%m/%d %H:%M:%S'
+    ]
+    
+    for fmt in date_formats:
+        try:
+            parsed_date = datetime.strptime(year_str, fmt)
+            return parsed_date.year
+        except ValueError:
+            continue
+    
+    # 如果所有解析都失败，返回当前年份
+    print(f"Warning: Unable to parse year from '{year_input}', using current year {datetime.now().year}")
+    return datetime.now().year
+
+
 def get_financial_data(
     symbol: Annotated[str, "ticker symbol of the company"],
     year: Annotated[int, "Year for financial data"] = None,
@@ -36,11 +83,18 @@ def get_financial_data(
         # 格式化股票代码
         formatted_symbol = format_symbol_for_baostock(symbol, market)
         
-        # 如果没有指定年份和季度，使用最近的数据
-        if year is None:
-            year = datetime.now().year
+        # 参数类型转换和验证
+        year = _parse_year_parameter(year)
+        
         if quarter is None:
             quarter = 4  # 默认年报
+        else:
+            try:
+                quarter = int(quarter)
+                if quarter not in [1, 2, 3, 4]:
+                    return f"Error: Invalid quarter '{quarter}'. Quarter must be 1, 2, 3, or 4."
+            except (ValueError, TypeError):
+                return f"Error: Invalid quarter format '{quarter}'. Quarter must be an integer (1-4)."
         
         log_operation("get_financial_data", symbol, market, "ATTEMPT")
         
@@ -133,11 +187,18 @@ def get_balance_sheet(
         # 格式化股票代码
         formatted_symbol = format_symbol_for_baostock(symbol, market)
         
-        # 如果没有指定年份和季度，使用最近的数据
-        if year is None:
-            year = datetime.now().year
+        # 参数类型转换和验证
+        year = _parse_year_parameter(year)
+        
         if quarter is None:
             quarter = 4  # 默认年报
+        else:
+            try:
+                quarter = int(quarter)
+                if quarter not in [1, 2, 3, 4]:
+                    return f"Error: Invalid quarter '{quarter}'. Quarter must be 1, 2, 3, or 4."
+            except (ValueError, TypeError):
+                return f"Error: Invalid quarter format '{quarter}'. Quarter must be an integer (1-4)."
         
         log_operation("get_balance_sheet", symbol, market, "ATTEMPT")
         
@@ -210,11 +271,18 @@ def get_income_statement(
         # 格式化股票代码
         formatted_symbol = format_symbol_for_baostock(symbol, market)
         
-        # 如果没有指定年份和季度，使用最近的数据
-        if year is None:
-            year = datetime.now().year
+        # 参数类型转换和验证
+        year = _parse_year_parameter(year)
+        
         if quarter is None:
             quarter = 4  # 默认年报
+        else:
+            try:
+                quarter = int(quarter)
+                if quarter not in [1, 2, 3, 4]:
+                    return f"Error: Invalid quarter '{quarter}'. Quarter must be 1, 2, 3, or 4."
+            except (ValueError, TypeError):
+                return f"Error: Invalid quarter format '{quarter}'. Quarter must be an integer (1-4)."
         
         log_operation("get_income_statement", symbol, market, "ATTEMPT")
         
@@ -287,11 +355,18 @@ def get_cashflow(
         # 格式化股票代码
         formatted_symbol = format_symbol_for_baostock(symbol, market)
         
-        # 如果没有指定年份和季度，使用最近的数据
-        if year is None:
-            year = datetime.now().year
+        # 参数类型转换和验证
+        year = _parse_year_parameter(year)
+        
         if quarter is None:
             quarter = 4  # 默认年报
+        else:
+            try:
+                quarter = int(quarter)
+                if quarter not in [1, 2, 3, 4]:
+                    return f"Error: Invalid quarter '{quarter}'. Quarter must be 1, 2, 3, or 4."
+            except (ValueError, TypeError):
+                return f"Error: Invalid quarter format '{quarter}'. Quarter must be an integer (1-4)."
         
         log_operation("get_cashflow", symbol, market, "ATTEMPT")
         
@@ -364,11 +439,18 @@ def get_fundamentals(
         # 格式化股票代码
         formatted_symbol = format_symbol_for_baostock(symbol, market)
         
-        # 如果没有指定年份和季度，使用最近的数据
-        if year is None:
-            year = datetime.now().year
+        # 参数类型转换和验证
+        year = _parse_year_parameter(year)
+        
         if quarter is None:
             quarter = 4  # 默认年报
+        else:
+            try:
+                quarter = int(quarter)
+                if quarter not in [1, 2, 3, 4]:
+                    return f"Error: Invalid quarter '{quarter}'. Quarter must be 1, 2, 3, or 4."
+            except (ValueError, TypeError):
+                return f"Error: Invalid quarter format '{quarter}'. Quarter must be an integer (1-4)."
         
         log_operation("get_fundamentals", symbol, market, "ATTEMPT")
         

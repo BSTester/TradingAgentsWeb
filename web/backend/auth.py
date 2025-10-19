@@ -9,7 +9,8 @@ from typing import Optional, Union
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from web.backend.models import User
 
 # Configuration
@@ -61,32 +62,38 @@ def verify_token(token: str) -> Optional[dict]:
     except JWTError:
         return None
 
-def get_user_by_username(db: Session, username: str) -> Optional[User]:
+async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User]:
     """
     Get user by username
     """
-    users = db.query(User).filter(User.username == username).order_by(User.id).all()
+    stmt = select(User).filter(User.username == username).order_by(User.id)
+    result = await db.execute(stmt)
+    users = result.scalars().all()
     return users[0] if users else None
 
-def get_user_by_email(db: Session, email: str) -> Optional[User]:
+async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
     """
     Get user by email
     """
-    users = db.query(User).filter(User.email == email).order_by(User.id).all()
+    stmt = select(User).filter(User.email == email).order_by(User.id)
+    result = await db.execute(stmt)
+    users = result.scalars().all()
     return users[0] if users else None
 
-def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
+async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
     """
     Get user by ID
     """
-    users = db.query(User).filter(User.id == user_id).order_by(User.id).all()
+    stmt = select(User).filter(User.id == user_id).order_by(User.id)
+    result = await db.execute(stmt)
+    users = result.scalars().all()
     return users[0] if users else None
 
-def authenticate_user(db: Session, username: str, password: str) -> Union[User, bool]:
+async def authenticate_user(db: AsyncSession, username: str, password: str) -> Union[User, bool]:
     """
     Authenticate a user with username and password
     """
-    user = get_user_by_username(db, username)
+    user = await get_user_by_username(db, username)
     if not user:
         return False
     if not verify_password(password, user.hashed_password):
@@ -95,23 +102,30 @@ def authenticate_user(db: Session, username: str, password: str) -> Union[User, 
         return False
     return user
 
-def create_user(db: Session, username: str, email: str, password: str) -> User:
+async def create_user(db: AsyncSession, username: str, email: str, password: str) -> User:
     """
     Create a new user
+    First registered user automatically becomes admin
     """
     # Check if username already exists
-    if get_user_by_username(db, username):
+    if await get_user_by_username(db, username):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="用户名已存在"
         )
     
     # Check if email already exists
-    if get_user_by_email(db, email):
+    if await get_user_by_email(db, email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="邮箱地址已存在"
         )
+    
+    # Check if this is the first user (will be admin)
+    stmt = select(User)
+    result = await db.execute(stmt)
+    user_count = len(result.scalars().all())
+    role = "admin" if user_count == 0 else "user"
     
     # Create new user
     hashed_password = get_password_hash(password)
@@ -119,16 +133,17 @@ def create_user(db: Session, username: str, email: str, password: str) -> User:
         username=username,
         email=email,
         hashed_password=hashed_password,
+        role=role,
         is_active=True
     )
     
     db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
+    await db.commit()
+    await db.refresh(db_user)
     
     return db_user
 
-def get_current_user_from_token(token: str, db: Session) -> Optional[User]:
+async def get_current_user_from_token(token: str, db: AsyncSession) -> Optional[User]:
     """
     Get current user from JWT token
     """
@@ -140,7 +155,7 @@ def get_current_user_from_token(token: str, db: Session) -> Optional[User]:
     if not isinstance(username, str) or not username:
         return None
     
-    user = get_user_by_username(db, username)
+    user = await get_user_by_username(db, username)
     if user is None or not user.is_active:
         return None
     

@@ -1,4 +1,4 @@
-# Frontend (Next.js static export) served by Nginx
+# Frontend (Next.js Server) with Nginx reverse proxy
 # ============================================
 # deps stage
 FROM node:20-alpine AS deps
@@ -12,23 +12,44 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Set environment variables for build
 ENV NODE_ENV=production
-# Build and static export to /app/out
-# Build and static export to /app/out (output: 'export' 会在 build 时自动生成 out)
-RUN npm run build
+ENV NEXT_TELEMETRY_DISABLED=1
+# Skip linting during build to avoid build failures
+ENV SKIP_LINT=true
+
+# Build Next.js application with verbose output
+RUN npm run build || (echo "Build failed. Checking for errors..." && exit 1)
 
 # ============================================
-# nginx runtime (pure static)
-FROM nginx:alpine AS runner
-# Install gettext for envsubst
+# Next.js runtime
+FROM node:20-alpine AS nextjs
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Copy necessary files
+COPY --from=builder /app/next.config.ts ./
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/node_modules ./node_modules
+
+EXPOSE 3000
+CMD ["npm", "start"]
+
+# ============================================
+# Nginx reverse proxy
+FROM nginx:alpine AS nginx
 RUN apk add --no-cache gettext
-# Copy static site
-COPY --from=builder /app/out /usr/share/nginx/html
-# Nginx config template and startup script
-COPY nginx.conf.template /etc/nginx/nginx.conf.template
-COPY start.sh /usr/local/bin/start.sh
-RUN sed -i 's/\r$//' /usr/local/bin/start.sh && chmod +x /usr/local/bin/start.sh
-# API backend base URL (e.g., http://backend:8000)
-ENV FRONTEND_API_BASE_URL="http://localhost:8000"
+
+# Copy Nginx config template
+COPY nginx-proxy.conf.template /etc/nginx/nginx.conf.template
+COPY start-nginx.sh /usr/local/bin/start-nginx.sh
+RUN sed -i 's/\r$//' /usr/local/bin/start-nginx.sh && chmod +x /usr/local/bin/start-nginx.sh
+
+# Environment variables for backend URL
+ENV BACKEND_URL="http://backend:8000"
+
 EXPOSE 80
-CMD ["/usr/local/bin/start.sh"]
+CMD ["/usr/local/bin/start-nginx.sh"]

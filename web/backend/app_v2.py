@@ -52,7 +52,7 @@ from cli.models import AnalystType
 
 
 # Import database and authentication components
-from web.backend.database import get_db, init_db, SessionLocal
+from web.backend.database import get_db, init_db, AsyncSessionLocal, SessionLocal
 from web.backend.models import User, AnalysisRecord, AnalysisLog
 from web.backend.schemas import (
     AnalysisRequest, AnalysisResponse, AnalysisStatus, 
@@ -62,7 +62,7 @@ from web.backend.auth_routes import router as auth_router, get_current_active_us
 from web.backend.middleware import LoggingMiddleware
 
 # Import API routes
-from web.backend.routes import analysis_routes, config_routes, task_routes, page_routes, websocket_routes, export_routes
+from web.backend.routes import analysis_routes, config_routes, task_routes, page_routes, websocket_routes, export_routes, leaderboard_routes, user_management_routes
 
 
 @asynccontextmanager
@@ -82,10 +82,15 @@ async def lifespan(app: FastAPI):
             
             # 仅 leader 执行启动任务
             # Initialize database tables (leader only)
-            init_db()
+            await init_db()
             print("✅ Database tables initialized successfully")
             
-            cleanup_running_tasks()
+            # Ensure first user is admin
+            from web.backend.utils.admin_helper import ensure_first_user_is_admin_async
+            async with AsyncSessionLocal() as db:
+                await ensure_first_user_is_admin_async(db)
+            
+            await cleanup_running_tasks()
             print("✅ Running tasks cleaned up")
             
             app.state.monitor_task = asyncio.create_task(task_monitor())
@@ -118,34 +123,36 @@ async def lifespan(app: FastAPI):
                 pass
 
 
-def cleanup_running_tasks():
+async def cleanup_running_tasks():
     """Clean up running tasks on server restart"""
-    db = SessionLocal()
-    try:
-        # 查找所有运行中或初始化中的任务
-        running_tasks = db.query(AnalysisRecord).filter(
-            AnalysisRecord.status.in_(["initializing", "running"])
-        ).all()
-        
-        if running_tasks:
-            print(f"🔄 发现 {len(running_tasks)} 个运行中的任务，准备中断...")
+    async with AsyncSessionLocal() as db:
+        try:
+            from sqlalchemy import select
+            # 查找所有运行中或初始化中的任务
+            result = await db.execute(
+                select(AnalysisRecord).where(
+                    AnalysisRecord.status.in_(["initializing", "running"])
+                )
+            )
+            running_tasks = result.scalars().all()
             
-            for task in running_tasks:
-                task.status = "interrupted"
-                task.current_step = "服务重启，任务已中断"
-                task.error_message = "服务重启导致任务中断"
-                print(f"  🛑 中断任务: {task.analysis_id}")
-            
-            db.commit()
-            print(f"✅ 已中断 {len(running_tasks)} 个任务")
-        else:
-            print("✅ 没有需要清理的运行中任务")
-            
-    except Exception as e:
-        print(f"❌ 清理运行中任务失败: {e}")
-        db.rollback()
-    finally:
-        db.close()
+            if running_tasks:
+                print(f"🔄 发现 {len(running_tasks)} 个运行中的任务，准备中断...")
+                
+                for task in running_tasks:
+                    task.status = "interrupted"
+                    task.current_step = "服务重启，任务已中断"
+                    task.error_message = "服务重启导致任务中断"
+                    print(f"  🛑 中断任务: {task.analysis_id}")
+                
+                await db.commit()
+                print(f"✅ 已中断 {len(running_tasks)} 个任务")
+            else:
+                print("✅ 没有需要清理的运行中任务")
+                
+        except Exception as e:
+            print(f"❌ 清理运行中任务失败: {e}")
+            await db.rollback()
 
 
 async def task_monitor():
@@ -445,6 +452,8 @@ app.include_router(analysis_routes.router)
 app.include_router(config_routes.router)
 app.include_router(task_routes.router)
 app.include_router(export_routes.router)
+app.include_router(leaderboard_routes.router)
+app.include_router(user_management_routes.router)
 
 # Include page and WebSocket routes
 app.include_router(page_routes.router)

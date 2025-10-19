@@ -12,6 +12,7 @@ interface AnalysisResultsProps {
   onBackToConfig: () => void;
   onBackToHistory: () => void;
   onShowToast: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
+  fromLeaderboard?: boolean; // 是否从排行榜进入
 }
 
 interface PhaseResult {
@@ -25,24 +26,37 @@ interface PhaseResult {
   }[];
 }
 
-export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, onShowToast }: AnalysisResultsProps) {
+export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, onShowToast, fromLeaderboard = false }: AnalysisResultsProps) {
   const [activePhase, setActivePhase] = useState(-1); // -1 表示显示最终分析说明
   const [systemDomain, setSystemDomain] = useState('');
 
   // 使用 useQuery 获取分析结果
   const { data: results, isLoading: loading, isError, error } = useQuery({
-    queryKey: ['analysis', 'results', analysisId],
+    queryKey: ['analysis', 'results', analysisId, fromLeaderboard],
     queryFn: async () => {
       const token = localStorage.getItem('access_token');
-      if (!token) {
+      
+      // 从排行榜进入时不需要 token，从历史记录进入时需要 token
+      if (!fromLeaderboard && !token) {
         throw new Error('请先登录');
       }
 
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.ANALYSIS.RESULTS(analysisId)), {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      // 根据来源选择不同的 API 端点
+      const endpoint = fromLeaderboard 
+        ? `/api/public/analysis/${analysisId}/results`  // 公开接口
+        : API_ENDPOINTS.ANALYSIS.RESULTS(analysisId);   // 私有接口
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      // 只有在有 token 时才添加 Authorization header
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(buildApiUrl(endpoint), {
+        headers
       });
 
       if (!response.ok) {
@@ -1119,41 +1133,44 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
           </div>
         </div>
 
-        {/* 底部操作按钮 */}
+        {/* 底部操作区域 */}
         <div className="p-6 bg-gray-50 border-t border-gray-200 no-print">
-          <div className="flex flex-wrap gap-3 justify-center">
-            <button
-              onClick={() => handleExport('pdf')}
-              className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center font-medium"
-            >
-              <i className="fas fa-file-pdf mr-2" />
-              导出为PDF
-            </button>
-            <button
-              onClick={() => handleExport('image')}
-              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center font-medium"
-            >
-              <i className="fas fa-image mr-2" />
-              导出为图片
-            </button>
-            <button
-              onClick={() => handleExport('markdown')}
-              className="px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center font-medium"
-            >
-              <i className="fas fa-file-code mr-2" />
-              导出为Markdown
-            </button>
-            <button
-              onClick={onBackToConfig}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center font-medium"
-            >
-              <i className="fas fa-plus-circle mr-2" />
-              新建分析
-            </button>
-          </div>
+          {/* 操作按钮 - 排行榜模式下隐藏 */}
+          {!fromLeaderboard && (
+            <div className="flex flex-wrap gap-3 justify-center mb-6">
+              <button
+                onClick={() => handleExport('pdf')}
+                className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center font-medium"
+              >
+                <i className="fas fa-file-pdf mr-2" />
+                导出为PDF
+              </button>
+              <button
+                onClick={() => handleExport('image')}
+                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center font-medium"
+              >
+                <i className="fas fa-image mr-2" />
+                导出为图片
+              </button>
+              <button
+                onClick={() => handleExport('markdown')}
+                className="px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center font-medium"
+              >
+                <i className="fas fa-file-code mr-2" />
+                导出为Markdown
+              </button>
+              <button
+                onClick={onBackToConfig}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center font-medium"
+              >
+                <i className="fas fa-plus-circle mr-2" />
+                新建分析
+              </button>
+            </div>
+          )}
 
-          {/* 免责声明 */}
-          <div className="mt-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+          {/* 免责声明 - 始终显示 */}
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
             <div className="flex items-start">
               <i className="fas fa-exclamation-triangle text-yellow-600 text-xl mr-3 mt-1" />
               <div>

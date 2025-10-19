@@ -19,6 +19,7 @@ class User(Base):
     username = Column(String(50), unique=True, index=True, nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
+    role = Column(String(20), default="user", nullable=False, index=True)  # admin, user
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -42,6 +43,7 @@ class AnalysisRecord(Base):
     
     # Analysis parameters
     ticker = Column(String(20), nullable=False, index=True)
+    market = Column(String(10), nullable=True, index=True)  # US, HK, CN
     analysis_date = Column(String(10), nullable=False)  # YYYY-MM-DD format
     analysts = Column(JSON, nullable=False)  # List of selected analysts
     research_depth = Column(Integer, nullable=False)
@@ -49,6 +51,9 @@ class AnalysisRecord(Base):
     shallow_thinker = Column(String(100), nullable=False)
     deep_thinker = Column(String(100), nullable=False)
     backend_url = Column(String(255), nullable=False)
+    
+    # Privacy settings
+    is_public = Column(Boolean, default=False, nullable=False, index=True)  # Whether to show in public leaderboard
     
     # Analysis status and results
     status = Column(String(20), default="queued", nullable=False, index=True)  # queued, running, completed, error
