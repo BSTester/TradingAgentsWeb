@@ -446,7 +446,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                   }`}
               >
                 <i className="fas fa-file-alt mr-2" />
-                交易决策分析
+                投资组合分析
               </button>
 
               {/* 四个阶段标签 */}

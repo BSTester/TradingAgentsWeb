@@ -268,7 +268,7 @@ def run_analysis_task(
             'risky': '激进风险分析师',
             'safe': '保守风险分析师',
             'neutral': '中性风险分析师',
-            'risk_manager': '风险管理评审'
+            'risk_manager': '风险管理评审及投资组合分析'
         }
         
         # LangGraph 节点名称到内部智能体代码的映射
@@ -319,14 +319,9 @@ def run_analysis_task(
             "final_trade_decision": None,
         }
         
-        # 预定义节点执行顺序（用于在 Msg Clear 时预测下一个节点）
-        # 顺序与 node_to_agent_map 保持一致
-        # 前面的分析师根据用户选择动态确定
-        agent_execution_order = []
-        analyst_order = ['news', 'social', 'market', 'fundamentals']  # 按 node_to_agent_map 的顺序
-        for analyst in analyst_order:
-            if analyst in analyst_types:
-                agent_execution_order.append(analyst)
+        # 预定义节点执行顺序（用于追踪智能体切换）
+        # 使用与图构建时相同的顺序（analyst_types 就是图的执行顺序）
+        agent_execution_order = list(analyst_types)  # 直接使用 analyst_types 的顺序
         
         # 后面的固定顺序（按 node_to_agent_map 的顺序）
         fixed_order = ['bull', 'bear', 'invest_judge', 'trader', 'risky', 'safe', 'neutral', 'risk_manager']
@@ -341,8 +336,6 @@ def run_analysis_task(
         current_agent_index = 0  # 当前智能体在顺序中的索引
         current_analyst_index = 0  # 用于进度计算
         agent_completed = False  # 标记当前智能体是否已完成（收集到报告字段）
-        
-
         
         # 创建一个包装器，在 stream 迭代时定期检查中断
         def stream_with_interrupt_check(stream_iterator, check_interval=0.1):
@@ -426,43 +419,16 @@ def run_analysis_task(
                 # 提取节点名称
                 node_name = None
                 state_update = None
-                
                 if isinstance(chunk, dict):
                     # updates 模式：chunk 的键就是节点名称
                     if len(chunk) > 0:
                         node_name = list(chunk.keys())[0]
                         state_update = chunk[node_name]
                         
-                        # 调试：打印节点信息
-                        if step_num <= 10:
-                            print(f"🔍 Step {step_num} - Node: {node_name}")
-                        
-                        # 检查是否是 "Msg Clear XXX" 节点（表示上一个节点完成）
-                        if node_name.startswith("Msg Clear "):
-                            # 提取节点名称
-                            cleared_node = node_name.replace("Msg Clear ", "").strip()
-                            print(f"  🧹 检测到清理节点: {node_name}")
-                            
-                            # 如果清理的节点在映射中，立即切换到下一个节点
-                            if cleared_node in node_to_agent_map:
-                                cleared_agent = node_to_agent_map[cleared_node]
-                                
-                                # 如果这是当前智能体，且还没有触发切换（没收集到报告），则切换
-                                if cleared_agent == current_agent and not agent_completed:
-                                    print(f"  ✅ 节点 {cleared_node} ({cleared_agent}) 已完成（Msg Clear）")
-                                    
-                                    # 查找下一个智能体
-                                    if current_agent_index < len(agent_execution_order) - 1:
-                                        next_agent_index = current_agent_index + 1
-                                        next_agent = agent_execution_order[next_agent_index]
-                                        detected_agent = next_agent
-                                        agent_completed = True  # 标记已完成
-                                        print(f"  🔄 触发切换: {current_agent} -> {next_agent} (Msg Clear)")
-                                elif cleared_agent == current_agent and agent_completed:
-                                    print(f"  ℹ️  节点 {cleared_node} 已通过报告收集完成，跳过 Msg Clear 切换")
+                        print(f"🔍 Step {step_num} - Name: {node_name}")
                         
                         # 根据节点名称映射到智能体（这是当前节点的内容）
-                        elif node_name in node_to_agent_map:
+                        if node_name in node_to_agent_map:
                             mapped_agent = node_to_agent_map[node_name]
                             
                             # 如果还没有当前智能体，这是第一个节点
@@ -473,10 +439,10 @@ def run_analysis_task(
                             elif mapped_agent == current_agent:
                                 print(f"  📝 当前节点 {node_name} 的内容")
                                 # 不改变 detected_agent，继续使用当前智能体
-                            # 如果不同，可能是新节点（但通常应该先收到 Msg Clear）
+                            # 如果不同，说明切换到了新节点
                             else:
                                 detected_agent = mapped_agent
-                                print(f"  ⚠️  直接切换到新节点: {node_name} -> {detected_agent}")
+                                print(f"  🔄 切换到新节点: {node_name} -> {detected_agent}")
                         
                         # 收集报告字段
                         if state_update and isinstance(state_update, dict):
@@ -496,7 +462,7 @@ def run_analysis_task(
                                 if current_agent == 'market' and not agent_completed:
                                     agent_completed = True
                                     print(f"  ✅ market 节点完成（收集到报告）")
-                                    # 立即触发切换
+                                    # 立即触发切换到下一个智能体
                                     if current_agent_index < len(agent_execution_order) - 1:
                                         next_agent_index = current_agent_index + 1
                                         next_agent = agent_execution_order[next_agent_index]
@@ -509,6 +475,7 @@ def run_analysis_task(
                                 if current_agent == 'social' and not agent_completed:
                                     agent_completed = True
                                     print(f"  ✅ social 节点完成（收集到报告）")
+                                    # 立即触发切换到下一个智能体
                                     if current_agent_index < len(agent_execution_order) - 1:
                                         next_agent_index = current_agent_index + 1
                                         next_agent = agent_execution_order[next_agent_index]
@@ -521,6 +488,7 @@ def run_analysis_task(
                                 if current_agent == 'news' and not agent_completed:
                                     agent_completed = True
                                     print(f"  ✅ news 节点完成（收集到报告）")
+                                    # 立即触发切换到下一个智能体
                                     if current_agent_index < len(agent_execution_order) - 1:
                                         next_agent_index = current_agent_index + 1
                                         next_agent = agent_execution_order[next_agent_index]
@@ -533,6 +501,7 @@ def run_analysis_task(
                                 if current_agent == 'fundamentals' and not agent_completed:
                                     agent_completed = True
                                     print(f"  ✅ fundamentals 节点完成（收集到报告）")
+                                    # 立即触发切换到下一个智能体
                                     if current_agent_index < len(agent_execution_order) - 1:
                                         next_agent_index = current_agent_index + 1
                                         next_agent = agent_execution_order[next_agent_index]
@@ -545,6 +514,7 @@ def run_analysis_task(
                                 if current_agent in ['bull', 'bear', 'invest_judge'] and not agent_completed:
                                     agent_completed = True
                                     print(f"  ✅ {current_agent} 节点完成（收集到报告）")
+                                    # 立即触发切换到下一个智能体
                                     if current_agent_index < len(agent_execution_order) - 1:
                                         next_agent_index = current_agent_index + 1
                                         next_agent = agent_execution_order[next_agent_index]
@@ -557,6 +527,7 @@ def run_analysis_task(
                                 if current_agent == 'trader' and not agent_completed:
                                     agent_completed = True
                                     print(f"  ✅ trader 节点完成（收集到报告）")
+                                    # 立即触发切换到下一个智能体
                                     if current_agent_index < len(agent_execution_order) - 1:
                                         next_agent_index = current_agent_index + 1
                                         next_agent = agent_execution_order[next_agent_index]
@@ -569,6 +540,7 @@ def run_analysis_task(
                                 if current_agent in ['risky', 'safe', 'neutral'] and not agent_completed:
                                     agent_completed = True
                                     print(f"  ✅ {current_agent} 节点完成（收集到报告）")
+                                    # 立即触发切换到下一个智能体
                                     if current_agent_index < len(agent_execution_order) - 1:
                                         next_agent_index = current_agent_index + 1
                                         next_agent = agent_execution_order[next_agent_index]
@@ -581,6 +553,7 @@ def run_analysis_task(
                                 if current_agent == 'risk_manager' and not agent_completed:
                                     agent_completed = True
                                     print(f"  ✅ risk_manager 节点完成（收集到报告）")
+                                    # 立即触发切换到下一个智能体
                                     if current_agent_index < len(agent_execution_order) - 1:
                                         next_agent_index = current_agent_index + 1
                                         next_agent = agent_execution_order[next_agent_index]
@@ -899,8 +872,13 @@ def run_analysis_task(
         # 友好的错误消息
         user_friendly_error = None
         
+        # 检测 JSON 解析错误（通常是 API 返回了非 JSON 响应）
+        if error_type == 'JSONDecodeError' or 'json' in error_msg.lower() or 'expecting value' in error_msg.lower():
+            user_friendly_error = "API 返回了无效的响应格式。可能原因：1) API 服务暂时不可用，2) API 密钥配额不足，3) 网络连接不稳定。请稍后重试或检查 API 配置"
+            print(f"💡 JSON 解析错误建议: {user_friendly_error}")
+        
         # 检测 token 超限错误
-        if 'context_length_exceeded' in error_msg or 'maximum context length' in error_msg.lower():
+        elif 'context_length_exceeded' in error_msg or 'maximum context length' in error_msg.lower():
             # 提取 token 数量信息
             import re
             token_match = re.search(r'(\d+)\s+tokens', error_msg)
@@ -922,6 +900,18 @@ def run_analysis_task(
         # 检测限流错误
         elif 'rate_limit' in error_msg.lower() or 'too many requests' in error_msg.lower():
             user_friendly_error = "API 请求频率超限,请稍后再试"
+        
+        # 检测工具调用错误（如 fundamentals 获取失败）
+        elif 'runtimeerror' in error_msg.lower() and 'vendor implementations failed' in error_msg.lower():
+            # 提取工具名称
+            import re
+            tool_match = re.search(r"method '(\w+)'", error_msg)
+            if tool_match:
+                tool_name = tool_match.group(1)
+                user_friendly_error = f"数据获取工具 '{tool_name}' 调用失败。可能原因：1) 数据源暂时不可用，2) 股票代码不存在，3) 网络连接问题。建议稍后重试"
+            else:
+                user_friendly_error = "数据获取工具调用失败，数据源可能暂时不可用。建议稍后重试"
+            print(f"💡 工具调用错误: {user_friendly_error}")
         
         # 如果没有匹配到特定错误,使用原始错误消息(但限制长度)
         if not user_friendly_error:
