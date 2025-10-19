@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { AuthProvider } from '@/lib/auth';
+import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: 'TradingAgents - 多智能体大语言模型金融交易框架',
@@ -23,9 +23,9 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased">
-        <AuthProvider>
+        <Providers>
           {children}
-        </AuthProvider>
+        </Providers>
       </body>
     </html>
   );

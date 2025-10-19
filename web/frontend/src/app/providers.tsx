@@ -3,8 +3,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useState, ReactNode } from 'react'
-import { AuthProvider } from '../hooks/useAuth'
-import { ToasterProvider } from '../components/ui/ToasterProvider'
+import { AuthProvider } from '@/lib/auth'
+import { ToasterProvider } from '@/components/ui/ToasterProvider'
 
 interface ProvidersProps {
   children: ReactNode

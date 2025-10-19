@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { buildApiUrl, API_ENDPOINTS } from '../../utils/api';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 
 
 interface AnalysisHistoryProps {
@@ -35,9 +34,6 @@ interface AnalysisListResponse {
 }
 
 export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress, onShowToast }: AnalysisHistoryProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
   const [page, setPage] = useState(1);
@@ -84,25 +80,6 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
   const total = data?.total || 0;
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
-  // 初始化时从 URL 查询参数恢复分页
-  useEffect(() => {
-    const pageParam = searchParams.get('page');
-    const initialPage = pageParam ? Math.max(1, parseInt(pageParam, 10) || 1) : 1;
-    if (initialPage !== page) {
-      setPage(initialPage);
-    }
-    // 仅在首次渲染时读取
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
-  // 当分页变化时，将当前分页写入 URL（不增加历史记录）
-  useEffect(() => {
-    const sp = new URLSearchParams(searchParams.toString());
-    sp.set('page', String(page));
-    router.replace(`${pathname}?${sp.toString()}`);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
-
   const handleDeleteClick = (analysisId: string, ticker: string) => {
     setDeleteConfirm({ show: true, analysisId, ticker });
   };
@@ -125,12 +102,17 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
         throw new Error(error.detail || '删除失败');
       }
 
-      // 使 React Query 缓存失效，重新获取数据
-      queryClient.invalidateQueries({ queryKey: ['analysis', 'list'] });
-
-      // 如果当前页删除后为空且页码>1，则回退上一页
+      // 如果当前页删除后为空且页码>1，则先回退到上一页
+      // 这样 invalidateQueries 会自动获取上一页的数据
       if (analyses.length === 1 && page > 1) {
         setPage(p => p - 1);
+        // 等待 state 更新后再使缓存失效
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['analysis', 'list'] });
+        }, 0);
+      } else {
+        // 否则直接使缓存失效，重新获取当前页数据
+        queryClient.invalidateQueries({ queryKey: ['analysis', 'list'] });
       }
 
       onShowToast('分析已删除', 'success');

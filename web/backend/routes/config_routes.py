@@ -54,19 +54,19 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
             },
             "oneai": {
                 "shallow": [
-                    {"value": "gpt-4o-mini", "label": "GPT-4o-mini - 快速高效，适合快速任务"},
-                    {"value": "gpt-4.1-nano", "label": "GPT-4.1-nano - 超轻量模型，适合基本操作"},
-                    {"value": "gpt-4.1-mini", "label": "GPT-4.1-mini - 紧凑模型，性能良好"},
-                    {"value": "gpt-4o", "label": "GPT-4o - 标准模型，能力稳定"},
+                    {"value": "openai/gpt-4o-mini", "label": "GPT-4o-mini - 快速高效，适合快速任务"},
+                    {"value": "openai/gpt-4.1-nano", "label": "GPT-4.1-nano - 超轻量模型，适合基本操作"},
+                    {"value": "openai/gpt-4.1-mini", "label": "GPT-4.1-mini - 紧凑模型，性能良好"},
+                    {"value": "openai/gpt-4o", "label": "GPT-4o - 标准模型，能力稳定"},
                 ],
                 "deep": [
-                    {"value": "gpt-4.1-nano", "label": "GPT-4.1-nano - 超轻量模型，适合基本操作"},
-                    {"value": "gpt-4.1-mini", "label": "GPT-4.1-mini - 紧凑模型，性能良好"},
-                    {"value": "gpt-4o", "label": "GPT-4o - 标准模型，能力稳定"},
-                    {"value": "o4-mini", "label": "o4-mini - 专业推理模型（紧凑版）"},
-                    {"value": "o3-mini", "label": "o3-mini - 高级推理模型（轻量级）"},
-                    {"value": "o3", "label": "o3 - 完整高级推理模型"},
-                    {"value": "o1", "label": "o1 - 首屈一指的推理和问题解决模型"},
+                    {"value": "openai/gpt-4.1-nano", "label": "GPT-4.1-nano - 超轻量模型，适合基本操作"},
+                    {"value": "openai/gpt-4.1-mini", "label": "GPT-4.1-mini - 紧凑模型，性能良好"},
+                    {"value": "openai/gpt-4o", "label": "GPT-4o - 标准模型，能力稳定"},
+                    {"value": "openai/o4-mini", "label": "o4-mini - 专业推理模型（紧凑版）"},
+                    {"value": "openai/o3-mini", "label": "o3-mini - 高级推理模型（轻量级）"},
+                    {"value": "openai/o3", "label": "o3 - 完整高级推理模型"},
+                    {"value": "openai/o1", "label": "o1 - 首屈一指的推理和问题解决模型"},
                 ]
             },
             "anthropic": {
