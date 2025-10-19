@@ -68,6 +68,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
   const [apiKeyValidated, setApiKeyValidated] = useState(false);
   const [validatingKey, setValidatingKey] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [tickerError, setTickerError] = useState<string>('');
 
   // 检查当前选择的LLM提供商是否需要API密钥
   const requiresApiKey = formData.llm_provider && formData.llm_provider !== 'ollama';
@@ -93,7 +94,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
         const cachedDate = new Date(cachedData.cached_at);
         const now = new Date();
         const diffHours = (now.getTime() - cachedDate.getTime()) / (1000 * 60 * 60);
-        
+
         // 缓存在24小时内有效
         if (diffHours < 24) {
           setFormData(prev => ({
@@ -101,13 +102,13 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
             ...cachedData,
             analysis_date: new Date().toISOString().split('T')[0] || '' // 始终使用今天的日期
           }));
-          
+
           // 如果缓存中包含API密钥且不是本地模型，设置验证状态为true
           // 这样用户就不需要重新输入已缓存的API密钥
           if (cachedData.api_key && cachedData.llm_provider && cachedData.llm_provider !== 'ollama') {
             setApiKeyValidated(true);
           }
-          
+
           return true;
         }
       }
@@ -149,12 +150,12 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
   const getModelsForProvider = (provider: string, type: 'shallow' | 'deep'): Model[] => {
     // 将provider转换为小写以匹配后端返回的键名
     const providerKey = provider.toLowerCase();
-    
+
     // 如果config中有模型数据，使用config的数据
     if (config?.models?.[providerKey]?.[type]) {
       return config.models[providerKey][type];
     }
-    
+
     // 否则使用默认模型列表
     const defaultModels: Record<string, Record<string, Model[]>> = {
       openai: {
@@ -211,7 +212,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
         ]
       }
     };
-    
+
     return defaultModels[providerKey]?.[type] || [];
   };
 
@@ -226,13 +227,52 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     return placeholders[provider] || '输入API密钥';
   };
 
+  // 验证股票代码格式
+  const validateTicker = (ticker: string): { valid: boolean; error: string } => {
+    if (!ticker) {
+      return { valid: false, error: '请输入股票代码' };
+    }
+
+    const trimmedTicker = ticker.trim().toUpperCase();
+
+    // 美股：1-5个大写字母
+    const usStockPattern = /^[A-Z]{1,5}$/;
+    // A股：6位数字（沪市600/601/603/605开头，深市000/002/003/300开头）
+    const aStockPattern = /^(600|601|603|605|000|002|003|300)\d{3}$/;
+    // 港股：4-5位数字 + .HK 或 .hk
+    const hkStockPattern = /^\d{4,5}\.(HK|hk)$/;
+
+    if (usStockPattern.test(trimmedTicker)) {
+      return { valid: true, error: '' };
+    }
+
+    if (aStockPattern.test(trimmedTicker)) {
+      return { valid: true, error: '' };
+    }
+
+    if (hkStockPattern.test(trimmedTicker)) {
+      return { valid: true, error: '' };
+    }
+
+    // 如果都不匹配，返回详细的错误信息
+    return {
+      valid: false,
+      error: '股票代码格式不正确。请输入：\n• 美股：1-5个字母（如 AAPL, TSLA）\n• A股：6位数字（如 600519, 000001）\n• 港股：数字+.HK（如 00700.HK, 09988.HK）'
+    };
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
+
     // 如果更改了LLM提供商或API密钥，重置验证状态
     if (name === 'llm_provider' || name === 'api_key') {
       setApiKeyValidated(false);
+    }
+
+    // 如果更改了股票代码，清除错误信息
+    if (name === 'ticker') {
+      setTickerError('');
     }
   };
 
@@ -279,7 +319,15 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    // 验证股票代码
+    const tickerValidation = validateTicker(formData.ticker);
+    if (!tickerValidation.valid) {
+      setTickerError(tickerValidation.error);
+      onShowToast('请输入有效的股票代码', 'error');
+      return;
+    }
+
     if (formData.analysts.length === 0) {
       onShowToast('请至少选择一个分析师', 'error');
       return;
@@ -296,10 +344,10 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     try {
       // 保存完整配置到缓存（包括API密钥）
       saveConfigToCache(formData);
-      
+
       // 准备API请求数据
       const requestData: any = {
-        ticker: formData.ticker,
+        ticker: formData.ticker.trim().toUpperCase(),
         analysis_date: formData.analysis_date,
         analysts: formData.analysts,
         research_depth: formData.research_depth,
@@ -322,11 +370,11 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
 
       // 调用后端API启动分析
       const response: AnalysisResponse = await analysisAPI.startAnalysis(requestData);
-      
+
       console.log('=== Analysis Started ===');
       console.log('Response:', response);
       console.log('Analysis ID:', response.analysis_id);
-      
+
       // 检查是否是重复任务
       if (response.message && response.status !== 'queued') {
         // 重复任务，显示明确的警告提示
@@ -377,10 +425,23 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
               name="ticker"
               value={formData.ticker}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="例如：TSLA, AAPL, NVDA"
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:border-transparent ${tickerError
+                ? 'border-red-300 focus:ring-red-500'
+                : 'border-gray-300 focus:ring-blue-500'
+                }`}
+              placeholder="例如：TSLA, 600519, 00700.HK"
               required
             />
+            {tickerError && (
+              <div className="mt-2 text-sm text-red-600 whitespace-pre-line">
+                <i className="fas fa-exclamation-circle mr-1" />
+                {tickerError}
+              </div>
+            )}
+            <p className="text-sm text-gray-500 mt-2">
+              <i className="fas fa-info-circle mr-1" />
+              支持美股（如 AAPL）、A股（如 600519）、港股（如 00700.HK）
+            </p>
           </div>
         </div>
 
@@ -422,11 +483,10 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
               {availableAnalysts.map((analyst: Analyst) => (
                 <div
                   key={analyst.value}
-                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                    formData.analysts.includes(analyst.value)
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
+                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${formData.analysts.includes(analyst.value)
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-300 hover:border-gray-400'
+                    }`}
                   onClick={() => handleAnalystToggle(analyst.value)}
                 >
                   <div className="flex items-start space-x-3">
@@ -461,16 +521,15 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
               {researchDepths.map((depth: ResearchDepth) => (
                 <div
                   key={depth.value}
-                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                    formData.research_depth === depth.value
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
+                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${formData.research_depth === depth.value
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-300 hover:border-gray-400'
+                    }`}
                   onClick={() => setFormData(prev => ({ ...prev, research_depth: depth.value }))}
                 >
                   <div className="flex items-start space-x-3">
                     <input
-                      type="radio" 
+                      type="radio"
                       name="research_depth"
                       value={depth.value}
                       checked={formData.research_depth === depth.value}
@@ -549,11 +608,10 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
                     type="button"
                     onClick={validateApiKey}
                     disabled={validatingKey || !formData.api_key}
-                    className={`px-4 py-2 rounded-md border font-medium transition-colors ${
-                      apiKeyValidated
-                        ? 'bg-green-50 border-green-200 text-green-700'
-                        : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    className={`px-4 py-2 rounded-md border font-medium transition-colors ${apiKeyValidated
+                      ? 'bg-green-50 border-green-200 text-green-700'
+                      : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {validatingKey ? (
                       <>
