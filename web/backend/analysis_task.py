@@ -9,7 +9,6 @@ import asyncio
 import json
 import threading
 import re
-import io
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
@@ -24,95 +23,6 @@ from cli.models import AnalystType
 
 from web.backend.database import SessionLocal
 from web.backend.models import AnalysisRecord
-
-
-class LogCapture:
-    """Capture logs from standard output."""
-    def __init__(self, callback):
-        self.callback = callback
-        self.original_stdout = sys.stdout
-        self.original_stderr = sys.stderr
-        
-    def write(self, text):
-        """捕获写入的文本"""
-        # 同时输出到原始stdout
-        self.original_stdout.write(text)
-        self.original_stdout.flush()
-        
-        # 解析并回调
-        if text.strip():
-            self.callback(text)
-    
-    def flush(self):
-        """刷新缓冲"""
-        self.original_stdout.flush()
-    
-    def __enter__(self):
-        sys.stdout = self
-        return self
-    
-    def __exit__(self, *args):
-        sys.stdout = self.original_stdout
-
-
-def parse_agent_log(log_line: str) -> dict:
-    """
-    Parse agent log line and extract role information.
-    
-    Log format example:
-    [14:23:15] Icon RoleName[TICKER] | Icon Level: Message
-    
-    Returns dict with timestamp, role, ticker, level, message
-    """
-    # 移除ANSI颜色代码
-    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-    clean_line = ansi_escape.sub('', log_line)
-    
-    # 匹配日志格式: [时间] emoji 角色名[股票] | 级别: 消息
-    pattern = r'\[(\d{2}:\d{2}:\d{2})\]\s+[^\s]+\s+([^\[]+)\[([^\]]+)\]\s+\|\s+[^\s]+\s+([^:]+):\s+(.+)'
-    match = re.match(pattern, clean_line)
-    
-    if match:
-        timestamp, role_name, ticker, level_text, message = match.groups()
-        
-        # 角色名称到角色代码的映射
-        role_name_to_code = {
-            '基本面分析师': 'FUNDAMENTALS_ANALYST',
-            '市场分析师': 'MARKET_ANALYST',
-            '新闻分析师': 'NEWS_ANALYST',
-            '社交媒体分析师': 'SOCIAL_ANALYST',
-            '多头研究员': 'BULL_RESEARCHER',
-            '空头研究员': 'BEAR_RESEARCHER',
-            '交易员': 'TRADER',
-            '投资评审': 'INVEST_JUDGE',
-            '激进风险分析师': 'RISKY_ANALYST',
-            '中性风险分析师': 'NEUTRAL_ANALYST',
-            '保守风险分析师': 'SAFE_ANALYST',
-            '风险管理评审': 'RISK_MANAGER'
-        }
-        
-        # 级别文本到级别代码的映射
-        level_text_to_code = {
-            '开始': 'START',
-            '完成': 'END',
-            '信息': 'INFO',
-            '决策': 'DECISION',
-            '工具调用': 'TOOL',
-            '错误': 'ERROR'
-        }
-        
-        role_code = role_name_to_code.get(role_name.strip(), None)
-        level_code = level_text_to_code.get(level_text.strip(), 'INFO')
-        
-        return {
-            'timestamp': timestamp,
-            'role': role_code,
-            'ticker': ticker.strip(),
-            'level': level_code,
-            'message': message.strip()
-        }
-    
-    return None
 
 
 def serialize_state(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -319,7 +229,9 @@ def run_analysis_task(
             request_data.get('ticker'),
             request_data.get('analysis_date')
         )
-        args = graph.propagator.get_graph_args(stream_mode="values")
+        args = graph.propagator.get_graph_args()
+        # 修改 stream_mode 为 "updates" 以获取节点信息
+        args["stream_mode"] = "updates"
         
         # 计算进度分配
         # 总进度: 10% -> 90%, 共 80% 的进度空间
@@ -344,121 +256,93 @@ def run_analysis_task(
         
         # 智能体名称映射(与logger.py中的ROLES对应)
         agent_name_map = {
-            'market': '市场分析师',
-            'social': '社交媒体分析师',
             'news': '新闻分析师',
+            'social': '社交媒体分析师',
+            'market': '市场分析师',
             'fundamentals': '基本面分析师',
-            'researcher': '研究分析师',
             'bull': '多头研究员',
             'bear': '空头研究员',
-            'trader': '交易员',
+            'researcher': '研究分析师',
             'invest_judge': '投资评审',
+            'trader': '交易员',
             'risky': '激进风险分析师',
-            'neutral': '中性风险分析师',
             'safe': '保守风险分析师',
+            'neutral': '中性风险分析师',
             'risk_manager': '风险管理评审'
         }
         
-        # 日志角色代码到内部角色的映射(用于解析新日志格式)
-        log_role_to_agent = {
-            'FUNDAMENTALS_ANALYST': 'fundamentals',
-            'MARKET_ANALYST': 'market',
-            'NEWS_ANALYST': 'news',
-            'SOCIAL_ANALYST': 'social',
-            'BULL_RESEARCHER': 'bull',
-            'BEAR_RESEARCHER': 'bear',
-            'TRADER': 'trader',
-            'INVEST_JUDGE': 'invest_judge',
-            'RISKY_ANALYST': 'risky',
-            'NEUTRAL_ANALYST': 'neutral',
-            'SAFE_ANALYST': 'safe',
-            'RISK_MANAGER': 'risk_manager'
+        # LangGraph 节点名称到内部智能体代码的映射
+        node_to_agent_map = {
+            'News Analyst': 'news',
+            'Social Analyst': 'social',
+            'Market Analyst': 'market',
+            'Fundamentals Analyst': 'fundamentals',
+            'Bull Researcher': 'bull',
+            'Bear Researcher': 'bear',
+            'Research Manager': 'invest_judge',
+            'Trader': 'trader',
+            'Risky Analyst': 'risky',
+            'Safe Analyst': 'safe',
+            'Neutral Analyst': 'neutral',
+            'Portfolio Manager': 'risk_manager',
         }
         
+        # 智能体对应的报告字段（用于判断节点完成）
+        agent_report_fields = {
+            'news': 'news_report',
+            'social': 'sentiment_report',
+            'market': 'market_report',
+            'fundamentals': 'fundamentals_report',
+            'bull': 'investment_debate_state',
+            'bear': 'investment_debate_state',
+            'invest_judge': 'investment_debate_state',
+            'trader': 'trader_investment_plan',
+            'risky': 'risk_debate_state',
+            'safe': 'risk_debate_state',
+            'neutral': 'risk_debate_state',
+            'risk_manager': 'investment_plan',
+        }
+        
+        # 报告字段收集器
+        report_sections = {
+            "ticker": request_data.get('ticker', 'UNKNOWN'),
+            "company_of_interest": None,
+            "trade_date": None,
+            "market_report": None,
+            "sentiment_report": None,
+            "news_report": None,
+            "fundamentals_report": None,
+            "investment_debate_state": None,
+            "trader_investment_plan": None,
+            "risk_debate_state": None,
+            "investment_plan": None,
+            "final_trade_decision": None,
+        }
+        
+        # 预定义节点执行顺序（用于在 Msg Clear 时预测下一个节点）
+        # 顺序与 node_to_agent_map 保持一致
+        # 前面的分析师根据用户选择动态确定
+        agent_execution_order = []
+        analyst_order = ['news', 'social', 'market', 'fundamentals']  # 按 node_to_agent_map 的顺序
+        for analyst in analyst_order:
+            if analyst in analyst_types:
+                agent_execution_order.append(analyst)
+        
+        # 后面的固定顺序（按 node_to_agent_map 的顺序）
+        fixed_order = ['bull', 'bear', 'invest_judge', 'trader', 'risky', 'safe', 'neutral', 'risk_manager']
+        agent_execution_order.extend(fixed_order)
+        
+        print(f"📋 预定义智能体执行顺序: {agent_execution_order}")
+        
         # 流式执行并定期检查中断
-        trace = []
         step_num = 0
         last_agent = None
         current_agent = None
+        current_agent_index = 0  # 当前智能体在顺序中的索引
+        current_analyst_index = 0  # 用于进度计算
+        agent_completed = False  # 标记当前智能体是否已完成（收集到报告字段）
         
-        # 用于跟踪从日志中检测到的智能体
-        log_detected_agent = None
-        last_log_agent = None
-        
-        # 用户选择的分析师映射(用于判断阶段完成)
-        selected_analysts_set = set()
-        for analyst in analyst_types:
-            if analyst == 'market':
-                selected_analysts_set.add('market')
-            elif analyst == 'social':
-                selected_analysts_set.add('social')
-            elif analyst == 'news':
-                selected_analysts_set.add('news')
-            elif analyst == 'fundamentals':
-                selected_analysts_set.add('fundamentals')
-        
-        # 日志捕获回调函数
-        def on_log_captured(log_line: str):
-            """处理捕获的日志行"""
-            nonlocal log_detected_agent, last_log_agent, current_analyst_index, current_agent
-            
-            parsed = parse_agent_log(log_line)
-            if parsed and parsed['role']:
-                role_code = parsed['role']
-                level = parsed['level']
-                message = parsed['message']
-                
-                # 映射到内部角色代码
-                agent = log_role_to_agent.get(role_code)
-                
-                if agent:
-                    log_detected_agent = agent
-                    
-                    # 检测智能体切换(START级别)
-                    if level == 'START' and agent != last_log_agent:
-                        # 上一个智能体完成
-                        if last_log_agent:
-                            agent_display_name = agent_name_map.get(last_log_agent, last_log_agent)
-                            progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent))
-                            send_log('info', f'{agent_display_name} 完成分析', last_log_agent, '完成', progress, '分析阶段')
-                            current_analyst_index += 1
-                        
-                        # 新智能体开始
-                        current_agent = agent
-                        agent_display_name = agent_name_map.get(agent, agent)
-                        progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent))
-                        send_log('info', f'🔍 {agent_display_name} 开始分析...', agent, '开始', progress, '分析阶段')
-                        
-                        if analysis_record:
-                            analysis_record.progress_percentage = progress
-                            try:
-                                db.commit()
-                            except:
-                                pass
-                        
-                        last_log_agent = agent
-                    
-                    # 记录决策
-                    elif level == 'DECISION':
-                        agent_display_name = agent_name_map.get(agent, agent)
-                        progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent) + (progress_per_agent * 0.8))
-                        send_log('info', f'🎯 {agent_display_name} {message}', agent, '决策', progress, '分析阶段')
-                    
-                    # 记录工具调用
-                    elif level == 'TOOL':
-                        progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent) + (progress_per_agent * 0.3))
-                        send_log('info', f'🔨 {message}', agent, '工具调用', progress, '分析阶段')
-                    
-                    # 记录信息(包括分析结果内容)
-                    elif level == 'INFO':
-                        # 输出智能体分析结果内容到控制台(00字符
-                        # 注意：这里不能使用 print()，因为会触发递归的日志捕获
-                        # if '生成报告完成' in message or '完成' in message:
-                        #     agent_display_name = agent_name_map.get(agent, agent)
-                        #     sys.__stdout__.write(f"📝 {agent_display_name} 输出内容预览: {message[:200]}\n")
-                        #     sys.__stdout__.flush()
-                        progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent) + (progress_per_agent * 0.5))
-                        send_log('info', message[:200], agent, '信息', progress, '分析阶段')
+
         
         # 创建一个包装器，在 stream 迭代时定期检查中断
         def stream_with_interrupt_check(stream_iterator, check_interval=0.1):
@@ -481,14 +365,14 @@ def run_analysis_task(
                 """在后台线程中读取 stream"""
                 try:
                     for chunk in stream_iterator:
-                        chunk_queue.put(('chunk', chunk))
+                        chunk_queue.put(('chunk', chunk, analysis_id))
                         if stop_event.is_set():
-                            print(f"🛑 Stream reader 检测到中断信号")
+                            print(f"🛑 [{analysis_id}] Stream reader 检测到中断信号")
                             break
-                    chunk_queue.put(('done', None))
+                    chunk_queue.put(('done', None, analysis_id))
                 except Exception as e:
                     exception_holder[0] = e
-                    chunk_queue.put(('error', e))
+                    chunk_queue.put(('error', e, analysis_id))
                 finally:
                     finished.set()
             
@@ -500,12 +384,20 @@ def run_analysis_task(
             while not finished.is_set() or not chunk_queue.empty():
                 # 检查中断信号
                 if stop_event.is_set():
-                    print(f"🛑 主线程检测到中断信号，停止迭代")
+                    print(f"🛑 [{analysis_id}] 主线程检测到中断信号，停止迭代")
                     raise InterruptedError("Analysis interrupted during stream")
                 
                 try:
                     # 尝试从队列获取 chunk，带超时
-                    msg_type, data = chunk_queue.get(timeout=check_interval)
+                    queue_item = chunk_queue.get(timeout=check_interval)
+                    msg_type = queue_item[0]
+                    data = queue_item[1]
+                    item_analysis_id = queue_item[2] if len(queue_item) > 2 else None
+                    
+                    # 验证 analysis_id 匹配，避免混淆
+                    if item_analysis_id and item_analysis_id != analysis_id:
+                        print(f"⚠️  警告: 队列中的 analysis_id ({item_analysis_id}) 与当前任务 ({analysis_id}) 不匹配，跳过")
+                        continue
                     
                     if msg_type == 'chunk':
                         yield data
@@ -521,153 +413,320 @@ def run_analysis_task(
             # 等待读取线程结束
             reader_thread.join(timeout=1.0)
         
-        # 使用日志捕获
-        with LogCapture(on_log_captured):
-            try:
-                stream_iterator = graph.graph.stream(init_agent_state, **args)
-                for chunk in stream_with_interrupt_check(stream_iterator):
-                    check_stop()
-                    step_num += 1
-                    
-                    # 优先使用日志检测的智能体
-                    if log_detected_agent:
-                        detected_agent = log_detected_agent
-                    else:
-                        detected_agent = None
-                    
-                    # 简化处理:从消息内容和工具调用推断智能体
-                    messages = chunk.get("messages", []) if isinstance(chunk, dict) else []
-                    if messages:
-                        trace.append(chunk)
-                        
-                        # 如果日志没有检测到,使用工具调用检测(回退方案)
-                        if not detected_agent:
-                            # 优先:通过工具调用推断智能体
-                            for msg in messages:
-                                if hasattr(msg, 'tool_calls') and msg.tool_calls:
-                                    for tool_call in msg.tool_calls:
-                                        tool_name = tool_call.get('name', '') if isinstance(tool_call, dict) else getattr(tool_call, 'name', '')
-                                        
-                                        # 根据工具名称推断智能体
-                                        if tool_name in ['get_stock_data', 'get_indicators', 'get_realtime_data']:
-                                            detected_agent = 'market'
-                                        elif tool_name in ['get_fundamentals', 'get_balance_sheet', 'get_cashflow', 'get_income_statement', 'get_dividend_data']:
-                                            detected_agent = 'fundamentals'
-                                        elif tool_name in ['get_news', 'get_global_news']:
-                                            detected_agent = 'news'
-                                        elif tool_name in ['get_insider_sentiment', 'get_insider_transactions']:
-                                            detected_agent = 'social'
-                                        
-                                        if detected_agent:
-                                            print(f"  🔧 Tool call: {tool_name} Agent: {detected_agent}")
-                                            break
-                                if detected_agent:
-                                    break
-                            
-                            # 回退:从内容推断智能体
-                            if not detected_agent:
-                                for msg in messages:
-                                    if hasattr(msg, 'content') and msg.content:
-                                        content = str(msg.content)
-                                        content_lower = content.lower()
-                                        
-                                        if any(kw in content_lower for kw in ['市场', 'market', '股价', 'price']):
-                                            detected_agent = 'market'
-                                        elif any(kw in content_lower for kw in ['社交', 'social', '情绪', 'sentiment']):
-                                            detected_agent = 'social'
-                                        elif any(kw in content_lower for kw in ['新闻', 'news']):
-                                            detected_agent = 'news'
-                                        elif any(kw in content_lower for kw in ['基本面', 'fundamental', '财报']):
-                                            detected_agent = 'fundamentals'
-                                        elif any(kw in content_lower for kw in ['研究', 'research']):
-                                            detected_agent = 'invest_judge'
-                                        elif any(kw in content_lower for kw in ['多头', 'bull', '看涨']):
-                                            detected_agent = 'bull'
-                                        elif any(kw in content_lower for kw in ['空头', 'bear', '看跌']):
-                                            detected_agent = 'bear'
-                                        elif any(kw in content_lower for kw in ['交易', 'trade', '策略']):
-                                            detected_agent = 'trader'
-                                        elif any(kw in content_lower for kw in ['风险', 'risk']):
-                                            detected_agent = 'risk_manager'
-                                        
-                                        if detected_agent:
-                                            break
-                        
-                        # 智能体切换检测(避免与日志检测重复)
-                        if detected_agent and detected_agent != last_agent and detected_agent != last_log_agent:
-                            # 上一个智能体完成
-                            if last_agent and last_agent != last_log_agent:
-                                agent_display_name = agent_name_map.get(last_agent, last_agent)
-                                progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent))
-                                send_log('info', f'{agent_display_name} 完成分析', last_agent, '完成', progress, '分析阶段')
-                                current_analyst_index += 1
-                            
-                            # 新智能体开始(如果日志还没有报告)
-                            if detected_agent != last_log_agent:
-                                current_agent = detected_agent
-                                agent_display_name = agent_name_map.get(current_agent, current_agent)
-                                progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent))
-                                send_log('info', f'🔍 {agent_display_name} 开始分析...', current_agent, '开始', progress, '分析阶段')
-                                # 使用独立会话更新进度，避免跨线程共享会话提交冲突
-                                try:
-                                    db2 = SessionLocal()
-                                    db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).update({
-                                        AnalysisRecord.progress_percentage: progress
-                                    })
-                                    db2.commit()
-                                except Exception:
-                                    try:
-                                        db2.rollback()
-                                    except Exception:
-                                        pass
-                                finally:
-                                    try:
-                                        db2.close()
-                                    except Exception:
-                                        pass
-                            
-                            # 更新 last_agent
-                            last_agent = detected_agent
-                        elif detected_agent:
-                            # 同一个智能体继续工作
-                            current_agent = detected_agent
-                        
-                        # 发送日志消息(避免与日志捕获重复)
-                        # 只在没有日志检测时才发送内容消息
-                        if not log_detected_agent:
-                            for msg in messages:
-                                if hasattr(msg, 'content') and msg.content:
-                                    content = str(msg.content)
-                                    if len(content) > 20:
-                                        # 输出智能体分析结果内容到控制台(00字符
-                                        agent_to_use = current_agent if current_agent else 'system'
-                                        # 避免递归日志捕获，直接写入原始 stdout
-                                        # agent_display_name = agent_name_map.get(agent_to_use, agent_to_use)
-                                        # sys.__stdout__.write(f"📝 {agent_display_name} 输出内容: {content[:200]}...\n")
-                                        # sys.__stdout__.flush()
-                                        
-                                        progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent) + (progress_per_agent * 0.5))
-                                        send_log('info', truncate_message(content, 150), agent_to_use, '分析中', progress, '分析阶段')
-                                        break
-              
-            except InterruptedError:
-                # 任务被中断，直接向上抛出
-                raise
-            except Exception as e:
-                print(f"⚠️  Error: {e}")
-                raise
+        try:
+            stream_iterator = graph.graph.stream(init_agent_state, **args)
+            for chunk in stream_with_interrupt_check(stream_iterator):
+                check_stop()
+                step_num += 1
                 
-        # 日志捕获结束
+                detected_agent = None
+                agent_switched = False
+                
+                # 在 updates 模式下，chunk 是 {node_name: state_update} 的字典
+                # 提取节点名称
+                node_name = None
+                state_update = None
+                
+                if isinstance(chunk, dict):
+                    # updates 模式：chunk 的键就是节点名称
+                    if len(chunk) > 0:
+                        node_name = list(chunk.keys())[0]
+                        state_update = chunk[node_name]
+                        
+                        # 调试：打印节点信息
+                        if step_num <= 10:
+                            print(f"🔍 Step {step_num} - Node: {node_name}")
+                        
+                        # 检查是否是 "Msg Clear XXX" 节点（表示上一个节点完成）
+                        if node_name.startswith("Msg Clear "):
+                            # 提取节点名称
+                            cleared_node = node_name.replace("Msg Clear ", "").strip()
+                            print(f"  🧹 检测到清理节点: {node_name}")
+                            
+                            # 如果清理的节点在映射中，立即切换到下一个节点
+                            if cleared_node in node_to_agent_map:
+                                cleared_agent = node_to_agent_map[cleared_node]
+                                
+                                # 如果这是当前智能体，且还没有触发切换（没收集到报告），则切换
+                                if cleared_agent == current_agent and not agent_completed:
+                                    print(f"  ✅ 节点 {cleared_node} ({cleared_agent}) 已完成（Msg Clear）")
+                                    
+                                    # 查找下一个智能体
+                                    if current_agent_index < len(agent_execution_order) - 1:
+                                        next_agent_index = current_agent_index + 1
+                                        next_agent = agent_execution_order[next_agent_index]
+                                        detected_agent = next_agent
+                                        agent_completed = True  # 标记已完成
+                                        print(f"  🔄 触发切换: {current_agent} -> {next_agent} (Msg Clear)")
+                                elif cleared_agent == current_agent and agent_completed:
+                                    print(f"  ℹ️  节点 {cleared_node} 已通过报告收集完成，跳过 Msg Clear 切换")
+                        
+                        # 根据节点名称映射到智能体（这是当前节点的内容）
+                        elif node_name in node_to_agent_map:
+                            mapped_agent = node_to_agent_map[node_name]
+                            
+                            # 如果还没有当前智能体，这是第一个节点
+                            if current_agent is None:
+                                detected_agent = mapped_agent
+                                print(f"  ✅ 初始化智能体节点: {node_name} -> {detected_agent}")
+                            # 如果映射的智能体与当前智能体相同，这是当前节点的内容
+                            elif mapped_agent == current_agent:
+                                print(f"  📝 当前节点 {node_name} 的内容")
+                                # 不改变 detected_agent，继续使用当前智能体
+                            # 如果不同，可能是新节点（但通常应该先收到 Msg Clear）
+                            else:
+                                detected_agent = mapped_agent
+                                print(f"  ⚠️  直接切换到新节点: {node_name} -> {detected_agent}")
+                        
+                        # 收集报告字段
+                        if state_update and isinstance(state_update, dict):
+                            # 收集基本信息字段
+                            if "company_of_interest" in state_update and state_update["company_of_interest"]:
+                                report_sections["company_of_interest"] = state_update["company_of_interest"]
+                                print(f"  📊 收集到 company_of_interest: {state_update['company_of_interest']}")
+                            
+                            if "trade_date" in state_update and state_update["trade_date"]:
+                                report_sections["trade_date"] = state_update["trade_date"]
+                                print(f"  📊 收集到 trade_date: {state_update['trade_date']}")
+                            
+                            # 收集各个报告字段，并检查是否触发节点完成
+                            if "market_report" in state_update and state_update["market_report"]:
+                                report_sections["market_report"] = state_update["market_report"]
+                                print(f"  📊 收集到 market_report")
+                                if current_agent == 'market' and not agent_completed:
+                                    agent_completed = True
+                                    print(f"  ✅ market 节点完成（收集到报告）")
+                                    # 立即触发切换
+                                    if current_agent_index < len(agent_execution_order) - 1:
+                                        next_agent_index = current_agent_index + 1
+                                        next_agent = agent_execution_order[next_agent_index]
+                                        detected_agent = next_agent
+                                        print(f"  🔄 触发切换: {current_agent} -> {next_agent} (收集到报告)")
+                            
+                            if "sentiment_report" in state_update and state_update["sentiment_report"]:
+                                report_sections["sentiment_report"] = state_update["sentiment_report"]
+                                print(f"  📊 收集到 sentiment_report")
+                                if current_agent == 'social' and not agent_completed:
+                                    agent_completed = True
+                                    print(f"  ✅ social 节点完成（收集到报告）")
+                                    if current_agent_index < len(agent_execution_order) - 1:
+                                        next_agent_index = current_agent_index + 1
+                                        next_agent = agent_execution_order[next_agent_index]
+                                        detected_agent = next_agent
+                                        print(f"  🔄 触发切换: {current_agent} -> {next_agent} (收集到报告)")
+                            
+                            if "news_report" in state_update and state_update["news_report"]:
+                                report_sections["news_report"] = state_update["news_report"]
+                                print(f"  📊 收集到 news_report")
+                                if current_agent == 'news' and not agent_completed:
+                                    agent_completed = True
+                                    print(f"  ✅ news 节点完成（收集到报告）")
+                                    if current_agent_index < len(agent_execution_order) - 1:
+                                        next_agent_index = current_agent_index + 1
+                                        next_agent = agent_execution_order[next_agent_index]
+                                        detected_agent = next_agent
+                                        print(f"  🔄 触发切换: {current_agent} -> {next_agent} (收集到报告)")
+                            
+                            if "fundamentals_report" in state_update and state_update["fundamentals_report"]:
+                                report_sections["fundamentals_report"] = state_update["fundamentals_report"]
+                                print(f"  📊 收集到 fundamentals_report")
+                                if current_agent == 'fundamentals' and not agent_completed:
+                                    agent_completed = True
+                                    print(f"  ✅ fundamentals 节点完成（收集到报告）")
+                                    if current_agent_index < len(agent_execution_order) - 1:
+                                        next_agent_index = current_agent_index + 1
+                                        next_agent = agent_execution_order[next_agent_index]
+                                        detected_agent = next_agent
+                                        print(f"  🔄 触发切换: {current_agent} -> {next_agent} (收集到报告)")
+                            
+                            if "investment_debate_state" in state_update and state_update["investment_debate_state"]:
+                                report_sections["investment_debate_state"] = state_update["investment_debate_state"]
+                                print(f"  📊 收集到 investment_debate_state")
+                                if current_agent in ['bull', 'bear', 'invest_judge'] and not agent_completed:
+                                    agent_completed = True
+                                    print(f"  ✅ {current_agent} 节点完成（收集到报告）")
+                                    if current_agent_index < len(agent_execution_order) - 1:
+                                        next_agent_index = current_agent_index + 1
+                                        next_agent = agent_execution_order[next_agent_index]
+                                        detected_agent = next_agent
+                                        print(f"  🔄 触发切换: {current_agent} -> {next_agent} (收集到报告)")
+                            
+                            if "trader_investment_plan" in state_update and state_update["trader_investment_plan"]:
+                                report_sections["trader_investment_plan"] = state_update["trader_investment_plan"]
+                                print(f"  📊 收集到 trader_investment_plan")
+                                if current_agent == 'trader' and not agent_completed:
+                                    agent_completed = True
+                                    print(f"  ✅ trader 节点完成（收集到报告）")
+                                    if current_agent_index < len(agent_execution_order) - 1:
+                                        next_agent_index = current_agent_index + 1
+                                        next_agent = agent_execution_order[next_agent_index]
+                                        detected_agent = next_agent
+                                        print(f"  🔄 触发切换: {current_agent} -> {next_agent} (收集到报告)")
+                            
+                            if "risk_debate_state" in state_update and state_update["risk_debate_state"]:
+                                report_sections["risk_debate_state"] = state_update["risk_debate_state"]
+                                print(f"  📊 收集到 risk_debate_state")
+                                if current_agent in ['risky', 'safe', 'neutral'] and not agent_completed:
+                                    agent_completed = True
+                                    print(f"  ✅ {current_agent} 节点完成（收集到报告）")
+                                    if current_agent_index < len(agent_execution_order) - 1:
+                                        next_agent_index = current_agent_index + 1
+                                        next_agent = agent_execution_order[next_agent_index]
+                                        detected_agent = next_agent
+                                        print(f"  🔄 触发切换: {current_agent} -> {next_agent} (收集到报告)")
+                            
+                            if "investment_plan" in state_update and state_update["investment_plan"]:
+                                report_sections["investment_plan"] = state_update["investment_plan"]
+                                print(f"  📊 收集到 investment_plan")
+                                if current_agent == 'risk_manager' and not agent_completed:
+                                    agent_completed = True
+                                    print(f"  ✅ risk_manager 节点完成（收集到报告）")
+                                    if current_agent_index < len(agent_execution_order) - 1:
+                                        next_agent_index = current_agent_index + 1
+                                        next_agent = agent_execution_order[next_agent_index]
+                                        detected_agent = next_agent
+                                        print(f"  🔄 触发切换: {current_agent} -> {next_agent} (收集到报告)")
+                            
+                            if "final_trade_decision" in state_update and state_update["final_trade_decision"]:
+                                report_sections["final_trade_decision"] = state_update["final_trade_decision"]
+                                print(f"  📊 收集到 final_trade_decision")
+                
+                # 获取消息列表（从 state_update 或 chunk 中）
+                messages = []
+                if state_update and isinstance(state_update, dict):
+                    messages = state_update.get("messages", [])
+                elif isinstance(chunk, dict):
+                    # 兼容旧格式
+                    for key, value in chunk.items():
+                        if isinstance(value, dict) and "messages" in value:
+                            messages = value.get("messages", [])
+                            break
+                
+                # 智能体切换检测（基于节点名称）
+                if detected_agent and detected_agent != last_agent:
+                    # 上一个智能体完成
+                    if last_agent:
+                        agent_display_name = agent_name_map.get(last_agent, last_agent)
+                        progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent))
+                        send_log('info', f'✅ {agent_display_name} 完成分析', last_agent, '完成', progress, '分析阶段')
+                        current_analyst_index += 1
+                    
+                    # 新智能体开始
+                    current_agent = detected_agent
+                    agent_completed = False  # 重置完成标记
+                    
+                    # 更新 current_agent_index
+                    try:
+                        current_agent_index = agent_execution_order.index(current_agent)
+                    except ValueError:
+                        # 如果不在列表中，保持当前索引
+                        print(f"  ⚠️  警告: {current_agent} 不在预定义顺序中")
+                    
+                    agent_display_name = agent_name_map.get(current_agent, current_agent)
+                    progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent))
+                    send_log('info', f'🔍 {agent_display_name} 开始分析...', current_agent, '开始', progress, '分析阶段')
+                    
+                    # 使用独立会话更新进度
+                    try:
+                        db2 = SessionLocal()
+                        db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).update({
+                            AnalysisRecord.progress_percentage: progress
+                        })
+                        db2.commit()
+                    except Exception:
+                        try:
+                            db2.rollback()
+                        except Exception:
+                            pass
+                    finally:
+                        try:
+                            db2.close()
+                        except Exception:
+                            pass
+                    
+                    # 更新 last_agent
+                    last_agent = detected_agent
+                
+                # 处理消息日志
+                if len(messages) > 0:
+                    first_msg = messages[0]
+                    first_msg_content = ""
+                    if hasattr(first_msg, 'content'):
+                        first_msg_content = str(first_msg.content).strip()
+                    
+                    # 优先检查工具调用
+                    if hasattr(first_msg, 'tool_calls') and first_msg.tool_calls:
+                        for tool_call in first_msg.tool_calls:
+                            tool_name = ""
+                            tool_args = {}
+                            
+                            if isinstance(tool_call, dict):
+                                tool_name = tool_call.get('name', '')
+                                tool_args = tool_call.get('args', {})
+                            else:
+                                tool_name = getattr(tool_call, 'name', '')
+                                tool_args = getattr(tool_call, 'args', {})
+                            
+                            if tool_name:
+                                # 格式化工具调用信息
+                                args_str = ", ".join([f"{k}={v}" for k, v in list(tool_args.items())[:3]])
+                                if len(tool_args) > 3:
+                                    args_str += ", ..."
+                                
+                                log_message = f"🔧 调用工具: {tool_name}({args_str})"
+                                
+                                # 使用当前智能体
+                                agent_to_use = current_agent if current_agent else 'system'
+                                progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent) + (progress_per_agent * 0.5))
+                                send_log('info', truncate_message(log_message, 150), agent_to_use, '工具调用', progress, '分析阶段')
+                                
+                                print(f"  🔧 [{agent_to_use}] 工具调用: {tool_name}")
+                                break
+                    
+                    # 如果有普通内容消息，作为当前智能体的日志
+                    elif first_msg_content and len(first_msg_content) > 5:
+                        agent_to_use = current_agent if current_agent else 'system'
+                        progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent) + (progress_per_agent * 0.5))
+                        send_log('info', truncate_message(first_msg_content, 150), agent_to_use, '分析中', progress, '分析阶段')
+        
+        except InterruptedError:
+            # 任务被中断，直接向上抛出
+            raise
+        except Exception as e:
+            print(f"⚠️  Error: {e}")
+            raise
         
         check_stop()
         
-        # 获取最终状态
-        final_state = trace[-1]
-        decision = graph.process_signal(final_state.get("final_trade_decision", "UNKNOWN"))
+        # 从收集的报告字段构建最终状态
+        print(f"📋 构建最终报告，收集到的字段: {[k for k, v in report_sections.items() if v is not None]}")
         
-        # 获取股票代码(确保不为 None)
-        ticker = request_data.get('ticker', 'UNKNOWN')
+        # 获取最终决策
+        decision_raw = report_sections.get("final_trade_decision", "UNKNOWN")
+        decision = graph.process_signal(decision_raw)
+        
+        # 获取基本信息（从收集的字段中）
+        ticker = report_sections.get("ticker", request_data.get('ticker', 'UNKNOWN'))
+        company_of_interest = report_sections.get("company_of_interest") or ticker
+        trade_date = report_sections.get("trade_date") or request_data.get('analysis_date', datetime.now().strftime('%Y-%m-%d'))
         analysis_date = request_data.get('analysis_date', datetime.now().strftime('%Y-%m-%d'))
+        
+        print(f"📊 最终信息: ticker={ticker}, company={company_of_interest}, date={trade_date}")
+        
+        # 构建完整的最终状态（使用收集的报告字段）
+        final_state = {
+            "company_of_interest": company_of_interest,
+            "trade_date": trade_date,
+            "market_report": report_sections.get("market_report", ""),
+            "sentiment_report": report_sections.get("sentiment_report", ""),
+            "news_report": report_sections.get("news_report", ""),
+            "fundamentals_report": report_sections.get("fundamentals_report", ""),
+            "investment_debate_state": report_sections.get("investment_debate_state", {}),
+            "trader_investment_plan": report_sections.get("trader_investment_plan", ""),
+            "risk_debate_state": report_sections.get("risk_debate_state", {}),
+            "investment_plan": report_sections.get("investment_plan", ""),
+            "final_trade_decision": decision_raw,
+        }
         
         # 保存状态到文件(按用户、股票代码和分析ID分开，避免覆盖)
         user_ticker_dir = Path(f"eval_results/user_{user_id}/{ticker}/TradingAgentsStrategy_logs/")
@@ -682,17 +741,17 @@ def run_analysis_task(
                 "user_id": user_id,
                 "analysis_id": analysis_id,
                 "ticker": ticker,
-                "company_of_interest": final_state.get("company_of_interest", ticker),
-                "trade_date": final_state.get("trade_date", analysis_date),
-                "market_report": final_state.get("market_report", ""),
-                "sentiment_report": final_state.get("sentiment_report", ""),
-                "news_report": final_state.get("news_report", ""),
-                "fundamentals_report": final_state.get("fundamentals_report", ""),
-                "investment_debate_state": final_state.get("investment_debate_state", {}),
-                "trader_investment_plan": final_state.get("trader_investment_plan", ""),
-                "risk_debate_state": final_state.get("risk_debate_state", {}),
-                "investment_plan": final_state.get("investment_plan", ""),
-                "final_trade_decision": final_state.get("final_trade_decision", decision),
+                "company_of_interest": company_of_interest,
+                "trade_date": trade_date,
+                "market_report": report_sections.get("market_report", ""),
+                "sentiment_report": report_sections.get("sentiment_report", ""),
+                "news_report": report_sections.get("news_report", ""),
+                "fundamentals_report": report_sections.get("fundamentals_report", ""),
+                "investment_debate_state": report_sections.get("investment_debate_state", {}),
+                "trader_investment_plan": report_sections.get("trader_investment_plan", ""),
+                "risk_debate_state": report_sections.get("risk_debate_state", {}),
+                "investment_plan": report_sections.get("investment_plan", ""),
+                "final_trade_decision": decision_raw,
             }
         }
         

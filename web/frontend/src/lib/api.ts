@@ -31,6 +31,20 @@ async function apiRequest<T>(
   });
 
   if (!response.ok) {
+    // Handle unauthorized: clear auth and redirect to login
+    if (response.status === 401) {
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem('access_token');
+          // Clear cookie used by middleware
+          document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+          // Redirect to login page
+          window.location.href = '/login';
+        } catch {}
+      }
+      throw new Error('无法验证凭据');
+    }
+
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(error.detail || `HTTP ${response.status}`);
   }

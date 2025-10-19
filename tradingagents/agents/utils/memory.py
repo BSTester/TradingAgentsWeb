@@ -24,7 +24,7 @@ class FinancialSituationMemory:
         """Get OpenAI embedding for a text"""
         
         response = self.client.embeddings.create(
-            model=self.embedding, input=text
+            model=self.embedding, input=text if self.embedding != "text-embedding-v4" else text[:8192]
         )
         return response.data[0].embedding
 
