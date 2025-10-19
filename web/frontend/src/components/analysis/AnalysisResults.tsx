@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { buildApiUrl, API_ENDPOINTS } from '../../utils/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -25,57 +26,51 @@ interface PhaseResult {
 }
 
 export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, onShowToast }: AnalysisResultsProps) {
-  const [results, setResults] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [activePhase, setActivePhase] = useState(-1); // -1 表示显示最终分析说明
   const [systemDomain, setSystemDomain] = useState('');
 
-  useEffect(() => {
-    // 获取分析结果
-    const fetchResults = async () => {
-      try {
-        const token = localStorage.getItem('access_token');
-        if (!token) {
-          onShowToast('请先登录', 'error');
-          setLoading(false);
-          return;
-        }
-
-        const response = await fetch(buildApiUrl(API_ENDPOINTS.ANALYSIS.RESULTS(analysisId)), {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            onShowToast('登录已过期，请重新登录', 'error');
-          } else if (response.status === 404) {
-            onShowToast('分析记录未找到', 'error');
-          } else if (response.status === 400) {
-            const error = await response.json();
-            onShowToast(error.detail || '分析未完成', 'error');
-          } else {
-            throw new Error('获取分析结果失败');
-          }
-          setLoading(false);
-          return;
-        }
-
-        const data = await response.json();
-        console.log('📊 Fetched results:', data);
-        setResults(data);
-      } catch (error) {
-        console.error('Error fetching results:', error);
-        onShowToast('获取分析结果失败', 'error');
-      } finally {
-        setLoading(false);
+  // 使用 useQuery 获取分析结果
+  const { data: results, isLoading: loading, isError, error } = useQuery({
+    queryKey: ['analysis', 'results', analysisId],
+    queryFn: async () => {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        throw new Error('请先登录');
       }
-    };
 
-    fetchResults();
-  }, [analysisId]);
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.ANALYSIS.RESULTS(analysisId)), {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('登录已过期，请重新登录');
+        } else if (response.status === 404) {
+          throw new Error('分析记录未找到');
+        } else if (response.status === 400) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || '分析未完成');
+        }
+        throw new Error('获取分析结果失败');
+      }
+
+      const data = await response.json();
+      console.log('📊 Fetched results:', data);
+      return data;
+    },
+    retry: 10, // 最多重试10次
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+  });
+
+  // 处理错误提示
+  useEffect(() => {
+    if (isError && error) {
+      onShowToast(error instanceof Error ? error.message : '获取分析结果失败', 'error');
+    }
+  }, [isError, error, onShowToast]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {

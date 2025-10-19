@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { buildApiUrl, API_ENDPOINTS } from '../../utils/api';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 
@@ -26,16 +27,20 @@ interface AnalysisRecord {
   };
 }
 
+interface AnalysisListResponse {
+  analyses: AnalysisRecord[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress, onShowToast }: AnalysisHistoryProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
 
-  const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [deleting, setDeleting] = useState<string | null>(null);
   const limit = 10; // 每页显示10条
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; analysisId: string; ticker: string }>({
@@ -43,6 +48,41 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
     analysisId: '',
     ticker: ''
   });
+
+  // 使用 useQuery 获取分析历史
+  const { data, isLoading, isError, error } = useQuery<AnalysisListResponse>({
+    queryKey: ['analysis', 'list', page, limit],
+    queryFn: async () => {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        throw new Error('请先登录');
+      }
+
+      const response = await fetch(buildApiUrl(`${API_ENDPOINTS.ANALYSIS.LIST}?page=${page}&limit=${limit}`), {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('登录已过期，请重新登录');
+        }
+        throw new Error('获取分析历史失败');
+      }
+
+      const result = await response.json();
+      console.log('📋 Fetched analyses:', result);
+      return result;
+    },
+    retry: 10, // 最多重试10次
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // 指数退避，最多10秒
+  });
+
+  const analyses = data?.analyses || [];
+  const total = data?.total || 0;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
 
   // 初始化时从 URL 查询参数恢复分页
   useEffect(() => {
@@ -85,26 +125,13 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
         throw new Error(error.detail || '删除失败');
       }
 
-      // 从列表中移除已删除的分析
-      setAnalyses(prev => prev.filter(a => a.id !== analysisId));
-      
-      // 更新总数和总页数，并在当前页删除后为空时回退上一页
-      setTotal(prevTotal => {
-        const newTotal = Math.max(0, prevTotal - 1);
-        const newTotalPages = Math.max(1, Math.ceil(newTotal / limit));
-        setTotalPages(newTotalPages);
-        
-        // 如果当前页码大于新总页数，或者当前页已经没有数据且页码>1，则自动回退
-        setAnalyses(current => {
-          if (current.length === 0 && page > 1) {
-            setPage(p => p - 1);
-          }
-          return current;
-        });
-        
-        // 同步 URL 中的页码（如果需要回退会在 useEffect 更新）
-        return newTotal;
-      });
+      // 使 React Query 缓存失效，重新获取数据
+      queryClient.invalidateQueries({ queryKey: ['analysis', 'list'] });
+
+      // 如果当前页删除后为空且页码>1，则回退上一页
+      if (analyses.length === 1 && page > 1) {
+        setPage(p => p - 1);
+      }
 
       onShowToast('分析已删除', 'success');
     } catch (error) {
@@ -115,50 +142,12 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
     }
   };
 
+  // 处理错误提示
   useEffect(() => {
-    // 获取分析历史
-    const fetchHistory = async () => {
-      try {
-        const token = localStorage.getItem('access_token');
-        if (!token) {
-          onShowToast('请先登录', 'error');
-          setLoading(false);
-          return;
-        }
-
-        const response = await fetch(buildApiUrl(`${API_ENDPOINTS.ANALYSIS.LIST}?page=${page}&limit=${limit}`), {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            onShowToast('登录已过期，请重新登录', 'error');
-            // 可以在这里触发登出逻辑
-          } else {
-            throw new Error('获取分析历史失败');
-          }
-          return;
-        }
-
-        const data = await response.json();
-        console.log('📋 Fetched analyses:', data);
-        
-        setAnalyses(data.analyses || []);
-        setTotal(data.total || 0);
-        setTotalPages(Math.ceil((data.total || 0) / limit));
-      } catch (error) {
-        console.error('Error fetching history:', error);
-        onShowToast('获取分析历史失败', 'error');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchHistory();
-  }, [page, onShowToast]);
+    if (isError && error) {
+      onShowToast(error instanceof Error ? error.message : '获取分析历史失败', 'error');
+    }
+  }, [isError, error, onShowToast]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -232,7 +221,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="text-center">
@@ -276,8 +265,8 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
         ) : (
           <div className="space-y-3">
             {analyses.map((analysis) => (
-              <div 
-                key={analysis.id} 
+              <div
+                key={analysis.id}
                 className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow duration-200 bg-white"
               >
                 {/* 五列布局：股票代码 | 投资建议 | 分析日期 | 创建时间 | 操作按钮 */}
@@ -296,7 +285,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                       </span>
                     </div>
                   </div>
-                  
+
                   {/* 第2列：投资建议 - 自动平分 */}
                   <div className="flex items-center justify-center flex-1 text-sm">
                     {analysis.summary && analysis.status === 'completed' && (
@@ -312,21 +301,21 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                       </div>
                     )}
                   </div>
-                  
+
                   {/* 第3列：分析日期 - 自动平分 */}
                   <div className="flex items-center justify-center text-sm flex-1">
                     <i className="far fa-calendar mr-1.5 text-blue-500 text-sm" />
                     <span className="text-gray-600 mr-1.5">分析日期:</span>
                     <span className="font-medium text-gray-900">{analysis.analysis_date}</span>
                   </div>
-                  
+
                   {/* 第4列：创建时间 - 自动平分 */}
                   <div className="flex items-center justify-center text-sm flex-1">
                     <i className="far fa-clock mr-1.5 text-green-500 text-sm" />
                     <span className="text-gray-600 mr-1.5">创建时间:</span>
                     <span className="font-medium text-gray-900">{new Date(analysis.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
-                  
+
                   {/* 第5列：操作按钮 - 自动平分 */}
                   <div className="flex items-center justify-center space-x-2 flex-1">
                     {analysis.status === 'completed' && (
@@ -338,9 +327,9 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                         查看详情
                       </button>
                     )}
-                    
+
                     {analysis.status === 'running' && (
-                      <button 
+                      <button
                         onClick={() => onViewProgress(analysis.id)}
                         className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors flex items-center"
                       >
@@ -348,8 +337,8 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                         查看进度
                       </button>
                     )}
-                    
-                    <button 
+
+                    <button
                       onClick={() => handleDeleteClick(analysis.id, analysis.ticker)}
                       disabled={analysis.status === 'running' || analysis.status === 'initializing' || deleting === analysis.id}
                       className="px-2 py-1.5 text-red-600 hover:bg-red-50 rounded-md text-sm font-medium transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
@@ -382,7 +371,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
             <div className="text-sm text-gray-600">
               显示第 {(page - 1) * limit + 1} - {Math.min(page * limit, total)} 条，共 {total} 条记录
             </div>
-            
+
             {/* 右侧：分页按钮 */}
             <div className="flex items-center space-x-2">
               {/* 上一页 */}
@@ -394,7 +383,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                 <i className="fas fa-chevron-left mr-1" />
                 上一页
               </button>
-              
+
               {/* 页码 */}
               <div className="flex items-center space-x-1">
                 {/* 第一页 */}
@@ -409,7 +398,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                     {page > 4 && <span className="px-2 text-gray-500">...</span>}
                   </>
                 )}
-                
+
                 {/* 当前页附近的页码 */}
                 {Array.from({ length: totalPages }, (_, i) => i + 1)
                   .filter(p => p >= page - 2 && p <= page + 2)
@@ -417,16 +406,15 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                     <button
                       key={p}
                       onClick={() => setPage(p)}
-                      className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                        p === page
-                          ? 'bg-blue-600 text-white'
-                          : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
-                      }`}
+                      className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${p === page
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                        }`}
                     >
                       {p}
                     </button>
                   ))}
-                
+
                 {/* 最后一页 */}
                 {page < totalPages - 2 && (
                   <>
@@ -440,7 +428,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                   </>
                 )}
               </div>
-              
+
               {/* 下一页 */}
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
@@ -467,7 +455,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
               新建分析
             </button>
           </div>
-          
+
           {/* 免责声明 */}
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
             <div className="flex items-start">
@@ -499,7 +487,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                   <p className="text-sm text-gray-600">此操作无法撤销</p>
                 </div>
               </div>
-              
+
               <div className="mb-6">
                 <p className="text-gray-700">
                   确定要删除 <span className="font-bold text-gray-900">{deleteConfirm.ticker}</span> 的分析记录吗？
