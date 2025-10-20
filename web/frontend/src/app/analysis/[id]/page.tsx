@@ -14,6 +14,9 @@ export default function AnalysisDetailPage() {
   const searchParams = useSearchParams();
   const { toast, showToast, hideToast } = useToast();
   
+  // 返回顶部功能 - 必须在所有条件判断之前声明
+  const [showBackToTop, setShowBackToTop] = React.useState(false);
+  
   const analysisId = params.id as string;
   
   // 检查是否从排行榜进入（通过 URL 参数判断）
@@ -55,6 +58,15 @@ export default function AnalysisDetailPage() {
     return undefined;
   }, [user, authLoading, router, fromLeaderboard]);
 
+  React.useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 300);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   // 只有从历史记录进入时才显示加载状态
   if (!fromLeaderboard && (authLoading || !user)) {
     return (
@@ -66,18 +78,6 @@ export default function AnalysisDetailPage() {
       </div>
     );
   }
-
-  // 返回顶部功能
-  const [showBackToTop, setShowBackToTop] = React.useState(false);
-
-  React.useEffect(() => {
-    const handleScroll = () => {
-      setShowBackToTop(window.scrollY > 300);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });

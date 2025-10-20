@@ -27,22 +27,32 @@ export function MarketTabs({ activeMarket, onMarketChange, marketLabels }: Marke
   };
 
   return (
-    <div className="border-b border-gray-200 mb-6">
-      <div className="flex space-x-1 overflow-x-auto">
+    <div className="mb-8">
+      <div className="grid grid-cols-3 gap-4">
         {markets.map((market) => (
           <button
             key={market}
             onClick={() => onMarketChange(market)}
             className={`
-              px-6 py-3 font-medium text-sm whitespace-nowrap transition-all duration-200
+              relative px-6 py-4 font-semibold text-base rounded-xl transition-all duration-300 shadow-md hover:shadow-lg
               ${activeMarket === market
-                ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                ? 'bg-gradient-to-br from-green-500 to-green-600 text-white transform scale-105'
+                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
               }
             `}
           >
-            <i className={`fas ${getMarketIcon(market)} mr-2`} />
-            {marketLabels[market]}
+            <div className="flex flex-col items-center space-y-2">
+              <div className={`
+                w-12 h-12 rounded-full flex items-center justify-center transition-all
+                ${activeMarket === market
+                  ? 'bg-white/20 text-white'
+                  : 'bg-gradient-to-br from-green-400 to-green-500 text-white'
+                }
+              `}>
+                <i className={`fas ${getMarketIcon(market)} text-xl`} />
+              </div>
+              <span>{marketLabels[market]}</span>
+            </div>
           </button>
         ))}
       </div>

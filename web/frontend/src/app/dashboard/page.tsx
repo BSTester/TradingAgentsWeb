@@ -140,10 +140,13 @@ export default function DashboardPage() {
                 </button>
               </div>
               <button
-                onClick={logout}
+                onClick={() => {
+                  logout();
+                  router.push('/');
+                }}
                 className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
               >
-                <i className="fas fa-sign-out-alt mr-1" />
+                <i className="fas fa-power-off mr-1" />
                 退出
               </button>
             </div>

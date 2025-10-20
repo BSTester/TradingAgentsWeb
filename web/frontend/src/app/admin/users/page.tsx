@@ -97,10 +97,11 @@ export default function UserManagementPage() {
   // 权限检查
   React.useEffect(() => {
     if (!authLoading && (!user || user.role !== 'admin')) {
-      showToast('需要管理员权限', 'error');
-      setTimeout(() => router.push('/'), 1500);
+      // 如果用户未登录或不是管理员，跳转到首页
+      // 不显示toast，因为可能是正常的退出登录操作
+      router.push('/');
     }
-  }, [user, authLoading, router, showToast]);
+  }, [user, authLoading, router]);
 
   const formatDate = (dateString: string) => {
     try {
@@ -147,8 +148,8 @@ export default function UserManagementPage() {
                 onClick={() => router.push('/dashboard')}
                 className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
               >
-                <i className="fas fa-home mr-1" />
-                返回首页
+                <i className="fas fa-tachometer-alt mr-1" />
+                返回控制台
               </button>
               <div className="text-gray-300 flex items-center">
                 <i className="fas fa-crown mr-2" />
@@ -158,10 +159,13 @@ export default function UserManagementPage() {
                 </span>
               </div>
               <button
-                onClick={logout}
+                onClick={() => {
+                  logout();
+                  router.push('/');
+                }}
                 className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
               >
-                <i className="fas fa-sign-out-alt mr-1" />
+                <i className="fas fa-power-off mr-1" />
                 退出
               </button>
             </div>
