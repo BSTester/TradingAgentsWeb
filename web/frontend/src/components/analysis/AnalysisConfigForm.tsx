@@ -259,9 +259,14 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       setApiKeyValidated(false);
     }
 
-    // 如果更改了股票代码，清除错误信息
+    // 如果更改了股票代码，实时校验
     if (name === 'ticker') {
-      setTickerError('');
+      if (value.trim() === '') {
+        setTickerError('');
+      } else {
+        const validation = validateTickerFormat(value);
+        setTickerError(validation.error);
+      }
     }
   };
 
