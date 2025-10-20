@@ -156,7 +156,7 @@ async def validate_api_key(request: dict, current_user: User = Depends(get_curre
     
     try:
         # Basic validation - just check if key format looks valid
-        if provider in ("openai", "oneai"):
+        if provider in ("openai", "oneai", 'deepseek'):
             if not api_key.startswith("sk-"):
                 raise HTTPException(status_code=400, detail="无效的OpenAI API密钥格式")
         elif provider == "anthropic":
