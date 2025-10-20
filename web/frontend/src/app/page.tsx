@@ -34,6 +34,7 @@ export default function LeaderboardPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [activeMarket, setActiveMarket] = useState<Market>('US');
+  const [isNavigating, setIsNavigating] = useState(false);
 
   // 从 URL 参数中读取市场标签
   React.useEffect(() => {
@@ -65,6 +66,8 @@ export default function LeaderboardPage() {
   };
 
   const handleCardClick = (analysisId: string) => {
+    // 显示loading状态
+    setIsNavigating(true);
     // 传递来源和市场参数，用于返回时定位
     router.push(`/analysis/${analysisId}?from=leaderboard&market=${activeMarket}`);
   };
@@ -78,26 +81,44 @@ export default function LeaderboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header user={user} onLogout={logout} />
-      <HeroSection onNewAnalysis={handleNewAnalysis} />
-      
-      <div className="flex-1 max-w-7xl mx-auto px-4 py-8 w-full">
-        <MarketTabs 
-          activeMarket={activeMarket}
-          onMarketChange={setActiveMarket}
-          marketLabels={marketLabels}
-        />
+    <>
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <Header user={user} onLogout={logout} />
+        <HeroSection onNewAnalysis={handleNewAnalysis} />
         
-        <AnalysisCardsGrid
-          analyses={data?.[activeMarket] || []}
-          isLoading={isLoading || authLoading}
-          isError={isError}
-          onCardClick={handleCardClick}
-        />
+        <div className="flex-1 max-w-7xl mx-auto px-4 py-8 w-full">
+          <MarketTabs 
+            activeMarket={activeMarket}
+            onMarketChange={setActiveMarket}
+            marketLabels={marketLabels}
+          />
+          
+          <AnalysisCardsGrid
+            analyses={data?.[activeMarket] || []}
+            isLoading={isLoading || authLoading}
+            isError={isError}
+            onCardClick={handleCardClick}
+          />
+        </div>
+        
+        <Footer />
       </div>
-      
-      <Footer />
-    </div>
+
+      {/* 页面跳转Loading遮罩 */}
+      {isNavigating && (
+        <div className="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50">
+          <div className="text-center">
+            <div className="relative inline-block mb-4">
+              {/* 外圈旋转 */}
+              <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+              {/* 内圈反向旋转 */}
+              <div className="absolute top-2 left-2 w-16 h-16 border-4 border-purple-200 border-b-purple-600 rounded-full animate-spin-reverse"></div>
+            </div>
+            <p className="text-gray-700 font-medium text-lg">正在加载分析详情...</p>
+            <p className="text-sm text-gray-500 mt-2">请稍候</p>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -74,7 +74,7 @@ export function Header({ user, onLogout }: HeaderProps) {
                     onClick={onLogout}
                     className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
                   >
-                    <i className="fas fa-sign-out-alt mr-1" />
+                    <i className="fas fa-power-off mr-1" />
                     退出
                   </button>
                 )}
@@ -85,7 +85,7 @@ export function Header({ user, onLogout }: HeaderProps) {
                   onClick={handleLogin}
                   className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
                 >
-                  <i className="fas fa-sign-in-alt mr-1" />
+                  <i className="fas fa-user-check mr-1" />
                   登录
                 </button>
                 <button

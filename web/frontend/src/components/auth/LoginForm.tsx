@@ -146,7 +146,7 @@ export function LoginForm() {
             </>
           ) : (
             <>
-              <i className="fas fa-sign-in-alt mr-2" />
+              <i className="fas fa-user-check mr-2" />
               登录账户
             </>
           )}

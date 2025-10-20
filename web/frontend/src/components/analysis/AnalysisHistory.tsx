@@ -174,16 +174,16 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
     switch (rec) {
       case '买入':
       case 'buy':
-        return 'text-green-600 bg-green-50';
+        return 'text-white bg-gradient-to-br from-green-500 to-green-600 shadow-md';
       case '持有':
       case '观望':
       case 'hold':
-        return 'text-blue-600 bg-blue-50';
+        return 'text-white bg-gradient-to-br from-yellow-500 to-yellow-600 shadow-md';
       case '卖出':
       case 'sell':
-        return 'text-red-600 bg-red-50';
+        return 'text-white bg-gradient-to-br from-red-500 to-red-600 shadow-md';
       default:
-        return 'text-gray-600 bg-gray-50';
+        return 'text-white bg-gradient-to-br from-yellow-500 to-yellow-600 shadow-md';
     }
   };
 
@@ -207,10 +207,16 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow-lg p-6">
+      <div className="bg-white rounded-lg shadow-lg p-12">
         <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4" />
-          <p className="text-gray-600">正在加载分析历史...</p>
+          <div className="relative inline-block mb-4">
+            {/* 外圈旋转 */}
+            <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+            {/* 内圈反向旋转 */}
+            <div className="absolute top-2 left-2 w-16 h-16 border-4 border-purple-200 border-b-purple-600 rounded-full animate-spin-reverse"></div>
+          </div>
+          <p className="text-gray-700 font-medium text-lg">正在加载分析历史...</p>
+          <p className="text-sm text-gray-500 mt-2">正在获取您的分析记录</p>
         </div>
       </div>
     );
@@ -257,7 +263,15 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                 <div className="flex items-center gap-4">
                   {/* 第1列：股票代码 - 自动平分 */}
                   <div className="flex items-center justify-center space-x-2 flex-1 text-sm">
-                    <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">
+                    <div className={`text-white w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-md ${
+                      analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
+                        ? 'bg-gradient-to-br from-green-500 to-green-600'
+                        : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
+                        ? 'bg-gradient-to-br from-red-500 to-red-600'
+                        : analysis.summary?.recommendation
+                        ? 'bg-gradient-to-br from-yellow-500 to-yellow-600'
+                        : 'bg-gradient-to-br from-gray-500 to-gray-600'
+                    }`}>
                       {analysis.ticker.substring(0, 2)}
                     </div>
                     <div className="flex flex-col">
@@ -295,14 +309,30 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
 
                   {/* 第3列：分析日期 - 自动平分 */}
                   <div className="flex items-center justify-center text-sm flex-1">
-                    <i className="far fa-calendar mr-1.5 text-blue-500 text-sm" />
+                    <i className={`far fa-calendar mr-1.5 text-sm ${
+                      analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
+                        ? 'text-green-500'
+                        : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
+                        ? 'text-red-500'
+                        : analysis.summary?.recommendation
+                        ? 'text-yellow-500'
+                        : 'text-gray-500'
+                    }`} />
                     <span className="text-gray-600 mr-1.5">分析日期:</span>
                     <span className="font-medium text-gray-900">{analysis.analysis_date}</span>
                   </div>
 
                   {/* 第4列：创建时间 - 自动平分 */}
                   <div className="flex items-center justify-center text-sm flex-1">
-                    <i className="far fa-clock mr-1.5 text-green-500 text-sm" />
+                    <i className={`far fa-clock mr-1.5 text-sm ${
+                      analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
+                        ? 'text-green-500'
+                        : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
+                        ? 'text-red-500'
+                        : analysis.summary?.recommendation
+                        ? 'text-yellow-500'
+                        : 'text-gray-500'
+                    }`} />
                     <span className="text-gray-600 mr-1.5">创建时间:</span>
                     <span className="font-medium text-gray-900">{new Date(analysis.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
@@ -312,7 +342,15 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                     {analysis.status === 'completed' && (
                       <button
                         onClick={() => onViewResults(analysis.id)}
-                        className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors flex items-center"
+                        className={`px-3 py-1.5 text-white rounded-md text-sm font-medium transition-colors flex items-center shadow-md ${
+                          analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
+                            ? 'bg-green-600 hover:bg-green-700'
+                            : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
+                            ? 'bg-red-600 hover:bg-red-700'
+                            : analysis.summary?.recommendation
+                            ? 'bg-yellow-600 hover:bg-yellow-700'
+                            : 'bg-gray-600 hover:bg-gray-700'
+                        }`}
                       >
                         <i className="fas fa-chart-line mr-1.5 text-sm" />
                         查看详情

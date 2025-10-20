@@ -323,10 +323,16 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-lg p-6">
+      <div className="bg-white rounded-lg shadow-lg p-12">
         <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4" />
-          <p className="text-gray-600">正在加载分析结果...</p>
+          <div className="relative inline-block mb-4">
+            {/* 外圈旋转 */}
+            <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+            {/* 内圈反向旋转 */}
+            <div className="absolute top-2 left-2 w-16 h-16 border-4 border-purple-200 border-b-purple-600 rounded-full animate-spin-reverse"></div>
+          </div>
+          <p className="text-gray-700 font-medium text-lg">正在加载分析结果...</p>
+          <p className="text-sm text-gray-500 mt-2">正在获取详细报告，请稍候</p>
         </div>
       </div>
     );

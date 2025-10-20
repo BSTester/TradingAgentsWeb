@@ -27,8 +27,14 @@ export function AnalysisCardsGrid({ analyses, isLoading, isError, onCardClick }:
     return (
       <div className="flex items-center justify-center py-20">
         <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4" />
-          <p className="text-gray-600">正在加载排行榜数据...</p>
+          <div className="relative inline-block mb-4">
+            {/* 外圈旋转 */}
+            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+            {/* 内圈反向旋转 */}
+            <div className="absolute top-2 left-2 w-12 h-12 border-4 border-purple-200 border-b-purple-600 rounded-full animate-spin-reverse"></div>
+          </div>
+          <p className="text-gray-700 font-medium">正在加载排行榜数据...</p>
+          <p className="text-sm text-gray-500 mt-2">请稍候</p>
         </div>
       </div>
     );

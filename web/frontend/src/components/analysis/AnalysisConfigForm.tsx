@@ -58,7 +58,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
   const [formData, setFormData] = useState<FormData>({
     ticker: '',
     analysis_date: new Date().toISOString().split('T')[0] || '',
-    analysts: ['market', 'social', 'news', 'fundamentals'],  // Default all analysts selected
+    analysts: [],  // 初始为空，由缓存或默认值填充
     research_depth: 1,
     llm_provider: '',
     api_key: '',
@@ -127,6 +127,12 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     const loaded = loadConfigFromCache();
     if (loaded) {
       onShowToast('已加载上次配置', 'info');
+    } else {
+      // 如果没有缓存，设置默认值：全选分析师
+      setFormData(prev => ({
+        ...prev,
+        analysts: ['market', 'social', 'news', 'fundamentals']
+      }));
     }
   }, []);
 
