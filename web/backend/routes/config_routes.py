@@ -31,6 +31,7 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
             {"value": "anthropic", "label": "Anthropic", "description": "Claude系列模型", "url": "https://api.anthropic.com/"},
             {"value": "google", "label": "Google", "description": "Gemini系列模型", "url": "https://generativelanguage.googleapis.com/v1"},
             {"value": "openrouter", "label": "OpenRouter", "description": "多模型聚合平台", "url": "https://openrouter.ai/api/v1"},
+            {"value": "deepseek", "label": "DeepSeek", "description": "DeepSeek系列模型", "url": "https://api.deepseek.com/v1"},
             # {"value": "oneai", "label": "OpenAI代理", "description": "GPT系列模型", "url": "https://api.bstester.com/v1"},
             # {"value": "ollama", "label": "Ollama", "description": "本地模型服务", "url": "http://localhost:11434/v1"}
         ],
@@ -67,6 +68,14 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
                     {"value": "openai/o3-mini", "label": "o3-mini - 高级推理模型（轻量级）"},
                     {"value": "openai/o3", "label": "o3 - 完整高级推理模型"},
                     {"value": "openai/o1", "label": "o1 - 首屈一指的推理和问题解决模型"},
+                ]
+            },
+            "deepseek": {
+                "shallow": [
+                    {"value": "deepseek-chat", "label": "DeepSeek-V3.2-Exp 的非思考模式"},
+                ],
+                "deep": [
+                    {"value": "deepseek-reasoner", "label": "DeepSeek-V3.2-Exp 的思考模式"},
                 ]
             },
             "anthropic": {
