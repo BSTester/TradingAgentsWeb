@@ -58,9 +58,17 @@ async def start_analysis(
     ticker = normalize_ticker(request.ticker)
     
     if not validate_ticker(ticker):
+        # 提供详细的错误信息
+        error_msg = f"无效的股票代码格式: {request.ticker}\n\n"
+        error_msg += "支持的格式：\n"
+        error_msg += "• 美股：1-5个字母（如 AAPL、TSLA）\n"
+        error_msg += "• 港股：4-5位数字或带.HK后缀（如 0700、00700.HK）\n"
+        error_msg += "• A股沪市：600/601/603/605/688开头（如 600519、688001.SH）\n"
+        error_msg += "• A股深市：000/001/002/300/301开头（如 000001、300750.SZ）"
+        
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"无效的股票代码格式: {request.ticker}。请输入有效的美股（如AAPL）、港股（如0700或0700.HK）或A股（如600000或600000.SH）代码。"
+            detail=error_msg
         )
     
     # Detect market
