@@ -58,7 +58,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
   const [formData, setFormData] = useState<FormData>({
     ticker: '',
     analysis_date: new Date().toISOString().split('T')[0] || '',
-    analysts: [],
+    analysts: ['market', 'social', 'news', 'fundamentals'],  // Default all analysts selected
     research_depth: 1,
     llm_provider: '',
     api_key: '',
