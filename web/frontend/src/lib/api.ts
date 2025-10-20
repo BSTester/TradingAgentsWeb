@@ -38,8 +38,14 @@ async function apiRequest<T>(
           localStorage.removeItem('access_token');
           // Clear cookie used by middleware
           document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
-          // Redirect to login page
-          window.location.href = '/login';
+          
+          // Only redirect to login if not on a public page
+          const publicPages = ['/', '/login', '/register', '/auth'];
+          const currentPath = window.location.pathname;
+          if (!publicPages.includes(currentPath) && !currentPath.startsWith('/analysis/')) {
+            // Redirect to login page
+            window.location.href = '/login';
+          }
         } catch {}
       }
       throw new Error('无法验证凭据');

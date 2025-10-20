@@ -5,6 +5,7 @@ import React from 'react';
 interface AnalysisCardData {
   analysis_id: string;
   ticker: string;
+  company_name?: string;
   market: string;
   analysis_date: string;
   trading_decision: string;
@@ -68,7 +69,10 @@ export function AnalysisCard({ analysis, onClick, market }: AnalysisCardProps) {
             </div>
             <div>
               <h3 className="text-xl font-bold text-gray-900">{analysis.ticker}</h3>
-              <p className="text-sm text-gray-500">{analysis.market}</p>
+              <p className="text-sm text-gray-500">
+                {analysis.market === 'US' ? '美股' : analysis.market === 'HK' ? '港股' : analysis.market === 'CN' ? 'A股' : analysis.market}
+                {analysis.company_name && ` | ${analysis.company_name}`}
+              </p>
             </div>
           </div>
 

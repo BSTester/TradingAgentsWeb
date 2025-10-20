@@ -96,6 +96,10 @@ def validate_ticker(ticker: str) -> bool:
             # 深市：000、001、002、300、301开头
             return prefix3 in ('000', '001', '002', '300', '301')
     
+    # 港股：4-5位纯数字（不带后缀）
+    if ticker.isdigit() and 4 <= len(ticker) <= 5:
+        return True
+    
     # 美股：1-5个字母
     if ticker.isalpha() and 1 <= len(ticker) <= 5:
         return True

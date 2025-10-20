@@ -15,6 +15,8 @@ interface AnalysisHistoryProps {
 interface AnalysisRecord {
   id: string;
   ticker: string;
+  company_name?: string;
+  market?: string;
   analysis_date: string;
   status: string;
   progress_percentage: number;
@@ -260,11 +262,18 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                     </div>
                     <div className="flex flex-col">
                       <h4 className="text-sm font-bold text-gray-900">
-                        {analysis.ticker}
+                        {analysis.ticker}{analysis.company_name && ` (${analysis.company_name})`}
                       </h4>
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getStatusColor(analysis.status)} text-center`}>
-                        {getStatusLabel(analysis.status)}
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        {analysis.market && (
+                          <span className="text-xs text-gray-500">
+                            {analysis.market === 'US' ? '美股' : analysis.market === 'HK' ? '港股' : 'A股'}
+                          </span>
+                        )}
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getStatusColor(analysis.status)} text-center`}>
+                          {getStatusLabel(analysis.status)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
