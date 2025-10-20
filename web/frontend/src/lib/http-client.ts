@@ -38,9 +38,14 @@ export class HttpClient {
         if (error.response?.status === 401) {
           // Token expired or invalid, remove it
           removeAuthToken();
-          // Redirect to login if in browser
+          
+          // Only redirect to login if not on a public page
           if (typeof window !== 'undefined') {
-            window.location.href = '/login';
+            const publicPages = ['/', '/login', '/register', '/auth'];
+            const currentPath = window.location.pathname;
+            if (!publicPages.includes(currentPath) && !currentPath.startsWith('/analysis/')) {
+              window.location.href = '/login';
+            }
           }
         }
         return Promise.reject(error);

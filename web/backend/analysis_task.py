@@ -752,6 +752,7 @@ def run_analysis_task(
             AnalysisRecord.progress_percentage: 100.0,
             AnalysisRecord.completed_at: completed_time,
             AnalysisRecord.final_state: _cleaned_state,
+            AnalysisRecord.company_name: company_of_interest if company_of_interest != ticker else None,
             AnalysisRecord.market_analysis: final_state.get("market_report", "") if final_state else "",
             AnalysisRecord.sentiment_analysis: final_state.get("sentiment_report", "") if final_state else "",
             AnalysisRecord.news_analysis: final_state.get("news_report", "") if final_state else "",

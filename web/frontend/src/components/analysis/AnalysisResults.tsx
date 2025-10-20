@@ -430,7 +430,10 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                   <i className="fas fa-chart-line text-3xl" />
                 </div>
                 <div>
-                  <p className="text-sm opacity-90">股票代码</p>
+                  <p className="text-sm opacity-90">
+                    {results?.market === 'US' ? '美股' : results?.market === 'HK' ? '港股' : results?.market === 'CN' ? 'A股' : '股票'}
+                    {results?.company_name && ` | ${results.company_name}`}
+                  </p>
                   <p className="text-3xl font-bold">{results?.ticker}</p>
                 </div>
               </div>
@@ -868,7 +871,10 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                   <i className="fas fa-chart-line text-3xl" />
                 </div>
                 <div>
-                  <p className="text-sm opacity-90">股票代码</p>
+                  <p className="text-sm opacity-90">
+                    {results?.market === 'US' ? '美股' : results?.market === 'HK' ? '港股' : results?.market === 'CN' ? 'A股' : '股票'}
+                    {results?.company_name && ` | ${results.company_name}`}
+                  </p>
                   <p className="text-3xl font-bold">{results?.ticker}</p>
                 </div>
               </div>
@@ -1107,6 +1113,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                 </p>
                 <p className="text-xs text-gray-500 mt-4">
                   报告生成时间：{results?.analysis_date} | 股票代码：{results?.ticker}
+                  {results?.company_name && ` (${results.company_name})`}
+                  {results?.market && ` | 市场：${results?.market === 'US' ? '美股' : results?.market === 'HK' ? '港股' : results?.market === 'CN' ? 'A股' : results?.market}`}
                 </p>
               </div>
             </div>

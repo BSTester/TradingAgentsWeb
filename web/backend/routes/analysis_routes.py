@@ -355,6 +355,8 @@ async def get_analysis_results(
     # Return results in the format expected by frontend
     return {
         "ticker": analysis.ticker,
+        "company_name": analysis.company_name,
+        "market": analysis.market,
         "analysis_date": analysis.analysis_date,
         "trading_decision": analysis.trading_decision,
         "final_summary": final_summary,
@@ -398,6 +400,8 @@ async def list_analyses(
             {
                 "id": analysis.analysis_id,
                 "ticker": analysis.ticker,
+                "company_name": analysis.company_name,
+                "market": analysis.market,
                 "analysis_date": analysis.analysis_date,
                 "status": analysis.status,
                 "progress_percentage": analysis.progress_percentage,
@@ -722,6 +726,8 @@ async def get_public_analysis_results(
     # Return results
     return {
         "ticker": analysis.ticker,
+        "company_name": analysis.company_name,
+        "market": analysis.market,
         "analysis_date": analysis.analysis_date,
         "trading_decision": analysis.trading_decision,
         "final_summary": final_summary,

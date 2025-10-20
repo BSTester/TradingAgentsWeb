@@ -6,6 +6,7 @@ import { AnalysisCard } from './AnalysisCard';
 interface AnalysisCardData {
   analysis_id: string;
   ticker: string;
+  company_name?: string;
   market: string;
   analysis_date: string;
   trading_decision: string;

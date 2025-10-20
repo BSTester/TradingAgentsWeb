@@ -43,6 +43,7 @@ class AnalysisRecord(Base):
     
     # Analysis parameters
     ticker = Column(String(20), nullable=False, index=True)
+    company_name = Column(String(100), nullable=True)  # Company name in Chinese
     market = Column(String(10), nullable=True, index=True)  # US, HK, CN
     analysis_date = Column(String(10), nullable=False)  # YYYY-MM-DD format
     analysts = Column(JSON, nullable=False)  # List of selected analysts

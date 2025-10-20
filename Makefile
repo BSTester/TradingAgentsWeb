@@ -102,9 +102,9 @@ rebuild:
 test:
 	docker-compose exec backend pytest
 
-# 数据库迁移
+# 数据库迁移（添加新字段到现有数据库）
 migrate:
-	docker-compose exec backend python web/backend/init_db.py
+	docker-compose exec backend python web/backend/migrations/apply_migration.py
 
 # 查看资源使用
 stats:

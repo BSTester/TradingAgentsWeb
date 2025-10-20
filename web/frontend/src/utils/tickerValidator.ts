@@ -16,10 +16,10 @@ export function normalizeTicker(ticker: string): string {
 export function validateTicker(ticker: string): boolean {
   const normalized = normalizeTicker(ticker);
   
-  // 港股：5位数字（2008年后统一为5位）或带.HK后缀
+  // 港股：带.HK后缀
   if (normalized.endsWith('.HK')) {
     const base = normalized.slice(0, -3);
-    // 港股代码：5位数字，或4位数字（兼容旧格式）
+    // 港股代码：4-5位数字
     return /^\d{4,5}$/.test(base);
   }
   
@@ -66,6 +66,11 @@ export function validateTicker(ticker: string): boolean {
       return prefix3 === '000' || prefix3 === '001' || prefix3 === '002' || 
              prefix3 === '300' || prefix3 === '301';
     }
+  }
+  
+  // 港股：4-5位纯数字（不带后缀）
+  if (/^\d{4,5}$/.test(normalized)) {
+    return true;
   }
   
   // 美股：1-5个字母

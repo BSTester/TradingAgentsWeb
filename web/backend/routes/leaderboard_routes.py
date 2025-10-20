@@ -55,6 +55,7 @@ async def get_leaderboard(db: AsyncSession = Depends(get_db)) -> Dict[str, List[
             market_data[market][ticker] = {
                 'analysis_id': analysis.analysis_id,
                 'ticker': analysis.ticker,
+                'company_name': analysis.company_name,
                 'market': analysis.market,
                 'analysis_date': analysis.analysis_date,
                 'trading_decision': analysis.trading_decision,

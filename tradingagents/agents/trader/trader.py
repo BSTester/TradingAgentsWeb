@@ -161,11 +161,34 @@ FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** | PRICE RANGE: <min>-<max> <curren
         
         log_agent_decision("TRADER", decision, company_name)
         log_agent_info("TRADER", f"交易计划生成完成，长度: {len(result.content)} 字符", company_name)
+        
+        # Extract company name from ticker symbol and analysis
+        log_agent_info("TRADER", f"提取公司名称: {ticker_symbol}", company_name)
+        company_name_extraction_messages = [
+            {
+                "role": "system",
+                "content": "You are a financial data assistant. Extract the Chinese company name from the given stock ticker symbol and analysis context. Return ONLY the short Chinese company name (e.g., '苹果' for AAPL, '腾讯' for 0700.HK, '贵州茅台' for 600519, '英伟达' for NVDA). Do not include any additional text, explanations, or formatting. Always return the name in Chinese characters."
+            },
+            {
+                "role": "user",
+                "content": f"Stock ticker: {ticker_symbol}\n\nAnalysis context:\n{decision_text[:500]}\n\nChinese company name:"
+            }
+        ]
+        
+        try:
+            company_name_result = llm.invoke(company_name_extraction_messages)
+            extracted_company_name = company_name_result.content.strip()
+            log_agent_info("TRADER", f"提取到公司名称: {extracted_company_name}", company_name)
+        except Exception as e:
+            log_agent_info("TRADER", f"提取公司名称失败: {e}, 使用原始ticker", company_name)
+            extracted_company_name = ticker_symbol
+        
         log_agent_end("TRADER", company_name)
 
         return {
             "messages": [result],
             "trader_investment_plan": result.content,
+            "company_of_interest": extracted_company_name,
             "sender": name,
         }
 
