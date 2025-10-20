@@ -148,7 +148,7 @@ def run_analysis_task(
         send_log('info', '🔑 配置 API 密钥...', 'system', '配置', 2.0, '准备阶段')
         check_stop()
         
-        if request_data.get('openai_api_key') and request_data.get('llm_provider', '').lower() in ("openai", "oneai"):
+        if request_data.get('openai_api_key') and request_data.get('llm_provider', '').lower() in ("openai", "oneai", "deepseek"):
             os.environ["OPENAI_API_KEY"] = request_data['openai_api_key']
         elif request_data.get('anthropic_api_key') and request_data.get('llm_provider', '').lower() == "anthropic":
             os.environ["ANTHROPIC_API_KEY"] = request_data['anthropic_api_key']
