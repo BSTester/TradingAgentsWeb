@@ -316,9 +316,9 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                     )}
                   </div>
 
-                  {/* 第3列：分析日期 - 自动平分 */}
+                  {/* 第3列：分析日期 - 上下排列 */}
                   <div className="flex items-center justify-center text-sm flex-1">
-                    <i className={`far fa-calendar mr-1.5 text-sm ${
+                    <i className={`far fa-calendar mr-1.5 text-xs ${
                       analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
                         ? 'text-green-500'
                         : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
@@ -327,13 +327,15 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                         ? 'text-yellow-500'
                         : 'text-gray-500'
                     }`} />
-                    <span className="text-gray-600 mr-1.5">分析日期:</span>
-                    <span className="font-medium text-gray-900">{analysis.analysis_date}</span>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-gray-500">分析日期</span>
+                      <span className="text-xs font-medium text-gray-900">{analysis.analysis_date}</span>
+                    </div>
                   </div>
 
-                  {/* 第4列：创建时间 - 自动平分 */}
+                  {/* 第4列：创建时间 - 上下排列 */}
                   <div className="flex items-center justify-center text-sm flex-1">
-                    <i className={`far fa-clock mr-1.5 text-sm ${
+                    <i className={`far fa-clock mr-1.5 text-xs ${
                       analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
                         ? 'text-green-500'
                         : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
@@ -342,11 +344,36 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                         ? 'text-yellow-500'
                         : 'text-gray-500'
                     }`} />
-                    <span className="text-gray-600 mr-1.5">创建时间:</span>
-                    <span className="font-medium text-gray-900">{new Date(analysis.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-gray-500">创建时间</span>
+                      <span className="text-xs font-medium text-gray-900">{new Date(analysis.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
                   </div>
 
-                  {/* 第5列：操作按钮 - 自动平分 */}
+                  {/* 第5列：完成时间 - 上下排列 */}
+                  <div className="flex items-center justify-center text-sm flex-1">
+                    {analysis.completed_at ? (
+                      <>
+                        <i className={`fas fa-check-circle mr-1.5 text-xs ${
+                          analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
+                            ? 'text-green-500'
+                            : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
+                            ? 'text-red-500'
+                            : analysis.summary?.recommendation
+                            ? 'text-yellow-500'
+                            : 'text-gray-500'
+                        }`} />
+                        <div className="flex flex-col">
+                          <span className="text-xs text-gray-500">完成时间</span>
+                          <span className="text-xs font-medium text-gray-900">{new Date(analysis.completed_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-xs text-gray-400">-</span>
+                    )}
+                  </div>
+
+                  {/* 第6列：操作按钮 - 自动平分 */}
                   <div className="flex items-center justify-center space-x-2 flex-1">
                     {analysis.status === 'completed' && (
                       <button
