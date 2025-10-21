@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, AuthResponse } from '@/lib/types';
 import { authAPI } from './apiClient';
+import { queryClient } from './react-query';
 
 interface AuthContextType {
   user: User | null;
@@ -91,6 +92,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('access_token');
     // 同时清除cookie
     document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+    
+    // 清除所有 React Query 缓存，避免下一个用户看到上一个用户的数据
+    queryClient.clear();
   };
 
   return (

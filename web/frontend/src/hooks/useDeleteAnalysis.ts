@@ -63,9 +63,12 @@ export function useDeleteAnalysis() {
     },
     // 无论成功还是失败，都重新获取数据以确保同步
     onSettled: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: queryKeys.analysis.all,
-        refetchType: 'active'
+      // 👇 这里调用 invalidateQueries 使缓存失效
+      // 作用：强制标记所有 analysis 相关的查询为"过期"，立即重新获取最新数据
+      // 效果：删除操作完成后，历史列表会自动刷新，显示最新数据（已删除的项不再出现）
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.analysis.all,  // 匹配所有以 ['analysis'] 开头的查询
+        refetchType: 'active'  // 只刷新当前激活（正在使用）的查询
       });
     },
   });
