@@ -25,6 +25,46 @@ def normalize_ticker(ticker: str) -> str:
     return ticker.upper().strip().replace(' ', '')
 
 
+def normalize_ticker_with_suffix(ticker: str) -> str:
+    """
+    标准化股票代码并添加市场后缀
+    
+    特殊处理：
+    - 港股：4-5位纯数字自动添加 .HK 后缀
+    - 其他市场：保持原样
+    
+    Args:
+        ticker: 原始股票代码
+        
+    Returns:
+        标准化后的股票代码（港股带.HK后缀）
+        
+    Examples:
+        >>> normalize_ticker_with_suffix("0700")
+        '0700.HK'
+        >>> normalize_ticker_with_suffix("00700")
+        '00700.HK'
+        >>> normalize_ticker_with_suffix("0700.HK")
+        '0700.HK'
+        >>> normalize_ticker_with_suffix("600519")
+        '600519'
+        >>> normalize_ticker_with_suffix("AAPL")
+        'AAPL'
+    """
+    normalized = normalize_ticker(ticker)
+    
+    # 如果已经带了.HK后缀，直接返回
+    if normalized.endswith('.HK'):
+        return normalized
+    
+    # 检查是否是港股（4-5位纯数字）
+    if normalized.isdigit() and 4 <= len(normalized) <= 5:
+        return f"{normalized}.HK"
+    
+    # 其他情况保持原样
+    return normalized
+
+
 def validate_ticker(ticker: str) -> bool:
     """
     校验股票代码格式是否有效

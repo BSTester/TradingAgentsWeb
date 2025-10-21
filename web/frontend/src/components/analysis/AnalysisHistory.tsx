@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { buildApiUrl, API_ENDPOINTS } from '../../utils/api';
+import { logger } from '@/utils/logger';
 
 
 interface AnalysisHistoryProps {
@@ -23,6 +24,7 @@ interface AnalysisRecord {
   created_at: string;
   updated_at: string;
   completed_at?: string;
+  is_public: boolean;
   summary?: {
     recommendation?: string;
   };
@@ -71,7 +73,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
       }
 
       const result = await response.json();
-      console.log('📋 Fetched analyses:', result);
+      logger.log('📋 Fetched analyses:', result);
       return result;
     },
     retry: 10, // 最多重试10次
@@ -119,7 +121,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
 
       onShowToast('分析已删除', 'success');
     } catch (error) {
-      console.error('Delete error:', error);
+      logger.error('Delete error:', error);
       onShowToast(error instanceof Error ? error.message : '删除失败', 'error');
     } finally {
       setDeleting(null);
@@ -257,12 +259,19 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
             {analyses.map((analysis) => (
               <div
                 key={analysis.id}
-                className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow duration-200 bg-white"
+                className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow duration-200 bg-white relative overflow-hidden"
               >
+                {/* 右上角公开标记 - 三角形角标 */}
+                {analysis.is_public && (
+                  <div className="absolute top-0 right-0 w-0 h-0 border-t-[40px] border-t-blue-500 border-l-[40px] border-l-transparent">
+                    <i className="fas fa-globe absolute -top-[32px] right-[4px] text-white text-xs" title="公开" />
+                  </div>
+                )}
+
                 {/* 五列布局：股票代码 | 投资建议 | 分析日期 | 创建时间 | 操作按钮 */}
                 <div className="flex items-center gap-4">
-                  {/* 第1列：股票代码 - 自动平分 */}
-                  <div className="flex items-center justify-center space-x-2 flex-1 text-sm">
+                  {/* 第1列：股票代码 - 左对齐 */}
+                  <div className="flex items-center justify-start space-x-2 flex-1 text-sm">
                     <div className={`text-white w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-md ${
                       analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
                         ? 'bg-gradient-to-br from-green-500 to-green-600'

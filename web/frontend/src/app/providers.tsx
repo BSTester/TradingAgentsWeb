@@ -14,7 +14,7 @@ export function Providers({ children }: ProvidersProps) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 1 * 60 * 1000, // 1 minute
         retry: (failureCount, error: any) => {
           if (error?.response?.status === 401) {
             return false

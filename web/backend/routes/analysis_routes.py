@@ -19,7 +19,7 @@ from web.backend.schemas import (
 )
 from web.backend.auth_routes import get_current_active_user
 from web.backend.analysis_task import run_analysis_task
-from web.backend.utils.market_detector import normalize_ticker, validate_ticker, detect_market
+from web.backend.utils.market_detector import normalize_ticker, normalize_ticker_with_suffix, validate_ticker, detect_market
 
 # 这些需要从 app_v2.py 导入
 # 暂时使用占位符，稍后会修复
@@ -70,6 +70,9 @@ async def start_analysis(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error_msg
         )
+    
+    # 标准化股票代码（港股自动添加.HK后缀）
+    ticker = normalize_ticker_with_suffix(ticker)
     
     # Detect market
     market = detect_market(ticker)
@@ -408,6 +411,7 @@ async def list_analyses(
                 "created_at": analysis.created_at,
                 "updated_at": analysis.updated_at,
                 "completed_at": analysis.completed_at,
+                "is_public": analysis.is_public,
                 "summary": {
                     "recommendation": analysis.trading_decision
                 } if analysis.trading_decision else None

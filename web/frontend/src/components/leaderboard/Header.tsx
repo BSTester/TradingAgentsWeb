@@ -7,6 +7,7 @@ interface User {
   id: number;
   username: string;
   email: string;
+  role?: string;
 }
 
 interface HeaderProps {
@@ -51,15 +52,13 @@ export function Header({ user, onLogout }: HeaderProps) {
                   <i className="fas fa-plus-circle mr-1" />
                   新建分析
                 </button>
-                {user.role === 'admin' && (
-                  <button
-                    onClick={() => router.push('/admin/users')}
-                    className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-                  >
-                    <i className="fas fa-users-cog mr-1" />
-                    用户管理
-                  </button>
-                )}
+                <button
+                  onClick={() => router.push('/history')}
+                  className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  <i className="fas fa-history mr-1" />
+                  分析历史
+                </button>
                 <div className="text-gray-300 flex items-center">
                   <i className={`fas ${user.role === 'admin' ? 'fa-crown' : 'fa-user-circle'} mr-2`} />
                   {user.username}

@@ -22,16 +22,30 @@ async def get_leaderboard(db: AsyncSession = Depends(get_db)) -> Dict[str, List[
     获取排行榜数据，按市场分组返回最新的10条完成分析
     相同分析日期的相同股票代码只显示完成时间最新的一条
     
+    规则：
+    1. 按市场分类（US、HK、CN）
+    2. 相同市场、相同分析日期、相同股票代码只显示最新完成的一条
+    3. 按完成时间倒序排列
+    4. 每个市场返回最多10条记录
+    
     Returns:
         Dict with keys 'US', 'HK', 'CN', each containing a list of analysis records
     """
     result = {}
     
-    # Query each market separately with limit at database level
+    # Query each market separately
     for market in ['US', 'HK', 'CN']:
-        # Create a subquery with row_number partitioned by analysis_date and ticker
+        # 使用窗口函数对相同日期+股票代码的记录进行排序
+        # row_number() 会为每个分区内的记录分配一个唯一的序号
         subquery = select(
-            AnalysisRecord,
+            AnalysisRecord.analysis_id,
+            AnalysisRecord.ticker,
+            AnalysisRecord.company_name,
+            AnalysisRecord.market,
+            AnalysisRecord.analysis_date,
+            AnalysisRecord.trading_decision,
+            AnalysisRecord.completed_at,
+            AnalysisRecord.progress_percentage,
             func.row_number().over(
                 partition_by=[AnalysisRecord.analysis_date, AnalysisRecord.ticker],
                 order_by=desc(AnalysisRecord.completed_at)
@@ -42,30 +56,35 @@ async def get_leaderboard(db: AsyncSession = Depends(get_db)) -> Dict[str, List[
             AnalysisRecord.is_public == True
         ).subquery()
         
-        # Select only records where row_number = 1 (latest for each date+ticker combination)
-        # and limit to 10 records
-        stmt = select(AnalysisRecord).select_from(subquery).filter(
+        # 只选择每个分区中 row_number = 1 的记录（即最新的记录）
+        # 然后按完成时间倒序排列，取前10条
+        stmt = select(subquery).filter(
             subquery.c.rn == 1
         ).order_by(
             desc(subquery.c.completed_at)
         ).limit(10)
         
         query_result = await db.execute(stmt)
-        analyses = query_result.scalars().all()
+        rows = query_result.all()
+        
+        # 调试日志
+        print(f"📊 排行榜查询 - 市场: {market}, 记录数: {len(rows)}")
+        for row in rows:
+            print(f"  - {row.ticker} ({row.analysis_date}): {row.trading_decision} @ {row.completed_at}")
         
         # Convert to dict format
         result[market] = [
             {
-                'analysis_id': analysis.analysis_id,
-                'ticker': analysis.ticker,
-                'company_name': analysis.company_name,
-                'market': analysis.market,
-                'analysis_date': analysis.analysis_date,
-                'trading_decision': analysis.trading_decision,
-                'completed_at': analysis.completed_at.isoformat() if analysis.completed_at else None,
-                'progress_percentage': analysis.progress_percentage
+                'analysis_id': row.analysis_id,
+                'ticker': row.ticker,
+                'company_name': row.company_name,
+                'market': row.market,
+                'analysis_date': row.analysis_date,
+                'trading_decision': row.trading_decision,
+                'completed_at': row.completed_at.isoformat() if row.completed_at else None,
+                'progress_percentage': row.progress_percentage
             }
-            for analysis in analyses
+            for row in rows
         ]
     
     return result
