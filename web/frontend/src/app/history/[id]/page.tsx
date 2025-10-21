@@ -1,52 +1,34 @@
 'use client';
 
 import React from 'react';
-import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { AnalysisResults } from '@/components/analysis/AnalysisResults';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { Footer } from '@/components/leaderboard/Footer';
-import { Header } from '@/components/leaderboard/Header';
+import { AppNavbar } from '@/components/common/AppNavbar';
 
-export default function AnalysisDetailPage() {
+export default function HistoryDetailPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
-  const searchParams = useSearchParams();
   const { toast, showToast, hideToast } = useToast();
   
-  // 返回顶部功能 - 必须在所有条件判断之前声明
+  // 返回顶部功能
   const [showBackToTop, setShowBackToTop] = React.useState(false);
   
   const analysisId = params.id as string;
-  
-  // 检查是否从排行榜进入（通过 URL 参数判断）
-  const fromLeaderboard = searchParams.get('from') === 'leaderboard';
-  const marketTab = searchParams.get('market') || 'US'; // 记住从哪个市场标签进入
 
   const handleBackToHome = () => {
     router.push('/');
   };
 
   const handleBackToHistory = () => {
-    if (fromLeaderboard) {
-      // 如果从排行榜进入，返回到对应的市场标签
-      router.push(`/?market=${marketTab}`);
-    } else if (user) {
-      router.push('/dashboard');
-    } else {
-      router.push('/');
-    }
+    router.push('/history');
   };
 
-  // 鉴权逻辑：只有从历史记录进入时才需要登录
+  // 鉴权逻辑
   React.useEffect(() => {
-    // 如果从排行榜进入，不需要鉴权
-    if (fromLeaderboard) {
-      return undefined;
-    }
-    
-    // 如果从历史记录进入，需要鉴权
     if (!authLoading && !user) {
       const timer = setTimeout(() => {
         const token = localStorage.getItem('access_token');
@@ -57,7 +39,7 @@ export default function AnalysisDetailPage() {
       return () => clearTimeout(timer);
     }
     return undefined;
-  }, [user, authLoading, router, fromLeaderboard]);
+  }, [user, authLoading, router]);
 
   React.useEffect(() => {
     const handleScroll = () => {
@@ -68,8 +50,7 @@ export default function AnalysisDetailPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // 只有从历史记录进入时才显示加载状态
-  if (!fromLeaderboard && (authLoading || !user)) {
+  if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -84,19 +65,10 @@ export default function AnalysisDetailPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const getMarketName = (market: string) => {
-    const marketNames: Record<string, string> = {
-      'US': '美股',
-      'HK': '港股',
-      'CN': 'A股'
-    };
-    return marketNames[market] || '排行榜';
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* 顶部导航栏 */}
-      <Header user={user} onLogout={logout} />
+      <AppNavbar user={user} onLogout={logout} />
 
       {/* 面包屑导航 */}
       <nav className="bg-white shadow-sm">
@@ -110,15 +82,16 @@ export default function AnalysisDetailPage() {
               首页
             </button>
             <i className="fas fa-chevron-right text-gray-400 text-xs" />
-            {fromLeaderboard && (
-              <>
-                <span className="text-gray-600">{getMarketName(marketTab)}</span>
-                <i className="fas fa-chevron-right text-gray-400 text-xs" />
-              </>
-            )}
-            <span className="text-gray-600">分析详情</span>
+            <button
+              onClick={handleBackToHistory}
+              className="text-blue-600 hover:text-blue-800"
+            >
+              分析历史
+            </button>
             <i className="fas fa-chevron-right text-gray-400 text-xs" />
-            <span className="text-gray-900 font-medium">{analysisId}</span>
+            <span className="text-gray-900 font-medium">分析详情</span>
+            <i className="fas fa-chevron-right text-gray-400 text-xs" />
+            <span className="text-gray-600">{analysisId}</span>
           </div>
         </div>
       </nav>
@@ -130,7 +103,7 @@ export default function AnalysisDetailPage() {
           onBackToConfig={handleBackToHome}
           onBackToHistory={handleBackToHistory}
           onShowToast={showToast}
-          fromLeaderboard={fromLeaderboard}
+          fromLeaderboard={false}
         />
       </div>
 

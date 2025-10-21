@@ -6,6 +6,7 @@ import { buildApiUrl, API_ENDPOINTS } from '../../utils/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
+import { logger } from '@/utils/logger';
 
 interface AnalysisResultsProps {
   analysisId: string;
@@ -38,6 +39,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
       
       // 从排行榜进入时不需要 token，从历史记录进入时需要 token
       if (!fromLeaderboard && !token) {
+        console.error('❌ 未找到 access_token');
         throw new Error('请先登录');
       }
 
@@ -45,6 +47,14 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
       const endpoint = fromLeaderboard 
         ? `/api/public/analysis/${analysisId}/results`  // 公开接口
         : API_ENDPOINTS.ANALYSIS.RESULTS(analysisId);   // 私有接口
+
+      logger.log('📡 请求分析结果:', {
+        analysisId,
+        endpoint,
+        fromLeaderboard,
+        hasToken: !!token,
+        tokenPrefix: token ? token.substring(0, 20) + '...' : 'none'
+      });
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json'
@@ -59,20 +69,33 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
         headers
       });
 
+      logger.log('📡 响应状态:', response.status, response.statusText);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        logger.error('❌ 请求失败:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+
         if (response.status === 401) {
           throw new Error('登录已过期，请重新登录');
         } else if (response.status === 404) {
           throw new Error('分析记录未找到');
         } else if (response.status === 400) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || '分析未完成');
+          try {
+            const errorData = JSON.parse(errorText);
+            throw new Error(errorData.detail || '分析未完成');
+          } catch {
+            throw new Error('分析未完成');
+          }
         }
-        throw new Error('获取分析结果失败');
+        throw new Error(`获取分析结果失败: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('📊 Fetched results:', data);
+      logger.log('✅ 成功获取分析结果:', data);
       return data;
     },
     retry: 10, // 最多重试10次
@@ -246,7 +269,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
             allowTaint: true,
           } as any);
 
-          console.log('Canvas size:', canvas.width, 'x', canvas.height);
+          logger.log('Canvas size:', canvas.width, 'x', canvas.height);
 
           // 移除临时容器
           document.body.removeChild(tempContainer);
@@ -271,8 +294,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
           const imgWidth = pdfWidth;
           const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-          console.log('PDF size:', pdfWidth, 'x', pdfHeight);
-          console.log('Image size in PDF:', imgWidth, 'x', imgHeight);
+          logger.log('PDF size:', pdfWidth, 'x', pdfHeight);
+          logger.log('Image size in PDF:', imgWidth, 'x', imgHeight);
 
           // 验证尺寸
           if (imgWidth <= 0 || imgHeight <= 0 || !isFinite(imgWidth) || !isFinite(imgHeight)) {
@@ -296,7 +319,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
 
           // 保存 PDF
           const filename = `${results?.ticker || 'analysis'}_${results?.analysis_date || 'report'}.pdf`;
-          console.log('Saving PDF:', filename);
+          logger.log('Saving PDF:', filename);
           pdf.save(filename);
 
           onShowToast('PDF 文件已下载', 'success');
@@ -419,9 +442,11 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
             </div>
             <button
               onClick={onBackToHistory}
-              className="text-gray-500 hover:text-gray-700 no-print"
+              className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors no-print"
+              title="返回"
             >
-              <i className="fas fa-times text-xl" />
+              <i className="fas fa-arrow-left text-lg" />
+              <span className="font-medium">返回</span>
             </button>
           </div>
         </div>

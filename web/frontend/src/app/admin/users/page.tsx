@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { buildApiUrl } from '@/utils/api';
 import { useToast, Toast } from '@/components/ui/Toast';
+import { AppNavbar } from '@/components/common/AppNavbar';
 
 interface User {
   id: number;
@@ -67,7 +68,7 @@ export default function UserManagementPage() {
       return response.json();
     },
     enabled: !!user && user.role === 'admin',
-    staleTime: 5 * 60 * 1000, // 5分钟缓存
+    staleTime: 1 * 60 * 1000, // 1分钟缓存
     refetchOnWindowFocus: false, // 窗口聚焦时不自动刷新
   });
 
@@ -90,7 +91,7 @@ export default function UserManagementPage() {
       return response.json();
     },
     enabled: !!user && user.role === 'admin',
-    staleTime: 5 * 60 * 1000, // 5分钟缓存
+    staleTime: 1 * 60 * 1000, // 1分钟缓存
     refetchOnWindowFocus: false, // 窗口聚焦时不自动刷新
   });
 
@@ -132,46 +133,7 @@ export default function UserManagementPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 顶部导航栏 */}
-      <nav className="bg-gray-900 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <button onClick={() => router.push('/')} className="flex-shrink-0">
-                <h1 className="text-white text-xl font-bold">
-                  <i className="fas fa-chart-line mr-2" />
-                  TradingAgents
-                </h1>
-              </button>
-            </div>
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-              >
-                <i className="fas fa-tachometer-alt mr-1" />
-                返回控制台
-              </button>
-              <div className="text-gray-300 flex items-center">
-                <i className="fas fa-crown mr-2" />
-                {user.username}
-                <span className="ml-2 px-2 py-0.5 bg-yellow-500 text-gray-900 text-xs font-bold rounded">
-                  管理员
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  logout();
-                  router.push('/');
-                }}
-                className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-              >
-                <i className="fas fa-power-off mr-1" />
-                退出
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <AppNavbar user={user} onLogout={logout} />
 
       {/* 主要内容 */}
       <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">

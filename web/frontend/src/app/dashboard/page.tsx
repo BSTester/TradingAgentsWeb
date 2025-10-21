@@ -8,15 +8,15 @@ import { AppConfig } from '@/lib/types';
 import { AnalysisConfigForm } from '@/components/analysis/AnalysisConfigForm';
 import { AnalysisProgress } from '@/components/analysis/AnalysisProgress';
 import { AnalysisResults } from '@/components/analysis/AnalysisResults';
-import { AnalysisHistory } from '@/components/analysis/AnalysisHistory';
 import { useToast, Toast } from '@/components/ui/Toast';
+import { AppNavbar } from '@/components/common/AppNavbar';
 
 export default function DashboardPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { toast, showToast, hideToast } = useToast();
   const [config, setConfig] = useState<AppConfig | null>(null);
-  const [currentView, setCurrentView] = useState<'config' | 'progress' | 'results' | 'history'>('config');
+  const [currentView, setCurrentView] = useState<'config' | 'progress' | 'results'>('config');
   const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -56,11 +56,8 @@ export default function DashboardPage() {
   }, [user]);
 
   const handleAnalysisStart = (analysisId: string) => {
-    console.log('=== Dashboard: handleAnalysisStart ===');
-    console.log('Received Analysis ID:', analysisId);
     setCurrentAnalysisId(analysisId);
     setCurrentView('progress');
-    console.log('Switched to progress view');
   };
 
   const handleAnalysisComplete = () => {
@@ -100,59 +97,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* 顶部导航栏 */}
-      <nav className="bg-gray-900 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 cursor-pointer" onClick={() => router.push('/')}>
-                <h1 className="text-white text-xl font-bold">
-                  <i className="fas fa-chart-line mr-2" />
-                  TradingAgents
-                </h1>
-              </div>
-            </div>
-            <div className="flex items-center flex-wrap gap-2 sm:space-x-4">
-              <button
-                onClick={() => setCurrentView('history')}
-                className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-              >
-                <i className="fas fa-history mr-1" />
-                分析历史
-              </button>
-              {user?.role === 'admin' && (
-                <button
-                  onClick={() => router.push('/admin/users')}
-                  className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-                >
-                  <i className="fas fa-users-cog mr-1" />
-                  用户管理
-                </button>
-              )}
-              <div className="relative">
-                <button className="text-gray-300 hover:text-white flex items-center">
-                  <i className={`fas ${user?.role === 'admin' ? 'fa-crown' : 'fa-user-circle'} mr-2`} />
-                  {user?.username}
-                  {user?.role === 'admin' && (
-                    <span className="ml-2 px-2 py-0.5 bg-yellow-500 text-gray-900 text-xs font-bold rounded">
-                      管理员
-                    </span>
-                  )}
-                </button>
-              </div>
-              <button
-                onClick={() => {
-                  logout();
-                  router.push('/');
-                }}
-                className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-              >
-                <i className="fas fa-power-off mr-1" />
-                退出
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <AppNavbar user={user} onLogout={logout} showNewAnalysis={false} />
 
       {/* 主要内容区域 */}
       <div className="flex-1 max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 w-full">
@@ -195,22 +140,7 @@ export default function DashboardPage() {
           <AnalysisResults
             analysisId={currentAnalysisId}
             onBackToConfig={() => setCurrentView('config')}
-            onBackToHistory={() => setCurrentView('history')}
-            onShowToast={showToast}
-          />
-        )}
-
-        {currentView === 'history' && (
-          <AnalysisHistory
-            onBackToConfig={() => setCurrentView('config')}
-            onViewResults={(analysisId: string) => {
-              setCurrentAnalysisId(analysisId);
-              setCurrentView('results');
-            }}
-            onViewProgress={(analysisId: string) => {
-              setCurrentAnalysisId(analysisId);
-              setCurrentView('progress');
-            }}
+            onBackToHistory={() => router.push('/history')}
             onShowToast={showToast}
           />
         )}

@@ -55,7 +55,7 @@ export default function LeaderboardPage() {
       if (!response.ok) throw new Error('获取排行榜失败');
       return response.json();
     },
-    staleTime: 5 * 60 * 1000, // 5分钟缓存
+    staleTime: 1 * 60 * 1000, // 1分钟缓存
     refetchOnWindowFocus: false, // 窗口聚焦时不自动刷新
   });
 
