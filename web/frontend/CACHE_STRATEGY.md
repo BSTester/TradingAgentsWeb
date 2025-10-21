@@ -1,17 +1,93 @@
 # 前端缓存策略说明
 
-## React Query 缓存配置
+## React Query 核心概念
 
-### 全局配置 (`src/lib/react-query.ts`)
+### `staleTime`（数据新鲜度）
+- **含义**：数据被认为是"新鲜"的时间
+- **行为**：在此时间内，React Query 使用缓存，不会重新获取数据
+- **示例**：
+  - `staleTime: 0` → 立即过期，每次都重新获取
+  - `staleTime: 60000` → 1分钟内使用缓存
+
+### `gcTime`（垃圾回收时间）
+- **含义**：未使用的缓存数据保留时间
+- **行为**：组件卸载后，缓存保留此时间，超时后清除
+- **示例**：
+  - `gcTime: 0` → 组件卸载后立即清除
+  - `gcTime: 300000` → 保留5分钟
+
+### `invalidateQueries`（使缓存失效）
+- **含义**：手动标记查询为"过期"
+- **行为**：强制重新获取数据，忽略 `staleTime`
+- **用途**：在数据变更（增删改）后立即刷新
+
+## 全局配置 (`src/lib/react-query.ts`)
 
 ```typescript
 {
   queries: {
-    staleTime: 1 * 60 * 1000,    // 1分钟 - 数据新鲜度
+    staleTime: 1 * 60 * 1000,    // 1分钟 - 默认数据新鲜度
     gcTime: 10 * 60 * 1000,      // 10分钟 - 缓存保留时间
     retry: 3,                     // 失败重试次数
   }
 }
+```
+
+## 历史记录列表的缓存策略
+
+### 设计思路
+
+✅ **平时有缓存**：使用全局默认的1分钟缓存，减少不必要的请求
+✅ **删除时立即刷新**：通过 `invalidateQueries` 强制获取最新数据
+
+### 实现方式
+
+```typescript
+// 1. 列表查询 - 使用默认缓存（1分钟）
+useQuery({
+  queryKey: queryKeys.analysis.list({ page, limit }),
+  queryFn: fetchAnalysisList,
+  // 使用全局默认配置，无需特殊设置
+})
+
+// 2. 删除操作 - 使缓存失效并重新获取
+useMutation({
+  mutationFn: deleteAnalysis,
+  onMutate: async (analysisId) => {
+    // 乐观更新：立即从 UI 移除
+    queryClient.setQueriesData(/* ... */);
+  },
+  onSettled: () => {
+    // 删除完成后，使缓存失效并重新获取
+    queryClient.invalidateQueries({ 
+      queryKey: queryKeys.analysis.all 
+    });
+  },
+})
+```
+
+### 工作流程
+
+```
+用户访问列表页
+  ↓
+首次加载：从服务器获取数据
+  ↓
+数据缓存1分钟
+  ↓
+1分钟内再次访问：直接使用缓存（快速）
+  ↓
+用户点击删除
+  ↓
+乐观更新：UI 立即移除该项
+  ↓
+发送删除请求
+  ↓
+删除成功：invalidateQueries 使缓存失效
+  ↓
+自动重新获取最新数据
+  ↓
+显示最新列表（已删除的项不再出现）
 ```
 
 ### 关键概念
@@ -31,6 +107,10 @@
 
 ## 删除操作的缓存刷新策略
 
+### 核心机制：invalidateQueries
+
+**关键点**：列表保持正常缓存（1分钟），删除时通过 `invalidateQueries` 强制刷新
+
 ### 实现方案
 
 #### 1. 使用 Mutation Hook（已实现）
@@ -39,29 +119,40 @@
 
 - **乐观更新**：删除前立即更新 UI，提升用户体验
 - **错误回滚**：如果删除失败，自动恢复之前的状态
-- **自动刷新**：删除成功后自动使相关查询失效并重新获取
+- **强制刷新**：删除成功后通过 `invalidateQueries` 使缓存失效并重新获取
 
 ```typescript
 // 使用示例
 const deleteMutation = useDeleteAnalysis();
-
 await deleteMutation.mutateAsync(analysisId);
 ```
 
-#### 2. 列表查询配置
-
-为分析列表设置 `staleTime: 0`，确保：
-- 删除后立即重新获取最新数据
-- 避免显示已删除的项目
-- 保持数据一致性
+#### 2. invalidateQueries 的作用
 
 ```typescript
-useQuery({
-  queryKey: queryKeys.analysis.list({ page, limit }),
-  staleTime: 0, // 立即过期
-  // ...
-})
+// 在 useDeleteAnalysis 中
+onSettled: () => {
+  // 使所有 analysis 相关的查询失效
+  queryClient.invalidateQueries({ 
+    queryKey: queryKeys.analysis.all,
+    refetchType: 'active' // 只刷新当前激活的查询
+  });
+}
 ```
+
+**效果**：
+- ✅ 忽略 `staleTime`，强制标记为过期
+- ✅ 立即重新获取数据
+- ✅ 确保显示最新列表（已删除的项不再出现）
+
+#### 3. 为什么不用 staleTime: 0？
+
+| 方案 | 优点 | 缺点 |
+|------|------|------|
+| `staleTime: 0` | 数据始终最新 | 每次访问都请求，浪费资源 |
+| `invalidateQueries` | 平时有缓存，变更时刷新 | ✅ 最佳方案 |
+
+**结论**：使用 `invalidateQueries` 既保证了删除后立即刷新，又不影响正常浏览时的性能。
 
 ### 其他需要立即刷新的操作
 
@@ -128,11 +219,43 @@ export const queryKeys = {
   });
   ```
 
-### 3. 不同场景的 staleTime 配置
+### 3. 不同场景的缓存配置建议
 
-- **静态数据**（配置、字典等）：`staleTime: Infinity`
-- **频繁变化的数据**（列表、状态）：`staleTime: 0`
-- **一般数据**：`staleTime: 1-5分钟`
+**当前配置**：所有查询使用全局默认（1分钟缓存），通过 `invalidateQueries` 处理数据变更
+
+如需针对特定数据类型优化，可以覆盖配置：
+
+```typescript
+// 静态数据 - 长期缓存
+useQuery({
+  queryKey: queryKeys.config.all,
+  queryFn: fetchConfig,
+  staleTime: 10 * 60 * 1000, // 10分钟
+  gcTime: 30 * 60 * 1000,    // 30分钟
+});
+
+// 详情数据 - 使用默认（1分钟）
+useQuery({
+  queryKey: queryKeys.analysis.detail(id),
+  queryFn: fetchAnalysisDetail,
+  // 使用全局默认配置
+});
+
+// 实时状态 - 短期缓存 + 自动刷新
+useQuery({
+  queryKey: queryKeys.analysis.status(id),
+  queryFn: fetchAnalysisStatus,
+  staleTime: 5 * 1000, // 5秒
+  refetchInterval: 5000, // 每5秒自动刷新
+});
+
+// 列表数据 - 使用默认 + invalidateQueries
+useQuery({
+  queryKey: queryKeys.analysis.list({ page, limit }),
+  queryFn: fetchAnalysisList,
+  // 使用全局默认，删除时通过 invalidateQueries 刷新
+});
+```
 
 ### 4. 乐观更新的使用场景
 
@@ -173,6 +296,30 @@ queryClient.removeQueries({ queryKey: ['analysis'] });
 queryClient.clear();
 ```
 
+## 用户切换时的缓存处理
+
+### 退出登录时清除缓存
+
+为了避免下一个用户看到上一个用户的数据，在退出登录时会清除所有缓存：
+
+```typescript
+// src/lib/auth.tsx
+const logout = () => {
+  setUser(null);
+  setToken(null);
+  localStorage.removeItem('access_token');
+  document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+  
+  // 清除所有 React Query 缓存
+  queryClient.clear();
+};
+```
+
+**效果**：
+- ✅ 退出后清除所有缓存数据
+- ✅ 下一个用户登录时从空白状态开始
+- ✅ 避免数据泄露和隐私问题
+
 ## 常见问题
 
 ### Q: 删除后列表没有立即更新？
@@ -193,3 +340,7 @@ queryClient.clear();
 **A:** React Query 自动处理：
 - 相同查询键的请求会被合并
 - 使用 `staleTime` 控制重新获取频率
+
+### Q: 退出登录后，下一个用户会看到上一个用户的数据吗？
+
+**A:** 不会。退出登录时会调用 `queryClient.clear()` 清除所有缓存，确保数据隔离。

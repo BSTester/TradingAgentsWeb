@@ -5,8 +5,8 @@ import { QueryClient } from '@tanstack/react-query';
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1 * 60 * 1000, // 1 minute
-      gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+      staleTime: 1 * 60 * 1000, // 1 minute - 默认缓存1分钟
+      gcTime: 10 * 60 * 1000, // 10 minutes - 缓存保留时间
       retry: (failureCount, error: unknown) => {
         // Don't retry on 4xx errors except 408, 429
         const errorResponse = (error as any)?.response;
