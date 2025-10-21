@@ -2,13 +2,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { buildApiUrl } from '@/utils/api';
 import { queryKeys } from '@/lib/react-query';
 
-interface AnalysisListResponse {
-  analyses: any[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
 export function useDeleteAnalysis() {
   const queryClient = useQueryClient();
 
@@ -29,46 +22,13 @@ export function useDeleteAnalysis() {
 
       return response.json();
     },
-    // 乐观更新：在删除请求发送前立即更新 UI
-    onMutate: async (analysisId: string) => {
-      // 取消所有正在进行的查询，避免覆盖我们的乐观更新
-      await queryClient.cancelQueries({ queryKey: queryKeys.analysis.all });
-
-      // 获取当前所有列表查询的快照
-      const previousData = queryClient.getQueriesData({ queryKey: queryKeys.analysis.all });
-
-      // 乐观更新：从所有列表中移除该项
-      queryClient.setQueriesData<AnalysisListResponse>(
-        { queryKey: queryKeys.analysis.all },
-        (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            analyses: old.analyses.filter(a => a.id !== analysisId),
-            total: old.total - 1,
-          };
-        }
-      );
-
-      // 返回快照以便在失败时回滚
-      return { previousData };
-    },
-    // 如果删除失败，回滚到之前的状态
-    onError: (err, analysisId, context) => {
-      if (context?.previousData) {
-        context.previousData.forEach(([queryKey, data]) => {
-          queryClient.setQueryData(queryKey, data);
-        });
-      }
-    },
-    // 无论成功还是失败，都重新获取数据以确保同步
-    onSettled: () => {
-      // 👇 这里调用 invalidateQueries 使缓存失效
-      // 作用：强制标记所有 analysis 相关的查询为"过期"，立即重新获取最新数据
-      // 效果：删除操作完成后，历史列表会自动刷新，显示最新数据（已删除的项不再出现）
+    // 删除成功后，使缓存失效并重新获取数据
+    onSuccess: () => {
+      // 使所有 analysis 相关的查询失效
+      // 由于列表的 staleTime: 0，会立即重新获取最新数据
       queryClient.invalidateQueries({
-        queryKey: queryKeys.analysis.all,  // 匹配所有以 ['analysis'] 开头的查询
-        refetchType: 'active'  // 只刷新当前激活（正在使用）的查询
+        queryKey: queryKeys.analysis.all,
+        refetchType: 'active'
       });
     },
   });
