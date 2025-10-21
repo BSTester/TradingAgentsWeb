@@ -37,28 +37,25 @@
 
 ### 设计思路
 
-✅ **平时有缓存**：使用全局默认的1分钟缓存，减少不必要的请求
-✅ **删除时立即刷新**：通过 `invalidateQueries` 强制获取最新数据
+✅ **列表不缓存**：设置 `staleTime: 0`，确保每次访问都获取最新数据
+✅ **删除时立即刷新**：通过 `invalidateQueries` 触发重新获取
 
 ### 实现方式
 
 ```typescript
-// 1. 列表查询 - 使用默认缓存（1分钟）
+// 1. 列表查询 - 不缓存
 useQuery({
   queryKey: queryKeys.analysis.list({ page, limit }),
   queryFn: fetchAnalysisList,
-  // 使用全局默认配置，无需特殊设置
+  staleTime: 0,  // 不缓存，每次都重新获取
+  gcTime: 0,     // 不保留缓存
 })
 
-// 2. 删除操作 - 使缓存失效并重新获取
+// 2. 删除操作 - 简单可靠
 useMutation({
   mutationFn: deleteAnalysis,
-  onMutate: async (analysisId) => {
-    // 乐观更新：立即从 UI 移除
-    queryClient.setQueriesData(/* ... */);
-  },
-  onSettled: () => {
-    // 删除完成后，使缓存失效并重新获取
+  onSuccess: () => {
+    // 删除成功后，使缓存失效并重新获取
     queryClient.invalidateQueries({ 
       queryKey: queryKeys.analysis.all 
     });
@@ -71,15 +68,11 @@ useMutation({
 ```
 用户访问列表页
   ↓
-首次加载：从服务器获取数据
-  ↓
-数据缓存1分钟
-  ↓
-1分钟内再次访问：直接使用缓存（快速）
+从服务器获取数据（不缓存）
   ↓
 用户点击删除
   ↓
-乐观更新：UI 立即移除该项
+显示"删除中"状态
   ↓
 发送删除请求
   ↓
@@ -89,6 +82,19 @@ useMutation({
   ↓
 显示最新列表（已删除的项不再出现）
 ```
+
+### 为什么不缓存列表？
+
+**原因**：
+- 历史记录列表是经常变化的数据（删除、新增分析）
+- 不缓存可以确保用户始终看到最新数据
+- 避免乐观更新带来的复杂性和潜在问题
+
+**权衡**：
+- ❌ 每次访问都需要请求（稍慢）
+- ✅ 数据始终准确（无缓存问题）
+- ✅ 代码简单可靠（无乐观更新）
+- ✅ 删除后立即显示最新数据
 
 ### 关键概念
 
@@ -107,22 +113,42 @@ useMutation({
 
 ## 删除操作的缓存刷新策略
 
-### 核心机制：invalidateQueries
+### 核心机制：staleTime: 0 + invalidateQueries
 
-**关键点**：列表保持正常缓存（1分钟），删除时通过 `invalidateQueries` 强制刷新
+**关键点**：列表不缓存（`staleTime: 0`），删除后通过 `invalidateQueries` 触发刷新
 
 ### 实现方案
 
 #### 1. 使用 Mutation Hook（已实现）
 
-创建了 `useDeleteAnalysis` hook，包含以下特性：
-
-- **乐观更新**：删除前立即更新 UI，提升用户体验
-- **错误回滚**：如果删除失败，自动恢复之前的状态
-- **强制刷新**：删除成功后通过 `invalidateQueries` 使缓存失效并重新获取
+创建了 `useDeleteAnalysis` hook，简单可靠：
 
 ```typescript
-// 使用示例
+export function useDeleteAnalysis() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (analysisId: string) => {
+      // 发送删除请求
+      const response = await fetch(buildApiUrl(`/api/analysis/${analysisId}`), {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      // 删除成功后，使缓存失效并重新获取
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.analysis.all,
+        refetchType: 'active'
+      });
+    },
+  });
+}
+```
+
+**使用示例**：
+```typescript
 const deleteMutation = useDeleteAnalysis();
 await deleteMutation.mutateAsync(analysisId);
 ```
@@ -130,29 +156,28 @@ await deleteMutation.mutateAsync(analysisId);
 #### 2. invalidateQueries 的作用
 
 ```typescript
-// 在 useDeleteAnalysis 中
-onSettled: () => {
+onSuccess: () => {
   // 使所有 analysis 相关的查询失效
   queryClient.invalidateQueries({ 
     queryKey: queryKeys.analysis.all,
-    refetchType: 'active' // 只刷新当前激活的查询
+    refetchType: 'active'
   });
 }
 ```
 
 **效果**：
-- ✅ 忽略 `staleTime`，强制标记为过期
-- ✅ 立即重新获取数据
+- ✅ 标记查询为过期
+- ✅ 触发重新获取数据
 - ✅ 确保显示最新列表（已删除的项不再出现）
 
-#### 3. 为什么不用 staleTime: 0？
+#### 3. 为什么选择 staleTime: 0？
 
-| 方案 | 优点 | 缺点 |
-|------|------|------|
-| `staleTime: 0` | 数据始终最新 | 每次访问都请求，浪费资源 |
-| `invalidateQueries` | 平时有缓存，变更时刷新 | ✅ 最佳方案 |
+| 方案 | 优点 | 缺点 | 适用场景 |
+|------|------|------|----------|
+| `staleTime: 0` | 数据始终最新<br>代码简单 | 每次访问都请求 | ✅ 历史记录列表 |
+| `staleTime: 60s + 乐观更新` | 有缓存，响应快 | 代码复杂<br>可能出错 | 其他数据 |
 
-**结论**：使用 `invalidateQueries` 既保证了删除后立即刷新，又不影响正常浏览时的性能。
+**结论**：对于历史记录列表，使用 `staleTime: 0` 更简单可靠，虽然每次都请求，但确保数据准确。
 
 ### 其他需要立即刷新的操作
 

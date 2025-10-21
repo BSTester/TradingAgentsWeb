@@ -78,8 +78,8 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
       logger.log('📋 Fetched analyses:', result);
       return result;
     },
-    // 使用全局默认配置（1分钟缓存）
-    // 删除操作通过 invalidateQueries 强制刷新，无需设置 staleTime: 0
+    staleTime: 0, // 历史记录列表不缓存，确保删除后立即刷新
+    gcTime: 0, // 不保留缓存
     retry: 10, // 最多重试10次
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // 指数退避，最多10秒
   });
