@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { buildApiUrl, API_ENDPOINTS } from '../../utils/api';
 import { logger } from '@/utils/logger';
+import { useDeleteAnalysis } from '@/hooks/useDeleteAnalysis';
+import { queryKeys } from '@/lib/react-query';
 
 
 interface AnalysisHistoryProps {
@@ -38,10 +40,7 @@ interface AnalysisListResponse {
 }
 
 export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress, onShowToast }: AnalysisHistoryProps) {
-  const queryClient = useQueryClient();
-
   const [page, setPage] = useState(1);
-  const [deleting, setDeleting] = useState<string | null>(null);
   const limit = 10; // 每页显示10条
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; analysisId: string; ticker: string }>({
     show: false,
@@ -49,9 +48,12 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
     ticker: ''
   });
 
+  // 使用删除 mutation
+  const deleteMutation = useDeleteAnalysis();
+
   // 使用 useQuery 获取分析历史
   const { data, isLoading, isError, error } = useQuery<AnalysisListResponse>({
-    queryKey: ['analysis', 'list', page, limit],
+    queryKey: queryKeys.analysis.list({ page, limit }),
     queryFn: async () => {
       const token = localStorage.getItem('access_token');
       if (!token) {
@@ -76,6 +78,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
       logger.log('📋 Fetched analyses:', result);
       return result;
     },
+    staleTime: 0, // 列表数据立即过期，确保删除后能立即刷新
     retry: 10, // 最多重试10次
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // 指数退避，最多10秒
   });
@@ -91,40 +94,19 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
   const handleDeleteConfirm = async () => {
     const analysisId = deleteConfirm.analysisId;
     setDeleteConfirm({ show: false, analysisId: '', ticker: '' });
-    setDeleting(analysisId);
+    
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(buildApiUrl(`/api/analysis/${analysisId}`), {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || '删除失败');
-      }
-
-      // 如果当前页删除后为空且页码>1，则先回退到上一页
-      // 这样 invalidateQueries 会自动获取上一页的数据
+      await deleteMutation.mutateAsync(analysisId);
+      
+      // 如果当前页删除后为空且页码>1，则回退到上一页
       if (analyses.length === 1 && page > 1) {
         setPage(p => p - 1);
-        // 等待 state 更新后再使缓存失效
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['analysis', 'list'] });
-        }, 0);
-      } else {
-        // 否则直接使缓存失效，重新获取当前页数据
-        queryClient.invalidateQueries({ queryKey: ['analysis', 'list'] });
       }
-
+      
       onShowToast('分析已删除', 'success');
     } catch (error) {
       logger.error('Delete error:', error);
       onShowToast(error instanceof Error ? error.message : '删除失败', 'error');
-    } finally {
-      setDeleting(null);
     }
   };
 
@@ -405,10 +387,10 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
 
                     <button
                       onClick={() => handleDeleteClick(analysis.id, analysis.ticker)}
-                      disabled={analysis.status === 'running' || analysis.status === 'initializing' || deleting === analysis.id}
+                      disabled={analysis.status === 'running' || analysis.status === 'initializing' || deleteMutation.isPending}
                       className="px-2 py-1.5 text-red-600 hover:bg-red-50 rounded-md text-sm font-medium transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {deleting === analysis.id ? (
+                      {deleteMutation.isPending ? (
                         <>
                           <i className="fas fa-spinner fa-spin mr-1.5 text-sm" />
                           删除中
