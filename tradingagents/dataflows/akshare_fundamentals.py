@@ -16,24 +16,20 @@ except Exception:
     pd = None  # type: ignore
 
 
-def get_balance_sheet(
-    symbol: Annotated[str, "ticker symbol of the company"],
-    freq: Annotated[str, "frequency"] = "quarterly",
-    curr_date: Annotated[str, "current date"] = None
-) -> str:
+def get_balance_sheet(ticker: str, freq: str = "quarterly", curr_date: str = None) -> str:
     """
-    获取资产负债表数据
-    
+    Retrieve balance sheet data for a given ticker symbol using Alpha Vantage.
+
     Args:
-        symbol: 股票代码
-        freq: 频率（季度/年度）
-        curr_date: 当前日期（未使用，保持接口一致性）
-        
+        ticker (str): Ticker symbol of the company
+        freq (str): Reporting frequency: annual/quarterly (default quarterly) - not used for Alpha Vantage
+        curr_date (str): Current date you are trading at, yyyy-mm-dd (not used for Alpha Vantage)
+
     Returns:
-        str: CSV格式的资产负债表数据
+        str: Balance sheet data with normalized fields
     """
     market = "UNKNOWN"
-    symbol = str(symbol or "")
+    symbol = str(ticker or "")
     freq = str(freq or "")
     try:
         check_akshare_availability()
@@ -96,24 +92,20 @@ def get_balance_sheet(
         return handle_akshare_exception(e, "retrieving balance sheet", str(symbol or ""))
 
 
-def get_income_statement(
-    symbol: Annotated[str, "ticker symbol of the company"],
-    freq: Annotated[str, "frequency"] = "quarterly",
-    curr_date: Annotated[str, "current date"] = None
-) -> str:
+def get_income_statement(ticker: str, freq: str = "quarterly", curr_date: str = None) -> str:
     """
-    获取利润表数据
-    
+    Retrieve income statement data for a given ticker symbol using Alpha Vantage.
+
     Args:
-        symbol: 股票代码
-        freq: 频率（季度/年度）
-        curr_date: 当前日期（未使用，保持接口一致性）
-        
+        ticker (str): Ticker symbol of the company
+        freq (str): Reporting frequency: annual/quarterly (default quarterly) - not used for Alpha Vantage
+        curr_date (str): Current date you are trading at, yyyy-mm-dd (not used for Alpha Vantage)
+
     Returns:
-        str: CSV格式的利润表数据
+        str: Income statement data with normalized fields
     """
     market = "UNKNOWN"
-    symbol = str(symbol or "")
+    symbol = str(ticker or "")
     freq = str(freq or "")
     try:
         check_akshare_availability()
@@ -177,24 +169,20 @@ def get_income_statement(
         return handle_akshare_exception(e, "retrieving income statement", str(symbol or ""))
 
 
-def get_cashflow(
-    symbol: Annotated[str, "ticker symbol of the company"],
-    freq: Annotated[str, "frequency"] = "quarterly",
-    curr_date: Annotated[str, "current date"] = None
-) -> str:
+def get_cashflow(ticker: str, freq: str = "quarterly", curr_date: str = None) -> str:
     """
-    获取现金流量表数据
-    
+    Retrieve cash flow statement data for a given ticker symbol using Alpha Vantage.
+
     Args:
-        symbol: 股票代码
-        freq: 频率（季度/年度）
-        curr_date: 当前日期（未使用，保持接口一致性）
-        
+        ticker (str): Ticker symbol of the company
+        freq (str): Reporting frequency: annual/quarterly (default quarterly) - not used for Alpha Vantage
+        curr_date (str): Current date you are trading at, yyyy-mm-dd (not used for Alpha Vantage)
+
     Returns:
-        str: CSV格式的现金流量表数据
+        str: Cash flow statement data with normalized fields
     """
     market = "UNKNOWN"
-    symbol = str(symbol or "")
+    symbol = str(ticker or "")
     freq = str(freq or "")
     try:
         check_akshare_availability()
@@ -257,20 +245,19 @@ def get_cashflow(
         return handle_akshare_exception(e, "retrieving cashflow", str(symbol or ""))
 
 
-def get_fundamentals(
-    symbol: Annotated[str, "ticker symbol of the company"]
-) -> str:
+def get_fundamentals(ticker: str, curr_date: str = None) -> str:
     """
-    获取基本面数据（主要是公司基本信息）
-    
+    Retrieve comprehensive fundamental data for a given ticker symbol using Alpha Vantage.
+
     Args:
-        symbol: 股票代码
-        
+        ticker (str): Ticker symbol of the company
+        curr_date (str): Current date you are trading at, yyyy-mm-dd (not used for Alpha Vantage)
+
     Returns:
-        str: CSV格式的基本面数据
+        str: Company overview data including financial ratios and key metrics
     """
     market = "UNKNOWN"
-    symbol = str(symbol or "")
+    symbol = str(ticker or "")
     try:
         check_akshare_availability()
         

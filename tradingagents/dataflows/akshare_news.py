@@ -2,7 +2,7 @@
 AKShare新闻数据获取模块
 提供股票新闻、全球财经新闻和市场情绪数据的获取功能
 """
-from typing import Annotated, Tuple
+from typing import Tuple
 import pandas as pd
 from datetime import datetime
 from .akshare_common import (
@@ -135,17 +135,22 @@ def _get_stock_specific_news(symbol: str, market: str, formatted_symbol: str, li
     return _get_fallback_news(limit)
 
 
-def get_stock_news(query, start_date, end_date) -> str:
-    """
-    获取股票相关新闻
-    
+# ============================================================================
+# 对外暴露的方法 - 方法名称和参数与 Alpha Vantage 保持一致
+# ============================================================================
+
+def get_news(ticker, start_date, end_date) -> dict[str, str] | str:
+    """Returns live and historical market news & sentiment data from premier news outlets worldwide.
+
+    Covers stocks, cryptocurrencies, forex, and topics like fiscal policy, mergers & acquisitions, IPOs.
+
     Args:
-        query: 查询关键词或股票代码
-        start_date: 开始日期
-        end_date: 结束日期
-        
+        ticker: Stock symbol for news articles.
+        start_date: Start date for news search.
+        end_date: End date for news search.
+
     Returns:
-        str: CSV格式的新闻数据
+        Dictionary containing news sentiment data or JSON string.
     """
     try:
         check_akshare_availability()
@@ -154,19 +159,19 @@ def get_stock_news(query, start_date, end_date) -> str:
         limit = 20
         
         market_info = None
-        if query:
+        if ticker:
             # 验证市场支持并获取市场信息
-            market, market_info = validate_market_support(query, "stock news retrieval")
-            formatted_symbol = format_symbol_for_market(query, market)
+            market, market_info = validate_market_support(ticker, "stock news retrieval")
+            formatted_symbol = format_symbol_for_market(ticker, market)
             
             # 使用统一的个股新闻获取逻辑
-            data, news_source = _get_stock_specific_news(query, market, formatted_symbol, limit)
+            data, news_source = _get_stock_specific_news(ticker, market, formatted_symbol, limit)
         else:
             # 获取全球财经新闻
             data, news_source = _get_fallback_news(limit)
         
         if data.empty:
-            return f"No news found for query '{query}'" if query else "No general news found"
+            return f"No news found for query '{ticker}'" if ticker else "No general news found"
         
         # 限制新闻数量
         if len(data) > limit:
@@ -177,9 +182,9 @@ def get_stock_news(query, start_date, end_date) -> str:
         
         # 构建头部信息
         header_lines = []
-        if query and market_info:
+        if ticker and market_info:
             header_lines.extend([
-                f"# Stock news for {query} ({market_info['market_name']})",
+                f"# Stock news for {ticker} ({market_info['market_name']})",
                 f"# Market: {market_info['market_name']} ({market_info['currency']})",
                 f"# News source: {news_source}",
                 f"# Date range: {start_date} to {end_date}"
@@ -199,14 +204,32 @@ def get_stock_news(query, start_date, end_date) -> str:
         
         header = '\n'.join(header_lines) + '\n\n'
         
-        log_operation("get_stock_news", query, market if query else None, "SUCCESS")
+        log_operation("get_news", ticker, market if ticker else None, "SUCCESS")
         return header + csv_string
         
     except Exception as e:
-        log_operation("get_stock_news", query, 
+        log_operation("get_news", ticker, 
                      market if 'market' in locals() else None, "FAILED")
-        return handle_akshare_exception(e, "retrieving stock news", query)
+        return handle_akshare_exception(e, "retrieving stock news", ticker)
 
+
+def get_insider_transactions(symbol: str) -> dict[str, str] | str:
+    """Returns latest and historical insider transactions by key stakeholders.
+
+    Covers transactions by founders, executives, board members, etc.
+
+    Args:
+        symbol: Ticker symbol. Example: "IBM".
+
+    Returns:
+        Dictionary containing insider transaction data or JSON string.
+    """
+    return f"Note: AKShare does not provide insider transaction data. This feature is not supported."
+
+
+# ============================================================================
+# 保留的内部辅助方法 - 供内部使用，不对外暴露
+# ============================================================================
 
 def get_global_news(curr_date, look_back_days=7, limit=5) -> str:
     """
@@ -255,21 +278,18 @@ def get_global_news(curr_date, look_back_days=7, limit=5) -> str:
         return handle_akshare_exception(e, "retrieving global news")
 
 
-def get_aggregated_news(
-    category: Annotated[str, "news category"] = "finance",
-    limit: Annotated[int, "number of news items to retrieve"] = 20,
-    sources: Annotated[int, "number of sources to aggregate from"] = 3
-) -> str:
+def _get_global_news_internal(curr_date, look_back_days=7, limit=5) -> str:
     """
-    获取聚合多源新闻数据
-    
-    Args:
-        category: 新闻类别
-        limit: 每个源限制返回的新闻条数
-        sources: 聚合的源数量
-        
-    Returns:
-        str: CSV格式的聚合新闻数据
+    内部方法：获取全球财经新闻（向后兼容）
+    直接调用 get_global_news
+    """
+    return get_global_news(curr_date, look_back_days, limit)
+
+
+def _get_aggregated_news_internal(category: str = "finance", limit: int = 20, sources: int = 3) -> str:
+    """
+    内部方法：获取聚合多源新闻数据
+    保留原有实现逻辑，供内部或其他模块调用
     """
     try:
         check_akshare_availability()
@@ -351,13 +371,10 @@ def get_aggregated_news(
         return handle_akshare_exception(e, f"retrieving aggregated news for category {category}")
 
 
-
-def get_market_sentiment() -> str:
+def _get_market_sentiment_internal() -> str:
     """
-    获取市场情绪数据
-    
-    Returns:
-        str: CSV格式的市场情绪数据
+    内部方法：获取市场情绪数据
+    保留原有实现逻辑，供内部或其他模块调用
     """
     try:
         check_akshare_availability()
@@ -413,70 +430,3 @@ def get_market_sentiment() -> str:
     except Exception as e:
         log_operation("get_market_sentiment", status="FAILED")
         return handle_akshare_exception(e, "retrieving market sentiment")
-
-
-def get_enhanced_market_sentiment() -> str:
-    """
-    获取增强的市场情绪数据，集成多种数据源
-    
-    Returns:
-        str: CSV格式的市场情绪数据
-    """
-    try:
-        check_akshare_availability()
-        
-        log_operation("get_enhanced_market_sentiment", status="ATTEMPT")
-        
-        # 获取市场情绪相关数据
-        sentiment_data = {}
-        
-        # 尝试获取不同的市场情绪指标
-        sentiment_sources = [
-            ("A股市场概况", "a_stock_summary", lambda: ak.stock_zh_a_spot_em().head(20)),
-            ("资金流向数据", "money_flow", lambda: ak.stock_market_fund_flow()),
-            ("新闻情绪指数", "news_sentiment", lambda: ak.index_news_sentiment_scope()),
-            ("百度交易提醒-停牌", "trade_suspend", lambda: ak.news_trade_notify_suspend_baidu()),
-            ("百度交易提醒-分红", "trade_dividend", lambda: ak.news_trade_notify_dividend_baidu()),
-            ("百度报告时间", "report_time", lambda: ak.news_report_time_baidu()),
-        ]
-        
-        for desc, key, source_func in sentiment_sources:
-            try:
-                print(f"Attempting to retrieve {desc}...")
-                data = source_func()
-                if not data.empty:
-                    sentiment_data[key] = data
-                    print(f"Successfully retrieved {desc}: {len(data)} records")
-                else:
-                    print(f"No data available for {desc}")
-            except Exception as e:
-                print(f"Failed to retrieve {desc}: {e}")
-        
-        if not sentiment_data:
-            log_operation("get_enhanced_market_sentiment", status="FAILED")
-            return "Error: Unable to retrieve any market sentiment data from AKShare"
-        
-        # 合并所有情绪数据
-        combined_csv = ""
-        for data_type, data in sentiment_data.items():
-            combined_csv += f"\n## {data_type.upper()} ##\n"
-            combined_csv += data.to_csv(index=False)
-            combined_csv += "\n"
-        
-        # 构建头部信息
-        header_lines = [
-            f"# Enhanced market sentiment data",
-            f"# Data types: {', '.join(sentiment_data.keys())}",
-            f"# Total data sources: {len(sentiment_data)}",
-            f"# Data source: AKShare (Multi-source sentiment analysis)",
-            f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        ]
-        
-        header = '\n'.join(header_lines) + '\n\n'
-        
-        log_operation("get_enhanced_market_sentiment", status="SUCCESS")
-        return header + combined_csv
-        
-    except Exception as e:
-        log_operation("get_enhanced_market_sentiment", status="FAILED")
-        return handle_akshare_exception(e, "retrieving enhanced market sentiment")

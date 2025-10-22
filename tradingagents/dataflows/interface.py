@@ -21,31 +21,25 @@ from .alpha_vantage import (
 from .alpha_vantage_common import AlphaVantageRateLimitError
 # Import AKShare and BaoStock modules
 from .akshare import (
-    get_akshare_stock_data,
-    get_akshare_realtime_data,
-    get_akshare_company_info,
+    get_akshare_stock,
     get_akshare_balance_sheet,
     get_akshare_income_statement,
     get_akshare_cashflow,
     get_akshare_fundamentals,
-    get_akshare_financial_data,
-    get_akshare_stock_news,
+    get_akshare_news,
     get_akshare_global_news,
-    get_akshare_market_sentiment,
-    get_akshare_aggregated_news,
-    get_akshare_enhanced_market_sentiment,
-    get_akshare_indicators
+    get_akshare_insider_transactions,
+    get_akshare_indicator
 )
 from .baostock import (
-    get_baostock_stock_data,
-    get_baostock_company_info,
-    get_baostock_realtime_data,
-    get_baostock_dividend_data,
+    get_baostock_stock,
     get_baostock_balance_sheet,
     get_baostock_income_statement,
     get_baostock_cashflow,
     get_baostock_fundamentals,
-    get_baostock_financial_data
+    get_baostock_news,
+    get_baostock_insider_transactions,
+    get_baostock_indicator
 )
 from .market_utils import MarketIdentifier, get_market_info
 
@@ -164,48 +158,48 @@ VENDOR_METHODS = {
     "get_stock_data": {
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
-        "akshare": get_akshare_stock_data,
-        "baostock": get_baostock_stock_data,
+        "akshare": get_akshare_stock,
+        "baostock": get_baostock_stock,
         "local": get_YFin_data,
     },
     # technical_indicators
     "get_indicators": {
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
-        "akshare": get_akshare_indicators,
+        "akshare": get_akshare_indicator,
         "local": get_stock_stats_indicators_window
     },
     # fundamental_data
     "get_fundamentals": {
         "alpha_vantage": get_alpha_vantage_fundamentals,
-        "akshare": get_akshare_company_info,
+        "akshare": get_akshare_fundamentals,
         "baostock": get_baostock_fundamentals,
         "openai": get_fundamentals_openai,
     },
     "get_balance_sheet": {
         "alpha_vantage": get_alpha_vantage_balance_sheet,
         "yfinance": get_yfinance_balance_sheet,
-        "akshare": lambda symbol, freq="quarterly", curr_date=None: get_akshare_financial_data(symbol, "balance_sheet"),
-        "baostock": lambda symbol, freq="quarterly", curr_date=None: get_baostock_balance_sheet(symbol),
+        "akshare": get_akshare_balance_sheet,
+        "baostock": get_baostock_balance_sheet,
         "local": get_simfin_balance_sheet,
     },
     "get_cashflow": {
         "alpha_vantage": get_alpha_vantage_cashflow,
         "yfinance": get_yfinance_cashflow,
-        "akshare": lambda symbol, freq="quarterly", curr_date=None: get_akshare_financial_data(symbol, "cashflow"),
-        "baostock": lambda symbol, freq="quarterly", curr_date=None: get_baostock_cashflow(symbol),
+        "akshare": get_akshare_cashflow,
+        "baostock": get_baostock_cashflow,
         "local": get_simfin_cashflow,
     },
     "get_income_statement": {
         "alpha_vantage": get_alpha_vantage_income_statement,
         "yfinance": get_yfinance_income_statement,
-        "akshare": lambda symbol, freq="quarterly", curr_date=None: get_akshare_financial_data(symbol, "income_statement"),
-        "baostock": lambda symbol, freq="quarterly", curr_date=None: get_baostock_income_statement(symbol),
+        "akshare": get_akshare_income_statement,
+        "baostock": get_baostock_income_statement,
         "local": get_simfin_income_statements,
     },
     # news_data
     "get_news": {
-        "akshare": get_akshare_stock_news,
+        "akshare": get_akshare_news,
         "alpha_vantage": get_alpha_vantage_news,
         "openai": get_stock_news_openai,
         "google": get_google_news,
@@ -217,20 +211,14 @@ VENDOR_METHODS = {
         "local": get_reddit_global_news
     },
     "get_insider_sentiment": {
-        "akshare": get_akshare_market_sentiment,
         "local": get_finnhub_company_insider_sentiment
     },
     "get_insider_transactions": {
         "alpha_vantage": get_alpha_vantage_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
+        "akshare": get_akshare_insider_transactions,
+        "baostock": get_baostock_insider_transactions,
         "local": get_finnhub_company_insider_transactions,
-    },
-    # Additional methods for new data sources
-    "get_realtime_data": {
-        "akshare": get_akshare_realtime_data,
-    },
-    "get_dividend_data": {
-        "baostock": lambda symbol, year=None, year_type="report": get_baostock_dividend_data(symbol, year, year_type),
     },
 }
 
