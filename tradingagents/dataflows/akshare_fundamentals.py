@@ -43,10 +43,8 @@ def get_balance_sheet(
         market = market or "UNKNOWN"
         
 
-        # 格式化股票代码
+        # 格式化股票代码（A股会自动添加 SZ/SH 前缀）
         formatted_symbol = format_symbol_for_market(symbol, market)
-        clean_symbol = formatted_symbol.replace('sz', '').replace('sh', '')
-        em_symbol = formatted_symbol.upper()
         
         log_operation("get_balance_sheet", symbol, market, "ATTEMPT")
         
@@ -54,7 +52,7 @@ def get_balance_sheet(
         if market == 'A_STOCK':
             freq_norm = (freq or '').lower()
             func_name = "stock_balance_sheet_by_yearly_em" if freq_norm in ["annual", "year", "年度"] else "stock_balance_sheet_by_report_em"
-            data = getattr(ak, func_name)(symbol=em_symbol)
+            data = getattr(ak, func_name)(symbol=formatted_symbol)
         elif market == 'HK_STOCK':
             # 港股：使用东财港股财务报表接口
             # freq 映射到 indicator：quarterly -> 报告期, annual -> 年度
@@ -125,10 +123,8 @@ def get_income_statement(
         market = market or "UNKNOWN"
         
 
-        # 格式化股票代码
+        # 格式化股票代码（A股会自动添加 SZ/SH 前缀）
         formatted_symbol = format_symbol_for_market(symbol, market)
-        clean_symbol = formatted_symbol.replace('sz', '').replace('sh', '')
-        em_symbol = formatted_symbol.upper()
         
         log_operation("get_income_statement", symbol, market, "ATTEMPT")
         
@@ -141,7 +137,7 @@ def get_income_statement(
                 func_name = "stock_profit_sheet_by_quarterly_em"
             else:
                 func_name = "stock_profit_sheet_by_report_em"
-            data = getattr(ak, func_name)(symbol=em_symbol)
+            data = getattr(ak, func_name)(symbol=formatted_symbol)
         elif market == 'HK_STOCK':
             indicator = '年度' if (freq or '').lower() not in ['quarterly', 'q', '季报'] else '报告期'
             hk_code = ''.join([c for c in formatted_symbol if c.isdigit()]) or symbol
@@ -208,10 +204,8 @@ def get_cashflow(
         market = market or "UNKNOWN"
         
 
-        # 格式化股票代码
+        # 格式化股票代码（A股会自动添加 SZ/SH 前缀）
         formatted_symbol = format_symbol_for_market(symbol, market)
-        clean_symbol = formatted_symbol.replace('sz', '').replace('sh', '')
-        em_symbol = formatted_symbol.upper()
         
         log_operation("get_cashflow", symbol, market, "ATTEMPT")
         
@@ -224,7 +218,7 @@ def get_cashflow(
                 func_name = "stock_cash_flow_sheet_by_quarterly_em"
             else:
                 func_name = "stock_cash_flow_sheet_by_report_em"
-            data = getattr(ak, func_name)(symbol=em_symbol)
+            data = getattr(ak, func_name)(symbol=formatted_symbol)
         elif market == 'HK_STOCK':
             indicator = '年度' if (freq or '').lower() not in ['quarterly', 'q', '季报'] else '报告期'
             hk_code = ''.join([c for c in formatted_symbol if c.isdigit()]) or symbol
@@ -291,22 +285,8 @@ def get_fundamentals(
         csv_string = ""
         
         if market == 'A_STOCK':
-            # A股基本面信息
-            # 确保股票代码带有 SH 或 SZ 前缀
-            clean_symbol = formatted_symbol.replace('sz', '').replace('sh', '').replace('SZ', '').replace('SH', '')
-            
-            # 根据股票代码判断交易所并添加前缀
-            if clean_symbol.startswith(('000', '002', '003', '30')):
-                # 深交所
-                em_symbol = f'SZ{clean_symbol}'
-            elif clean_symbol.startswith(('60', '68')):
-                # 上交所
-                em_symbol = f'SH{clean_symbol}'
-            else:
-                # 其他情况，尝试使用原格式
-                em_symbol = formatted_symbol.upper()
-            
-            basic_info = getattr(ak, "stock_individual_basic_info_xq")(symbol=em_symbol)
+            # A股基本面信息 - formatted_symbol 已包含 SZ/SH 前缀
+            basic_info = getattr(ak, "stock_individual_basic_info_xq")(symbol=formatted_symbol)
             
             # 转换为更易读的格式
             info_dict = {}

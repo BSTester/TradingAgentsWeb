@@ -210,9 +210,8 @@ def get_stock_info(
         csv_string = ""
         
         if market == 'A_STOCK':
-            # A股公司信息（雪球）
-            em_symbol = formatted_symbol.upper()
-            basic_info = getattr(ak, "stock_individual_basic_info_xq")(symbol=em_symbol)
+            # A股公司信息（雪球）- formatted_symbol 已包含 SZ/SH 前缀
+            basic_info = getattr(ak, "stock_individual_basic_info_xq")(symbol=formatted_symbol)
             
             # 转换为更易读的格式
             info_dict = {}
