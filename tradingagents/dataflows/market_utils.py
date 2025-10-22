@@ -117,11 +117,11 @@ class MarketIdentifier:
             
         elif vendor in ['yfinance', 'alpha_vantage']:
             if market == 'A_STOCK':
-                # Yahoo Finance A股格式: 000001.SZ, 600000.SS
+                # Yahoo Finance A股格式: 000001.SZ, 600000.SH
                 if symbol.startswith(('000', '002', '003', '30')):
                     return f'{symbol}.SZ'
                 elif symbol.startswith(('60', '68')):
-                    return f'{symbol}.SS'
+                    return f'{symbol}.SH'
                 else:
                     return symbol
             elif market == 'HK_STOCK':
