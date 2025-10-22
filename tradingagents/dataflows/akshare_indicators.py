@@ -24,23 +24,29 @@ except ImportError:
     print("Info: TA-Lib not available, using pandas-based calculations")
 
 
-def get_akshare_indicators(
-    symbol: Annotated[str, "ticker symbol of the company"],
-    indicator: Annotated[str, "technical indicator to get the analysis and report of"],
-    curr_date: Annotated[str, "The current trading date you are trading on, YYYY-mm-dd"],
-    look_back_days: Annotated[int, "how many days to look back"] = 30,
+def get_indicator(
+    symbol: str,
+    indicator: str,
+    curr_date: str,
+    look_back_days: int,
+    interval: str = "daily",
+    time_period: int = 14,
+    series_type: str = "close"
 ) -> str:
     """
-    使用AKShare数据计算技术指标
-    
+    Returns Alpha Vantage technical indicator values over a time window.
+
     Args:
-        symbol: 股票代码
-        indicator: 技术指标名称
-        curr_date: 当前交易日期
-        look_back_days: 回看天数
-        
+        symbol: ticker symbol of the company
+        indicator: technical indicator to get the analysis and report of
+        curr_date: The current trading date you are trading on, YYYY-mm-dd
+        look_back_days: how many days to look back
+        interval: Time interval (daily, weekly, monthly)
+        time_period: Number of data points for calculation
+        series_type: The desired price type (close, open, high, low)
+
     Returns:
-        str: 包含指标值和描述的字符串
+        String containing indicator values and description
     """
     if not AKSHARE_AVAILABLE:
         return "Error: AKShare is not installed. Please install with: pip install akshare"
@@ -142,8 +148,8 @@ def get_akshare_indicators(
         end_date_str = curr_date
         
         # 使用akshare股票数据获取函数
-        from .akshare_stock import get_stock_data
-        stock_data_csv = get_stock_data(symbol, start_date_str, end_date_str)
+        from .akshare_stock import get_stock
+        stock_data_csv = get_stock(symbol, start_date_str, end_date_str)
         
         if stock_data_csv.startswith("Error") or stock_data_csv.startswith("No data"):
             return f"Error getting stock data: {stock_data_csv}"

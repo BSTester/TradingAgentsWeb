@@ -16,21 +16,22 @@ except Exception:
     pd = None  # type: ignore
 
 
-def get_stock_data(
-    symbol: Annotated[str, "ticker symbol of the company"],
-    start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
-    end_date: Annotated[str, "End date in yyyy-mm-dd format"],
+def get_stock(
+    symbol: str,
+    start_date: str,
+    end_date: str
 ) -> str:
     """
-    获取股票历史数据 - 支持A股、港股、美股
-    
+    Returns raw daily OHLCV values, adjusted close values, and historical split/dividend events
+    filtered to the specified date range.
+
     Args:
-        symbol: 股票代码
-        start_date: 开始日期 (YYYY-MM-DD)
-        end_date: 结束日期 (YYYY-MM-DD)
-        
+        symbol: The name of the equity. For example: symbol=IBM
+        start_date: Start date in yyyy-mm-dd format
+        end_date: End date in yyyy-mm-dd format
+
     Returns:
-        str: CSV格式的股票历史数据
+        CSV string containing the daily adjusted time series data filtered to the date range.
     """
     try:
         check_akshare_availability()
@@ -49,7 +50,7 @@ def get_stock_data(
         formatted_start = format_date_for_akshare(start_date, market)
         formatted_end = format_date_for_akshare(end_date, market)
         
-        log_operation("get_stock_data", symbol, market, "ATTEMPT")
+        log_operation("get_stock", symbol, market, "ATTEMPT")
         
         # 根据市场选择对应的AKShare接口
         data = None
@@ -93,7 +94,7 @@ def get_stock_data(
                 raise Exception(f"AKShare US stock interface failed for {symbol}: {str(e)}")
         
         if data is None or data.empty:
-            log_operation("get_stock_data", symbol, market, "FAILED")
+            log_operation("get_stock", symbol, market, "FAILED")
             error_msg = f"No data found for symbol '{symbol}' between {start_date} and {end_date}"
             # 对于美股，抛出异常以触发回退到其他数据源
             if market == 'US_STOCK':
@@ -109,173 +110,12 @@ def get_stock_data(
             "Date range": f"{start_date} to {end_date}"
         }
         
-        log_operation("get_stock_data", symbol, market, "SUCCESS")
+        log_operation("get_stock", symbol, market, "SUCCESS")
         return process_dataframe_for_output(data, symbol, market_info, "Stock", additional_info)
         
     except Exception as e:
-        log_operation("get_stock_data", symbol, (market if ('market' in locals() and market is not None) else "UNKNOWN"), "FAILED")
+        log_operation("get_stock", symbol, (market if ('market' in locals() and market is not None) else "UNKNOWN"), "FAILED")
         # 对于美股，直接抛出异常以触发回退
         if 'market' in locals() and market == 'US_STOCK':
             raise e
         return handle_akshare_exception(e, "retrieving stock data", symbol)
-
-
-def get_realtime_data(
-    symbol: Annotated[str, "ticker symbol of the company"]
-) -> str:
-    """
-    获取股票实时数据
-    
-    Args:
-        symbol: 股票代码
-        
-    Returns:
-        str: CSV格式的实时股票数据
-    """
-    try:
-        check_akshare_availability()
-        
-        # 验证市场支持并获取市场信息
-        market, market_info = validate_market_support(symbol, "realtime data retrieval")
-        
-        # 格式化股票代码
-        formatted_symbol = format_symbol_for_market(symbol, market)
-        
-        log_operation("get_realtime_data", symbol, market, "ATTEMPT")
-        stock_data = None
-        
-        # 根据市场获取实时数据
-        if market == 'A_STOCK':
-            data = getattr(ak, "stock_zh_a_spot_em")()
-            # 筛选特定股票
-            clean_symbol = formatted_symbol.replace('sz', '').replace('sh', '')
-            stock_data = data[data['代码'] == clean_symbol]
-            
-        elif market == 'HK_STOCK':
-            data = getattr(ak, "stock_hk_spot_em")()
-            stock_data = data[data['代码'] == formatted_symbol]
-            
-        elif market == 'US_STOCK':
-            data = getattr(ak, "stock_us_spot_em")()
-            stock_data = data[data['代码'] == formatted_symbol]
-        
-        if stock_data.empty:
-            log_operation("get_realtime_data", symbol, market, "FAILED")
-            return f"No real-time data found for symbol '{symbol}'"
-        
-        # 转换为CSV字符串
-        csv_string = stock_data.to_csv(index=False)
-        
-        # 构建头部信息
-        header_lines = [
-            f"# Real-time data for {symbol} ({market_info['market_name']})",
-            f"# Formatted symbol: {formatted_symbol}",
-            f"# Market: {market_info['market_name']} ({market_info['currency']})",
-            f"# Data source: AKShare",
-            f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        ]
-        
-        header = '\n'.join(header_lines) + '\n\n'
-        
-        log_operation("get_realtime_data", symbol, market, "SUCCESS")
-        return header + csv_string
-        
-    except Exception as e:
-        log_operation("get_realtime_data", symbol, (market if ('market' in locals() and market is not None) else "UNKNOWN"), "FAILED")
-        return handle_akshare_exception(e, "retrieving real-time data", symbol)
-
-
-def get_stock_info(
-    symbol: Annotated[str, "ticker symbol of the company"]
-) -> str:
-    """
-    获取股票基本信息
-    
-    Args:
-        symbol: 股票代码
-        
-    Returns:
-        str: CSV格式的股票基本信息
-    """
-    try:
-        check_akshare_availability()
-        
-        # 验证市场支持并获取市场信息
-        market, market_info = validate_market_support(symbol, "company info retrieval")
-        
-        # 格式化股票代码
-        formatted_symbol = format_symbol_for_market(symbol, market)
-        
-        log_operation("get_stock_info", symbol, market, "ATTEMPT")
-        csv_string = ""
-        
-        if market == 'A_STOCK':
-            # A股公司信息（雪球）- formatted_symbol 已包含 SZ/SH 前缀
-            basic_info = getattr(ak, "stock_individual_basic_info_xq")(symbol=formatted_symbol)
-            
-            # 转换为更易读的格式
-            info_dict = {}
-            for _, row in basic_info.iterrows():
-                info_dict[row['item']] = row['value']
-            
-            # 转换为DataFrame以便输出CSV（无 pandas 时降级为手工 CSV）
-            if pd is not None:
-                info_df = pd.DataFrame(list(info_dict.items()), columns=['Item', 'Value'])
-                csv_string = info_df.to_csv(index=False)
-            else:
-                csv_rows = ["Item,Value"] + [f"{k},{v}" for k, v in info_dict.items()]
-                csv_string = "\n".join(csv_rows)
-            
-        elif market == 'HK_STOCK':
-            # 港股公司信息（雪球）
-            hk_code = ''.join([c for c in formatted_symbol if c.isdigit()]) or formatted_symbol
-            hk_code = hk_code.zfill(5)
-            basic_info = getattr(ak, "stock_individual_basic_info_hk_xq")(symbol=hk_code)
-            
-            # 转换为更易读的格式
-            info_dict = {}
-            for _, row in basic_info.iterrows():
-                info_dict[row['item']] = row['value']
-            
-            # 转换为DataFrame以便输出CSV（无 pandas 时降级为手工 CSV）
-            if pd is not None:
-                info_df = pd.DataFrame(list(info_dict.items()), columns=['Item', 'Value'])
-                csv_string = info_df.to_csv(index=False)
-            else:
-                csv_rows = ["Item,Value"] + [f"{k},{v}" for k, v in info_dict.items()]
-                csv_string = "\n".join(csv_rows)
-        elif market == 'US_STOCK':
-            # 美股公司信息（雪球）
-            us_code = formatted_symbol.replace('.', '_')
-            basic_info = getattr(ak, "stock_individual_basic_info_us_xq")(symbol=us_code)
-            
-            # 转换为更易读的格式
-            info_dict = {}
-            for _, row in basic_info.iterrows():
-                info_dict[row['item']] = row['value']
-            
-            # 转换为DataFrame以便输出CSV（无 pandas 时降级为手工 CSV）
-            if pd is not None:
-                info_df = pd.DataFrame(list(info_dict.items()), columns=['Item', 'Value'])
-                csv_string = info_df.to_csv(index=False)
-            else:
-                csv_rows = ["Item,Value"] + [f"{k},{v}" for k, v in info_dict.items()]
-                csv_string = "\n".join(csv_rows)
-        
-        # 构建头部信息
-        header_lines = [
-            f"# Company information for {symbol} ({market_info['market_name']})",
-            f"# Formatted symbol: {formatted_symbol}",
-            f"# Market: {market_info['market_name']} ({market_info['currency']})",
-            f"# Data source: AKShare",
-            f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        ]
-        
-        header = '\n'.join(header_lines) + '\n\n'
-        
-        log_operation("get_stock_info", symbol, market, "SUCCESS")
-        return header + csv_string
-        
-    except Exception as e:
-        log_operation("get_stock_info", symbol, (market if ('market' in locals() and market is not None) else "UNKNOWN"), "FAILED")
-        return handle_akshare_exception(e, "retrieving company info", symbol)
