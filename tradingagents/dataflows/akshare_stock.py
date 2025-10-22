@@ -55,8 +55,10 @@ def get_stock(
         # 根据市场选择对应的AKShare接口
         data = None
         if market == 'A_STOCK':
+            # A股使用纯数字代码
+            clean_symbol = formatted_symbol.replace('SZ', '').replace('SH', '')
             data = ak.stock_zh_a_hist(
-                symbol=formatted_symbol,
+                symbol=clean_symbol,
                 period="daily",
                 start_date=formatted_start,
                 end_date=formatted_end,
