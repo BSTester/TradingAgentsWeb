@@ -84,7 +84,7 @@ def _get_stock_specific_news(symbol: str, market: str, formatted_symbol: str, li
     # 准备股票代码，stock_news_em接口可以处理不同市场的股票
     if market == 'A_STOCK':
         # A股使用纯数字代码
-        clean_symbol = formatted_symbol.replace('sz', '').replace('sh', '')
+        clean_symbol = formatted_symbol.replace('SZ', '').replace('SH', '')
     elif market == 'HK_STOCK':
         # 港股使用纯数字代码，去掉.HK后缀
         clean_symbol = formatted_symbol.replace('.HK', '').zfill(5)
