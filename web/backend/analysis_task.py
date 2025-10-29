@@ -166,6 +166,8 @@ def run_analysis_task(
         config["backend_url"] = request_data.get('backend_url', '')
         config["max_debate_rounds"] = request_data.get('research_depth', 1)
         config["max_risk_discuss_rounds"] = request_data.get('research_depth', 1)
+        # Pass analysis_id to ensure unique memory collections per analysis (multi-user safety)
+        config["analysis_id"] = analysis_id
         
         # 转换分析师类型
         analyst_types = []
@@ -743,6 +745,13 @@ def run_analysis_task(
         send_log('info', '分析流程完成', 'system', '完成', 90.0, '完成阶段')
         check_stop()
         
+        # 清理内存集合
+        send_log('info', '🧹 清理内存资源...', 'system', '清理', 92.0, '完成阶段')
+        try:
+            graph.cleanup_memories()
+        except Exception as e:
+            print(f"⚠️  清理内存失败（可忽略）: {e}")
+        
         # 保存结果（使用独立会话，避免主会话事务污染导致的重连错误）
         send_log('info', '💾 保存分析结果...', 'system', '保存结果', 95.0, '完成阶段')
         
@@ -972,4 +981,12 @@ def run_analysis_task(
         loop.close()
         
     finally:
+        # 清理内存集合（无论成功、中断还是失败）
+        try:
+            if 'graph' in locals():
+                graph.cleanup_memories()
+                print(f"🧹 已清理分析 {analysis_id} 的内存集合")
+        except Exception as e:
+            print(f"⚠️  清理内存失败（可忽略）: {e}")
+        
         db.close()
