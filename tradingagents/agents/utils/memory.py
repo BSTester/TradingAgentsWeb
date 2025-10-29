@@ -14,7 +14,17 @@ class FinancialSituationMemory:
         embedding_api_key = config.get("embedding_api_key")
         self.client = OpenAI(base_url=embedding_base_url, api_key=embedding_api_key)
         self.chroma_client = chromadb.Client(Settings(allow_reset=True))
-        self.situation_collection = self.chroma_client.create_collection(name=name)
+        self.collection_name = name
+        # Use get_or_create_collection to avoid "already exists" error on repeated analysis
+        self.situation_collection = self.chroma_client.get_or_create_collection(name=name)
+    
+    def cleanup(self):
+        """Clean up the collection to free memory after analysis"""
+        try:
+            self.chroma_client.delete_collection(name=self.collection_name)
+        except Exception as e:
+            # Silently ignore if collection doesn't exist or other errors
+            pass
 
     def get_embedding(self, text):
         """Get OpenAI embedding for a text"""
