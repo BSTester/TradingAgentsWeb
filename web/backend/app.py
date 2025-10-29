@@ -587,7 +587,7 @@ app.mount("/static", StaticFiles(directory="web/backend/static"), name="static")
 
 if __name__ == "__main__":
     uvicorn.run(
-        "web.backend.app_v2:app",
+        "web.backend.app:app",
         host="0.0.0.0",
         port=8000,
         reload=os.getenv("NODE_ENV", "production") != "production",
