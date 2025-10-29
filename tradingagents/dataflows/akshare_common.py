@@ -1,240 +1,254 @@
 """
-AKShare common utilities and shared functions
-提供AKShare数据源的公共工具函数和配置
+AkShare Common Utilities
+Shared functions for market identification, symbol normalization, and data formatting
 """
-import pandas as pd
-from datetime import datetime
-from typing import Optional, Tuple, Dict, Any
-from .market_utils import MarketIdentifier, get_market_info
 
-try:
-    import akshare as ak
-    AKSHARE_AVAILABLE = True
-except ImportError:
-    AKSHARE_AVAILABLE = False
-    print("Warning: AKShare not installed. Install with: pip install akshare")
+import logging
+from typing import Dict, Any
 
-
-class AKShareError(Exception):
-    """AKShare相关异常基类"""
-    pass
-
-
-class AKShareNotAvailableError(AKShareError):
-    """AKShare未安装异常"""
-    pass
-
-
-class AKShareDataError(AKShareError):
-    """AKShare数据获取异常"""
-    pass
-
-
-def check_akshare_availability():
-    """检查AKShare是否可用"""
-    if not AKSHARE_AVAILABLE:
-        raise AKShareNotAvailableError("AKShare is not installed. Please install with: pip install akshare")
+# Market identification patterns
+MARKET_PATTERNS = {
+    'A_STOCK': {
+        'description': 'A股市场 (深圳/上海/科创板/创业板/北交所)',
+        'patterns': [
+            lambda s: s.isdigit() and len(s) == 6,
+            lambda s: s.upper().endswith(('.SZ', '.SH'))
+        ]
+    },
+    'HK_STOCK': {
+        'description': '港股市场',
+        'patterns': [
+            lambda s: s.upper().endswith('.HK'),
+            lambda s: s.isdigit() and 1 <= len(s) <= 5
+        ]
+    },
+    'US_STOCK': {
+        'description': '美股市场',
+        'patterns': [
+            lambda s: any(c.isalpha() for c in s) and not s.upper().endswith(('.HK', '.SZ', '.SH'))
+        ]
+    }
+}
 
 
-def format_symbol_for_market(symbol: str, market: str) -> str:
-    """为特定市场格式化股票代码"""
-    return MarketIdentifier.format_symbol_for_vendor(symbol, 'akshare', market)
-
-
-def validate_date_format(date_str: str) -> None:
-    """验证日期格式"""
-    try:
-        datetime.strptime(date_str, "%Y-%m-%d")
-    except ValueError:
-        raise ValueError(f"Invalid date format: {date_str}. Expected YYYY-MM-DD format.")
-
-
-def format_date_for_akshare(date_str: str, market: str) -> str:
+def _identify_market(symbol: str) -> str:
     """
-    为AKShare接口格式化日期
+    Identify the market based on stock symbol format.
     
     Args:
-        date_str: YYYY-MM-DD格式的日期字符串
-        market: 市场类型 (A_STOCK, HK_STOCK, US_STOCK)
+        symbol: Stock symbol
         
     Returns:
-        str: 格式化后的日期字符串
+        Market type: 'A_STOCK', 'HK_STOCK', 'US_STOCK', or 'UNKNOWN'
     """
-    # AKShare的所有市场都使用YYYYMMDD格式
-    return date_str.replace('-', '')
+    if not symbol:
+        return 'UNKNOWN'
+    
+    symbol = symbol.strip()
+    
+    # Check each market pattern
+    for market, config in MARKET_PATTERNS.items():
+        for pattern in config['patterns']:
+            try:
+                if pattern(symbol):
+                    return market
+            except:
+                continue
+    
+    return 'UNKNOWN'
 
 
-def standardize_column_names(df: pd.DataFrame, market: str) -> pd.DataFrame:
+def normalize_symbol_for_sina(ticker: str, market: str) -> str:
     """
-    标准化DataFrame列名
+    Normalize symbol for Sina Finance API
+    A股需要添加市场前缀: sh/sz/bj
     
     Args:
-        df: 原始DataFrame
-        market: 市场类型
+        ticker: Stock symbol
+        market: Market type
         
     Returns:
-        pd.DataFrame: 标准化后的DataFrame
+        Normalized symbol with market prefix
     """
-    if df.empty:
-        return df
+    if market != 'A_STOCK':
+        return ticker
     
-    # 基础列名映射
-    column_mapping = {
-        # A股列名映射（中文到英文）
-        '日期': 'Date',
-        '开盘': 'Open',
-        '收盘': 'Close',
-        '最高': 'High',
-        '最低': 'Low',
-        '成交量': 'Volume',
-        '成交额': 'Amount',
-        '振幅': 'Amplitude',
-        '涨跌幅': 'Change_Pct',
-        '涨跌额': 'Change_Amount',
-        '换手率': 'Turnover',
+    # 已经有前缀，直接返回
+    if ticker.lower().startswith(('sh', 'sz', 'bj')):
+        return ticker
+    
+    # 根据代码开头判断市场
+    if ticker.startswith(('60', '68')):  # 上海主板/科创板
+        return f"sh{ticker}"
+    elif ticker.startswith(('00', '30')):  # 深圳主板/创业板
+        return f"sz{ticker}"
+    elif ticker.startswith(('83', '87')):  # 北交所
+        return f"bj{ticker}"
+    else:
+        # 默认上海
+        return f"sh{ticker}"
+
+
+def normalize_symbol_for_us(ticker: str) -> str:
+    """
+    Normalize symbol for US stocks
+    处理特殊符号: BRK.A → BRK_A
+    
+    Args:
+        ticker: Stock symbol
         
-        # 美股列名映射（小写到标准大写）
-        'date': 'Date',
-        'open': 'Open',
-        'high': 'High',
-        'low': 'Low',
-        'close': 'Close',
-        'volume': 'Volume',
+    Returns:
+        Normalized symbol
+    """
+    return ticker.replace('.', '_')
+
+
+def normalize_symbol_for_hk(ticker: str) -> str:
+    """
+    Normalize symbol for HK stocks
+    标准化为5位数字，去除 .HK 后缀
+    
+    Args:
+        ticker: Stock symbol
+        
+    Returns:
+        Normalized 5-digit symbol
+    """
+    symbol_upper = ticker.upper()
+    if symbol_upper.endswith('.HK'):
+        num = symbol_upper[:-3]
+        if num.isdigit():
+            return num.zfill(5)
+    elif ticker.isdigit():
+        return ticker.zfill(5)
+    return ticker
+
+
+def map_frequency(freq: str, market: str) -> str:
+    """
+    Map frequency parameter to market-specific values
+    
+    Args:
+        freq: Frequency ('annual' or 'quarterly')
+        market: Market type
+        
+    Returns:
+        Market-specific frequency string
+    """
+    freq_lower = freq.lower()
+    
+    if market == 'A_STOCK':
+        # Sina: 不需要特殊映射
+        return freq_lower
+    elif market == 'US_STOCK':
+        # EastMoney US: 年报/单季报/累计季报
+        if freq_lower == 'annual':
+            return '年报'
+        elif freq_lower == 'quarterly':
+            return '单季报'
+        else:
+            return '年报'  # 默认
+    elif market == 'HK_STOCK':
+        # EastMoney HK: 年度/报告期
+        if freq_lower == 'annual':
+            return '年度'
+        else:
+            return '报告期'
+    
+    return freq_lower
+
+
+def map_statement_type(statement_type: str, market: str) -> str:
+    """
+    Map statement type to market-specific names
+    
+    Args:
+        statement_type: Type of statement ('balance_sheet', 'cashflow', 'income_statement')
+        market: Market type
+        
+    Returns:
+        Market-specific statement name
+    """
+    type_mapping = {
+        'balance_sheet': {
+            'A_STOCK': '资产负债表',
+            'US_STOCK': '资产负债表',
+            'HK_STOCK': '资产负债表'
+        },
+        'cashflow': {
+            'A_STOCK': '现金流量表',
+            'US_STOCK': '现金流量表',
+            'HK_STOCK': '现金流量表'
+        },
+        'income_statement': {
+            'A_STOCK': '利润表',
+            'US_STOCK': '综合损益表',  # 注意：美股是"综合损益表"
+            'HK_STOCK': '利润表'
+        }
     }
     
-    # 重命名列
-    df_renamed = df.rename(columns=column_mapping)
-    
-    return df_renamed
+    return type_mapping.get(statement_type, {}).get(market, statement_type)
 
 
-def process_dataframe_for_output(df: pd.DataFrame, symbol: str, market_info: Dict[str, Any], 
-                                data_type: str, additional_info: Optional[Dict[str, Any]] = None) -> str:
+def format_large_number(value: float, item_name: str = '') -> str:
     """
-    处理DataFrame并生成标准化输出
+    Format large numbers with appropriate units (亿/万)
     
     Args:
-        df: 处理的DataFrame
-        symbol: 股票代码
-        market_info: 市场信息
-        data_type: 数据类型描述
-        additional_info: 额外信息
+        value: Numeric value
+        item_name: Name of the item (for context)
         
     Returns:
-        str: 标准化的CSV输出字符串
+        Formatted string
     """
-    if df.empty:
-        return f"No {data_type} data found for symbol '{symbol}'"
+    import pandas as pd
     
-    # 确保Date列是datetime类型并设置为索引（如果存在）
-    if 'Date' in df.columns:
-        df['Date'] = pd.to_datetime(df['Date'])
-        df.set_index('Date', inplace=True)
+    if pd.isna(value) or value == 'N/A' or str(value) == 'None':
+        return 'N/A'
     
-    # 数值列保留2位小数
-    numeric_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-    for col in numeric_columns:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce').round(2)
-    
-    # 转换为CSV字符串
-    csv_string = df.to_csv()
-    
-    # 构建头部信息
-    header_lines = [
-        f"# {data_type} data for {symbol} ({market_info['market_name']})",
-        f"# Market: {market_info['market_name']} ({market_info['currency']})",
-        f"# Total records: {len(df)}",
-        f"# Data source: AKShare",
-        f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    ]
-    
-    # 添加额外信息
-    if additional_info:
-        for key, value in additional_info.items():
-            header_lines.insert(-2, f"# {key}: {value}")
-    
-    header = '\n'.join(header_lines) + '\n\n'
-    
-    return header + csv_string
-
-
-def handle_akshare_exception(e: Exception, operation: str, symbol: str = None) -> str:
-    """
-    统一处理AKShare异常
-    
-    Args:
-        e: 异常对象
-        operation: 操作描述
-        symbol: 股票代码（可选）
+    try:
+        if isinstance(value, str):
+            value = float(value.replace(',', ''))
         
+        # 每股数据保留4位小数
+        if '每股' in item_name or 'EPS' in item_name or 'per share' in item_name.lower():
+            return f"{value:.4f}元"
+        
+        # 大数字格式化
+        if abs(value) > 100000000:  # 超过1亿
+            return f"{value/100000000:.2f}亿"
+        elif abs(value) > 10000:  # 超过1万
+            return f"{value/10000:.2f}万"
+        else:
+            return f"{value:.2f}"
+    except:
+        return str(value)
+
+
+def check_akshare_available() -> bool:
+    """
+    Check if akshare is available
+    
     Returns:
-        str: 标准化错误信息
-        
-    Raises:
-        Exception: 对于网络相关错误，重新抛出异常以触发降级处理
+        True if akshare is installed and can be imported
     """
-    symbol_info = f" for {symbol}" if symbol else ""
-    error_str = str(e).lower()
-    
-    # 检查是否为网络相关错误，如果是则重新抛出以触发降级处理
-    if any(keyword in error_str for keyword in ['connection', 'network', 'timeout', 'remote', 'aborted', 'disconnected']):
-        raise Exception(f"Network error {operation}{symbol_info}: {str(e)}")
-    
-    # 对于其他错误，返回错误字符串
-    return f"Error {operation}{symbol_info}: {str(e)}"
+    try:
+        import akshare
+        return True
+    except ImportError:
+        return False
 
 
-def validate_market_support(symbol: str, operation: str = "operation") -> Tuple[str, Dict[str, Any]]:
+def get_akshare():
     """
-    验证市场支持并返回市场信息
+    Get akshare module or None if not available
     
-    Args:
-        symbol: 股票代码
-        operation: 操作描述
-        
     Returns:
-        Tuple[str, Dict]: (market, market_info)
-        
-    Raises:
-        AKShareDataError: 当市场不支持时
+        akshare module or None
     """
-    market_info = get_market_info(symbol)
-    market = market_info['market']
-    
-    if not MarketIdentifier.is_market_supported(symbol, 'akshare'):
-        raise AKShareDataError(f"Market {market} is not supported by AKShare for {operation}")
-    
-    return market, market_info
-
-
-def create_fallback_response(primary_error: str, fallback_result: Optional[str] = None) -> str:
-    """
-    创建带有fallback信息的响应
-    
-    Args:
-        primary_error: 主要错误信息
-        fallback_result: fallback结果（可选）
-        
-    Returns:
-        str: 最终响应字符串
-    """
-    if fallback_result and not fallback_result.startswith("Error"):
-        return fallback_result
-    else:
-        return primary_error
-
-
-def log_operation(operation: str, symbol: str = None, market: str = None, status: str = "ATTEMPT"):
-    """
-    记录操作日志
-    
-    Args:
-        operation: 操作名称
-        symbol: 股票代码（可选）
-        market: 市场类型（可选）
-        status: 状态 (ATTEMPT, SUCCESS, FAILED)
-    """
-    symbol_info = f" {symbol}" if symbol else ""
-    market_info = f" ({market})" if market else ""
-    print(f"[AKShare] {status}: {operation}{symbol_info}{market_info}")
+    try:
+        import akshare as ak
+        return ak
+    except ImportError:
+        logging.error("akshare not installed")
+        return None

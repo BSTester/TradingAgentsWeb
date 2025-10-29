@@ -1,30 +1,26 @@
 import chromadb
 from chromadb.config import Settings
 from openai import OpenAI
-import os
 
 
 class FinancialSituationMemory:
     def __init__(self, name, config):
-        base_url = config["backend_url"]
-        api_key = os.getenv("EMBEDDING_KEY", "")
-        if base_url == "http://localhost:11434/v1":
+        configured_embedding_model = config.get("embedding_llm", "text-embedding-3-small")
+        if config["backend_url"] == "http://localhost:11434/v1":
             self.embedding = "nomic-embed-text"
-        elif base_url == "https://api.openai.com/v1":
-            self.embedding = "text-embedding-3-small"
-            api_key = os.getenv("OPENAI_API_KEY")
         else:
-            self.embedding = os.getenv("EMBEDDING_LLM", "text-embedding-3-small")
-            base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+            self.embedding = configured_embedding_model
+        embedding_base_url = config.get("embedding_backend_url", config["backend_url"])
+        embedding_api_key = config.get("embedding_api_key")
+        self.client = OpenAI(base_url=embedding_base_url, api_key=embedding_api_key)
         self.chroma_client = chromadb.Client(Settings(allow_reset=True))
-        self.situation_collection = self.chroma_client.get_or_create_collection(name=name)
+        self.situation_collection = self.chroma_client.create_collection(name=name)
 
     def get_embedding(self, text):
         """Get OpenAI embedding for a text"""
         
         response = self.client.embeddings.create(
-            model=self.embedding, input=text if self.embedding != "text-embedding-v4" else text[:8192]
+            model=self.embedding, input=text[:8192] if self.embedding == "text-embedding-v4" else text
         )
         return response.data[0].embedding
 

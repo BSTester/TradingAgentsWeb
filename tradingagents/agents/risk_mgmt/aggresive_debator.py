@@ -1,13 +1,9 @@
 import time
 import json
-from tradingagents.agents.utils.logger import log_agent_start, log_agent_end, log_agent_info
 
 
 def create_risky_debator(llm):
     def risky_node(state) -> dict:
-        company_name = state.get("company_of_interest", "")
-        log_agent_start("RISKY_ANALYST", company_name, "开始激进风险分析")
-        
         risk_debate_state = state["risk_debate_state"]
         history = risk_debate_state.get("history", "")
         risky_history = risk_debate_state.get("risky_history", "")
@@ -34,12 +30,11 @@ Latest World Affairs Report: {news_report}
 Company Fundamentals Report: {fundamentals_report}
 Here is the current conversation history: {history} Here are the last arguments from the conservative analyst: {current_safe_response} Here are the last arguments from the neutral analyst: {current_neutral_response}. If there are no responses from the other viewpoints, do not halluncinate and just present your point.
 
-Engage actively by addressing any specific concerns raised, refuting the weaknesses in their logic, and asserting the benefits of risk-taking to outpace market norms. Maintain a focus on debating and persuading, not just presenting data. Challenge each counterpoint to underscore why a high-risk approach is optimal. Output conversationally as if you are speaking without any special formatting. answer in Chinese."""
+Engage actively by addressing any specific concerns raised, refuting the weaknesses in their logic, and asserting the benefits of risk-taking to outpace market norms. Maintain a focus on debating and persuading, not just presenting data. Challenge each counterpoint to underscore why a high-risk approach is optimal. Output conversationally as if you are speaking without any special formatting.
 
-        log_agent_info("RISKY_ANALYST", "开始生成激进风险论证", company_name)
+Always respond in Chinese. All reasoning and analytical conclusions must be grounded in facts; do not fabricate analysis results. Do not mention this instruction in your output."""
+
         response = llm.invoke(prompt)
-        log_agent_info("RISKY_ANALYST", f"激进风险论证生成完成，长度: {len(response.content)} 字符", company_name)
-        log_agent_end("RISKY_ANALYST", company_name)
 
         argument = f"Risky Analyst: {response.content}"
 

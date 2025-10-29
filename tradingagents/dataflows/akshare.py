@@ -1,50 +1,56 @@
 """
-AKShare数据源主入口文件
-提供所有AKShare功能的统一导入接口
+AKShare data provider - Main entry point
+Imports all functions from specialized modules following alpha_vantage.py pattern
 """
 
-# 股票数据模块
-from .akshare_stock import (
-    get_stock as get_akshare_stock
-)
-
-# 财务数据模块  
+# Import from specialized modules
+from .akshare_stock import get_stock
+from .akshare_indicator import get_indicators
 from .akshare_fundamentals import (
-    get_balance_sheet as get_akshare_balance_sheet,
-    get_income_statement as get_akshare_income_statement,
-    get_cashflow as get_akshare_cashflow,
-    get_fundamentals as get_akshare_fundamentals
+    get_fundamentals,
+    get_balance_sheet,
+    get_cashflow,
+    get_income_statement
 )
-
-# 新闻数据模块
 from .akshare_news import (
-    get_news as get_akshare_news,
-    get_insider_transactions as get_akshare_insider_transactions,
-    get_global_news as get_akshare_global_news
+    get_news,
+    get_global_news,
+    get_insider_transactions,
+    get_insider_sentiment
 )
 
-# 技术指标模块
-from .akshare_indicators import (
-    get_indicator as get_akshare_indicator
+# Export common utilities for backward compatibility
+from .akshare_common import (
+    _identify_market,
+    MARKET_PATTERNS,
+    normalize_symbol_for_sina,
+    normalize_symbol_for_us,
+    normalize_symbol_for_hk,
+    check_akshare_available,
+    get_akshare
 )
 
-
-# 导出所有可用的函数
 __all__ = [
-    # 股票数据
-    'get_akshare_stock',
-    
-    # 财务数据
-    'get_akshare_balance_sheet',
-    'get_akshare_income_statement',
-    'get_akshare_cashflow',
-    'get_akshare_fundamentals',
-    
-    # 新闻数据
-    'get_akshare_news',
-    'get_akshare_insider_transactions',
-    'get_akshare_global_news',
-    
-    # 技术指标
-    'get_akshare_indicator'
+    # Stock data
+    'get_stock',
+    # Technical indicators
+    'get_indicators',
+    # Fundamentals
+    'get_fundamentals',
+    'get_balance_sheet',
+    'get_cashflow',
+    'get_income_statement',
+    # News and sentiment
+    'get_news',
+    'get_global_news',
+    'get_insider_transactions',
+    'get_insider_sentiment',
+    # Common utilities
+    '_identify_market',
+    'MARKET_PATTERNS',
+    'normalize_symbol_for_sina',
+    'normalize_symbol_for_us',
+    'normalize_symbol_for_hk',
+    'check_akshare_available',
+    'get_akshare'
 ]

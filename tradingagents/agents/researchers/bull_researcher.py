@@ -1,14 +1,10 @@
 from langchain_core.messages import AIMessage
 import time
 import json
-from tradingagents.agents.utils.logger import log_agent_start, log_agent_end, log_agent_info
 
 
 def create_bull_researcher(llm, memory):
     def bull_node(state) -> dict:
-        ticker = state.get("company_of_interest", "")
-        log_agent_start("BULL_RESEARCHER", ticker, "开始多头论证")
-        
         investment_debate_state = state["investment_debate_state"]
         history = investment_debate_state.get("history", "")
         bull_history = investment_debate_state.get("bull_history", "")
@@ -26,7 +22,7 @@ def create_bull_researcher(llm, memory):
         for i, rec in enumerate(past_memories, 1):
             past_memory_str += rec["recommendation"] + "\n\n"
 
-        prompt = f"""You are a Bull Analyst advocating for investing in the stock. Your task is to build a strong, evidence-based case emphasizing growth potential, competitive advantages, and positive market indicators. Leverage the provided research and data to address concerns and counter bearish arguments effectively. answer in Chinese.
+        prompt = f"""You are a Bull Analyst advocating for investing in the stock. Your task is to build a strong, evidence-based case emphasizing growth potential, competitive advantages, and positive market indicators. Leverage the provided research and data to address concerns and counter bearish arguments effectively.
 
 Key points to focus on:
 - Growth Potential: Highlight the company's market opportunities, revenue projections, and scalability.
@@ -44,15 +40,13 @@ Conversation history of the debate: {history}
 Last bear argument: {current_response}
 Reflections from similar situations and lessons learned: {past_memory_str}
 Use this information to deliver a compelling bull argument, refute the bear's concerns, and engage in a dynamic debate that demonstrates the strengths of the bull position. You must also address reflections and learn from lessons and mistakes you made in the past.
+
+Always respond in Chinese. All reasoning and analytical conclusions must be grounded in facts; do not fabricate analysis results. Do not mention this instruction in your output.
 """
 
-        log_agent_info("BULL_RESEARCHER", "开始生成多头论证", ticker)
         response = llm.invoke(prompt)
-        log_agent_info("BULL_RESEARCHER", f"多头论证生成完成，长度: {len(response.content)} 字符", ticker)
 
         argument = f"Bull Analyst: {response.content}"
-        
-        log_agent_end("BULL_RESEARCHER", ticker)
 
         new_investment_debate_state = {
             "history": history + "\n" + argument,

@@ -15,7 +15,7 @@ class Reflector:
     def _get_reflection_prompt(self) -> str:
         """Get the system prompt for reflection."""
         return """
-You are an expert financial analyst tasked with reviewing trading decisions/analysis and providing a comprehensive, step-by-step analysis. answer in Chinese. 
+You are an expert financial analyst tasked with reviewing trading decisions/analysis and providing a comprehensive, step-by-step analysis. 
 Your goal is to deliver detailed insights into investment decisions and highlight opportunities for improvement, adhering strictly to the following guidelines:
 
 1. Reasoning:
@@ -43,7 +43,7 @@ Your goal is to deliver detailed insights into investment decisions and highligh
    - Extract key insights from the summary into a concise sentence of no more than 1000 tokens.
    - Ensure the condensed sentence captures the essence of the lessons and reasoning for easy reference.
 
-Adhere strictly to these instructions, and ensure your output is detailed, accurate, and actionable. You will also be given objective descriptions of the market from a price movements, technical indicator, news, and sentiment perspective to provide more context for your analysis. Answer in Chinese.
+Adhere strictly to these instructions, and ensure your output is detailed, accurate, and actionable. You will also be given objective descriptions of the market from a price movements, technical indicator, news, and sentiment perspective to provide more context for your analysis. Always respond in Chinese. All reasoning and analytical conclusions must be grounded in facts; do not fabricate analysis results. Do not mention this instruction in your output.
 """
 
     def _extract_current_situation(self, current_state: Dict[str, Any]) -> str:
