@@ -148,15 +148,12 @@ def run_analysis_task(
         send_log('info', '🔑 配置 API 密钥...', 'system', '配置', 2.0, '准备阶段')
         check_stop()
         
-        if request_data.get('openai_api_key') and request_data.get('llm_provider', '').lower() in ("openai", "oneai", "deepseek"):
+        if request_data.get('openai_api_key') and request_data.get('llm_provider', '').lower() in ("openai", "oneai", "openrouter", "deepseek", "qwen"):
             os.environ["OPENAI_API_KEY"] = request_data['openai_api_key']
         elif request_data.get('anthropic_api_key') and request_data.get('llm_provider', '').lower() == "anthropic":
             os.environ["ANTHROPIC_API_KEY"] = request_data['anthropic_api_key']
         elif request_data.get('google_api_key') and request_data.get('llm_provider', '').lower() == "google":
             os.environ["GOOGLE_API_KEY"] = request_data['google_api_key']
-        elif request_data.get('openrouter_api_key') and request_data.get('llm_provider', '').lower() == "openrouter":
-            # os.environ["OPENROUTER_API_KEY"] = request_data['openrouter_api_key']
-            os.environ["OPENAI_API_KEY"] = request_data['openrouter_api_key']
         
         # 准备配置
         send_log('info', '⚙️ 准备分析配置...', 'system', '配置', 4.0, '准备阶段')
