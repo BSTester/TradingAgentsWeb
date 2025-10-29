@@ -50,4 +50,4 @@ RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 EXPOSE 8000
 
 # 默认启动后端服务
-CMD ["python", "web/backend/app_v2.py"]
+CMD ["python", "web/backend/app.py"]
