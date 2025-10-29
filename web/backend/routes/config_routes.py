@@ -32,7 +32,8 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
             {"value": "google", "label": "Google", "description": "Gemini系列模型", "url": "https://generativelanguage.googleapis.com/v1"},
             {"value": "openrouter", "label": "OpenRouter", "description": "多模型聚合平台", "url": "https://openrouter.ai/api/v1"},
             {"value": "deepseek", "label": "DeepSeek", "description": "DeepSeek系列模型", "url": "https://api.deepseek.com/v1"},
-            # {"value": "oneai", "label": "OpenAI代理", "description": "GPT系列模型", "url": "https://api.bstester.com/v1"},
+            {"value": "qwen", "label": "Qwen", "description": "阿里千问系列模型", "url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"},
+            {"value": "oneai", "label": "OneAI", "description": "多模型聚合平台", "url": "https://api.bstester.com/v1"},
             # {"value": "ollama", "label": "Ollama", "description": "本地模型服务", "url": "http://localhost:11434/v1"}
         ],
         "models": {
@@ -59,6 +60,8 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
                     {"value": "openai/gpt-4.1-nano", "label": "GPT-4.1-nano - 超轻量模型，适合基本操作"},
                     {"value": "openai/gpt-4.1-mini", "label": "GPT-4.1-mini - 紧凑模型，性能良好"},
                     {"value": "openai/gpt-4o", "label": "GPT-4o - 标准模型，能力稳定"},
+                    {"value": "x-ai/grok-4-fast", "label": "Grok-4-fast - 快速高效，适合快速任务"},
+                    {"value": "x-ai/grok-4", "label": "Grok-4 - 高级推理模型"}
                 ],
                 "deep": [
                     {"value": "openai/gpt-4.1-nano", "label": "GPT-4.1-nano - 超轻量模型，适合基本操作"},
@@ -68,6 +71,8 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
                     {"value": "openai/o3-mini", "label": "o3-mini - 高级推理模型（轻量级）"},
                     {"value": "openai/o3", "label": "o3 - 完整高级推理模型"},
                     {"value": "openai/o1", "label": "o1 - 首屈一指的推理和问题解决模型"},
+                    {"value": "x-ai/grok-4", "label": "Grok-4 - 高级推理模型"},
+                    {"value": "qwen3-max-preview", "label": "Qwen3-max - 通义千问高级推理模型"}
                 ]
             },
             "deepseek": {
@@ -76,6 +81,14 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
                 ],
                 "deep": [
                     {"value": "deepseek-reasoner", "label": "DeepSeek-V3.2-Exp 的思考模式"},
+                ]
+            },
+            "qwen": {
+                "shallow": [
+                    {"value": "qwen3-max", "label": "qwen3 通义千问高级推理模型"},
+                ],
+                "deep": [
+                    {"value": "qwen3-max", "label": "qwen3 通义千问高级推理模型"},
                 ]
             },
             "anthropic": {
@@ -156,7 +169,7 @@ async def validate_api_key(request: dict, current_user: User = Depends(get_curre
     
     try:
         # Basic validation - just check if key format looks valid
-        if provider in ("openai", "oneai", 'deepseek'):
+        if provider in ("openai", "oneai", 'deepseek', 'qwen'):
             if not api_key.startswith("sk-"):
                 raise HTTPException(status_code=400, detail="无效的OpenAI API密钥格式")
         elif provider == "anthropic":

@@ -154,6 +154,9 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     { value: 'anthropic', label: 'Anthropic', description: 'Claude系列模型' },
     { value: 'google', label: 'Google', description: 'Gemini系列模型' },
     { value: 'openrouter', label: 'OpenRouter', description: '多模型聚合平台' },
+    { value: 'deepseek', label: 'Deepseek', description: 'Deepseek系列模型' },
+    { value: 'qwen', label: 'Qwen', description: '通义千问系列模型' },
+    { value: 'oneai', label: 'OneAI', description: '多模型聚合平台' },
     { value: 'ollama', label: 'Ollama', description: '本地模型服务' }
   ];
 
@@ -209,6 +212,17 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
           { value: 'google/gemini-pro', label: 'Gemini Pro' }
         ]
       },
+      oneai: {
+        shallow: [
+          { value: 'openai/gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+          { value: 'anthropic/claude-3-haiku', label: 'Claude 3 Haiku' }
+        ],
+        deep: [
+          { value: 'openai/gpt-4-turbo', label: 'GPT-4 Turbo' },
+          { value: 'anthropic/claude-3-opus', label: 'Claude 3 Opus' },
+          { value: 'google/gemini-pro', label: 'Gemini Pro' }
+        ]
+      },
       ollama: {
         shallow: [
           { value: 'llama3.2', label: 'Llama 3.2' },
@@ -229,6 +243,9 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
   const getApiKeyPlaceholder = (provider: string) => {
     const placeholders: Record<string, string> = {
       openai: '输入您的OpenAI API密钥 (sk-...)',
+      oneai: '输入您的OneAI API密钥 (sk-...)',
+      deepseek: '输入您的Deepseek API密钥 (sk-...)',
+      qwen: '输入您的Qwen API密钥 (sk-...)',
       anthropic: '输入您的Anthropic API密钥 (sk-ant-...)',
       google: '输入您的Google API密钥',
       openrouter: '输入您的OpenRouter API密钥 (sk-or-...)',
@@ -370,14 +387,12 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       };
 
       // 根据提供商添加对应的API密钥
-      if (formData.llm_provider === 'openai' || formData.llm_provider === 'oneai' || formData.llm_provider === 'deepseek') {
+      if (formData.llm_provider === 'openai' || formData.llm_provider === 'oneai' || formData.llm_provider === 'qwen' || formData.llm_provider === 'deepseek' || formData.llm_provider === 'openrouter') {
         requestData.openai_api_key = formData.api_key;
       } else if (formData.llm_provider === 'anthropic') {
         requestData.anthropic_api_key = formData.api_key;
       } else if (formData.llm_provider === 'google') {
         requestData.google_api_key = formData.api_key;
-      } else if (formData.llm_provider === 'openrouter') {
-        requestData.openrouter_api_key = formData.api_key;
       }
 
       // 调用后端API启动分析
