@@ -673,15 +673,15 @@ def run_analysis_task(
         
         # 获取最终决策
         decision_raw = report_sections.get("final_trade_decision", "UNKNOWN")
-        if decision_raw.upper() == 'HOLD':
-            decision_raw = '观望'
-        elif decision_raw.upper() == 'SELL':
-            decision_raw = '卖出'
-        elif decision_raw.upper() == 'BUY':
-            decision_raw = '买入'
-        else:
-            decision_raw = '未明确'
         decision = graph.process_signal(decision_raw)
+        if decision.upper() == 'HOLD':
+            decision = '观望'
+        elif decision.upper() == 'SELL':
+            decision = '卖出'
+        elif decision.upper() == 'BUY':
+            decision = '买入'
+        else:
+            decision = '未明确'
         
         # 获取基本信息（从收集的字段中）
         ticker = report_sections.get("ticker", request_data.get('ticker', 'UNKNOWN'))
