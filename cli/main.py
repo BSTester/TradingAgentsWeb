@@ -398,7 +398,7 @@ def update_display(layout, spinner_text=None):
 def get_user_selections():
     """Get all user selections before starting the analysis display."""
     # Display ASCII art welcome message
-    with open("./cli/static/welcome.txt", "r", encoding='utf8') as f:
+    with open("./cli/static/welcome.txt", "r", encoding="utf-8") as f:
         welcome_ascii = f.read()
 
     # Create welcome box content
@@ -768,7 +768,7 @@ def run_analysis():
             func(*args, **kwargs)
             timestamp, message_type, content = obj.messages[-1]
             content = content.replace("\n", " ")  # Replace newlines with spaces
-            with open(log_file, "a", encoding='utf8') as f:
+            with open(log_file, "a", encoding="utf-8") as f:
                 f.write(f"{timestamp} [{message_type}] {content}\n")
         return wrapper
     
@@ -779,7 +779,7 @@ def run_analysis():
             func(*args, **kwargs)
             timestamp, tool_name, args = obj.tool_calls[-1]
             args_str = ", ".join(f"{k}={v}" for k, v in args.items())
-            with open(log_file, "a", encoding='utf8') as f:
+            with open(log_file, "a", encoding="utf-8") as f:
                 f.write(f"{timestamp} [Tool Call] {tool_name}({args_str})\n")
         return wrapper
 
@@ -792,7 +792,7 @@ def run_analysis():
                 content = obj.report_sections[section_name]
                 if content:
                     file_name = f"{section_name}.md"
-                    with open(report_dir / file_name, "w", encoding='utf8') as f:
+                    with open(report_dir / file_name, "w", encoding="utf-8") as f:
                         f.write(content)
         return wrapper
 
@@ -844,7 +844,7 @@ def run_analysis():
             selections["ticker"], selections["analysis_date"]
         )
         args = graph.propagator.get_graph_args()
-        args["stream_mode"] = 'values'
+
         # Stream the analysis
         trace = []
         for chunk in graph.graph.stream(init_agent_state, **args):

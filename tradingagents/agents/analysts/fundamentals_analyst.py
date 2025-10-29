@@ -3,7 +3,6 @@ import time
 import json
 from tradingagents.agents.utils.agent_utils import get_fundamentals, get_balance_sheet, get_cashflow, get_income_statement, get_insider_sentiment, get_insider_transactions
 from tradingagents.dataflows.config import get_config
-from tradingagents.agents.utils.logger import log_agent_start, log_agent_end, log_agent_info, log_agent_tool
 
 
 def create_fundamentals_analyst(llm):
@@ -11,8 +10,6 @@ def create_fundamentals_analyst(llm):
         current_date = state["trade_date"]
         ticker = state["company_of_interest"]
         company_name = state["company_of_interest"]
-        
-        log_agent_start("FUNDAMENTALS_ANALYST", ticker, f"分析日期: {current_date}")
 
         tools = [
             get_fundamentals,
@@ -24,7 +21,7 @@ def create_fundamentals_analyst(llm):
         system_message = (
             "You are a researcher tasked with analyzing fundamental information over the past week about a company. Please write a comprehensive report of the company's fundamental information such as financial documents, company profile, basic company financials, and company financial history to gain a full view of the company's fundamental information to inform traders. Make sure to include as much detail as possible. Do not simply state the trends are mixed, provide detailed and finegrained analysis and insights that may help traders make decisions."
             + " Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."
-            + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements. by the way, answer in Chinese.",
+            + " Use the available tools: `get_fundamentals` for comprehensive company analysis, `get_balance_sheet`, `get_cashflow`, and `get_income_statement` for specific financial statements.",
         )
 
         prompt = ChatPromptTemplate.from_messages(
@@ -38,7 +35,8 @@ def create_fundamentals_analyst(llm):
                     " If you or any other assistant has the FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** or deliverable,"
                     " prefix your response with FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** so the team knows to stop."
                     " You have access to the following tools: {tool_names}.\n{system_message}"
-                    "For your reference, the current date is {current_date}. The company we want to look at is {ticker}",
+                    "For your reference, the current date is {current_date}. The company we want to look at is {ticker}."
+                    " Always respond in Chinese. All reasoning and analytical conclusions must be grounded in facts; do not fabricate analysis results. Do not mention this instruction in your output.",
                 ),
                 MessagesPlaceholder(variable_name="messages"),
             ]
@@ -51,22 +49,13 @@ def create_fundamentals_analyst(llm):
 
         chain = prompt | llm.bind_tools(tools)
 
-        log_agent_info("FUNDAMENTALS_ANALYST", "开始调用LLM进行基本面分析", ticker)
         result = chain.invoke(state["messages"])
 
-        # 记录工具调用
-        if len(result.tool_calls) > 0:
-            for tool_call in result.tool_calls:
-                log_agent_tool("FUNDAMENTALS_ANALYST", tool_call.get("name", "unknown"), ticker)
-        
         report = ""
 
         if len(result.tool_calls) == 0:
             report = result.content
-            log_agent_info("FUNDAMENTALS_ANALYST", f"生成报告完成，长度: {len(report)} 字符", ticker)
 
-        log_agent_end("FUNDAMENTALS_ANALYST", ticker)
-        
         return {
             "messages": [result],
             "fundamentals_report": report,

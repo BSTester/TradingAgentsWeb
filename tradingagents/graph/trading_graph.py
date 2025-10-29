@@ -72,7 +72,7 @@ class TradingAgentsGraph:
         )
 
         # Initialize LLMs
-        if self.config["llm_provider"].lower() in ("openai", "oneai", "deepseek") or self.config["llm_provider"] == "ollama" or self.config["llm_provider"] == "openrouter":
+        if self.config["llm_provider"].lower() in ("openai", "ollama", "openrouter", "oneai", "deepseek", "qwen"):
             self.deep_thinking_llm = ChatOpenAI(model=self.config["deep_think_llm"], base_url=self.config["backend_url"])
             self.quick_thinking_llm = ChatOpenAI(model=self.config["quick_think_llm"], base_url=self.config["backend_url"])
         elif self.config["llm_provider"].lower() == "anthropic":
@@ -155,6 +155,13 @@ class TradingAgentsGraph:
                     get_income_statement,
                 ]
             ),
+            "trader": ToolNode(
+                [
+                    # Trader tools for final decision making
+                    get_stock_data,
+                    get_indicators,
+                ]
+            ),
         }
 
     def propagate(self, company_name, trade_date):
@@ -233,7 +240,7 @@ class TradingAgentsGraph:
             "w",
             encoding="utf-8"
         ) as f:
-            json.dump(self.log_states_dict, f, indent=4, ensure_ascii=False)
+            json.dump(self.log_states_dict, f, indent=4)
 
     def reflect_and_remember(self, returns_losses):
         """Reflect on decisions and update memory based on returns."""

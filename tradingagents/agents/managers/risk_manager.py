@@ -1,13 +1,11 @@
 import time
 import json
-from tradingagents.agents.utils.logger import log_agent_start, log_agent_end, log_agent_info, log_agent_decision
 
 
 def create_risk_manager(llm, memory):
     def risk_manager_node(state) -> dict:
 
         company_name = state["company_of_interest"]
-        log_agent_start("RISK_MANAGER", company_name, "开始风险评估")
 
         history = state["risk_debate_state"]["history"]
         risk_debate_state = state["risk_debate_state"]
@@ -24,7 +22,7 @@ def create_risk_manager(llm, memory):
         for i, rec in enumerate(past_memories, 1):
             past_memory_str += rec["recommendation"] + "\n\n"
 
-        prompt = f"""As the Risk Management Judge and Debate Facilitator, your goal is to evaluate the debate between three risk analysts—Risky, Neutral, and Safe/Conservative—and determine the best course of action for the trader. Your decision must result in a clear recommendation: Buy, Sell, or Hold. Choose Hold only if strongly justified by specific arguments, not as a fallback when all sides seem valid. Strive for clarity and decisiveness. answer in Chinese.
+        prompt = f"""As the Risk Management Judge and Debate Facilitator, your goal is to evaluate the debate between three risk analysts—Risky, Neutral, and Safe/Conservative—and determine the best course of action for the trader. Your decision must result in a clear recommendation: Buy, Sell, or Hold. Choose Hold only if strongly justified by specific arguments, not as a fallback when all sides seem valid. Strive for clarity and decisiveness.
 
 Guidelines for Decision-Making:
 1. **Summarize Key Arguments**: Extract the strongest points from each analyst, focusing on relevance to the context.
@@ -43,25 +41,11 @@ Deliverables:
 
 ---
 
-Focus on actionable insights and continuous improvement. Build on past lessons, critically evaluate all perspectives, and ensure each decision advances better outcomes."""
+Focus on actionable insights and continuous improvement. Build on past lessons, critically evaluate all perspectives, and ensure each decision advances better outcomes.
 
-        log_agent_info("RISK_MANAGER", "开始生成风险评估决策", company_name)
+Always respond in Chinese. All reasoning and analytical conclusions must be grounded in facts; do not fabricate analysis results. Do not mention this instruction in your output."""
+
         response = llm.invoke(prompt)
-        
-        # 提取最终决策
-        decision_text = response.content
-        if "BUY" in decision_text.upper():
-            decision = "BUY"
-        elif "SELL" in decision_text.upper():
-            decision = "SELL"
-        elif "HOLD" in decision_text.upper():
-            decision = "HOLD"
-        else:
-            decision = "未明确"
-        
-        log_agent_decision("RISK_MANAGER", decision, company_name)
-        log_agent_info("RISK_MANAGER", f"风险评估完成，长度: {len(response.content)} 字符", company_name)
-        log_agent_end("RISK_MANAGER", company_name)
 
         new_risk_debate_state = {
             "judge_decision": response.content,
