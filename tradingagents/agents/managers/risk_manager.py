@@ -5,8 +5,7 @@ import json
 def create_risk_manager(llm, memory):
     def risk_manager_node(state) -> dict:
 
-        company_name = state["company_of_interest"]
-
+        ticker  = state["company_of_interest"]
         history = state["risk_debate_state"]["history"]
         risk_debate_state = state["risk_debate_state"]
         market_research_report = state["market_report"]
@@ -60,9 +59,40 @@ Always respond in Chinese. All reasoning and analytical conclusions must be grou
             "count": risk_debate_state["count"],
         }
 
+        # Extract company name using LLM (at the end)
+        extract_name_prompt = f"""Based on the following information, extract the company name corresponding to stock ticker {ticker}.
+
+Market Research Report:
+{market_research_report}
+
+News Report:
+{news_report}
+
+Fundamentals Report:
+{fundamentals_report}
+
+Sentiment Report:
+{sentiment_report}
+
+Trading Plan:
+{trader_plan}
+
+Requirements:
+1. Return ONLY the company name, no other descriptions or explanations
+2. Maximum 8 Chinese characters for the company name
+3. If it's a Chinese company name, return the abbreviated form (e.g., 贵州茅台, 腾讯控股)
+4. If it's an English company name, PRIORITIZE translating to Chinese (e.g., 苹果 for Apple, 特斯拉 for Tesla, 微软 for Microsoft)
+5. Only use English name if Chinese translation is not available or commonly used
+6. Output the company name directly without any additional text"""
+
+        company_name_response = llm.invoke(extract_name_prompt)
+        company_name = company_name_response.content.strip()
+
         return {
             "risk_debate_state": new_risk_debate_state,
             "final_trade_decision": response.content,
+            "ticker": ticker,
+            "company_of_interest": company_name
         }
 
     return risk_manager_node
