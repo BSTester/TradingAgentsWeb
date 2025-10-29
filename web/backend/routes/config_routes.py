@@ -32,7 +32,7 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
             {"value": "google", "label": "Google", "description": "Gemini系列模型", "url": "https://generativelanguage.googleapis.com/v1"},
             {"value": "openrouter", "label": "OpenRouter", "description": "多模型聚合平台", "url": "https://openrouter.ai/api/v1"},
             {"value": "deepseek", "label": "DeepSeek", "description": "DeepSeek系列模型", "url": "https://api.deepseek.com/v1"},
-            {"value": "qwen", "label": "Qwen", "description": "阿里千问系列模型", "url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"},
+            {"value": "qwen", "label": "Qwen", "description": "阿里千问系列模型", "url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
             {"value": "oneai", "label": "OneAI", "description": "多模型聚合平台", "url": "https://api.bstester.com/v1"},
             # {"value": "ollama", "label": "Ollama", "description": "本地模型服务", "url": "http://localhost:11434/v1"}
         ],
