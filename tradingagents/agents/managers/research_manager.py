@@ -1,13 +1,9 @@
 import time
 import json
-from tradingagents.agents.utils.logger import log_agent_start, log_agent_end, log_agent_info, log_agent_decision
 
 
 def create_research_manager(llm, memory):
     def research_manager_node(state) -> dict:
-        company_name = state.get("company_of_interest", "")
-        log_agent_start("INVEST_JUDGE", company_name, "开始投资评审")
-        
         history = state["investment_debate_state"].get("history", "")
         market_research_report = state["market_report"]
         sentiment_report = state["sentiment_report"]
@@ -32,32 +28,17 @@ Additionally, develop a detailed investment plan for the trader. This should inc
 Your Recommendation: A decisive stance supported by the most convincing arguments.
 Rationale: An explanation of why these arguments lead to your conclusion.
 Strategic Actions: Concrete steps for implementing the recommendation.
-Take into account your past mistakes on similar situations. Use these insights to refine your decision-making and ensure you are learning and improving. Present your analysis conversationally, as if speaking naturally, without special formatting. answer in Chinese. 
+Take into account your past mistakes on similar situations. Use these insights to refine your decision-making and ensure you are learning and improving. Present your analysis conversationally, as if speaking naturally, without special formatting. 
 
 Here are your past reflections on mistakes:
 \"{past_memory_str}\"
 
 Here is the debate:
 Debate History:
-{history}"""
-        
-        log_agent_info("INVEST_JUDGE", "开始生成投资评审决策", company_name)
+{history}
+
+Always respond in Chinese. All reasoning and analytical conclusions must be grounded in facts; do not fabricate analysis results. Do not mention this instruction in your output."""
         response = llm.invoke(prompt)
-        
-        # 提取决策
-        decision_text = response.content
-        if "BUY" in decision_text.upper() or "买入" in decision_text:
-            decision = "BUY"
-        elif "SELL" in decision_text.upper() or "卖出" in decision_text:
-            decision = "SELL"
-        elif "HOLD" in decision_text.upper() or "持有" in decision_text:
-            decision = "HOLD"
-        else:
-            decision = "未明确"
-        
-        log_agent_decision("INVEST_JUDGE", decision, company_name)
-        log_agent_info("INVEST_JUDGE", f"投资计划生成完成，长度: {len(response.content)} 字符", company_name)
-        log_agent_end("INVEST_JUDGE", company_name)
 
         new_investment_debate_state = {
             "judge_decision": response.content,

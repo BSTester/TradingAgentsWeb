@@ -24,8 +24,13 @@ export class WebSocketClient {
   public onMessage?: (message: WebSocketMessage) => void;
   public onLog?: (log: LogEntry) => void;
 
+  private subprotocol: string | null = null;
+
   constructor(endpoint: string, options: WebSocketClientOptions = {}) {
-    this.url = buildWebSocketUrl(endpoint);
+    const baseUrl = buildWebSocketUrl(endpoint);
+    const token = typeof window !== 'undefined' ? getAuthToken() || localStorage.getItem('access_token') : null;
+    this.url = baseUrl;
+    this.subprotocol = token ? `jwt.${token}` : null;
     this.options = {
       reconnectAttempts: options.reconnectAttempts ?? 5,
       reconnectDelay: options.reconnectDelay ?? 1000,
@@ -41,7 +46,7 @@ export class WebSocketClient {
     this.isConnecting = true;
     
     try {
-      this.ws = new WebSocket(this.url);
+      this.ws = this.subprotocol ? new WebSocket(this.url, [this.subprotocol]) : new WebSocket(this.url);
       
       this.ws.onopen = () => {
         this.isConnecting = false;

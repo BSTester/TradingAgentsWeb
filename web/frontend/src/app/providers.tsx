@@ -3,8 +3,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useState, ReactNode } from 'react'
-import { AuthProvider } from '../hooks/useAuth'
-import { ToasterProvider } from '../components/ui/ToasterProvider'
+import { AuthProvider } from '@/lib/auth'
+import { ToasterProvider } from '@/components/ui/ToasterProvider'
 
 interface ProvidersProps {
   children: ReactNode
@@ -14,7 +14,7 @@ export function Providers({ children }: ProvidersProps) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 1 * 60 * 1000, // 1 minute
         retry: (failureCount, error: any) => {
           if (error?.response?.status === 401) {
             return false

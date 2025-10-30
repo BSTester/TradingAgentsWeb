@@ -6,25 +6,32 @@ import os
 
 class FinancialSituationMemory:
     def __init__(self, name, config):
-        base_url = config["backend_url"]
-        api_key = os.getenv("EMBEDDING_KEY", "")
-        if base_url == "http://localhost:11434/v1":
+        configured_embedding_model = config.get("embedding_llm", "text-embedding-3-small")
+        if config["backend_url"] == "http://localhost:11434/v1":
             self.embedding = "nomic-embed-text"
-        elif base_url == "https://api.openai.com/v1":
-            self.embedding = "text-embedding-3-small"
-            api_key = os.getenv("OPENAI_API_KEY")
         else:
-            self.embedding = os.getenv("EMBEDDING_LLM", "text-embedding-3-small")
-            base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-        self.client = OpenAI(base_url=base_url, api_key=api_key)
+            self.embedding = configured_embedding_model
+        embedding_base_url = config.get("embedding_backend_url", config["backend_url"])
+        embedding_api_key = config.get("embedding_api_key")
+        self.client = OpenAI(base_url=embedding_base_url, api_key=embedding_api_key)
         self.chroma_client = chromadb.Client(Settings(allow_reset=True))
+        self.collection_name = name
+        # Use get_or_create_collection to avoid "already exists" error on repeated analysis
         self.situation_collection = self.chroma_client.get_or_create_collection(name=name)
+    
+    def cleanup(self):
+        """Clean up the collection to free memory after analysis"""
+        try:
+            self.chroma_client.delete_collection(name=self.collection_name)
+        except Exception as e:
+            # Silently ignore if collection doesn't exist or other errors
+            pass
 
     def get_embedding(self, text):
         """Get OpenAI embedding for a text"""
         
         response = self.client.embeddings.create(
-            model=self.embedding, input=text
+            model=self.embedding, input=text[:8192] if self.embedding == "text-embedding-v4" else text
         )
         return response.data[0].embedding
 

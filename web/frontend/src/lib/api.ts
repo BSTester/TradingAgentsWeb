@@ -2,7 +2,7 @@
  * API client for TradingAgents backend
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { API_BASE_URL, buildApiUrl, buildWebSocketUrl } from '@/utils/api';
 
 // Get auth token from localStorage
 const getAuthToken = (): string | null => {
@@ -25,12 +25,32 @@ async function apiRequest<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const response = await fetch(buildApiUrl(endpoint), {
     ...options,
     headers,
   });
 
   if (!response.ok) {
+    // Handle unauthorized: clear auth and redirect to login
+    if (response.status === 401) {
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem('access_token');
+          // Clear cookie used by middleware
+          document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+          
+          // Only redirect to login if not on a public page
+          const publicPages = ['/', '/login', '/register', '/auth'];
+          const currentPath = window.location.pathname;
+          if (!publicPages.includes(currentPath) && !currentPath.startsWith('/analysis/')) {
+            // Redirect to login page
+            window.location.href = '/login';
+          }
+        } catch {}
+      }
+      throw new Error('无法验证凭据');
+    }
+
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(error.detail || `HTTP ${response.status}`);
   }
@@ -168,8 +188,11 @@ export class AnalysisWebSocket {
   }
 
   connect() {
-    const wsUrl = API_BASE_URL.replace('http', 'ws');
-    this.ws = new WebSocket(`${wsUrl}/ws/analysis/${this.analysisId}`);
+
+    const baseUrl = buildWebSocketUrl(`/ws/analysis/${this.analysisId}`);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    const subprotocol = token ? `jwt.${token}` : undefined;
+    this.ws = subprotocol ? new WebSocket(baseUrl, [subprotocol]) : new WebSocket(baseUrl);
 
     this.ws.onopen = () => {
       console.log('WebSocket connected');
@@ -181,6 +204,11 @@ export class AnalysisWebSocket {
     this.ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        // 过滤非当前分析的消息
+        if (data && data.analysis_id && data.analysis_id !== this.analysisId) {
+          console.log('Ignored WS message for different analysis_id:', data.analysis_id);
+          return;
+        }
         this.onMessage(data);
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error);

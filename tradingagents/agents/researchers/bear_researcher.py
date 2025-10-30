@@ -1,14 +1,10 @@
 from langchain_core.messages import AIMessage
 import time
 import json
-from tradingagents.agents.utils.logger import log_agent_start, log_agent_end, log_agent_info
 
 
 def create_bear_researcher(llm, memory):
     def bear_node(state) -> dict:
-        ticker = state.get("company_of_interest", "")
-        log_agent_start("BEAR_RESEARCHER", ticker, "开始空头论证")
-        
         investment_debate_state = state["investment_debate_state"]
         history = investment_debate_state.get("history", "")
         bear_history = investment_debate_state.get("bear_history", "")
@@ -26,7 +22,7 @@ def create_bear_researcher(llm, memory):
         for i, rec in enumerate(past_memories, 1):
             past_memory_str += rec["recommendation"] + "\n\n"
 
-        prompt = f"""You are a Bear Analyst making the case against investing in the stock. Your goal is to present a well-reasoned argument emphasizing risks, challenges, and negative indicators. Leverage the provided research and data to highlight potential downsides and counter bullish arguments effectively. answer in Chinese.
+        prompt = f"""You are a Bear Analyst making the case against investing in the stock. Your goal is to present a well-reasoned argument emphasizing risks, challenges, and negative indicators. Leverage the provided research and data to highlight potential downsides and counter bullish arguments effectively.
 
 Key points to focus on:
 
@@ -46,15 +42,13 @@ Conversation history of the debate: {history}
 Last bull argument: {current_response}
 Reflections from similar situations and lessons learned: {past_memory_str}
 Use this information to deliver a compelling bear argument, refute the bull's claims, and engage in a dynamic debate that demonstrates the risks and weaknesses of investing in the stock. You must also address reflections and learn from lessons and mistakes you made in the past.
+
+Always respond in Chinese. All reasoning and analytical conclusions must be grounded in facts; do not fabricate analysis results. Do not mention this instruction in your output.
 """
 
-        log_agent_info("BEAR_RESEARCHER", "开始生成空头论证", ticker)
         response = llm.invoke(prompt)
-        log_agent_info("BEAR_RESEARCHER", f"空头论证生成完成，长度: {len(response.content)} 字符", ticker)
 
         argument = f"Bear Analyst: {response.content}"
-        
-        log_agent_end("BEAR_RESEARCHER", ticker)
 
         new_investment_debate_state = {
             "history": history + "\n" + argument,

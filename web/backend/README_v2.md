@@ -20,8 +20,13 @@ pip install -r requirements.txt
 ```
 
 2. Initialize database:
+
+数据库会在应用启动时自动初始化，无需手动操作。
+
+如果需要添加新字段到现有数据库，运行迁移脚本：
 ```bash
-python web/init_db.py --sample-user
+cd web/backend/migrations
+python apply_migration.py
 ```
 
 3. Run the application:

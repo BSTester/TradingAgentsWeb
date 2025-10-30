@@ -1,482 +1,571 @@
 """
-AKShare新闻数据获取模块
-提供股票新闻、全球财经新闻和市场情绪数据的获取功能
+AkShare News and Sentiment Data
+Get news, insider transactions, and sentiment data
 """
-from typing import Annotated, Tuple
+
+import logging
 import pandas as pd
-from datetime import datetime
-from .akshare_common import (
-    check_akshare_availability, validate_market_support, format_symbol_for_market,
-    handle_akshare_exception, log_operation, ak
-)
+from datetime import datetime, timedelta
+from typing import Annotated
+
+from .akshare_common import _identify_market, normalize_symbol_for_hk, MARKET_PATTERNS, get_akshare
 
 
-def _get_enhanced_fallback_news(limit: int = 20) -> Tuple[pd.DataFrame, str]:
+def get_news(ticker, start_date, end_date) -> str:
     """
-    获取增强的兜底新闻数据，集成所有可用新闻源
+    Get stock news with multi-source priority:
+    1. EastMoney news
+    2. Other available sources
     
     Args:
-        limit: 限制返回的新闻条数
+        ticker: Stock symbol or search query
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format
         
     Returns:
-        Tuple[pd.DataFrame, str]: (新闻数据, 新闻源名称)
+        Formatted string with news articles
     """
-    # 扩展的新闻源列表，按优先级排序
-    news_sources = [
-        # 第一梯队：实时财经资讯
-        ("财联社电报", lambda: ak.stock_info_global_cls()),
-        ("同花顺全球资讯", lambda: ak.stock_info_global_ths()),
-        ("新浪全球资讯", lambda: ak.stock_info_global_sina()),
-        ("富途全球资讯", lambda: ak.stock_info_global_futu()),
-        
-        # 第二梯队：权威新闻源
-        ("央视新闻", lambda: ak.news_cctv()),
-        ("百度经济新闻", lambda: ak.news_economic_baidu()),
-        
-        # 第三梯队：综合资讯平台
-        ("东方财富全球资讯", lambda: ak.stock_info_global_em()),
-        ("创新层股票新闻", lambda: ak.stock_news_main_cx()),
-        
-        # 第四梯队：期货和其他财经新闻
-        ("上海金属期货新闻", lambda: ak.futures_news_shmet()),
-    ]
+    ak = get_akshare()
+    if not ak:
+        return "Error: akshare not installed"
     
-    for source_name, source_func in news_sources:
-        try:
-            log_operation(f"get_enhanced_fallback_news from {source_name}", status="ATTEMPT")
-            data = source_func()
-            if not data.empty:
-                # 确保数据格式正确，添加基本字段检查
-                if len(data.columns) > 0:  # 至少有一些列数据
-                    if len(data) > limit:
-                        data = data.head(limit)
-                    log_operation(f"get_enhanced_fallback_news from {source_name}", status="SUCCESS")
-                    return data, source_name
-        except Exception as e:
-            log_operation(f"get_enhanced_fallback_news from {source_name}", status="FAILED")
-            print(f"Warning: {source_name} news source failed: {e}")
-            continue
-    
-    # 如果所有新闻源都失败，返回空数据
-    return pd.DataFrame(), "无可用新闻源"
-
-
-def _get_fallback_news(limit: int = 20) -> Tuple[pd.DataFrame, str]:
-    """
-    向后兼容的兜底新闻函数，调用增强版本
-    """
-    return _get_enhanced_fallback_news(limit)
-
-
-def _get_stock_specific_news(symbol: str, market: str, formatted_symbol: str, limit: int = 20) -> Tuple[pd.DataFrame, str]:
-    """
-    尝试获取个股特定新闻
-    
-    Args:
-        symbol: 原始股票代码
-        market: 市场类型
-        formatted_symbol: 格式化后的股票代码
-        limit: 限制返回的新闻条数
-        
-    Returns:
-        Tuple[pd.DataFrame, str]: (新闻数据, 新闻源名称)
-    """
-    # 准备股票代码，stock_news_em接口可以处理不同市场的股票
-    if market == 'A_STOCK':
-        # A股使用纯数字代码
-        clean_symbol = formatted_symbol.replace('sz', '').replace('sh', '')
-    elif market == 'HK_STOCK':
-        # 港股使用纯数字代码，去掉.HK后缀
-        clean_symbol = formatted_symbol.replace('.HK', '').zfill(5)
-    elif market == 'US_STOCK':
-        # 美股使用原始代码
-        clean_symbol = symbol.upper()
-    else:
-        clean_symbol = symbol
-    
-    # 尝试使用stock_news_em获取个股新闻
     try:
-        log_operation(f"get_stock_specific_news for {symbol} ({market})", status="ATTEMPT")
-        print(f"Info: Trying to get news for {symbol} ({market}) using symbol: {clean_symbol}")
-        
-        # 使用更稳定的参数调用方式
-        data = ak.stock_news_em(symbol=clean_symbol)
-        
-        if not data.empty:
-            # 检查数据质量，确保有有效列
-            if len(data.columns) > 0:
-                if len(data) > limit:
-                    data = data.head(limit)
-                log_operation(f"get_stock_specific_news for {symbol}", status="SUCCESS")
-                return data, f"东方财富个股新闻({market})"
-            else:
-                print(f"Info: Empty columns in news data for {symbol}, using fallback")
+        market = _identify_market(ticker)
+
+        # Normalize symbol for AKShare news API across markets
+        if market == 'HK_STOCK':
+            symbol_for_ak = normalize_symbol_for_hk(ticker)
+        elif market == 'US_STOCK':
+            symbol_for_ak = ticker.upper()
         else:
-            print(f"Info: No specific news found for {symbol}, using fallback")
-    except Exception as e:
-        print(f"Warning: stock_news_em failed for {symbol} ({clean_symbol}): {e}")
-        # 可能是网络问题或API参数问题，尝试另一种调用方式
-        try:
-            # 对于A股，尝试使用带前缀的格式
-            if market == 'A_STOCK':
-                prefixed_symbol = formatted_symbol  # sz000001 或 sh600000
-                data = ak.stock_news_em(symbol=prefixed_symbol)
-                if not data.empty:
-                    if len(data) > limit:
-                        data = data.head(limit)
-                    log_operation(f"get_stock_specific_news for {symbol} (alternative)", status="SUCCESS")
-                    return data, f"东方财富个股新闻({market})"
-        except Exception as e2:
-            print(f"Warning: Alternative stock_news_em call also failed: {e2}")
-    
-    # 如果个股新闻获取失败，使用兜底新闻源
-    print(f"Info: Using fallback news for {symbol} ({market})")
-    log_operation(f"get_stock_specific_news for {symbol}", status="FAILED")
-    return _get_fallback_news(limit)
+            symbol_for_ak = ticker
 
+        # Unified: stock_news_em supports all markets
+        news_data = ak.stock_news_em(symbol=symbol_for_ak)
+        if not isinstance(news_data, pd.DataFrame) or news_data.empty:
+            return f"No news found for {ticker}"
 
-def get_stock_news(query, start_date, end_date) -> str:
-    """
-    获取股票相关新闻
-    
-    Args:
-        query: 查询关键词或股票代码
-        start_date: 开始日期
-        end_date: 结束日期
-        
-    Returns:
-        str: CSV格式的新闻数据
-    """
-    try:
-        check_akshare_availability()
-        
-        # 使用固定的limit值
-        limit = 20
-        
-        market_info = None
-        if query:
-            # 验证市场支持并获取市场信息
-            market, market_info = validate_market_support(query, "stock news retrieval")
-            formatted_symbol = format_symbol_for_market(query, market)
+        # Standardize columns and filter by date range if possible
+        title_col = next((c for c in ['新闻标题', 'title', '标题'] if c in news_data.columns), None)
+        content_col = next((c for c in ['新闻内容', 'content', '摘要'] if c in news_data.columns), None)
+        date_col = next((c for c in ['发布时间', 'publish_time', 'date', '时间'] if c in news_data.columns), None)
+        if date_col is not None:
+            # Try to coerce to datetime
+            news_data[date_col] = pd.to_datetime(news_data[date_col], errors='coerce')
+            sdt = pd.to_datetime(start_date, errors='coerce')
+            edt = pd.to_datetime(end_date, errors='coerce')
+            if pd.notna(sdt) and pd.notna(edt):
+                news_data = news_data[(news_data[date_col] >= sdt) & (news_data[date_col] <= edt)]
+
+        result = f"## News for {ticker} (AKShare-EastMoney)\n\n"
+        for _, row in news_data.head(10).iterrows():  # Limit to 10 recent news
+            title = row.get(title_col, row.get('title', 'No title')) if title_col else row.get('title', 'No title')
+            content = row.get(content_col, row.get('content', '')) if content_col else row.get('content', '')
+            pub_date = row.get(date_col, row.get('publish_time', '')) if date_col else row.get('publish_time', '')
+
+            result += f"### {title}\n"
+            if pub_date is not None and pub_date != '':
+                result += f"**Date:** {pub_date}\n"
+            if content:
+                result += f"{str(content)[:500]}...\n"  # Truncate long content
+            result += "\n"
+
+        return result
             
-            # 使用统一的个股新闻获取逻辑
-            data, news_source = _get_stock_specific_news(query, market, formatted_symbol, limit)
-        else:
-            # 获取全球财经新闻
-            data, news_source = _get_fallback_news(limit)
-        
-        if data.empty:
-            return f"No news found for query '{query}'" if query else "No general news found"
-        
-        # 限制新闻数量
-        if len(data) > limit:
-            data = data.head(limit)
-        
-        # 转换为CSV字符串
-        csv_string = data.to_csv(index=False)
-        
-        # 构建头部信息
-        header_lines = []
-        if query and market_info:
-            header_lines.extend([
-                f"# Stock news for {query} ({market_info['market_name']})",
-                f"# Market: {market_info['market_name']} ({market_info['currency']})",
-                f"# News source: {news_source}",
-                f"# Date range: {start_date} to {end_date}"
-            ])
-        else:
-            header_lines.extend([
-                f"# General financial news",
-                f"# News source: {news_source}",
-                f"# Date range: {start_date} to {end_date}"
-            ])
-        
-        header_lines.extend([
-            f"# Total news items: {len(data)}",
-            f"# Data provider: AKShare",
-            f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        ])
-        
-        header = '\n'.join(header_lines) + '\n\n'
-        
-        log_operation("get_stock_news", query, market if query else None, "SUCCESS")
-        return header + csv_string
-        
     except Exception as e:
-        log_operation("get_stock_news", query, 
-                     market if 'market' in locals() else None, "FAILED")
-        return handle_akshare_exception(e, "retrieving stock news", query)
+        return f"Error retrieving news for {ticker}: {str(e)}"
 
 
-def get_global_news(curr_date, look_back_days=7, limit=5) -> str:
+def get_insider_transactions(symbol) -> str:
     """
-    获取全球财经新闻
+    Get insider transaction data from AKShare
+    
+    For A-shares: Uses shareholder change data (股东持股变动)
+    For US/HK stocks: Not supported by AKShare, use Alpha Vantage or yfinance instead
     
     Args:
-        curr_date: 当前日期
-        look_back_days: 回溯天数
-        limit: 限制返回的新闻条数
+        symbol: Stock symbol
         
     Returns:
-        str: CSV格式的全球新闻数据
+        Formatted string with insider transaction data
     """
+    ak = get_akshare()
+    if not ak:
+        return "Error: akshare not installed"
+    
     try:
-        check_akshare_availability()
+        market = _identify_market(symbol)
         
-        log_operation("get_global_news", status="ATTEMPT")
+        if market == 'A_STOCK':
+            # Try to get shareholder change data (股东持股变动)
+            try:
+                df = ak.stock_shareholder_change_ths(symbol=symbol)
+                if not df.empty:
+                    result = f"## Insider Transactions for {symbol} (Shareholder Changes)\n\n"
+                    result += f"**Data Source**: 同花顺-股东持股变动\n"
+                    result += f"**Total Records**: {len(df)}\n\n"
+                    
+                    # Show recent changes (last 10)
+                    recent_df = df.head(10)
+                    
+                    result += "### Recent Shareholder Changes:\n\n"
+                    for _, row in recent_df.iterrows():
+                        date = row.get('公告日期', row.get('date', 'N/A'))
+                        holder = row.get('变动股东', row.get('shareholder', 'N/A'))
+                        change = row.get('变动数量', row.get('change_amount', 'N/A'))
+                        price = row.get('交易均价', row.get('avg_price', 'N/A'))
+                        remaining = row.get('剩余股份总数', row.get('remaining_shares', 'N/A'))
+                        method = row.get('变动途径', row.get('change_method', 'N/A'))
+                        
+                        result += f"**{date}**\n"
+                        result += f"- Shareholder: {holder}\n"
+                        result += f"- Change: {change}\n"
+                        result += f"- Avg Price: {price}\n"
+                        result += f"- Remaining Shares: {remaining}\n"
+                        if method and method != 'N/A':
+                            result += f"- Method: {method}\n"
+                        result += "\n"
+                    
+                    return result
+            except Exception as e:
+                logging.warning(f"stock_shareholder_change_ths failed: {e}")
+            
+            # Fallback: Try to get main stockholder data
+            try:
+                df = ak.stock_main_stock_holder(stock=symbol)
+                if not df.empty:
+                    result = f"## Insider Transactions for {symbol} (Main Stockholders)\n\n"
+                    result += f"**Data Source**: 新浪财经-主要股东\n"
+                    result += f"**Total Records**: {len(df)}\n\n"
+                    
+                    # Show top 10 stockholders
+                    top_df = df.head(10)
+                    
+                    result += "### Top Stockholders:\n\n"
+                    for _, row in top_df.iterrows():
+                        num = row.get('编号', row.get('number', 'N/A'))
+                        name = row.get('股东名称', row.get('name', 'N/A'))
+                        shares = row.get('持股数量', row.get('shares', 'N/A'))
+                        ratio = row.get('持股比例', row.get('ratio', 'N/A'))
+                        date = row.get('截至日期', row.get('date', 'N/A'))
+                        
+                        result += f"**{num}. {name}**\n"
+                        result += f"- Shares: {shares}\n"
+                        result += f"- Ratio: {ratio}%\n"
+                        result += f"- As of: {date}\n\n"
+                    
+                    return result
+            except Exception as e:
+                logging.warning(f"stock_main_stock_holder failed: {e}")
+            
+            return f"No insider transaction data available for {symbol}"
         
-        # 获取全球财经新闻，统一使用兜底逻辑
-        data, news_source = _get_fallback_news(limit)
+        elif market == 'US_STOCK':
+            return (
+                f"Insider transactions not supported for US stocks in AKShare.\n\n"
+                f"**Recommendation**: Use Alpha Vantage's `get_insider_transactions` function:\n"
+                f"- Provides official SEC Form 4 filings\n"
+                f"- Covers all US public companies\n"
+                f"- Real-time insider transaction data\n\n"
+                f"Alternative: Use yfinance's `insider_transactions` property."
+            )
         
-        if data.empty:
-            log_operation("get_global_news", status="FAILED")
-            return f"No global news found from any available source"
+        elif market == 'HK_STOCK':
+            return (
+                f"Insider transactions not supported for HK stocks in AKShare.\n\n"
+                f"**Recommendation**: Use yfinance or other data sources:\n"
+                f"- HKEx provides director dealings data\n"
+                f"- yfinance may have limited insider data for HK stocks\n\n"
+                f"Note: HK market has different disclosure requirements than US markets."
+            )
         
-        # 转换为CSV字符串
-        csv_string = data.to_csv(index=False)
-        
-        # 构建头部信息
-        header_lines = [
-            f"# Global financial news",
-            f"# Date range: {look_back_days} days before {curr_date} to {curr_date}",
-            f"# News source: {news_source}",
-            f"# Total news items: {len(data)}",
-            f"# Data provider: AKShare",
-            f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        ]
-        
-        header = '\n'.join(header_lines) + '\n\n'
-        
-        log_operation("get_global_news", status="SUCCESS")
-        return header + csv_string
-        
+        else:
+            return f"Insider transactions not supported for market: {MARKET_PATTERNS.get(market, {}).get('description', 'Unknown')}"
+            
     except Exception as e:
-        log_operation("get_global_news", status="FAILED")
-        return handle_akshare_exception(e, "retrieving global news")
+        return f"Error retrieving insider transactions for {symbol}: {str(e)}"
 
 
-def get_aggregated_news(
-    category: Annotated[str, "news category"] = "finance",
-    limit: Annotated[int, "number of news items to retrieve"] = 20,
-    sources: Annotated[int, "number of sources to aggregate from"] = 3
-) -> str:
+def get_global_news(curr_date, look_back_days=7, limit=10) -> str:
     """
-    获取聚合多源新闻数据
+    聚合所有可用渠道的全球财经信息（不按优先级，全部尝试获取并汇总）
     
     Args:
-        category: 新闻类别
-        limit: 每个源限制返回的新闻条数
-        sources: 聚合的源数量
+        curr_date: Current date in YYYY-MM-DD format
+        look_back_days: Number of days to look back (default: 7)
+        limit: Maximum number of news items (default: 10)
         
     Returns:
-        str: CSV格式的聚合新闻数据
+        Formatted string with global financial news
     """
-    try:
-        check_akshare_availability()
-        
-        log_operation("get_aggregated_news", status="ATTEMPT")
-        
-        # 定义所有可用的新闻源
-        all_news_sources = [
-            ("财联社电报", lambda: ak.stock_info_global_cls()),
-            ("同花顺全球资讯", lambda: ak.stock_info_global_ths()),
-            ("新浪全球资讯", lambda: ak.stock_info_global_sina()),
-            ("富途全球资讯", lambda: ak.stock_info_global_futu()),
-            ("央视新闻", lambda: ak.news_cctv()),
-            ("百度经济新闻", lambda: ak.news_economic_baidu()),
-            ("东方财富全球资讯", lambda: ak.stock_info_global_em()),
-            ("创新层股票新闻", lambda: ak.stock_news_main_cx()),
-        ]
-        
-        aggregated_data = []
-        successful_sources = []
-        
-        # 从多个源获取新闻
-        for i, (source_name, source_func) in enumerate(all_news_sources[:sources]):
-            try:
-                log_operation(f"get_aggregated_news from {source_name}", status="ATTEMPT")
-                data = source_func()
-                if not data.empty and len(data.columns) > 0:
-                    if len(data) > limit:
-                        data = data.head(limit)
-                    
-                    # 添加源标识
-                    data = data.copy()
-                    data['news_source'] = source_name
-                    aggregated_data.append(data)
-                    successful_sources.append(source_name)
-                    
-                    log_operation(f"get_aggregated_news from {source_name}", status="SUCCESS")
-                    print(f"Successfully collected {len(data)} news items from {source_name}")
-                else:
-                    print(f"No data from {source_name}")
-            except Exception as e:
-                log_operation(f"get_aggregated_news from {source_name}", status="FAILED")
-                print(f"Warning: Failed to get news from {source_name}: {e}")
-                continue
-        
-        if not aggregated_data:
-            log_operation("get_aggregated_news", status="FAILED")
-            return f"No aggregated {category} news found from any source"
-        
-        # 合并所有数据
-        try:
-            combined_data = pd.concat(aggregated_data, ignore_index=True, sort=False)
-        except Exception as e:
-            # 如果合并失败，使用第一个有效数据源
-            print(f"Warning: Failed to concat data, using first source: {e}")
-            combined_data = aggregated_data[0]
-        
-        # 转换为CSV字符串
-        csv_string = combined_data.to_csv(index=False)
-        
-        # 构建头部信息
-        header_lines = [
-            f"# Aggregated {category} news from multiple sources",
-            f"# Category: {category}",
-            f"# News sources: {', '.join(successful_sources)}",
-            f"# Total news items: {len(combined_data)}",
-            f"# Sources used: {len(successful_sources)}",
-            f"# Data provider: AKShare (Multi-source)",
-            f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        ]
-        
-        header = '\n'.join(header_lines) + '\n\n'
-        
-        log_operation("get_aggregated_news", status="SUCCESS")
-        return header + csv_string
-        
-    except Exception as e:
-        log_operation("get_aggregated_news", status="FAILED")
-        return handle_akshare_exception(e, f"retrieving aggregated news for category {category}")
-
-
-
-def get_market_sentiment() -> str:
-    """
-    获取市场情绪数据
+    ak = get_akshare()
+    if not ak:
+        return "Error: akshare not installed"
     
-    Returns:
-        str: CSV格式的市场情绪数据
-    """
     try:
-        check_akshare_availability()
+        # Convert date format for AKShare
+        curr_date_ak = curr_date.replace("-", "")
         
-        log_operation("get_market_sentiment", status="ATTEMPT")
+        # Initialize result with header
+        result = f"## Global Financial News ({curr_date})\n\n"
         
-        # 获取市场情绪相关数据
-        sentiment_data = {}
-        
-        # 尝试获取不同的市场情绪指标
+        # 1. Get Wallstreetcn Macro Calendar (华尔街见闻-日历-宏观) - Highest Priority
         try:
-            # A股市场概况
-            a_stock_spot = ak.stock_zh_a_spot_em()
-            if not a_stock_spot.empty:
-                sentiment_data['a_stock_summary'] = a_stock_spot.head(10)
-                print("Successfully retrieved A-stock market summary")
-        except Exception as e:
-            print(f"Failed to retrieve A-stock summary: {e}")
-        
-        try:
-            # 资金流向数据
-            money_flow = ak.stock_market_fund_flow()
-            if not money_flow.empty:
-                sentiment_data['money_flow'] = money_flow
-                print("Successfully retrieved money flow data")
-        except Exception as e:
-            print(f"Failed to retrieve money flow data: {e}")
-        
-        if not sentiment_data:
-            log_operation("get_market_sentiment", status="FAILED")
-            return "Error: Unable to retrieve market sentiment data from AKShare"
-        
-        # 合并所有情绪数据
-        combined_csv = ""
-        for data_type, data in sentiment_data.items():
-            combined_csv += f"\n## {data_type.upper()} ##\n"
-            combined_csv += data.to_csv(index=False)
-            combined_csv += "\n"
-        
-        # 构建头部信息
-        header_lines = [
-            f"# Market sentiment data",
-            f"# Data types: {', '.join(sentiment_data.keys())}",
-            f"# Data source: AKShare",
-            f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        ]
-        
-        header = '\n'.join(header_lines) + '\n\n'
-        
-        log_operation("get_market_sentiment", status="SUCCESS")
-        return header + combined_csv
-        
-    except Exception as e:
-        log_operation("get_market_sentiment", status="FAILED")
-        return handle_akshare_exception(e, "retrieving market sentiment")
-
-
-def get_enhanced_market_sentiment() -> str:
-    """
-    获取增强的市场情绪数据，集成多种数据源
-    
-    Returns:
-        str: CSV格式的市场情绪数据
-    """
-    try:
-        check_akshare_availability()
-        
-        log_operation("get_enhanced_market_sentiment", status="ATTEMPT")
-        
-        # 获取市场情绪相关数据
-        sentiment_data = {}
-        
-        # 尝试获取不同的市场情绪指标
-        sentiment_sources = [
-            ("A股市场概况", "a_stock_summary", lambda: ak.stock_zh_a_spot_em().head(20)),
-            ("资金流向数据", "money_flow", lambda: ak.stock_market_fund_flow()),
-            ("新闻情绪指数", "news_sentiment", lambda: ak.index_news_sentiment_scope()),
-            ("百度交易提醒-停牌", "trade_suspend", lambda: ak.news_trade_notify_suspend_baidu()),
-            ("百度交易提醒-分红", "trade_dividend", lambda: ak.news_trade_notify_dividend_baidu()),
-            ("百度报告时间", "report_time", lambda: ak.news_report_time_baidu()),
-        ]
-        
-        for desc, key, source_func in sentiment_sources:
-            try:
-                print(f"Attempting to retrieve {desc}...")
-                data = source_func()
-                if not data.empty:
-                    sentiment_data[key] = data
-                    print(f"Successfully retrieved {desc}: {len(data)} records")
+            df_macro_ws = ak.macro_info_ws(date=curr_date_ak)
+            if not df_macro_ws.empty:
+                result += "### 📊 华尔街见闻-宏观日历\n\n"
+                # Sort by importance if available
+                if '重要性' in df_macro_ws.columns:
+                    df_macro_ws_sorted = df_macro_ws.sort_values('重要性', ascending=False)
                 else:
-                    print(f"No data available for {desc}")
-            except Exception as e:
-                print(f"Failed to retrieve {desc}: {e}")
+                    df_macro_ws_sorted = df_macro_ws
+                
+                for _, row in df_macro_ws_sorted.head(limit).iterrows():
+                    time_str = row.get('时间', row.get('time', ''))
+                    region = row.get('地区', row.get('region', ''))
+                    event = row.get('事件', row.get('event', ''))
+                    importance = row.get('重要性', row.get('importance', ''))
+                    current_val = row.get('今值', row.get('current', ''))
+                    expected_val = row.get('预期', row.get('expected', ''))
+                    previous_val = row.get('前值', row.get('previous', ''))
+                    
+                    # Format importance indicator
+                    importance_indicator = ""
+                    if importance:
+                        if str(importance) == "3" or "高" in str(importance):
+                            importance_indicator = "🔴 高"
+                        elif str(importance) == "2" or "中" in str(importance):
+                            importance_indicator = "🟡 中"
+                        elif str(importance) == "1" or "低" in str(importance):
+                            importance_indicator = "🟢 低"
+                        else:
+                            importance_indicator = f"📈 {importance}"
+                    
+                    result += f"**{time_str} | {region} | {event}**"
+                    if importance_indicator:
+                        result += f" {importance_indicator}"
+                    result += "\n"
+                    
+                    if current_val or expected_val or previous_val:
+                        result += f"今值: {current_val} | 预期: {expected_val} | 前值: {previous_val}\n"
+                    result += "\n"
+                result += "---\n\n"
+        except Exception as e:
+            logging.warning(f"Failed to get Wallstreetcn macro calendar: {str(e)}")
         
-        if not sentiment_data:
-            log_operation("get_enhanced_market_sentiment", status="FAILED")
-            return "Error: Unable to retrieve any market sentiment data from AKShare"
+        # 2. Get CCTV News (新闻联播) - High Priority
+        try:
+            df_cctv = ak.news_cctv(date=curr_date_ak)
+            if not df_cctv.empty:
+                result += "### 📺 央视新闻联播\n\n"
+                for _, row in df_cctv.head(limit).iterrows():
+                    title = row.get('title', 'No title')
+                    content = row.get('content', '')
+                    date = row.get('date', curr_date_ak)
+                    
+                    result += f"**{title}**\n"
+                    result += f"*日期: {date}*\n"
+                    if content:
+                        result += f"{content[:500]}...\n" if len(content) > 500 else f"{content}\n"
+                    result += "\n"
+                result += "---\n\n"
+        except Exception as e:
+            logging.warning(f"Failed to get CCTV news: {str(e)}")
         
-        # 合并所有情绪数据
-        combined_csv = ""
-        for data_type, data in sentiment_data.items():
-            combined_csv += f"\n## {data_type.upper()} ##\n"
-            combined_csv += data.to_csv(index=False)
-            combined_csv += "\n"
+        # 3. Get Economic News from Baidu (百度财经新闻)
+        try:
+            df_baidu_econ = ak.news_economic_baidu()
+            if not df_baidu_econ.empty:
+                result += "### 📰 百度财经新闻\n\n"
+                for _, row in df_baidu_econ.head(limit).iterrows():
+                    title = row.get('新闻标题', row.get('title', 'No title'))
+                    content = row.get('新闻内容', row.get('content', ''))
+                    pub_time = row.get('发布时间', row.get('publish_time', ''))
+                    
+                    result += f"**{title}**\n"
+                    if pub_time:
+                        result += f"*时间: {pub_time}*\n"
+                    if content:
+                        result += f"{content[:300]}...\n" if len(content) > 300 else f"{content}\n"
+                    result += "\n"
+                result += "---\n\n"
+        except Exception as e:
+            logging.warning(f"Failed to get Baidu economic news: {str(e)}")
         
-        # 构建头部信息
-        header_lines = [
-            f"# Enhanced market sentiment data",
-            f"# Data types: {', '.join(sentiment_data.keys())}",
-            f"# Total data sources: {len(sentiment_data)}",
-            f"# Data source: AKShare (Multi-source sentiment analysis)",
-            f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        ]
+        # 4. Get EastMoney Stock News (东方财富股票新闻)
+        try:
+            df_em_stock = ak.stock_news_em()
+            if not df_em_stock.empty:
+                result += "### 📈 东方财富股票新闻\n\n"
+                for _, row in df_em_stock.head(limit).iterrows():
+                    title = row.get('新闻标题', row.get('title', 'No title'))
+                    content = row.get('新闻内容', row.get('content', ''))
+                    pub_time = row.get('发布时间', row.get('publish_time', ''))
+                    
+                    result += f"**{title}**\n"
+                    if pub_time:
+                        result += f"*时间: {pub_time}*\n"
+                    if content:
+                        result += f"{content[:300]}...\n" if len(content) > 300 else f"{content}\n"
+                    result += "\n"
+                result += "---\n\n"
+        except Exception as e:
+            logging.warning(f"Failed to get EastMoney stock news: {str(e)}")
         
-        header = '\n'.join(header_lines) + '\n\n'
+        # 5. Get EastMoney Financial News (东方财富财经新闻 - 财经早知道)
+        try:
+            df_cjzc = ak.stock_info_cjzc_em()
+            if not df_cjzc.empty:
+                result += "### 💼 东方财富-财经早知道\n\n"
+                for _, row in df_cjzc.head(limit).iterrows():
+                    # Try different column names
+                    title = row.get('标题', row.get('title', row.get('新闻标题', 'No title')))
+                    content = row.get('内容', row.get('content', row.get('新闻内容', '')))
+                    pub_time = row.get('时间', row.get('发布时间', row.get('publish_time', '')))
+                    
+                    result += f"**{title}**\n"
+                    if pub_time:
+                        result += f"*时间: {pub_time}*\n"
+                    if content:
+                        result += f"{str(content)[:300]}...\n" if len(str(content)) > 300 else f"{content}\n"
+                    result += "\n"
+                result += "---\n\n"
+        except Exception as e:
+            logging.warning(f"Failed to get EastMoney CJZC news: {str(e)}")
         
-        log_operation("get_enhanced_market_sentiment", status="SUCCESS")
-        return header + combined_csv
+        # 6. Get EastMoney Global News (东方财富全球财经新闻)
+        try:
+            df_global_em = ak.stock_info_global_em()
+            if not df_global_em.empty:
+                result += "### 🌍 东方财富-全球财经\n\n"
+                for _, row in df_global_em.head(limit).iterrows():
+                    title = row.get('标题', row.get('title', row.get('新闻标题', 'No title')))
+                    content = row.get('内容', row.get('content', row.get('摘要', '')))
+                    pub_time = row.get('时间', row.get('发布时间', row.get('publish_time', '')))
+                    
+                    result += f"**{title}**\n"
+                    if pub_time:
+                        result += f"*时间: {pub_time}*\n"
+                    if content:
+                        result += f"{str(content)[:300]}...\n" if len(str(content)) > 300 else f"{content}\n"
+                    result += "\n"
+                result += "---\n\n"
+        except Exception as e:
+            logging.warning(f"Failed to get EastMoney global news: {str(e)}")
         
+        # 7. Get Futu Global News (富途全球新闻)
+        try:
+            df_futu = ak.stock_info_global_futu()
+            if not df_futu.empty:
+                result += "### 🐂 富途-全球资讯\n\n"
+                for _, row in df_futu.head(limit).iterrows():
+                    # Futu may have different column structure
+                    cols = list(df_futu.columns)
+                    title_col = next((c for c in ['标题', 'title', '新闻标题', 'name'] if c in cols), None)
+                    content_col = next((c for c in ['内容', 'summary', '新闻内容', '摘录', '简介', 'desc'] if c in cols), None)
+                    date_col = next((c for c in ['时间', '发布时间', 'publish_time', 'date'] if c in cols), None)
+                    
+                    title = row.get(title_col, 'No title') if title_col else 'No title'
+                    content = row.get(content_col, '') if content_col else ''
+                    pub_time = row.get(date_col, '') if date_col else ''
+                    
+                    result += f"**{title}**\n"
+                    if pub_time:
+                        result += f"*时间: {pub_time}*\n"
+                    if content:
+                        result += f"{str(content)[:300]}...\n" if len(str(content)) > 300 else f"{content}\n"
+                    result += "\n"
+                result += "---\n\n"
+        except Exception as e:
+            logging.warning(f"Failed to get Futu global news: {str(e)}")
+        
+        # 8. Get CLS Global News (财联社全球新闻)
+        try:
+            df_cls = ak.stock_info_global_cls(symbol="全部")
+            if not df_cls.empty:
+                result += "### 📡 财联社-全球资讯\n\n"
+                for _, row in df_cls.head(limit).iterrows():
+                    cols = list(df_cls.columns)
+                    title_col = next((c for c in ['标题', 'title', '新闻标题'] if c in cols), None)
+                    content_col = next((c for c in ['内容', 'content', '新闻内容', '摘要'] if c in cols), None)
+                    date_col = next((c for c in ['时间', '发布时间', 'publish_time', 'date'] if c in cols), None)
+                    
+                    title = row.get(title_col, 'No title') if title_col else 'No title'
+                    content = row.get(content_col, '') if content_col else ''
+                    pub_time = row.get(date_col, '') if date_col else ''
+                    
+                    result += f"**{title}**\n"
+                    if pub_time:
+                        result += f"*时间: {pub_time}*\n"
+                    if content:
+                        result += f"{str(content)[:300]}...\n" if len(str(content)) > 300 else f"{content}\n"
+                    result += "\n"
+                result += "---\n\n"
+        except Exception as e:
+            logging.warning(f"Failed to get CLS global news: {str(e)}")
+        
+        # Try to get news from previous days if look_back_days > 0
+        if look_back_days > 0:
+            curr_date_dt = datetime.strptime(curr_date, "%Y-%m-%d")
+            
+            for i in range(1, min(look_back_days + 1, 4)):  # Limit to 3 previous days
+                try:
+                    prev_date = curr_date_dt - timedelta(days=i)
+                    prev_date_ak = prev_date.strftime("%Y%m%d")
+                    
+                    # Try to get macro calendar for previous days
+                    try:
+                        df_prev_macro = ak.macro_info_ws(date=prev_date_ak)
+                        if not df_prev_macro.empty:
+                            # Add only the most important event from previous days
+                            if '重要性' in df_prev_macro.columns:
+                                top_event = df_prev_macro.sort_values('重要性', ascending=False).iloc[0]
+                            else:
+                                top_event = df_prev_macro.iloc[0]
+                            
+                            result += f"### 📊 华尔街见闻-宏观日历 ({prev_date.strftime('%Y-%m-%d')})\n\n"
+                            event_name = top_event.get('事件', top_event.get('event', 'No event'))
+                            region = top_event.get('地区', top_event.get('region', ''))
+                            result += f"**{region} | {event_name}**\n"
+                            
+                            current_val = top_event.get('今值', top_event.get('current', ''))
+                            expected_val = top_event.get('预期', top_event.get('expected', ''))
+                            previous_val = top_event.get('前值', top_event.get('previous', ''))
+                            if current_val or expected_val or previous_val:
+                                result += f"今值: {current_val} | 预期: {expected_val} | 前值: {previous_val}\n"
+                            result += "\n"
+                    except Exception as e:
+                        logging.warning(f"Failed to get macro calendar for {prev_date_ak}: {str(e)}")
+                    
+                    # Also get CCTV news for previous days
+                    df_prev_cctv = ak.news_cctv(date=prev_date_ak)
+                    if not df_prev_cctv.empty:
+                        # Add only the top story from previous days
+                        top_story = df_prev_cctv.iloc[0]
+                        result += f"### 📺 央视新闻联播 ({prev_date.strftime('%Y-%m-%d')})\n\n"
+                        result += f"**{top_story.get('title', 'No title')}**\n"
+                        content = top_story.get('content', '')
+                        if content:
+                            result += f"{content[:300]}...\n" if len(content) > 300 else f"{content}\n"
+                        result += "\n"
+                except Exception as e:
+                    logging.warning(f"Failed to get news for {prev_date_ak}: {str(e)}")
+                    continue
+        
+        # Summary section
+        result += "### 📋 数据源总结\n\n"
+        result += "本次获取的全球新闻数据包含以下来源：\n"
+        result += "- 📊 华尔街见闻宏观日历\n"
+        result += "- 📺 央视新闻联播\n"
+        result += "- 📰 百度财经新闻\n"
+        result += "- 📈 东方财富股票新闻\n"
+        result += "- 💼 东方财富财经早知道\n"
+        result += "- 🌍 东方财富全球财经\n"
+        result += "- 🐂 富途全球资讯\n"
+        result += "- 📡 财联社全球资讯\n"
+        
+        return result if len(result) > 50 else f"No global news data available for the specified period"
+            
     except Exception as e:
-        log_operation("get_enhanced_market_sentiment", status="FAILED")
-        return handle_akshare_exception(e, "retrieving enhanced market sentiment")
+        return f"Error fetching global news: {str(e)}"
+
+
+def get_insider_sentiment(ticker, curr_date) -> str:
+    """
+    Get insider sentiment analysis using AKShare (approximated through various indicators)
+    
+    For A-shares: Uses fund flow, dragon-tiger list, and other market indicators
+    For US/HK stocks: Not supported by AKShare
+    
+    Args:
+        ticker: Stock symbol
+        curr_date: Current date in YYYY-MM-DD format
+        
+    Returns:
+        Formatted string with insider sentiment analysis
+    """
+    ak = get_akshare()
+    if not ak:
+        return "Error: akshare not installed"
+    
+    try:
+        market = _identify_market(ticker)
+        
+        if market == 'A_STOCK':
+            sentiment_data = {}
+            
+            # 1. Get insider transactions (high-level executives buying/selling)
+            try:
+                feature_df = ak.stock_individual_fund_flow(symbol=ticker)
+                if not feature_df.empty:
+                    insider_cols = [col for col in feature_df.columns if '高管' in col or '内部' in col]
+                    if insider_cols:
+                        recent_insider = feature_df[insider_cols].tail(5).sum().sum()
+                        sentiment_data['insider_transactions'] = recent_insider
+            except:
+                sentiment_data['insider_transactions'] = "N/A"
+            
+            # 2. Get fund flow data (institutional sentiment)
+            try:
+                fund_flow_df = ak.stock_individual_fund_flow_rank()
+                if not fund_flow_df.empty:
+                    symbol_flow = fund_flow_df[fund_flow_df['代码'] == ticker]
+                    if not symbol_flow.empty:
+                        sentiment_data['main_fund_flow'] = symbol_flow.iloc[0]['主力净流入-净额']
+                        sentiment_data['main_fund_flow_pct'] = symbol_flow.iloc[0]['主力净流入-净占比']
+            except:
+                sentiment_data['main_fund_flow'] = "N/A"
+                sentiment_data['main_fund_flow_pct'] = "N/A"
+            
+            # 3. Get dragon-tiger list data (hot money sentiment)
+            try:
+                curr_date_ak = curr_date.replace("-", "")
+                lhb_df = ak.stock_lhb_detail_em(curr_date_ak)
+                if not lhb_df.empty:
+                    symbol_lhb = lhb_df[lhb_df['代码'] == ticker]
+                    if not symbol_lhb.empty:
+                        sentiment_data['lhb_buy_amount'] = symbol_lhb['买入金额'].sum()
+                        sentiment_data['lhb_sell_amount'] = symbol_lhb['卖出金额'].sum()
+                        sentiment_data['lhb_net_amount'] = sentiment_data['lhb_buy_amount'] - sentiment_data['lhb_sell_amount']
+            except:
+                sentiment_data['lhb_buy_amount'] = "N/A"
+                sentiment_data['lhb_sell_amount'] = "N/A"
+                sentiment_data['lhb_net_amount'] = "N/A"
+            
+            # Format the sentiment analysis
+            result = f"## Insider Sentiment Analysis for {ticker} ({curr_date})\n\n"
+            result += f"**Data Source**: AKShare - A股市场数据\n\n"
+            result += f"**Insider Transactions:** {sentiment_data.get('insider_transactions', 'N/A')}\n"
+            result += f"**Main Fund Net Flow:** {sentiment_data.get('main_fund_flow', 'N/A')}\n"
+            result += f"**Main Fund Flow Percentage:** {sentiment_data.get('main_fund_flow_pct', 'N/A')}\n"
+            result += f"**Dragon-Tiger List Buy Amount:** {sentiment_data.get('lhb_buy_amount', 'N/A')}\n"
+            result += f"**Dragon-Tiger List Sell Amount:** {sentiment_data.get('lhb_sell_amount', 'N/A')}\n"
+            result += f"**Dragon-Tiger List Net Amount:** {sentiment_data.get('lhb_net_amount', 'N/A')}\n"
+            
+            return result
+        
+        elif market == 'US_STOCK':
+            return (
+                f"Insider sentiment analysis not supported for US stocks in AKShare.\n\n"
+                f"**Recommendation**: Use Alpha Vantage's NEWS_SENTIMENT API:\n"
+                f"- Provides sentiment scores from news articles\n"
+                f"- Includes insider transaction sentiment\n"
+                f"- Real-time sentiment analysis\n\n"
+                f"Alternative: Use social media sentiment tools or financial news APIs."
+            )
+        
+        elif market == 'HK_STOCK':
+            return (
+                f"Insider sentiment analysis not supported for HK stocks in AKShare.\n\n"
+                f"**Recommendation**: Use alternative data sources:\n"
+                f"- Financial news sentiment APIs\n"
+                f"- Social media sentiment analysis\n"
+                f"- Market microstructure indicators\n\n"
+                f"Note: HK market sentiment data is less readily available than US markets."
+            )
+        
+        else:
+            return f"Insider sentiment analysis not supported for market: {MARKET_PATTERNS.get(market, {}).get('description', 'Unknown')}"
+            
+    except Exception as e:
+        return f"Error analyzing insider sentiment for {ticker}: {str(e)}"

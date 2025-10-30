@@ -84,7 +84,7 @@ export function useAnalysisFormState() {
     llmProvider: 'openai',
     shallowThinker: 'gpt-4o-mini',
     deepThinker: 'gpt-4o',
-    backendUrl: 'http://localhost:8000',
+    backendUrl: (typeof window !== 'undefined' ? window.location.origin : ''),
   });
 
   const updateFormField = <K extends keyof typeof formState>(

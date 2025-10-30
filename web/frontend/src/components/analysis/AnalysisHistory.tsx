@@ -1,7 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { buildApiUrl, API_ENDPOINTS } from '../../utils/api';
+import { logger } from '@/utils/logger';
+import { useDeleteAnalysis } from '@/hooks/useDeleteAnalysis';
+import { queryKeys } from '@/lib/react-query';
 
 
 interface AnalysisHistoryProps {
@@ -14,30 +18,79 @@ interface AnalysisHistoryProps {
 interface AnalysisRecord {
   id: string;
   ticker: string;
+  company_name?: string;
+  market?: string;
   analysis_date: string;
   status: string;
   progress_percentage: number;
   created_at: string;
   updated_at: string;
   completed_at?: string;
+  is_public: boolean;
   summary?: {
     recommendation?: string;
   };
 }
 
+interface AnalysisListResponse {
+  analyses: AnalysisRecord[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress, onShowToast }: AnalysisHistoryProps) {
-  const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [deleting, setDeleting] = useState<string | null>(null);
   const limit = 10; // 每页显示10条
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; analysisId: string; ticker: string }>({
     show: false,
     analysisId: '',
     ticker: ''
   });
+
+  // 使用删除 mutation
+  const deleteMutation = useDeleteAnalysis();
+
+  // 使用 useQuery 获取分析历史
+  const { data, isLoading, isError, error } = useQuery<AnalysisListResponse>({
+    queryKey: queryKeys.analysis.list({ page, limit }),
+    queryFn: async () => {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        throw new Error('请先登录');
+      }
+
+      const response = await fetch(buildApiUrl(`${API_ENDPOINTS.ANALYSIS.LIST}?page=${page}&limit=${limit}`), {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        cache: 'no-store' // 禁用浏览器缓存
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('登录已过期，请重新登录');
+        }
+        throw new Error('获取分析历史失败');
+      }
+
+      const result = await response.json();
+      logger.log('📋 Fetched analyses:', result);
+      return result;
+    },
+    staleTime: 0, // 历史记录列表不缓存，确保删除后立即刷新
+    gcTime: 0, // 不保留缓存
+    retry: 10, // 最多重试10次
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // 指数退避，最多10秒
+  });
+
+  const analyses = data?.analyses || [];
+  const total = data?.total || 0;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
 
   const handleDeleteClick = (analysisId: string, ticker: string) => {
     setDeleteConfirm({ show: true, analysisId, ticker });
@@ -46,76 +99,28 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
   const handleDeleteConfirm = async () => {
     const analysisId = deleteConfirm.analysisId;
     setDeleteConfirm({ show: false, analysisId: '', ticker: '' });
-    setDeleting(analysisId);
-    try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(buildApiUrl(`/api/analysis/${analysisId}`), {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || '删除失败');
+    try {
+      await deleteMutation.mutateAsync(analysisId);
+
+      // 如果当前页删除后为空且页码>1，则回退到上一页
+      if (analyses.length === 1 && page > 1) {
+        setPage(p => p - 1);
       }
 
-      // 从列表中移除已删除的分析
-      setAnalyses(prev => prev.filter(a => a.id !== analysisId));
       onShowToast('分析已删除', 'success');
     } catch (error) {
-      console.error('Delete error:', error);
+      logger.error('Delete error:', error);
       onShowToast(error instanceof Error ? error.message : '删除失败', 'error');
-    } finally {
-      setDeleting(null);
     }
   };
 
+  // 处理错误提示
   useEffect(() => {
-    // 获取分析历史
-    const fetchHistory = async () => {
-      try {
-        const token = localStorage.getItem('access_token');
-        if (!token) {
-          onShowToast('请先登录', 'error');
-          setLoading(false);
-          return;
-        }
-
-        const response = await fetch(buildApiUrl(`${API_ENDPOINTS.ANALYSIS.LIST}?page=${page}&limit=${limit}`), {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            onShowToast('登录已过期，请重新登录', 'error');
-            // 可以在这里触发登出逻辑
-          } else {
-            throw new Error('获取分析历史失败');
-          }
-          return;
-        }
-
-        const data = await response.json();
-        console.log('📋 Fetched analyses:', data);
-        
-        setAnalyses(data.analyses || []);
-        setTotal(data.total || 0);
-        setTotalPages(Math.ceil((data.total || 0) / limit));
-      } catch (error) {
-        console.error('Error fetching history:', error);
-        onShowToast('获取分析历史失败', 'error');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchHistory();
-  }, [page, onShowToast]);
+    if (isError && error) {
+      onShowToast(error instanceof Error ? error.message : '获取分析历史失败', 'error');
+    }
+  }, [isError, error, onShowToast]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -154,37 +159,53 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
   };
 
   const getRecommendationColor = (recommendation?: string) => {
-    switch (recommendation) {
+    const rec = recommendation?.trim().toLowerCase();
+    switch (rec) {
       case '买入':
-        return 'text-green-600 bg-green-50';
+      case 'buy':
+        return 'text-white bg-gradient-to-br from-green-500 to-green-600 shadow-md';
       case '持有':
-        return 'text-blue-600 bg-blue-50';
+      case '观望':
+      case 'hold':
+        return 'text-white bg-gradient-to-br from-yellow-500 to-yellow-600 shadow-md';
       case '卖出':
-        return 'text-red-600 bg-red-50';
+      case 'sell':
+        return 'text-white bg-gradient-to-br from-red-500 to-red-600 shadow-md';
       default:
-        return 'text-gray-600 bg-gray-50';
+        return 'text-white bg-gradient-to-br from-yellow-500 to-yellow-600 shadow-md';
     }
   };
 
   const getRecommendationIcon = (recommendation?: string) => {
-    switch (recommendation) {
+    const rec = recommendation?.trim().toLowerCase();
+    switch (rec) {
       case '买入':
+      case 'buy':
         return 'fa-arrow-up';
       case '持有':
+      case '观望':
+      case 'hold':
         return 'fa-minus';
       case '卖出':
+      case 'sell':
         return 'fa-arrow-down';
       default:
         return 'fa-question';
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow-lg p-6">
+      <div className="bg-white rounded-lg shadow-lg p-12">
         <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4" />
-          <p className="text-gray-600">正在加载分析历史...</p>
+          <div className="relative inline-block mb-4">
+            {/* 外圈旋转 */}
+            <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+            {/* 内圈反向旋转 */}
+            <div className="absolute top-2 left-2 w-16 h-16 border-4 border-purple-200 border-b-purple-600 rounded-full animate-spin-reverse"></div>
+          </div>
+          <p className="text-gray-700 font-medium text-lg">正在加载分析历史...</p>
+          <p className="text-sm text-gray-500 mt-2">正在获取您的分析记录</p>
         </div>
       </div>
     );
@@ -223,27 +244,48 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
         ) : (
           <div className="space-y-3">
             {analyses.map((analysis) => (
-              <div 
-                key={analysis.id} 
-                className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow duration-200 bg-white"
+              <div
+                key={analysis.id}
+                className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow duration-200 bg-white relative overflow-hidden"
               >
+                {/* 右上角公开标记 - 三角形角标 */}
+                {analysis.is_public && (
+                  <div className="absolute top-0 right-0 w-0 h-0 border-t-[40px] border-t-blue-500 border-l-[40px] border-l-transparent">
+                    <i className="fas fa-globe absolute -top-[32px] right-[4px] text-white text-xs" title="公开" />
+                  </div>
+                )}
+
                 {/* 五列布局：股票代码 | 投资建议 | 分析日期 | 创建时间 | 操作按钮 */}
                 <div className="flex items-center gap-4">
-                  {/* 第1列：股票代码 - 自动平分 */}
-                  <div className="flex items-center justify-center space-x-2 flex-1 text-sm">
-                    <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">
+                  {/* 第1列：股票代码 - 左对齐 */}
+                  <div className="flex items-center justify-start space-x-2 flex-1 text-sm">
+                    <div className={`text-white w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-md ${analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
+                      ? 'bg-gradient-to-br from-green-500 to-green-600'
+                      : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
+                        ? 'bg-gradient-to-br from-red-500 to-red-600'
+                        : analysis.summary?.recommendation
+                          ? 'bg-gradient-to-br from-yellow-500 to-yellow-600'
+                          : 'bg-gradient-to-br from-gray-500 to-gray-600'
+                      }`}>
                       {analysis.ticker.substring(0, 2)}
                     </div>
                     <div className="flex flex-col">
                       <h4 className="text-sm font-bold text-gray-900">
-                        {analysis.ticker}
+                        {analysis.ticker}{analysis.company_name && ` (${analysis.company_name})`}
                       </h4>
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getStatusColor(analysis.status)} text-center`}>
-                        {getStatusLabel(analysis.status)}
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        {analysis.market && (
+                          <span className="text-xs text-gray-500">
+                            {analysis.market === 'US' ? '美股' : analysis.market === 'HK' ? '港股' : 'A股'}
+                          </span>
+                        )}
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getStatusColor(analysis.status)} text-center`}>
+                          {getStatusLabel(analysis.status)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  
+
                   {/* 第2列：投资建议 - 自动平分 */}
                   <div className="flex items-center justify-center flex-1 text-sm">
                     {analysis.summary && analysis.status === 'completed' && (
@@ -259,35 +301,82 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                       </div>
                     )}
                   </div>
-                  
-                  {/* 第3列：分析日期 - 自动平分 */}
+
+                  {/* 第3列：分析日期 - 上下排列 */}
                   <div className="flex items-center justify-center text-sm flex-1">
-                    <i className="far fa-calendar mr-1.5 text-blue-500 text-sm" />
-                    <span className="text-gray-600 mr-1.5">分析日期:</span>
-                    <span className="font-medium text-gray-900">{analysis.analysis_date}</span>
+                    <i className={`far fa-calendar mr-1.5 text-xs ${analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
+                      ? 'text-green-500'
+                      : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
+                        ? 'text-red-500'
+                        : analysis.summary?.recommendation
+                          ? 'text-yellow-500'
+                          : 'text-gray-500'
+                      }`} />
+                    <div className="flex flex-col">
+                      <span className="text-xs text-gray-500">分析日期</span>
+                      <span className="text-xs font-medium text-gray-900">{analysis.analysis_date}</span>
+                    </div>
                   </div>
-                  
-                  {/* 第4列：创建时间 - 自动平分 */}
+
+                  {/* 第4列：创建时间 - 上下排列 */}
                   <div className="flex items-center justify-center text-sm flex-1">
-                    <i className="far fa-clock mr-1.5 text-green-500 text-sm" />
-                    <span className="text-gray-600 mr-1.5">创建时间:</span>
-                    <span className="font-medium text-gray-900">{new Date(analysis.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                    <i className={`far fa-clock mr-1.5 text-xs ${analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
+                      ? 'text-green-500'
+                      : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
+                        ? 'text-red-500'
+                        : analysis.summary?.recommendation
+                          ? 'text-yellow-500'
+                          : 'text-gray-500'
+                      }`} />
+                    <div className="flex flex-col">
+                      <span className="text-xs text-gray-500">创建时间</span>
+                      <span className="text-xs font-medium text-gray-900">{new Date(analysis.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
                   </div>
-                  
-                  {/* 第5列：操作按钮 - 自动平分 */}
+
+                  {/* 第5列：完成时间 - 上下排列 */}
+                  <div className="flex items-center justify-center text-sm flex-1">
+                    {analysis.completed_at ? (
+                      <>
+                        <i className={`fas fa-check-circle mr-1.5 text-xs ${analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
+                          ? 'text-green-500'
+                          : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
+                            ? 'text-red-500'
+                            : analysis.summary?.recommendation
+                              ? 'text-yellow-500'
+                              : 'text-gray-500'
+                          }`} />
+                        <div className="flex flex-col">
+                          <span className="text-xs text-gray-500">完成时间</span>
+                          <span className="text-xs font-medium text-gray-900">{new Date(analysis.completed_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-xs text-gray-400">-</span>
+                    )}
+                  </div>
+
+                  {/* 第6列：操作按钮 - 自动平分 */}
                   <div className="flex items-center justify-center space-x-2 flex-1">
                     {analysis.status === 'completed' && (
                       <button
                         onClick={() => onViewResults(analysis.id)}
-                        className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors flex items-center"
+                        className={`px-3 py-1.5 text-white rounded-md text-sm font-medium transition-colors flex items-center shadow-md ${analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
+                          ? 'bg-green-600 hover:bg-green-700'
+                          : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
+                            ? 'bg-red-600 hover:bg-red-700'
+                            : analysis.summary?.recommendation
+                              ? 'bg-yellow-600 hover:bg-yellow-700'
+                              : 'bg-gray-600 hover:bg-gray-700'
+                          }`}
                       >
                         <i className="fas fa-chart-line mr-1.5 text-sm" />
                         查看详情
                       </button>
                     )}
-                    
+
                     {analysis.status === 'running' && (
-                      <button 
+                      <button
                         onClick={() => onViewProgress(analysis.id)}
                         className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors flex items-center"
                       >
@@ -295,13 +384,13 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                         查看进度
                       </button>
                     )}
-                    
-                    <button 
+
+                    <button
                       onClick={() => handleDeleteClick(analysis.id, analysis.ticker)}
-                      disabled={analysis.status === 'running' || analysis.status === 'initializing' || deleting === analysis.id}
+                      disabled={analysis.status === 'running' || analysis.status === 'initializing' || deleteMutation.isPending}
                       className="px-2 py-1.5 text-red-600 hover:bg-red-50 rounded-md text-sm font-medium transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {deleting === analysis.id ? (
+                      {deleteMutation.isPending ? (
                         <>
                           <i className="fas fa-spinner fa-spin mr-1.5 text-sm" />
                           删除中
@@ -329,7 +418,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
             <div className="text-sm text-gray-600">
               显示第 {(page - 1) * limit + 1} - {Math.min(page * limit, total)} 条，共 {total} 条记录
             </div>
-            
+
             {/* 右侧：分页按钮 */}
             <div className="flex items-center space-x-2">
               {/* 上一页 */}
@@ -341,7 +430,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                 <i className="fas fa-chevron-left mr-1" />
                 上一页
               </button>
-              
+
               {/* 页码 */}
               <div className="flex items-center space-x-1">
                 {/* 第一页 */}
@@ -356,7 +445,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                     {page > 4 && <span className="px-2 text-gray-500">...</span>}
                   </>
                 )}
-                
+
                 {/* 当前页附近的页码 */}
                 {Array.from({ length: totalPages }, (_, i) => i + 1)
                   .filter(p => p >= page - 2 && p <= page + 2)
@@ -364,16 +453,15 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                     <button
                       key={p}
                       onClick={() => setPage(p)}
-                      className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                        p === page
-                          ? 'bg-blue-600 text-white'
-                          : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
-                      }`}
+                      className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${p === page
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                        }`}
                     >
                       {p}
                     </button>
                   ))}
-                
+
                 {/* 最后一页 */}
                 {page < totalPages - 2 && (
                   <>
@@ -387,7 +475,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                   </>
                 )}
               </div>
-              
+
               {/* 下一页 */}
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
@@ -414,7 +502,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
               新建分析
             </button>
           </div>
-          
+
           {/* 免责声明 */}
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
             <div className="flex items-start">
@@ -446,7 +534,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                   <p className="text-sm text-gray-600">此操作无法撤销</p>
                 </div>
               </div>
-              
+
               <div className="mb-6">
                 <p className="text-gray-700">
                   确定要删除 <span className="font-bold text-gray-900">{deleteConfirm.ticker}</span> 的分析记录吗？

@@ -11,6 +11,10 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+# 更换为国内镜像源（阿里云）
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+    sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
+
 # 安装系统依赖
 RUN apt-get update && apt-get install -y \
     gcc \
@@ -46,4 +50,4 @@ RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 EXPOSE 8000
 
 # 默认启动后端服务
-CMD ["python", "web/backend/app_v2.py"]
+CMD ["python", "web/backend/app.py"]

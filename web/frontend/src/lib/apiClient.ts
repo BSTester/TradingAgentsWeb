@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { API_BASE_URL } from '@/utils/api';
+
+
 
 // Create axios instance
 export const apiClient = axios.create({
@@ -62,39 +64,57 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Auth API (使用公共客户端，不需要认证)
+
+
+/**
+ * Auth API（公共客户端，不需要认证）
+ * 后端已强制校验验证码：/api/auth/login 和 /api/auth/register
+ */
 export const authAPI = {
-  login: async (username: string, password: string) => {
+  getCaptcha: async () => {
+    const res = await publicApiClient.post('/api/auth/captcha/new', {});
+    // seed 方案：后端只返回 seed，前端据此派生并绘制验证码
+    return res.data as { captcha_id: string; seed: string };
+  },
+
+  login: async (username: string, password: string, captcha?: { id: string; answer: string }) => {
     try {
-      const response = await publicApiClient.post('/api/auth/login', {
-        username,
-        password,
-      });
+      const payload: any = { username, password };
+      if (captcha?.id && captcha?.answer) {
+        payload.captcha_id = captcha.id;
+        payload.captcha_answer = captcha.answer;
+      }
+      const response = await publicApiClient.post('/api/auth/login', payload);
       return response.data;
     } catch (error: any) {
-      // 提取详细错误信息
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          '登录失败，请稍后重试';
+      let errorMessage = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         error.message || 
+                         '登录失败，请稍后重试';
+      if (typeof errorMessage === 'string' && /Invalid or expired captcha/i.test(errorMessage)) {
+        errorMessage = '验证码无效或已过期';
+      }
       throw new Error(errorMessage);
     }
   },
 
-  register: async (username: string, email: string, password: string) => {
+  register: async (username: string, email: string, password: string, captcha?: { id: string; answer: string }) => {
     try {
-      const response = await publicApiClient.post('/api/auth/register', {
-        username,
-        email,
-        password,
-      });
+      const payload: any = { username, email, password };
+      if (captcha?.id && captcha?.answer) {
+        payload.captcha_id = captcha.id;
+        payload.captcha_answer = captcha.answer;
+      }
+      const response = await publicApiClient.post('/api/auth/register', payload);
       return response.data;
     } catch (error: any) {
-      // 提取详细错误信息
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          '注册失败，请稍后重试';
+      let errorMessage = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         error.message || 
+                         '注册失败，请稍后重试';
+      if (typeof errorMessage === 'string' && /Invalid or expired captcha/i.test(errorMessage)) {
+        errorMessage = '验证码无效或已过期';
+      }
       throw new Error(errorMessage);
     }
   },

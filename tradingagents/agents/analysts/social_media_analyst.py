@@ -3,7 +3,6 @@ import time
 import json
 from tradingagents.agents.utils.agent_utils import get_news
 from tradingagents.dataflows.config import get_config
-from tradingagents.agents.utils.logger import log_agent_start, log_agent_end, log_agent_info, log_agent_tool
 
 
 def create_social_media_analyst(llm):
@@ -11,8 +10,6 @@ def create_social_media_analyst(llm):
         current_date = state["trade_date"]
         ticker = state["company_of_interest"]
         company_name = state["company_of_interest"]
-        
-        log_agent_start("SOCIAL_ANALYST", ticker, f"分析日期: {current_date}")
 
         tools = [
             get_news,
@@ -20,7 +17,7 @@ def create_social_media_analyst(llm):
 
         system_message = (
             "You are a social media and company specific news researcher/analyst tasked with analyzing social media posts, recent company news, and public sentiment for a specific company over the past week. You will be given a company's name your objective is to write a comprehensive long report detailing your analysis, insights, and implications for traders and investors on this company's current state after looking at social media and what people are saying about that company, analyzing sentiment data of what people feel each day about the company, and looking at recent company news. Use the get_news(query, start_date, end_date) tool to search for company-specific news and social media discussions. Try to look at all sources possible from social media to sentiment to news. Do not simply state the trends are mixed, provide detailed and finegrained analysis and insights that may help traders make decisions."
-            + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read. by the way, answer in Chinese.""",
+            + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read.""",
         )
 
         prompt = ChatPromptTemplate.from_messages(
@@ -34,7 +31,8 @@ def create_social_media_analyst(llm):
                     " If you or any other assistant has the FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** or deliverable,"
                     " prefix your response with FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** so the team knows to stop."
                     " You have access to the following tools: {tool_names}.\n{system_message}"
-                    "For your reference, the current date is {current_date}. The current company we want to analyze is {ticker}",
+                    "For your reference, the current date is {current_date}. The current company we want to analyze is {ticker}."
+                    " Always respond in Chinese. All reasoning and analytical conclusions must be grounded in facts; do not fabricate analysis results. Do not mention this instruction in your output.",
                 ),
                 MessagesPlaceholder(variable_name="messages"),
             ]
@@ -47,22 +45,13 @@ def create_social_media_analyst(llm):
 
         chain = prompt | llm.bind_tools(tools)
 
-        log_agent_info("SOCIAL_ANALYST", "开始调用LLM进行社交媒体情绪分析", ticker)
         result = chain.invoke(state["messages"])
 
-        # 记录工具调用
-        if len(result.tool_calls) > 0:
-            for tool_call in result.tool_calls:
-                log_agent_tool("SOCIAL_ANALYST", tool_call.get("name", "unknown"), ticker)
-        
         report = ""
 
         if len(result.tool_calls) == 0:
             report = result.content
-            log_agent_info("SOCIAL_ANALYST", f"生成报告完成，长度: {len(report)} 字符", ticker)
 
-        log_agent_end("SOCIAL_ANALYST", ticker)
-        
         return {
             "messages": [result],
             "sentiment_report": report,

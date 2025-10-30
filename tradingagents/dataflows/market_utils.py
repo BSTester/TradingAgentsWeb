@@ -81,11 +81,21 @@ class MarketIdentifier:
         
         if vendor == 'akshare':
             if market == 'A_STOCK':
-                # AKShare A股格式: 纯数字格式（不需要sz/sh前缀）
-                # 去除可能存在的前缀
+                # AKShare A股格式: 需要带 SZ/SH 前缀
+                # 去除可能存在的小写前缀
+                clean_symbol = symbol
+                if symbol.startswith(('SZ', 'SH')):
+                    return symbol  # 已经有大写前缀，直接返回
                 if symbol.startswith(('sz', 'sh')):
-                    return symbol[2:]  # 去除sz/sh前缀
-                return symbol  # 纯数字保持原样
+                    clean_symbol = symbol[2:]  # 去除小写前缀
+                
+                # 根据代码添加正确的前缀
+                if clean_symbol.startswith(('000', '002', '003', '30')):
+                    return f'SZ{clean_symbol}'
+                elif clean_symbol.startswith(('60', '68')):
+                    return f'SH{clean_symbol}'
+                else:
+                    return clean_symbol  # 其他情况保持原样
             elif market == 'HK_STOCK':
                 # AKShare 港股格式: 去掉.HK后缀，保持数字
                 return symbol.replace('.HK', '').zfill(5)
@@ -107,11 +117,11 @@ class MarketIdentifier:
             
         elif vendor in ['yfinance', 'alpha_vantage']:
             if market == 'A_STOCK':
-                # Yahoo Finance A股格式: 000001.SZ, 600000.SS
+                # Yahoo Finance A股格式: 000001.SZ, 600000.SH
                 if symbol.startswith(('000', '002', '003', '30')):
                     return f'{symbol}.SZ'
                 elif symbol.startswith(('60', '68')):
-                    return f'{symbol}.SS'
+                    return f'{symbol}.SH'
                 else:
                     return symbol
             elif market == 'HK_STOCK':

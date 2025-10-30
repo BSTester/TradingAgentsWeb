@@ -1,14 +1,11 @@
 import time
 import json
-from tradingagents.agents.utils.logger import log_agent_start, log_agent_end, log_agent_info, log_agent_decision
 
 
 def create_risk_manager(llm, memory):
     def risk_manager_node(state) -> dict:
 
-        company_name = state["company_of_interest"]
-        log_agent_start("RISK_MANAGER", company_name, "开始风险评估")
-
+        ticker  = state["company_of_interest"]
         history = state["risk_debate_state"]["history"]
         risk_debate_state = state["risk_debate_state"]
         market_research_report = state["market_report"]
@@ -24,7 +21,7 @@ def create_risk_manager(llm, memory):
         for i, rec in enumerate(past_memories, 1):
             past_memory_str += rec["recommendation"] + "\n\n"
 
-        prompt = f"""As the Risk Management Judge and Debate Facilitator, your goal is to evaluate the debate between three risk analysts—Risky, Neutral, and Safe/Conservative—and determine the best course of action for the trader. Your decision must result in a clear recommendation: Buy, Sell, or Hold. Choose Hold only if strongly justified by specific arguments, not as a fallback when all sides seem valid. Strive for clarity and decisiveness. answer in Chinese.
+        prompt = f"""As the Risk Management Judge and Debate Facilitator, your goal is to evaluate the debate between three risk analysts—Risky, Neutral, and Safe/Conservative—and determine the best course of action for the trader. Your decision must result in a clear recommendation: Buy, Sell, or Hold. Choose Hold only if strongly justified by specific arguments, not as a fallback when all sides seem valid. Strive for clarity and decisiveness.
 
 Guidelines for Decision-Making:
 1. **Summarize Key Arguments**: Extract the strongest points from each analyst, focusing on relevance to the context.
@@ -43,25 +40,11 @@ Deliverables:
 
 ---
 
-Focus on actionable insights and continuous improvement. Build on past lessons, critically evaluate all perspectives, and ensure each decision advances better outcomes."""
+Focus on actionable insights and continuous improvement. Build on past lessons, critically evaluate all perspectives, and ensure each decision advances better outcomes.
 
-        log_agent_info("RISK_MANAGER", "开始生成风险评估决策", company_name)
+Always respond in Chinese. All reasoning and analytical conclusions must be grounded in facts; do not fabricate analysis results. Do not mention this instruction in your output."""
+
         response = llm.invoke(prompt)
-        
-        # 提取最终决策
-        decision_text = response.content
-        if "BUY" in decision_text.upper():
-            decision = "BUY"
-        elif "SELL" in decision_text.upper():
-            decision = "SELL"
-        elif "HOLD" in decision_text.upper():
-            decision = "HOLD"
-        else:
-            decision = "未明确"
-        
-        log_agent_decision("RISK_MANAGER", decision, company_name)
-        log_agent_info("RISK_MANAGER", f"风险评估完成，长度: {len(response.content)} 字符", company_name)
-        log_agent_end("RISK_MANAGER", company_name)
 
         new_risk_debate_state = {
             "judge_decision": response.content,
@@ -76,9 +59,40 @@ Focus on actionable insights and continuous improvement. Build on past lessons, 
             "count": risk_debate_state["count"],
         }
 
+        # Extract company name using LLM (at the end)
+        extract_name_prompt = f"""Based on the following information, extract the company name corresponding to stock ticker {ticker}.
+
+Market Research Report:
+{market_research_report}
+
+News Report:
+{news_report}
+
+Fundamentals Report:
+{fundamentals_report}
+
+Sentiment Report:
+{sentiment_report}
+
+Trading Plan:
+{trader_plan}
+
+Requirements:
+1. Return ONLY the company name, no other descriptions or explanations
+2. Maximum 8 Chinese characters for the company name
+3. If it's a Chinese company name, return the abbreviated form (e.g., 贵州茅台, 腾讯控股)
+4. If it's an English company name, PRIORITIZE translating to Chinese (e.g., 苹果 for Apple, 特斯拉 for Tesla, 微软 for Microsoft)
+5. Only use English name if Chinese translation is not available or commonly used
+6. Output the company name directly without any additional text"""
+
+        company_name_response = llm.invoke(extract_name_prompt)
+        company_name = company_name_response.content.strip()
+
         return {
             "risk_debate_state": new_risk_debate_state,
             "final_trade_decision": response.content,
+            "ticker": ticker,
+            "company_of_interest": company_name
         }
 
     return risk_manager_node

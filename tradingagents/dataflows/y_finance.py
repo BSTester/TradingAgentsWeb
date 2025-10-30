@@ -211,9 +211,6 @@ def _get_stock_stats_bulk(
                     f"{symbol}-YFin-data-2015-01-01-2025-03-25.csv",
                 )
             )
-            # 确保Date列是datetime类型
-            if "Date" in data.columns:
-                data["Date"] = pd.to_datetime(data["Date"])
             df = wrap(data)
         except FileNotFoundError:
             raise Exception("Stockstats fail: Yahoo Finance data not fetched yet!")
@@ -248,11 +245,9 @@ def _get_stock_stats_bulk(
             )
             data = data.reset_index()
             data.to_csv(data_file, index=False)
-            # 确保Date列是datetime类型
-            data["Date"] = pd.to_datetime(data["Date"])
         
         df = wrap(data)
-        # 保持Date列为datetime类型，方便后续处理
+        df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
     
     # Calculate the indicator for all rows at once
     df[indicator]  # This triggers stockstats to calculate the indicator
@@ -260,12 +255,7 @@ def _get_stock_stats_bulk(
     # Create a dictionary mapping date strings to indicator values
     result_dict = {}
     for _, row in df.iterrows():
-        # 确保日期格式一致
-        if isinstance(row["Date"], str):
-            date_str = row["Date"]
-        else:
-            date_str = row["Date"].strftime("%Y-%m-%d")
-            
+        date_str = row["Date"]
         indicator_value = row[indicator]
         
         # Handle NaN/None values

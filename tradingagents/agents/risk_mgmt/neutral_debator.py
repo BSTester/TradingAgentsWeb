@@ -1,13 +1,9 @@
 import time
 import json
-from tradingagents.agents.utils.logger import log_agent_start, log_agent_end, log_agent_info
 
 
 def create_neutral_debator(llm):
     def neutral_node(state) -> dict:
-        company_name = state.get("company_of_interest", "")
-        log_agent_start("NEUTRAL_ANALYST", company_name, "开始中性风险分析")
-        
         risk_debate_state = state["risk_debate_state"]
         history = risk_debate_state.get("history", "")
         neutral_history = risk_debate_state.get("neutral_history", "")
@@ -34,12 +30,11 @@ Latest World Affairs Report: {news_report}
 Company Fundamentals Report: {fundamentals_report}
 Here is the current conversation history: {history} Here is the last response from the risky analyst: {current_risky_response} Here is the last response from the safe analyst: {current_safe_response}. If there are no responses from the other viewpoints, do not halluncinate and just present your point.
 
-Engage actively by analyzing both sides critically, addressing weaknesses in the risky and conservative arguments to advocate for a more balanced approach. Challenge each of their points to illustrate why a moderate risk strategy might offer the best of both worlds, providing growth potential while safeguarding against extreme volatility. Focus on debating rather than simply presenting data, aiming to show that a balanced view can lead to the most reliable outcomes. Output conversationally as if you are speaking without any special formatting. answer in Chinese."""
+Engage actively by analyzing both sides critically, addressing weaknesses in the risky and conservative arguments to advocate for a more balanced approach. Challenge each of their points to illustrate why a moderate risk strategy might offer the best of both worlds, providing growth potential while safeguarding against extreme volatility. Focus on debating rather than simply presenting data, aiming to show that a balanced view can lead to the most reliable outcomes. Output conversationally as if you are speaking without any special formatting.
 
-        log_agent_info("NEUTRAL_ANALYST", "开始生成中性风险论证", company_name)
+Always respond in Chinese. All reasoning and analytical conclusions must be grounded in facts; do not fabricate analysis results. Do not mention this instruction in your output."""
+
         response = llm.invoke(prompt)
-        log_agent_info("NEUTRAL_ANALYST", f"中性风险论证生成完成，长度: {len(response.content)} 字符", company_name)
-        log_agent_end("NEUTRAL_ANALYST", company_name)
 
         argument = f"Neutral Analyst: {response.content}"
 

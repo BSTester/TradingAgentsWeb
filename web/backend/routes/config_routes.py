@@ -31,7 +31,10 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
             {"value": "anthropic", "label": "Anthropic", "description": "Claude系列模型", "url": "https://api.anthropic.com/"},
             {"value": "google", "label": "Google", "description": "Gemini系列模型", "url": "https://generativelanguage.googleapis.com/v1"},
             {"value": "openrouter", "label": "OpenRouter", "description": "多模型聚合平台", "url": "https://openrouter.ai/api/v1"},
-            {"value": "ollama", "label": "Ollama", "description": "本地模型服务", "url": "http://localhost:11434/v1"}
+            {"value": "deepseek", "label": "DeepSeek", "description": "DeepSeek系列模型", "url": "https://api.deepseek.com/v1"},
+            {"value": "qwen", "label": "Qwen", "description": "阿里千问系列模型", "url": "https://dashscope.aliyuncs.com/compatible-mode/v1"},
+            {"value": "oneai", "label": "OneAI", "description": "多模型聚合平台", "url": "https://api.bstester.com/v1"},
+            # {"value": "ollama", "label": "Ollama", "description": "本地模型服务", "url": "http://localhost:11434/v1"}
         ],
         "models": {
             "openai": {
@@ -49,6 +52,43 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
                     {"value": "o3-mini", "label": "o3-mini - 高级推理模型（轻量级）"},
                     {"value": "o3", "label": "o3 - 完整高级推理模型"},
                     {"value": "o1", "label": "o1 - 首屈一指的推理和问题解决模型"},
+                ]
+            },
+            "oneai": {
+                "shallow": [
+                    {"value": "openai/gpt-4o-mini", "label": "GPT-4o-mini - 快速高效，适合快速任务"},
+                    {"value": "openai/gpt-4.1-nano", "label": "GPT-4.1-nano - 超轻量模型，适合基本操作"},
+                    {"value": "openai/gpt-4.1-mini", "label": "GPT-4.1-mini - 紧凑模型，性能良好"},
+                    {"value": "openai/gpt-4o", "label": "GPT-4o - 标准模型，能力稳定"},
+                    {"value": "x-ai/grok-4-fast", "label": "Grok-4-fast - 快速高效，适合快速任务"},
+                    {"value": "x-ai/grok-4", "label": "Grok-4 - 高级推理模型"}
+                ],
+                "deep": [
+                    {"value": "openai/gpt-4.1-nano", "label": "GPT-4.1-nano - 超轻量模型，适合基本操作"},
+                    {"value": "openai/gpt-4.1-mini", "label": "GPT-4.1-mini - 紧凑模型，性能良好"},
+                    {"value": "openai/gpt-4o", "label": "GPT-4o - 标准模型，能力稳定"},
+                    {"value": "openai/o4-mini", "label": "o4-mini - 专业推理模型（紧凑版）"},
+                    {"value": "openai/o3-mini", "label": "o3-mini - 高级推理模型（轻量级）"},
+                    {"value": "openai/o3", "label": "o3 - 完整高级推理模型"},
+                    {"value": "openai/o1", "label": "o1 - 首屈一指的推理和问题解决模型"},
+                    {"value": "x-ai/grok-4", "label": "Grok-4 - 高级推理模型"},
+                    {"value": "qwen3-max-preview", "label": "Qwen3-max - 通义千问高级推理模型"}
+                ]
+            },
+            "deepseek": {
+                "shallow": [
+                    {"value": "deepseek-chat", "label": "DeepSeek-V3.2-Exp 的非思考模式"},
+                ],
+                "deep": [
+                    {"value": "deepseek-reasoner", "label": "DeepSeek-V3.2-Exp 的思考模式"},
+                ]
+            },
+            "qwen": {
+                "shallow": [
+                    {"value": "qwen3-max", "label": "qwen3 通义千问高级推理模型"},
+                ],
+                "deep": [
+                    {"value": "qwen3-max", "label": "qwen3 通义千问高级推理模型"},
                 ]
             },
             "anthropic": {
@@ -81,13 +121,29 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
             },
             "openrouter": {
                 "shallow": [
-                    {"value": "meta-llama/llama-4-scout:free", "label": "Meta: Llama 4 Scout"},
-                    {"value": "meta-llama/llama-3.3-8b-instruct:free", "label": "Meta: Llama 3.3 8B Instruct - 轻量级和超快速变体"},
-                    {"value": "google/gemini-2.0-flash-exp:free", "label": "Gemini Flash 2.0 提供显著更快的首个令牌响应时间"}
+                    {"value": "deepseek/deepseek-chat-v3.1:free", "label": "DeepSeek V3.1 - 混合专家模型(免费)"},
+                    {"value": "deepseek/deepseek-chat-v3.1", "label": "DeepSeek V3.1 - 混合专家模型"},
+                    {"value": "google/gemini-2.0-flash-exp:free", "label": "Gemini Flash 2.0 提供显著更快的首个令牌响应时间(免费)"},
+                    {"value": "google/gemini-2.5-flash", "label": "Gemini 2.5 Flash 是 Google 最先进的主力模型"},
+                    {"value": "qwen/qwen3-max", "label": "Qwen-3 是 Qwen 最先进的模型"},
+                    {"value": "openai/gpt-4.1", "label": "GPT-4.1 是一款旗舰大型语言模型"},
+                    {"value": "anthropic/claude-3.7-sonnet", "label": "Claude 3.7 Sonnet - 用于对话和推理的强大模型"},
+                    {"value": "anthropic/claude-3.5-sonnet", "label": "Claude 3.5 Sonnet - 用于对话和推理的强大模型"},
+                    {"value": "x-ai/grok-4-fast", "label": "Grok 4 Fast 是 xAI 最新的多模态模型"},
+                    {"value": "x-ai/grok-3-mini", "label": "Grok 3 Mini 一个轻量级模型，在响应之前会思考"}
                 ],
                 "deep": [
-                    {"value": "deepseek/deepseek-chat-v3-0324:free", "label": "DeepSeek V3 - 685B参数，混合专家模型"},
-                    {"value": "deepseek/deepseek-chat-v3-0324:free", "label": "Deepseek - 旗舰聊天模型系列的最新迭代"}
+                    {"value": "deepseek/deepseek-v3.2-exp", "label": "DeepSeek V3.2 - 增强版混合专家模型"},
+                    {"value": "deepseek/deepseek-r1", "label": "Deepseek R1 - 旗舰聊天模型系列的最新迭代"},
+                    {"value": "google/gemini-2.5-pro", "label": "Gemini 2.5 Pro 是 Google 最先进的人工智能模型"},
+                    {"value": "qwen/qwen3-max", "label": "Qwen-3 是 Qwen 最先进的模型"},
+                    {"value": "openai/gpt-5", "label": "GPT-5 是 OpenAI 最先进的模型"},
+                    {"value": "openai/o1-pro", "label": "o1 Pro - 首屈一指的推理和问题解决模型"},
+                    {"value": "openai/o3", "label": "o3 - 完整高级推理模型"},
+                    {"value": "anthropic/claude-sonnet-4", "label": "Claude Sonnet 4 显着增强了其前身 Sonnet 3.7 的功能"},
+                    {"value": "anthropic/claude-opus-4.1", "label": "Claude Opus 4.1 是 Anthropic 旗舰模型的更新版本"},
+                    {"value": "x-ai/grok-4", "label": "Grok 4 是 xAI 的最新推理模型"},
+                    {"value": "x-ai/grok-3", "label": "Grok 3 是 xAI 的先进的人工智能模型"}
                 ]
             },
             "ollama": {
@@ -115,7 +171,7 @@ async def validate_api_key(request: dict, current_user: User = Depends(get_curre
     
     try:
         # Basic validation - just check if key format looks valid
-        if provider == "openai":
+        if provider in ("openai", "oneai", 'deepseek', 'qwen'):
             if not api_key.startswith("sk-"):
                 raise HTTPException(status_code=400, detail="无效的OpenAI API密钥格式")
         elif provider == "anthropic":

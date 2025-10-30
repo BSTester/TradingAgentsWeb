@@ -1,14 +1,10 @@
 from langchain_core.messages import AIMessage
 import time
 import json
-from tradingagents.agents.utils.logger import log_agent_start, log_agent_end, log_agent_info
 
 
 def create_safe_debator(llm):
     def safe_node(state) -> dict:
-        company_name = state.get("company_of_interest", "")
-        log_agent_start("SAFE_ANALYST", company_name, "开始保守风险分析")
-        
         risk_debate_state = state["risk_debate_state"]
         history = risk_debate_state.get("history", "")
         safe_history = risk_debate_state.get("safe_history", "")
@@ -35,12 +31,11 @@ Latest World Affairs Report: {news_report}
 Company Fundamentals Report: {fundamentals_report}
 Here is the current conversation history: {history} Here is the last response from the risky analyst: {current_risky_response} Here is the last response from the neutral analyst: {current_neutral_response}. If there are no responses from the other viewpoints, do not halluncinate and just present your point.
 
-Engage by questioning their optimism and emphasizing the potential downsides they may have overlooked. Address each of their counterpoints to showcase why a conservative stance is ultimately the safest path for the firm's assets. Focus on debating and critiquing their arguments to demonstrate the strength of a low-risk strategy over their approaches. Output conversationally as if you are speaking without any special formatting. answer in Chinese."""
+Engage by questioning their optimism and emphasizing the potential downsides they may have overlooked. Address each of their counterpoints to showcase why a conservative stance is ultimately the safest path for the firm's assets. Focus on debating and critiquing their arguments to demonstrate the strength of a low-risk strategy over their approaches. Output conversationally as if you are speaking without any special formatting.
 
-        log_agent_info("SAFE_ANALYST", "开始生成保守风险论证", company_name)
+Always respond in Chinese. All reasoning and analytical conclusions must be grounded in facts; do not fabricate analysis results. Do not mention this instruction in your output."""
+
         response = llm.invoke(prompt)
-        log_agent_info("SAFE_ANALYST", f"保守风险论证生成完成，长度: {len(response.content)} 字符", company_name)
-        log_agent_end("SAFE_ANALYST", company_name)
 
         argument = f"Safe Analyst: {response.content}"
 

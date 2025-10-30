@@ -8,15 +8,15 @@ import { AppConfig } from '@/lib/types';
 import { AnalysisConfigForm } from '@/components/analysis/AnalysisConfigForm';
 import { AnalysisProgress } from '@/components/analysis/AnalysisProgress';
 import { AnalysisResults } from '@/components/analysis/AnalysisResults';
-import { AnalysisHistory } from '@/components/analysis/AnalysisHistory';
 import { useToast, Toast } from '@/components/ui/Toast';
+import { AppNavbar } from '@/components/common/AppNavbar';
 
 export default function DashboardPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { toast, showToast, hideToast } = useToast();
   const [config, setConfig] = useState<AppConfig | null>(null);
-  const [currentView, setCurrentView] = useState<'config' | 'progress' | 'results' | 'history'>('config');
+  const [currentView, setCurrentView] = useState<'config' | 'progress' | 'results'>('config');
   const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -56,16 +56,31 @@ export default function DashboardPage() {
   }, [user]);
 
   const handleAnalysisStart = (analysisId: string) => {
-    console.log('=== Dashboard: handleAnalysisStart ===');
-    console.log('Received Analysis ID:', analysisId);
     setCurrentAnalysisId(analysisId);
     setCurrentView('progress');
-    console.log('Switched to progress view');
   };
 
   const handleAnalysisComplete = () => {
     setCurrentView('results');
   };
+
+  const handleBackToTop = () => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // 返回顶部按钮显示逻辑
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 300);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // 如果正在认证检查或加载配置，显示加载状态
   if (authLoading || isLoading || !user) {
@@ -82,57 +97,22 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* 顶部导航栏 */}
-      <nav className="bg-gray-900 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <h1 className="text-white text-xl font-bold">
-                  <i className="fas fa-chart-line mr-2" />
-                  TradingAgents
-                </h1>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setCurrentView('history')}
-                className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-              >
-                <i className="fas fa-history mr-1" />
-                分析历史
-              </button>
-              <div className="relative">
-                <button className="text-gray-300 hover:text-white flex items-center">
-                  <i className="fas fa-user-circle mr-2" />
-                  {user?.username}
-                </button>
-              </div>
-              <button
-                onClick={logout}
-                className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-              >
-                <i className="fas fa-sign-out-alt mr-1" />
-                退出
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <AppNavbar user={user} onLogout={logout} showNewAnalysis={false} />
 
       {/* 主要内容区域 */}
-      <div className="flex-1 max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 w-full">
+      <div className="flex-1 max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 w-full">
         {/* 欢迎横幅 */}
         {currentView === 'config' && (
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-6 mb-6 text-white">
             <div className="text-center">
-              <h1 className="text-3xl font-bold mb-2">
+              <h1 className="text-2xl md:text-3xl font-bold mb-2">
                 <i className="fas fa-robot mr-3" />
                 TradingAgents
               </h1>
-              <p className="text-xl mb-2">多智能体大语言模型金融交易框架</p>
-              <p className="text-lg">
+              <p className="text-lg md:text-xl mb-2">多智能体大语言模型金融交易框架</p>
+              <p className="text-base md:text-lg">
                 <strong>工作流程：</strong>
-                分析师团队 → 研究团队 → 交易员 → 风险管理 → 组合管理
+                分析师团队 → 研究团队 → 交易员 → 风险管理 → 投资组合分析
               </p>
             </div>
           </div>
@@ -160,25 +140,22 @@ export default function DashboardPage() {
           <AnalysisResults
             analysisId={currentAnalysisId}
             onBackToConfig={() => setCurrentView('config')}
-            onShowToast={showToast}
-          />
-        )}
-
-        {currentView === 'history' && (
-          <AnalysisHistory
-            onBackToConfig={() => setCurrentView('config')}
-            onViewResults={(analysisId: string) => {
-              setCurrentAnalysisId(analysisId);
-              setCurrentView('results');
-            }}
-            onViewProgress={(analysisId: string) => {
-              setCurrentAnalysisId(analysisId);
-              setCurrentView('progress');
-            }}
+            onBackToHistory={() => router.push('/history')}
             onShowToast={showToast}
           />
         )}
       </div>
+
+      {/* 回到顶部按钮，仅在查看报告页面且滚动超过300px时显示 */}
+      {currentView === 'results' && showBackToTop && (
+        <button
+          onClick={handleBackToTop}
+          className="fixed bottom-8 right-8 bg-blue-600 text-white w-12 h-12 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-300 flex items-center justify-center z-50 hover:scale-110"
+          aria-label="返回顶部"
+        >
+          <i className="fas fa-arrow-up text-xl" />
+        </button>
+      )}
 
       {/* 页面底部版权信息 */}
       <footer className="bg-white border-t border-gray-200 mt-auto">

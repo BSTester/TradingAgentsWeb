@@ -136,8 +136,7 @@ TASK_MONITOR_LEADER_PORT=8001
 ### 3.6 初始化数据库（可选）
 ```bash
 # v2 版本会在应用启动生命周期中自动 init_db
-# 如果需要预置用户或在启动前初始化，可执行：
-python web/backend/init_db.py
+# 数据库会自动初始化，第一个注册用户自动成为管理员
 ```
 
 ### 3.7 本地启动（开发模式）
@@ -188,7 +187,7 @@ docker-compose up --build -d
   - FastAPI 应用：`app_v2.py`（含 lifespan、CORS、LoggingMiddleware）
   - 路由模块：`routes/analysis_routes.py, config_routes.py, task_routes.py, page_routes.py, websocket_routes.py, export_routes.py`
   - 认证模块：`auth_routes.py`（注册、登录、JWT 刷新）
-  - 数据库模块：`database.py, models.py, init_db.py`（SQLite 默认）
+  - 数据库模块：`database.py, models.py`（SQLite 默认，应用启动时自动初始化）
   - 任务调度：`TaskManager`（线程池、用户级队列、异常任务中断）
   - WebSocket：实时推送分析进度/日志至前端
 
@@ -211,7 +210,7 @@ docker-compose up --build -d
 - 标的代码与市场识别
   - 美股：例如 AAPL、MSFT
   - 港股：支持纯数字代码（如 0700）或带后缀 `.HK` 的格式（如 0700.HK）
-  - A 股：常见 6 位代码，部分数据源需带交易所后缀（如 603777.SH / 600000.SS），系统会结合供应商策略做兼容
+  - A 股：常见 6 位代码，部分数据源需带交易所后缀（如 603777.SH / 600000.SZ），系统会结合供应商策略做兼容
 - 研究深度（默认 1/3/5）
   - 控制多智能体“辩论/讨论”轮次与风控评估深度
 - LLM 与模型
@@ -236,12 +235,39 @@ docker-compose up --build -d
 
 ---
 
-## 5. 许可证
+## 5. 文档
+
+详细文档请查看 [docs](docs/) 目录：
+
+### 核心功能
+- [公司名称显示功能](docs/COMPANY_NAME_FEATURE.md) - 中文公司名称提取和显示
+
+### 数据库
+- [数据库初始化说明](docs/DATABASE_INIT_SUMMARY.md) - 应用启动时自动初始化
+- [数据库设置指南](docs/DATABASE_SETUP.md) - 完整的数据库配置说明
+- [数据库配置](docs/DATABASE_CONFIG.md) - 数据库连接配置
+
+### 部署
+- [部署检查清单](docs/DEPLOYMENT_CHECKLIST.md) - 完整的部署步骤和验证
+- [Docker 部署](docs/DOCKER_DEPLOYMENT.md) - 容器化部署指南
+- [Nginx 配置](docs/NGINX_CONFIG_GUIDE.md) - 反向代理和 SSL 配置
+
+### 开发
+- [本地开发指南](docs/LOCAL_DEVELOPMENT.md) - 开发环境搭建
+- [环境配置](docs/ENV_SETUP.md) - 环境变量和 API 密钥配置
+
+### 其他
+- [股票代码编码规则](docs/股票代码编码规则详解.md) - 美股、港股、A股编码规则
+- [股票代码验证升级](docs/股票代码验证升级说明.md) - 验证规则说明
+
+---
+
+## 6. 许可证
 本项目基于仓库内 LICENSE 文件所述条款发布，请遵循相关许可。
 
 ---
 
-## 6. 参考与致谢
+## 7. 参考与致谢
 - TradingAgents 原版框架与多智能体设计
 - FastAPI / SQLAlchemy / Jinja2 / Uvicorn
 - Next.js / React / Tailwind

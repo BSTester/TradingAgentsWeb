@@ -5,8 +5,8 @@ Analysis API Routes
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import desc, select, func
 from datetime import datetime
 from typing import Optional
 
@@ -19,6 +19,7 @@ from web.backend.schemas import (
 )
 from web.backend.auth_routes import get_current_active_user
 from web.backend.analysis_task import run_analysis_task
+from web.backend.utils.market_detector import normalize_ticker, normalize_ticker_with_suffix, validate_ticker, detect_market
 
 # 这些需要从 app_v2.py 导入
 # 暂时使用占位符，稍后会修复
@@ -32,15 +33,17 @@ router = APIRouter(prefix="/api", tags=["analysis"])
 async def start_analysis(
     request: AnalysisRequest,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Start a new trading analysis (requires authentication)"""
     
     # 检查用户是否已有运行中的任务
-    running_analysis = db.query(AnalysisRecord).filter(
+    stmt = select(AnalysisRecord).filter(
         AnalysisRecord.user_id == current_user.id,
         AnalysisRecord.status.in_(["initializing", "running"])
-    ).first()
+    )
+    result = await db.execute(stmt)
+    running_analysis = result.scalars().first()
     
     if running_analysis:
         # 返回运行中的任务，前端会自动跳转到进度页面
@@ -51,14 +54,38 @@ async def start_analysis(
             message=f"您已有运行中的分析任务，已自动连接"
         )
     
+    # Normalize and validate ticker
+    ticker = normalize_ticker(request.ticker)
+    
+    if not validate_ticker(ticker):
+        # 提供详细的错误信息
+        error_msg = f"无效的股票代码格式: {request.ticker}\n\n"
+        error_msg += "支持的格式：\n"
+        error_msg += "• 美股：1-5个字母（如 AAPL、TSLA）\n"
+        error_msg += "• 港股：4-5位数字或带.HK后缀（如 0700、00700.HK）\n"
+        error_msg += "• A股沪市：600/601/603/605/688开头（如 600519、688001.SH）\n"
+        error_msg += "• A股深市：000/001/002/300/301开头（如 000001、300750.SZ）"
+        
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_msg
+        )
+    
+    # 标准化股票代码（港股自动添加.HK后缀）
+    ticker = normalize_ticker_with_suffix(ticker)
+    
+    # Detect market
+    market = detect_market(ticker)
+    
     # Generate analysis ID
-    analysis_id = f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{request.ticker}_{current_user.id}"
+    analysis_id = f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{ticker}_{current_user.id}"
     
     # Create analysis record
     analysis_record = AnalysisRecord(
         analysis_id=analysis_id,
         user_id=current_user.id,
-        ticker=request.ticker,
+        ticker=ticker,  # Use normalized ticker
+        market=market,  # Auto-fill market field
         analysis_date=request.analysis_date,
         analysts=request.analysts,
         research_depth=request.research_depth,
@@ -66,18 +93,19 @@ async def start_analysis(
         shallow_thinker=request.shallow_thinker,
         deep_thinker=request.deep_thinker,
         backend_url=request.backend_url,
+        is_public=request.is_public,  # Save privacy setting
         status="queued",
         current_step="Analysis queued",
         progress_percentage=0.0
     )
     
     db.add(analysis_record)
-    db.commit()
-    db.refresh(analysis_record)
+    await db.commit()
+    await db.refresh(analysis_record)
     
-    # Convert request to dict
+    # Convert request to dict (use normalized ticker)
     request_data = {
-        'ticker': request.ticker,
+        'ticker': ticker,
         'analysis_date': request.analysis_date,
         'analysts': request.analysts,
         'research_depth': request.research_depth,
@@ -107,7 +135,7 @@ async def start_analysis(
         # Task queued
         analysis_record.status = "queued"
         analysis_record.current_step = "等待队列中..."
-        db.commit()
+        await db.commit()
     
     return AnalysisResponse(analysis_id=analysis_id, status="queued")
 
@@ -116,13 +144,15 @@ async def start_analysis(
 async def stop_analysis(
     analysis_id: str,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Stop a running analysis (requires authentication and ownership)"""
-    analysis = db.query(AnalysisRecord).filter(
+    stmt = select(AnalysisRecord).filter(
         AnalysisRecord.analysis_id == analysis_id,
         AnalysisRecord.user_id == current_user.id
-    ).first()
+    )
+    result = await db.execute(stmt)
+    analysis = result.scalars().first()
     
     if not analysis:
         raise HTTPException(status_code=404, detail="分析未找到")
@@ -159,13 +189,15 @@ async def stop_analysis(
 async def get_analysis_status(
     analysis_id: str,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get the status of an analysis (requires authentication and ownership)"""
-    analysis = db.query(AnalysisRecord).filter(
+    stmt = select(AnalysisRecord).filter(
         AnalysisRecord.analysis_id == analysis_id,
         AnalysisRecord.user_id == current_user.id
-    ).first()
+    )
+    result = await db.execute(stmt)
+    analysis = result.scalars().first()
     
     if not analysis:
         raise HTTPException(status_code=404, detail="分析未找到")
@@ -184,13 +216,15 @@ async def get_analysis_status(
 async def get_analysis_results(
     analysis_id: str,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get the results of a completed analysis (requires authentication and ownership)"""
-    analysis = db.query(AnalysisRecord).filter(
+    stmt = select(AnalysisRecord).filter(
         AnalysisRecord.analysis_id == analysis_id,
         AnalysisRecord.user_id == current_user.id
-    ).first()
+    )
+    result = await db.execute(stmt)
+    analysis = result.scalars().first()
     
     if not analysis:
         raise HTTPException(status_code=404, detail="分析未找到")
@@ -324,6 +358,8 @@ async def get_analysis_results(
     # Return results in the format expected by frontend
     return {
         "ticker": analysis.ticker,
+        "company_name": analysis.company_name,
+        "market": analysis.market,
         "analysis_date": analysis.analysis_date,
         "trading_decision": analysis.trading_decision,
         "final_summary": final_summary,
@@ -340,35 +376,42 @@ async def list_analyses(
     status_filter: Optional[str] = None,
     ticker_filter: Optional[str] = None,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """List user's analyses with pagination and filtering"""
-    query = db.query(AnalysisRecord).filter(AnalysisRecord.user_id == current_user.id)
+    stmt = select(AnalysisRecord).filter(AnalysisRecord.user_id == current_user.id)
     
     # Apply filters
     if status_filter:
-        query = query.filter(AnalysisRecord.status == status_filter)
+        stmt = stmt.filter(AnalysisRecord.status == status_filter)
     if ticker_filter:
-        query = query.filter(AnalysisRecord.ticker.ilike(f"%{ticker_filter}%"))
+        stmt = stmt.filter(AnalysisRecord.ticker.ilike(f"%{ticker_filter}%"))
     
     # Get total count
-    total = query.count()
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total_result = await db.execute(count_stmt)
+    total = total_result.scalar()
     
     # Apply pagination
     offset = (page - 1) * limit
-    analyses = query.order_by(AnalysisRecord.created_at.desc()).offset(offset).limit(limit).all()
+    stmt = stmt.order_by(AnalysisRecord.created_at.desc()).offset(offset).limit(limit)
+    result = await db.execute(stmt)
+    analyses = result.scalars().all()
     
     return {
         "analyses": [
             {
                 "id": analysis.analysis_id,
                 "ticker": analysis.ticker,
+                "company_name": analysis.company_name,
+                "market": analysis.market,
                 "analysis_date": analysis.analysis_date,
                 "status": analysis.status,
                 "progress_percentage": analysis.progress_percentage,
                 "created_at": analysis.created_at,
                 "updated_at": analysis.updated_at,
                 "completed_at": analysis.completed_at,
+                "is_public": analysis.is_public,
                 "summary": {
                     "recommendation": analysis.trading_decision
                 } if analysis.trading_decision else None
@@ -386,13 +429,15 @@ async def list_analyses(
 async def get_analysis_markdown(
     analysis_id: str,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Get analysis results in Markdown format - 包含所有阶段"""
-    analysis = db.query(AnalysisRecord).filter(
+    stmt = select(AnalysisRecord).filter(
         AnalysisRecord.analysis_id == analysis_id,
         AnalysisRecord.user_id == current_user.id
-    ).first()
+    )
+    result = await db.execute(stmt)
+    analysis = result.scalars().first()
     
     if not analysis:
         raise HTTPException(status_code=404, detail="分析未找到")
@@ -524,13 +569,15 @@ async def get_analysis_markdown(
 async def delete_analysis(
     analysis_id: str,
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Delete an analysis record (requires authentication and ownership)"""
-    analysis = db.query(AnalysisRecord).filter(
+    stmt = select(AnalysisRecord).filter(
         AnalysisRecord.analysis_id == analysis_id,
         AnalysisRecord.user_id == current_user.id
-    ).first()
+    )
+    result = await db.execute(stmt)
+    analysis = result.scalars().first()
     
     if not analysis:
         raise HTTPException(status_code=404, detail="分析未找到")
@@ -540,10 +587,158 @@ async def delete_analysis(
         raise HTTPException(status_code=400, detail="无法删除正在运行的分析，请先停止")
     
     # 删除分析记录
-    db.delete(analysis)
-    db.commit()
+    await db.delete(analysis)
+    await db.commit()
     
     return {"message": "分析已删除", "analysis_id": analysis_id}
+
+
+@router.get("/public/analysis/{analysis_id}/results")
+async def get_public_analysis_results(
+    analysis_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get the results of a completed analysis (public access for leaderboard)"""
+    # 不需要鉴权，但只能查看公开的已完成分析
+    stmt = select(AnalysisRecord).filter(
+        AnalysisRecord.analysis_id == analysis_id,
+        AnalysisRecord.status == "completed",  # 只允许查看已完成的分析
+        AnalysisRecord.is_public == True  # 只允许查看公开的分析
+    )
+    result = await db.execute(stmt)
+    analysis = result.scalars().first()
+    
+    if not analysis:
+        raise HTTPException(status_code=404, detail="分析未找到、未完成或未公开")
+    
+    # 构建 phases 数据结构（与私有接口相同的逻辑）
+    phases = []
+    
+    # 从 final_state 中提取数据
+    final_state = analysis.final_state or {}
+    if isinstance(final_state, str):
+        try:
+            import json
+            final_state = json.loads(final_state)
+        except Exception:
+            final_state = {}
+    if not isinstance(final_state, dict):
+        final_state = {}
+    
+    # 阶段1：分析师团队
+    analyst_agents = []
+    if analysis.market_analysis:
+        analyst_agents.append({"name": "市场分析师", "result": analysis.market_analysis})
+    if analysis.sentiment_analysis:
+        analyst_agents.append({"name": "社交媒体分析师", "result": analysis.sentiment_analysis})
+    if analysis.news_analysis:
+        analyst_agents.append({"name": "新闻分析师", "result": analysis.news_analysis})
+    if analysis.fundamentals_analysis:
+        analyst_agents.append({"name": "基本面分析师", "result": analysis.fundamentals_analysis})
+    
+    if analyst_agents:
+        phases.append({
+            "id": 1,
+            "name": "分析师团队",
+            "icon": "fa-users",
+            "color": "blue",
+            "agents": analyst_agents
+        })
+    
+    # 阶段2：研究团队
+    research_agents = []
+    if final_state.get("investment_debate_state"):
+        debate_state = final_state["investment_debate_state"]
+        if debate_state.get("bull_history"):
+            research_agents.append({"name": "多头研究员", "result": debate_state["bull_history"]})
+        if debate_state.get("bear_history"):
+            research_agents.append({"name": "空头研究员", "result": debate_state["bear_history"]})
+        if debate_state.get("judge_decision"):
+            research_agents.append({"name": "投资评审", "result": debate_state["judge_decision"]})
+    
+    if research_agents:
+        phases.append({
+            "id": 2,
+            "name": "研究团队",
+            "icon": "fa-search",
+            "color": "green",
+            "agents": research_agents
+        })
+    
+    # 阶段3：交易团队
+    if final_state.get("trader_investment_plan"):
+        phases.append({
+            "id": 3,
+            "name": "交易团队",
+            "icon": "fa-chart-line",
+            "color": "purple",
+            "agents": [
+                {"name": "交易员", "result": final_state["trader_investment_plan"]}
+            ]
+        })
+    
+    # 阶段4：风险管理
+    risk_agents = []
+    if final_state.get("risk_debate_state"):
+        risk_state = final_state["risk_debate_state"]
+        if risk_state.get("risky_history"):
+            risk_agents.append({"name": "激进风险分析师", "result": risk_state["risky_history"]})
+        if risk_state.get("neutral_history"):
+            risk_agents.append({"name": "中性风险分析师", "result": risk_state["neutral_history"]})
+        if risk_state.get("safe_history"):
+            risk_agents.append({"name": "保守风险分析师", "result": risk_state["safe_history"]})
+        if risk_state.get("judge_decision"):
+            risk_agents.append({"name": "风险管理评审", "result": risk_state["judge_decision"]})
+    
+    if risk_agents:
+        phases.append({
+            "id": 4,
+            "name": "风险管理",
+            "icon": "fa-shield-alt",
+            "color": "red",
+            "agents": risk_agents
+        })
+    
+    # 构建最终摘要
+    final_summary = analysis.final_summary
+    if not final_summary:
+        summary_parts = []
+        
+        if final_state.get("investment_plan"):
+            summary_parts.append(f"## 投资决策\n\n{final_state['investment_plan']}")
+        elif final_state.get("investment_debate_state", {}).get("judge_decision"):
+            summary_parts.append(f"## 投资决策\n\n{final_state['investment_debate_state']['judge_decision']}")
+        
+        if final_state.get("trader_investment_plan"):
+            summary_parts.append(f"## 交易策略\n\n{final_state['trader_investment_plan']}")
+        
+        if final_state.get("final_trade_decision"):
+            summary_parts.append(f"## 最终交易决策\n\n{final_state['final_trade_decision']}")
+        elif final_state.get("risk_debate_state", {}).get("judge_decision"):
+            summary_parts.append(f"## 风险评估\n\n{final_state['risk_debate_state']['judge_decision']}")
+        
+        if not summary_parts:
+            if analysis.market_analysis:
+                summary_parts.append(f"**市场分析：**\n{analysis.market_analysis[:300]}...")
+            if final_state.get("investment_debate_state", {}).get("judge_decision"):
+                summary_parts.append(f"**投资建议：**\n{final_state['investment_debate_state']['judge_decision'][:300]}...")
+            if final_state.get("trader_investment_plan"):
+                summary_parts.append(f"**交易策略：**\n{final_state['trader_investment_plan'][:300]}...")
+        
+        final_summary = "\n\n".join(summary_parts) if summary_parts else analysis.trading_decision or "暂无分析摘要"
+    
+    # Return results
+    return {
+        "ticker": analysis.ticker,
+        "company_name": analysis.company_name,
+        "market": analysis.market,
+        "analysis_date": analysis.analysis_date,
+        "trading_decision": analysis.trading_decision,
+        "final_summary": final_summary,
+        "phases": phases,
+        "created_at": analysis.created_at,
+        "completed_at": analysis.completed_at
+    }
 
 
 def init_analysis_routes(app_task_manager, app_manager):
