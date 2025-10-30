@@ -121,10 +121,11 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
             },
             "openrouter": {
                 "shallow": [
-                    {"value": "meta-llama/llama-4-scout:free", "label": "Meta: Llama 4 Scout"},
-                    {"value": "meta-llama/llama-3.3-8b-instruct:free", "label": "Meta: Llama 3.3 8B Instruct - 轻量级和超快速变体"},
-                    {"value": "google/gemini-2.0-flash-exp:free", "label": "Gemini Flash 2.0 提供显著更快的首个令牌响应时间"},
+                    {"value": "deepseek/deepseek-chat-v3.1:free", "label": "DeepSeek V3.1 - 混合专家模型(免费)"},
+                    {"value": "deepseek/deepseek-chat-v3.1", "label": "DeepSeek V3.1 - 混合专家模型"},
+                    {"value": "google/gemini-2.0-flash-exp:free", "label": "Gemini Flash 2.0 提供显著更快的首个令牌响应时间(免费)"},
                     {"value": "google/gemini-2.5-flash", "label": "Gemini 2.5 Flash 是 Google 最先进的主力模型"},
+                    {"value": "qwen/qwen3-max", "label": "Qwen-3 是 Qwen 最先进的模型"},
                     {"value": "openai/gpt-4.1", "label": "GPT-4.1 是一款旗舰大型语言模型"},
                     {"value": "anthropic/claude-3.7-sonnet", "label": "Claude 3.7 Sonnet - 用于对话和推理的强大模型"},
                     {"value": "anthropic/claude-3.5-sonnet", "label": "Claude 3.5 Sonnet - 用于对话和推理的强大模型"},
@@ -132,9 +133,10 @@ async def get_config(current_user: User = Depends(get_current_active_user)):
                     {"value": "x-ai/grok-3-mini", "label": "Grok 3 Mini 一个轻量级模型，在响应之前会思考"}
                 ],
                 "deep": [
-                    {"value": "deepseek/deepseek-chat-v3.1:free", "label": "DeepSeek V3.1 - 685B参数，混合专家模型"},
-                    {"value": "deepseek/deepseek-r1-0528:free", "label": "Deepseek R1 - 旗舰聊天模型系列的最新迭代"},
+                    {"value": "deepseek/deepseek-v3.2-exp", "label": "DeepSeek V3.2 - 增强版混合专家模型"},
+                    {"value": "deepseek/deepseek-r1", "label": "Deepseek R1 - 旗舰聊天模型系列的最新迭代"},
                     {"value": "google/gemini-2.5-pro", "label": "Gemini 2.5 Pro 是 Google 最先进的人工智能模型"},
+                    {"value": "qwen/qwen3-max", "label": "Qwen-3 是 Qwen 最先进的模型"},
                     {"value": "openai/gpt-5", "label": "GPT-5 是 OpenAI 最先进的模型"},
                     {"value": "openai/o1-pro", "label": "o1 Pro - 首屈一指的推理和问题解决模型"},
                     {"value": "openai/o3", "label": "o3 - 完整高级推理模型"},
