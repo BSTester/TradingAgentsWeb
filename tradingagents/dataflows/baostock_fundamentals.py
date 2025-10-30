@@ -11,142 +11,91 @@ from .baostock_common import (
 )
 
 
-def get_financial_data(
-    symbol: Annotated[str, "ticker symbol of the company"],
-    year: Annotated[int, "Year for financial data"] = None,
-    quarter: Annotated[int, "Quarter (1-4) for financial data"] = None
-) -> str:
+def _parse_year_parameter(year_input):
     """
-    获取综合财务数据
+    解析年份参数，支持多种格式
     
     Args:
-        symbol: 股票代码
-        year: 年份
-        quarter: 季度 (1-4)
+        year_input: 年份输入，可以是整数、字符串数字或日期字符串
         
     Returns:
-        str: CSV格式的财务数据
+        int: 解析后的年份，如果解析失败则返回当前年份
+    """
+    if year_input is None:
+        return datetime.now().year
+    
+    # 如果已经是整数，直接返回
+    if isinstance(year_input, int):
+        return year_input
+    
+    # 转换为字符串处理
+    year_str = str(year_input).strip()
+    
+    # 尝试直接转换为整数
+    try:
+        return int(year_str)
+    except ValueError:
+        pass
+    
+    # 尝试解析日期格式
+    date_formats = [
+        '%Y-%m-%d',
+        '%Y/%m/%d',
+        '%Y%m%d',
+        '%Y-%m-%d %H:%M:%S',
+        '%Y/%m/%d %H:%M:%S'
+    ]
+    
+    for fmt in date_formats:
+        try:
+            parsed_date = datetime.strptime(year_str, fmt)
+            return parsed_date.year
+        except ValueError:
+            continue
+    
+    # 如果所有解析都失败，返回当前年份
+    print(f"Warning: Unable to parse year from '{year_input}', using current year {datetime.now().year}")
+    return datetime.now().year
+
+
+def get_balance_sheet(ticker: str, freq: str = "quarterly", curr_date: str = None) -> str:
+    """
+    Retrieve balance sheet data for a given ticker symbol using Alpha Vantage.
+
+    Args:
+        ticker (str): Ticker symbol of the company
+        freq (str): Reporting frequency: annual/quarterly (default quarterly) - not used for Alpha Vantage
+        curr_date (str): Current date you are trading at, yyyy-mm-dd (not used for Alpha Vantage)
+
+    Returns:
+        str: Balance sheet data with normalized fields
     """
     try:
         check_baostock_availability()
         
         # 验证市场支持并获取市场信息
-        market, market_info = validate_market_support(symbol, "financial data retrieval")
+        market, market_info = validate_market_support(ticker, "balance sheet retrieval")
         
         # 格式化股票代码
-        formatted_symbol = format_symbol_for_baostock(symbol, market)
+        formatted_symbol = format_symbol_for_baostock(ticker, market)
         
-        # 如果没有指定年份和季度，使用最近的数据
-        if year is None:
-            year = datetime.now().year
-        if quarter is None:
-            quarter = 4  # 默认年报
+        # 将 freq 和 curr_date 转换为 year 和 quarter
+        year = _parse_year_parameter(curr_date) if curr_date else datetime.now().year
         
-        log_operation("get_financial_data", symbol, market, "ATTEMPT")
+        # 根据 freq 确定 quarter
+        if freq and freq.lower() in ["annual", "year", "年度"]:
+            quarter = 4  # 年报
+        else:
+            quarter = 4  # 默认季报（最新季度）
         
-        with BaoStockSession():
-            results = {}
-            
-            # 获取各类财务数据
-            financial_queries = [
-                ('profit', lambda: bs.query_profit_data(code=formatted_symbol, year=year, quarter=quarter)),
-                ('operation', lambda: bs.query_operation_data(code=formatted_symbol, year=year, quarter=quarter)),
-                ('growth', lambda: bs.query_growth_data(code=formatted_symbol, year=year, quarter=quarter)),
-                ('balance', lambda: bs.query_balance_data(code=formatted_symbol, year=year, quarter=quarter)),
-                ('cash_flow', lambda: bs.query_cash_flow_data(code=formatted_symbol, year=year, quarter=quarter))
-            ]
-            
-            for name, query_func in financial_queries:
-                try:
-                    rs = query_func()
-                    if rs.error_code == '0':
-                        data_list = []
-                        while (rs.error_code == '0') & rs.next():
-                            data_list.append(rs.get_row_data())
-                        
-                        if data_list:
-                            columns = rs.fields
-                            df = pd.DataFrame(data_list, columns=columns)
-                            results[name] = df
-                            print(f"Successfully retrieved {name} data: {len(df)} records")
-                        else:
-                            print(f"No {name} data available")
-                    else:
-                        print(f"Failed to retrieve {name} data: {rs.error_msg}")
-                except Exception as e:
-                    print(f"Error retrieving {name} data: {e}")
-        
-        if not results:
-            log_operation("get_financial_data", symbol, market, "FAILED")
-            return f"No financial data found for symbol '{symbol}' for {year}Q{quarter}"
-        
-        # 合并所有财务数据
-        combined_csv = ""
-        for name, df in results.items():
-            combined_csv += f"\\n## {name.upper()} DATA ##\\n"
-            combined_csv += df.to_csv(index=False)
-            combined_csv += "\\n"
-        
-        # 构建头部信息
-        header_lines = [
-            f"# Financial data for {symbol} ({market_info['market_name']}) - {year}Q{quarter}",
-            f"# Formatted symbol: {formatted_symbol}",
-            f"# Market: {market_info['market_name']} ({market_info['currency']})",
-            f"# Data types: {', '.join(results.keys())}",
-            f"# Total data sources: {len(results)}",
-            f"# Data source: BaoStock",
-            f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        ]
-        
-        header = '\\n'.join(header_lines) + '\\n\\n'
-        
-        log_operation("get_financial_data", symbol, market, "SUCCESS")
-        return header + combined_csv
-        
-    except Exception as e:
-        log_operation("get_financial_data", symbol, market if 'market' in locals() else None, "FAILED")
-        return handle_baostock_exception(e, "retrieving financial data", symbol)
-
-
-def get_balance_sheet(
-    symbol: Annotated[str, "ticker symbol of the company"],
-    year: Annotated[int, "Year for financial data"] = None,
-    quarter: Annotated[int, "Quarter (1-4) for financial data"] = None
-) -> str:
-    """
-    获取资产负债表数据（偿债能力数据）
-    
-    Args:
-        symbol: 股票代码
-        year: 年份
-        quarter: 季度
-        
-    Returns:
-        str: CSV格式的资产负债表数据
-    """
-    try:
-        check_baostock_availability()
-        
-        # 验证市场支持并获取市场信息
-        market, market_info = validate_market_support(symbol, "balance sheet retrieval")
-        
-        # 格式化股票代码
-        formatted_symbol = format_symbol_for_baostock(symbol, market)
-        
-        # 如果没有指定年份和季度，使用最近的数据
-        if year is None:
-            year = datetime.now().year
-        if quarter is None:
-            quarter = 4  # 默认年报
-        
-        log_operation("get_balance_sheet", symbol, market, "ATTEMPT")
+        log_operation("get_balance_sheet", ticker, market, "ATTEMPT")
         
         with BaoStockSession():
             # 获取季频偿债能力（包含资产负债表相关数据）
             rs = bs.query_balance_data(code=formatted_symbol, year=year, quarter=quarter)
             
             if rs.error_code != '0':
-                log_operation("get_balance_sheet", symbol, market, "FAILED")
+                log_operation("get_balance_sheet", ticker, market, "FAILED")
                 return f"Error: BaoStock query failed: {rs.error_msg}"
             
             # 转换为DataFrame
@@ -155,8 +104,8 @@ def get_balance_sheet(
                 data_list.append(rs.get_row_data())
             
             if not data_list:
-                log_operation("get_balance_sheet", symbol, market, "FAILED")
-                return f"No balance sheet data found for symbol '{symbol}' for {year}Q{quarter}"
+                log_operation("get_balance_sheet", ticker, market, "FAILED")
+                return f"No balance sheet data found for symbol '{ticker}' for {year}Q{quarter}"
             
             # 创建DataFrame
             columns = rs.fields
@@ -167,7 +116,7 @@ def get_balance_sheet(
         
         # 构建头部信息
         header_lines = [
-            f"# Balance Sheet data for {symbol} ({market_info['market_name']}) - {year}Q{quarter}",
+            f"# Balance Sheet data for {ticker} ({market_info['market_name']}) - {year}Q{quarter}",
             f"# Formatted symbol: {formatted_symbol}",
             f"# Market: {market_info['market_name']} ({market_info['currency']})",
             f"# Total records: {len(data)}",
@@ -177,53 +126,52 @@ def get_balance_sheet(
         
         header = '\\n'.join(header_lines) + '\\n\\n'
         
-        log_operation("get_balance_sheet", symbol, market, "SUCCESS")
+        log_operation("get_balance_sheet", ticker, market, "SUCCESS")
         return header + csv_string
         
     except Exception as e:
-        log_operation("get_balance_sheet", symbol, market if 'market' in locals() else None, "FAILED")
-        return handle_baostock_exception(e, "retrieving balance sheet", symbol)
+        log_operation("get_balance_sheet", ticker, market if 'market' in locals() else None, "FAILED")
+        return handle_baostock_exception(e, "retrieving balance sheet", ticker)
 
 
-def get_income_statement(
-    symbol: Annotated[str, "ticker symbol of the company"],
-    year: Annotated[int, "Year for financial data"] = None,
-    quarter: Annotated[int, "Quarter (1-4) for financial data"] = None
-) -> str:
+def get_income_statement(ticker: str, freq: str = "quarterly", curr_date: str = None) -> str:
     """
-    获取利润表数据（盈利能力数据）
-    
+    Retrieve income statement data for a given ticker symbol using Alpha Vantage.
+
     Args:
-        symbol: 股票代码
-        year: 年份
-        quarter: 季度
-        
+        ticker (str): Ticker symbol of the company
+        freq (str): Reporting frequency: annual/quarterly (default quarterly) - not used for Alpha Vantage
+        curr_date (str): Current date you are trading at, yyyy-mm-dd (not used for Alpha Vantage)
+
     Returns:
-        str: CSV格式的利润表数据
+        str: Income statement data with normalized fields
     """
     try:
         check_baostock_availability()
         
         # 验证市场支持并获取市场信息
-        market, market_info = validate_market_support(symbol, "income statement retrieval")
+        market, market_info = validate_market_support(ticker, "income statement retrieval")
         
         # 格式化股票代码
-        formatted_symbol = format_symbol_for_baostock(symbol, market)
+        formatted_symbol = format_symbol_for_baostock(ticker, market)
         
-        # 如果没有指定年份和季度，使用最近的数据
-        if year is None:
-            year = datetime.now().year
-        if quarter is None:
-            quarter = 4  # 默认年报
+        # 将 freq 和 curr_date 转换为 year 和 quarter
+        year = _parse_year_parameter(curr_date) if curr_date else datetime.now().year
         
-        log_operation("get_income_statement", symbol, market, "ATTEMPT")
+        # 根据 freq 确定 quarter
+        if freq and freq.lower() in ["annual", "year", "年度"]:
+            quarter = 4  # 年报
+        else:
+            quarter = 4  # 默认季报（最新季度）
+        
+        log_operation("get_income_statement", ticker, market, "ATTEMPT")
         
         with BaoStockSession():
             # 获取季频盈利能力
             rs = bs.query_profit_data(code=formatted_symbol, year=year, quarter=quarter)
             
             if rs.error_code != '0':
-                log_operation("get_income_statement", symbol, market, "FAILED")
+                log_operation("get_income_statement", ticker, market, "FAILED")
                 return f"Error: BaoStock query failed: {rs.error_msg}"
             
             # 转换为DataFrame
@@ -232,8 +180,8 @@ def get_income_statement(
                 data_list.append(rs.get_row_data())
             
             if not data_list:
-                log_operation("get_income_statement", symbol, market, "FAILED")
-                return f"No income statement data found for symbol '{symbol}' for {year}Q{quarter}"
+                log_operation("get_income_statement", ticker, market, "FAILED")
+                return f"No income statement data found for symbol '{ticker}' for {year}Q{quarter}"
             
             # 创建DataFrame
             columns = rs.fields
@@ -244,7 +192,7 @@ def get_income_statement(
         
         # 构建头部信息
         header_lines = [
-            f"# Income Statement data for {symbol} ({market_info['market_name']}) - {year}Q{quarter}",
+            f"# Income Statement data for {ticker} ({market_info['market_name']}) - {year}Q{quarter}",
             f"# Formatted symbol: {formatted_symbol}",
             f"# Market: {market_info['market_name']} ({market_info['currency']})",
             f"# Total records: {len(data)}",
@@ -254,53 +202,52 @@ def get_income_statement(
         
         header = '\\n'.join(header_lines) + '\\n\\n'
         
-        log_operation("get_income_statement", symbol, market, "SUCCESS")
+        log_operation("get_income_statement", ticker, market, "SUCCESS")
         return header + csv_string
         
     except Exception as e:
-        log_operation("get_income_statement", symbol, market if 'market' in locals() else None, "FAILED")
-        return handle_baostock_exception(e, "retrieving income statement", symbol)
+        log_operation("get_income_statement", ticker, market if 'market' in locals() else None, "FAILED")
+        return handle_baostock_exception(e, "retrieving income statement", ticker)
 
 
-def get_cashflow(
-    symbol: Annotated[str, "ticker symbol of the company"],
-    year: Annotated[int, "Year for financial data"] = None,
-    quarter: Annotated[int, "Quarter (1-4) for financial data"] = None
-) -> str:
+def get_cashflow(ticker: str, freq: str = "quarterly", curr_date: str = None) -> str:
     """
-    获取现金流量表数据
-    
+    Retrieve cash flow statement data for a given ticker symbol using Alpha Vantage.
+
     Args:
-        symbol: 股票代码
-        year: 年份
-        quarter: 季度
-        
+        ticker (str): Ticker symbol of the company
+        freq (str): Reporting frequency: annual/quarterly (default quarterly) - not used for Alpha Vantage
+        curr_date (str): Current date you are trading at, yyyy-mm-dd (not used for Alpha Vantage)
+
     Returns:
-        str: CSV格式的现金流量表数据
+        str: Cash flow statement data with normalized fields
     """
     try:
         check_baostock_availability()
         
         # 验证市场支持并获取市场信息
-        market, market_info = validate_market_support(symbol, "cashflow retrieval")
+        market, market_info = validate_market_support(ticker, "cashflow retrieval")
         
         # 格式化股票代码
-        formatted_symbol = format_symbol_for_baostock(symbol, market)
+        formatted_symbol = format_symbol_for_baostock(ticker, market)
         
-        # 如果没有指定年份和季度，使用最近的数据
-        if year is None:
-            year = datetime.now().year
-        if quarter is None:
-            quarter = 4  # 默认年报
+        # 将 freq 和 curr_date 转换为 year 和 quarter
+        year = _parse_year_parameter(curr_date) if curr_date else datetime.now().year
         
-        log_operation("get_cashflow", symbol, market, "ATTEMPT")
+        # 根据 freq 确定 quarter
+        if freq and freq.lower() in ["annual", "year", "年度"]:
+            quarter = 4  # 年报
+        else:
+            quarter = 4  # 默认季报（最新季度）
+        
+        log_operation("get_cashflow", ticker, market, "ATTEMPT")
         
         with BaoStockSession():
             # 获取季频现金流量
             rs = bs.query_cash_flow_data(code=formatted_symbol, year=year, quarter=quarter)
             
             if rs.error_code != '0':
-                log_operation("get_cashflow", symbol, market, "FAILED")
+                log_operation("get_cashflow", ticker, market, "FAILED")
                 return f"Error: BaoStock query failed: {rs.error_msg}"
             
             # 转换为DataFrame
@@ -309,8 +256,8 @@ def get_cashflow(
                 data_list.append(rs.get_row_data())
             
             if not data_list:
-                log_operation("get_cashflow", symbol, market, "FAILED")
-                return f"No cashflow data found for symbol '{symbol}' for {year}Q{quarter}"
+                log_operation("get_cashflow", ticker, market, "FAILED")
+                return f"No cashflow data found for symbol '{ticker}' for {year}Q{quarter}"
             
             # 创建DataFrame
             columns = rs.fields
@@ -321,7 +268,7 @@ def get_cashflow(
         
         # 构建头部信息
         header_lines = [
-            f"# Cash Flow Statement data for {symbol} ({market_info['market_name']}) - {year}Q{quarter}",
+            f"# Cash Flow Statement data for {ticker} ({market_info['market_name']}) - {year}Q{quarter}",
             f"# Formatted symbol: {formatted_symbol}",
             f"# Market: {market_info['market_name']} ({market_info['currency']})",
             f"# Total records: {len(data)}",
@@ -331,46 +278,39 @@ def get_cashflow(
         
         header = '\\n'.join(header_lines) + '\\n\\n'
         
-        log_operation("get_cashflow", symbol, market, "SUCCESS")
+        log_operation("get_cashflow", ticker, market, "SUCCESS")
         return header + csv_string
         
     except Exception as e:
-        log_operation("get_cashflow", symbol, market if 'market' in locals() else None, "FAILED")
-        return handle_baostock_exception(e, "retrieving cashflow", symbol)
+        log_operation("get_cashflow", ticker, market if 'market' in locals() else None, "FAILED")
+        return handle_baostock_exception(e, "retrieving cashflow", ticker)
 
 
-def get_fundamentals(
-    symbol: Annotated[str, "ticker symbol of the company"],
-    year: Annotated[int, "Year for financial data"] = None,
-    quarter: Annotated[int, "Quarter (1-4) for financial data"] = None
-) -> str:
+def get_fundamentals(ticker: str, curr_date: str = None) -> str:
     """
-    获取基本面数据（营运能力和成长能力数据）
-    
+    Retrieve comprehensive fundamental data for a given ticker symbol using Alpha Vantage.
+
     Args:
-        symbol: 股票代码
-        year: 年份
-        quarter: 季度
-        
+        ticker (str): Ticker symbol of the company
+        curr_date (str): Current date you are trading at, yyyy-mm-dd (not used for Alpha Vantage)
+
     Returns:
-        str: CSV格式的基本面数据
+        str: Company overview data including financial ratios and key metrics
     """
     try:
         check_baostock_availability()
         
         # 验证市场支持并获取市场信息
-        market, market_info = validate_market_support(symbol, "fundamentals retrieval")
+        market, market_info = validate_market_support(ticker, "fundamentals retrieval")
         
         # 格式化股票代码
-        formatted_symbol = format_symbol_for_baostock(symbol, market)
+        formatted_symbol = format_symbol_for_baostock(ticker, market)
         
-        # 如果没有指定年份和季度，使用最近的数据
-        if year is None:
-            year = datetime.now().year
-        if quarter is None:
-            quarter = 4  # 默认年报
+        # 将 curr_date 转换为 year 和 quarter
+        year = _parse_year_parameter(curr_date) if curr_date else datetime.now().year
+        quarter = 4  # 默认年报
         
-        log_operation("get_fundamentals", symbol, market, "ATTEMPT")
+        log_operation("get_fundamentals", ticker, market, "ATTEMPT")
         
         with BaoStockSession():
             results = {}
@@ -404,8 +344,8 @@ def get_fundamentals(
                 print(f"Failed to retrieve growth data: {e}")
         
         if not results:
-            log_operation("get_fundamentals", symbol, market, "FAILED")
-            return f"No fundamentals data found for symbol '{symbol}' for {year}Q{quarter}"
+            log_operation("get_fundamentals", ticker, market, "FAILED")
+            return f"No fundamentals data found for symbol '{ticker}' for {year}Q{quarter}"
         
         # 合并所有基本面数据
         combined_csv = ""
@@ -416,7 +356,7 @@ def get_fundamentals(
         
         # 构建头部信息
         header_lines = [
-            f"# Fundamentals data for {symbol} ({market_info['market_name']}) - {year}Q{quarter}",
+            f"# Fundamentals data for {ticker} ({market_info['market_name']}) - {year}Q{quarter}",
             f"# Formatted symbol: {formatted_symbol}",
             f"# Market: {market_info['market_name']} ({market_info['currency']})",
             f"# Data types: {', '.join(results.keys())}",
@@ -427,9 +367,9 @@ def get_fundamentals(
         
         header = '\\n'.join(header_lines) + '\\n\\n'
         
-        log_operation("get_fundamentals", symbol, market, "SUCCESS")
+        log_operation("get_fundamentals", ticker, market, "SUCCESS")
         return header + combined_csv
         
     except Exception as e:
-        log_operation("get_fundamentals", symbol, market if 'market' in locals() else None, "FAILED")
-        return handle_baostock_exception(e, "retrieving fundamentals", symbol)
+        log_operation("get_fundamentals", ticker, market if 'market' in locals() else None, "FAILED")
+        return handle_baostock_exception(e, "retrieving fundamentals", ticker)

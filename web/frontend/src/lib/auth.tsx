@@ -3,12 +3,13 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, AuthResponse } from '@/lib/types';
 import { authAPI } from './apiClient';
+import { queryClient } from './react-query';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  login: (username: string, password: string, captcha?: { id: string; answer: string }) => Promise<void>;
+  register: (username: string, email: string, password: string, captcha?: { id: string; answer: string }) => Promise<void>;
   logout: () => void;
   token: string | null;
 }
@@ -45,9 +46,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, captcha?: { id: string; answer: string }) => {
     try {
-      const response: AuthResponse = await authAPI.login(username, password);
+      const response: AuthResponse = await authAPI.login(username, password, captcha);
       
       // 立即设置用户状态和token
       setUser(response.user);
@@ -65,9 +66,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (username: string, email: string, password: string) => {
+  const register = async (username: string, email: string, password: string, captcha?: { id: string; answer: string }) => {
     try {
-      const response: AuthResponse = await authAPI.register(username, email, password);
+      const response: AuthResponse = await authAPI.register(username, email, password, captcha);
       
       // 立即设置用户状态和token
       setUser(response.user);
@@ -91,6 +92,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('access_token');
     // 同时清除cookie
     document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+    
+    // 清除所有 React Query 缓存，避免下一个用户看到上一个用户的数据
+    queryClient.clear();
   };
 
   return (

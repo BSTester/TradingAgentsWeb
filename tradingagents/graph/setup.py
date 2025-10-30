@@ -96,6 +96,7 @@ class GraphSetup:
             self.deep_thinking_llm, self.invest_judge_memory
         )
         trader_node = create_trader(self.quick_thinking_llm, self.trader_memory)
+        trader_msg_delete = create_msg_delete()
 
         # Create risk analysis nodes
         risky_analyst = create_risky_debator(self.quick_thinking_llm)
@@ -121,6 +122,8 @@ class GraphSetup:
         workflow.add_node("Bear Researcher", bear_researcher_node)
         workflow.add_node("Research Manager", research_manager_node)
         workflow.add_node("Trader", trader_node)
+        workflow.add_node("tools_trader", self.tool_nodes["trader"])
+        workflow.add_node("Msg Clear Trader", trader_msg_delete)
         workflow.add_node("Risky Analyst", risky_analyst)
         workflow.add_node("Neutral Analyst", neutral_analyst)
         workflow.add_node("Safe Analyst", safe_analyst)
@@ -170,7 +173,13 @@ class GraphSetup:
             },
         )
         workflow.add_edge("Research Manager", "Trader")
-        workflow.add_edge("Trader", "Risky Analyst")
+        workflow.add_conditional_edges(
+            "Trader",
+            self.conditional_logic.should_continue_trader,
+            ["tools_trader", "Msg Clear Trader"],
+        )
+        workflow.add_edge("tools_trader", "Trader")
+        workflow.add_edge("Msg Clear Trader", "Risky Analyst")
         workflow.add_conditional_edges(
             "Risky Analyst",
             self.conditional_logic.should_continue_risk_analysis,

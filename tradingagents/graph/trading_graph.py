@@ -72,7 +72,7 @@ class TradingAgentsGraph:
         )
 
         # Initialize LLMs
-        if self.config["llm_provider"].lower() == "openai" or self.config["llm_provider"] == "ollama" or self.config["llm_provider"] == "openrouter":
+        if self.config["llm_provider"].lower() in ("openai", "ollama", "openrouter", "oneai", "deepseek", "qwen"):
             self.deep_thinking_llm = ChatOpenAI(model=self.config["deep_think_llm"], base_url=self.config["backend_url"])
             self.quick_thinking_llm = ChatOpenAI(model=self.config["quick_think_llm"], base_url=self.config["backend_url"])
         elif self.config["llm_provider"].lower() == "anthropic":
@@ -84,12 +84,14 @@ class TradingAgentsGraph:
         else:
             raise ValueError(f"Unsupported LLM provider: {self.config['llm_provider']}")
         
-        # Initialize memories
-        self.bull_memory = FinancialSituationMemory("bull_memory", self.config)
-        self.bear_memory = FinancialSituationMemory("bear_memory", self.config)
-        self.trader_memory = FinancialSituationMemory("trader_memory", self.config)
-        self.invest_judge_memory = FinancialSituationMemory("invest_judge_memory", self.config)
-        self.risk_manager_memory = FinancialSituationMemory("risk_manager_memory", self.config)
+        # Initialize memories with unique names per analysis to avoid conflicts in multi-user scenarios
+        # Use analysis_id from config if available, otherwise use timestamp-based unique ID
+        analysis_id = self.config.get("analysis_id", f"analysis_{id(self)}")
+        self.bull_memory = FinancialSituationMemory(f"bull_memory_{analysis_id}", self.config)
+        self.bear_memory = FinancialSituationMemory(f"bear_memory_{analysis_id}", self.config)
+        self.trader_memory = FinancialSituationMemory(f"trader_memory_{analysis_id}", self.config)
+        self.invest_judge_memory = FinancialSituationMemory(f"invest_judge_memory_{analysis_id}", self.config)
+        self.risk_manager_memory = FinancialSituationMemory(f"risk_manager_memory_{analysis_id}", self.config)
 
         # Create tool nodes
         self.tool_nodes = self._create_tool_nodes()
@@ -153,6 +155,13 @@ class TradingAgentsGraph:
                     get_balance_sheet,
                     get_cashflow,
                     get_income_statement,
+                ]
+            ),
+            "trader": ToolNode(
+                [
+                    # Trader tools for final decision making
+                    get_stock_data,
+                    get_indicators,
                 ]
             ),
         }
@@ -233,7 +242,7 @@ class TradingAgentsGraph:
             "w",
             encoding="utf-8"
         ) as f:
-            json.dump(self.log_states_dict, f, indent=4, ensure_ascii=False)
+            json.dump(self.log_states_dict, f, indent=4)
 
     def reflect_and_remember(self, returns_losses):
         """Reflect on decisions and update memory based on returns."""
@@ -256,3 +265,15 @@ class TradingAgentsGraph:
     def process_signal(self, full_signal):
         """Process a signal to extract the core decision."""
         return self.signal_processor.process_signal(full_signal)
+    
+    def cleanup_memories(self):
+        """Clean up all memory collections to free resources after analysis."""
+        try:
+            self.bull_memory.cleanup()
+            self.bear_memory.cleanup()
+            self.trader_memory.cleanup()
+            self.invest_judge_memory.cleanup()
+            self.risk_manager_memory.cleanup()
+        except Exception as e:
+            # Silently ignore cleanup errors
+            pass

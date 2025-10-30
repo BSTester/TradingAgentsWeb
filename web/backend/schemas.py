@@ -14,6 +14,9 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    # 服务端验证码（防绕过前端）
+    captcha_id: Optional[str] = None
+    captcha_answer: Optional[str] = None
     
     @validator('username')
     def validate_username(cls, v):
@@ -32,9 +35,13 @@ class UserCreate(UserBase):
 class UserLogin(BaseModel):
     username: str
     password: str
+    # 服务端验证码（防绕过前端）
+    captcha_id: Optional[str] = None
+    captcha_answer: Optional[str] = None
 
 class User(UserBase):
     id: int
+    role: str
     is_active: bool
     created_at: datetime
     
@@ -43,6 +50,11 @@ class User(UserBase):
 
 class UserInDB(User):
     hashed_password: str
+
+# Captcha
+class CaptchaResponse(BaseModel):
+    captcha_id: str
+    seed: str
 
 # Token schemas
 class Token(BaseModel):
@@ -68,6 +80,8 @@ class AnalysisRequest(BaseModel):
     backend_url: str
     shallow_thinker: str
     deep_thinker: str
+    # Privacy settings
+    is_public: bool = False  # Whether to show in public leaderboard
     # API Keys
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None

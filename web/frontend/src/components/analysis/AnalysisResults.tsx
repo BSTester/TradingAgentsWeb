@@ -1,15 +1,19 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { buildApiUrl, API_ENDPOINTS } from '../../utils/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
+import { logger } from '@/utils/logger';
 
 interface AnalysisResultsProps {
   analysisId: string;
   onBackToConfig: () => void;
+  onBackToHistory: () => void;
   onShowToast: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
+  fromLeaderboard?: boolean; // 是否从排行榜进入
 }
 
 interface PhaseResult {
@@ -23,63 +27,170 @@ interface PhaseResult {
   }[];
 }
 
-export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: AnalysisResultsProps) {
-  const [results, setResults] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, onShowToast, fromLeaderboard = false }: AnalysisResultsProps) {
   const [activePhase, setActivePhase] = useState(-1); // -1 表示显示最终分析说明
+  const [systemDomain, setSystemDomain] = useState('');
 
-  useEffect(() => {
-    // 获取分析结果
-    const fetchResults = async () => {
-      try {
-        const token = localStorage.getItem('access_token');
-        if (!token) {
-          onShowToast('请先登录', 'error');
-          setLoading(false);
-          return;
-        }
+  // 使用 useQuery 获取分析结果
+  const { data: results, isLoading: loading, isError, error } = useQuery({
+    queryKey: ['analysis', 'results', analysisId, fromLeaderboard],
+    queryFn: async () => {
+      const token = localStorage.getItem('access_token');
+      
+      // 从排行榜进入时不需要 token，从历史记录进入时需要 token
+      if (!fromLeaderboard && !token) {
+        console.error('❌ 未找到 access_token');
+        throw new Error('请先登录');
+      }
 
-        const response = await fetch(buildApiUrl(API_ENDPOINTS.ANALYSIS.RESULTS(analysisId)), {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+      // 根据来源选择不同的 API 端点
+      const endpoint = fromLeaderboard 
+        ? `/api/public/analysis/${analysisId}/results`  // 公开接口
+        : API_ENDPOINTS.ANALYSIS.RESULTS(analysisId);   // 私有接口
+
+      logger.log('📡 请求分析结果:', {
+        analysisId,
+        endpoint,
+        fromLeaderboard,
+        hasToken: !!token,
+        tokenPrefix: token ? token.substring(0, 20) + '...' : 'none'
+      });
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      // 只有在有 token 时才添加 Authorization header
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(buildApiUrl(endpoint), {
+        headers
+      });
+
+      logger.log('📡 响应状态:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        logger.error('❌ 请求失败:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
         });
 
-        if (!response.ok) {
-          if (response.status === 401) {
-            onShowToast('登录已过期，请重新登录', 'error');
-          } else if (response.status === 404) {
-            onShowToast('分析记录未找到', 'error');
-          } else if (response.status === 400) {
-            const error = await response.json();
-            onShowToast(error.detail || '分析未完成', 'error');
-          } else {
-            throw new Error('获取分析结果失败');
+        if (response.status === 401) {
+          throw new Error('登录已过期，请重新登录');
+        } else if (response.status === 404) {
+          throw new Error('分析记录未找到');
+        } else if (response.status === 400) {
+          try {
+            const errorData = JSON.parse(errorText);
+            throw new Error(errorData.detail || '分析未完成');
+          } catch {
+            throw new Error('分析未完成');
           }
-          setLoading(false);
-          return;
         }
-
-        const data = await response.json();
-        console.log('📊 Fetched results:', data);
-        setResults(data);
-      } catch (error) {
-        console.error('Error fetching results:', error);
-        onShowToast('获取分析结果失败', 'error');
-      } finally {
-        setLoading(false);
+        throw new Error(`获取分析结果失败: ${response.status} ${response.statusText}`);
       }
-    };
 
-    fetchResults();
-  }, [analysisId]);
+      const data = await response.json();
+      logger.log('✅ 成功获取分析结果:', data);
+      return data;
+    },
+    retry: 10, // 最多重试10次
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+  });
 
-  const handleExport = async (format: 'pdf' | 'markdown') => {
+  // 处理错误提示
+  useEffect(() => {
+    if (isError && error) {
+      onShowToast(error instanceof Error ? error.message : '获取分析结果失败', 'error');
+    }
+  }, [isError, error, onShowToast]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const origin = window.location.origin.replace(/\/+$/, '');
+        setSystemDomain(origin);
+      } catch {}
+    }
+  }, []);
+
+  const handleExport = async (format: 'pdf' | 'markdown' | 'image') => {
     try {
       const token = localStorage.getItem('access_token');
       if (!token) {
         onShowToast('请先登录', 'error');
+        return;
+      }
+
+      // 新增：导出为图片（PNG）
+      if (format === 'image') {
+        try {
+          onShowToast('正在生成图片，请稍候...', 'info');
+
+          // 动态导入 html2canvas
+          const html2canvas = (await import('html2canvas')).default;
+
+          // 使用与 PDF 相同的完整内容容器
+          const exportContent = document.querySelector('.pdf-export-content') as HTMLElement;
+          if (!exportContent) {
+            throw new Error('找不到导出内容区域');
+          }
+
+          // 克隆内容到临时容器以便完整渲染
+          const tempContainer = document.createElement('div');
+          tempContainer.style.position = 'absolute';
+          tempContainer.style.left = '-9999px';
+          tempContainer.style.top = '0';
+          tempContainer.style.width = '794px'; // A4 宽度对应的像素基准
+          tempContainer.style.backgroundColor = 'white';
+          tempContainer.style.padding = '40px';
+
+          const clonedContent = exportContent.cloneNode(true) as HTMLElement;
+          clonedContent.style.display = 'block';
+          clonedContent.style.position = 'static';
+          clonedContent.style.width = '100%';
+
+          tempContainer.appendChild(clonedContent);
+          document.body.appendChild(tempContainer);
+
+          // 等待渲染稳定
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          const canvas = await html2canvas(tempContainer, {
+            useCORS: true,
+            logging: true,
+            backgroundColor: '#ffffff',
+            scale: 2,
+            windowWidth: 874, // 794 + 80 padding
+            allowTaint: true,
+          } as any);
+
+          // 移除临时容器
+          document.body.removeChild(tempContainer);
+
+          if (canvas.width === 0 || canvas.height === 0) {
+            throw new Error('内容渲染失败，请重试');
+          }
+
+          // 生成 PNG 并下载
+          const imgData = canvas.toDataURL('image/png');
+          const link = document.createElement('a');
+          const filename = `${results?.ticker || 'analysis'}_${results?.analysis_date || 'report'}.png`;
+          link.href = imgData;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+
+          onShowToast('图片已下载', 'success');
+        } catch (error) {
+          console.error('Image generation error:', error);
+          onShowToast(`图片生成失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error');
+        }
         return;
       }
 
@@ -158,7 +269,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
             allowTaint: true,
           } as any);
 
-          console.log('Canvas size:', canvas.width, 'x', canvas.height);
+          logger.log('Canvas size:', canvas.width, 'x', canvas.height);
 
           // 移除临时容器
           document.body.removeChild(tempContainer);
@@ -183,8 +294,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
           const imgWidth = pdfWidth;
           const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-          console.log('PDF size:', pdfWidth, 'x', pdfHeight);
-          console.log('Image size in PDF:', imgWidth, 'x', imgHeight);
+          logger.log('PDF size:', pdfWidth, 'x', pdfHeight);
+          logger.log('Image size in PDF:', imgWidth, 'x', imgHeight);
 
           // 验证尺寸
           if (imgWidth <= 0 || imgHeight <= 0 || !isFinite(imgWidth) || !isFinite(imgHeight)) {
@@ -208,7 +319,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
 
           // 保存 PDF
           const filename = `${results?.ticker || 'analysis'}_${results?.analysis_date || 'report'}.pdf`;
-          console.log('Saving PDF:', filename);
+          logger.log('Saving PDF:', filename);
           pdf.save(filename);
 
           onShowToast('PDF 文件已下载', 'success');
@@ -235,10 +346,16 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-lg p-6">
+      <div className="bg-white rounded-lg shadow-lg p-12">
         <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4" />
-          <p className="text-gray-600">正在加载分析结果...</p>
+          <div className="relative inline-block mb-4">
+            {/* 外圈旋转 */}
+            <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+            {/* 内圈反向旋转 */}
+            <div className="absolute top-2 left-2 w-16 h-16 border-4 border-purple-200 border-b-purple-600 rounded-full animate-spin-reverse"></div>
+          </div>
+          <p className="text-gray-700 font-medium text-lg">正在加载分析结果...</p>
+          <p className="text-sm text-gray-500 mt-2">正在获取详细报告，请稍候</p>
         </div>
       </div>
     );
@@ -324,10 +441,12 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
               </div>
             </div>
             <button
-              onClick={onBackToConfig}
-              className="text-gray-500 hover:text-gray-700 no-print"
+              onClick={onBackToHistory}
+              className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors no-print"
+              title="返回"
             >
-              <i className="fas fa-times text-xl" />
+              <i className="fas fa-arrow-left text-lg" />
+              <span className="font-medium">返回</span>
             </button>
           </div>
         </div>
@@ -342,7 +461,10 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
                   <i className="fas fa-chart-line text-3xl" />
                 </div>
                 <div>
-                  <p className="text-sm opacity-90">股票代码</p>
+                  <p className="text-sm opacity-90">
+                    {results?.market === 'US' ? '美股' : results?.market === 'HK' ? '港股' : results?.market === 'CN' ? 'A股' : '股票'}
+                    {results?.company_name && ` | ${results.company_name}`}
+                  </p>
                   <p className="text-3xl font-bold">{results?.ticker}</p>
                 </div>
               </div>
@@ -372,7 +494,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
                   }`}
               >
                 <i className="fas fa-file-alt mr-2" />
-                交易决策分析
+                投资组合分析
               </button>
 
               {/* 四个阶段标签 */}
@@ -780,7 +902,10 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
                   <i className="fas fa-chart-line text-3xl" />
                 </div>
                 <div>
-                  <p className="text-sm opacity-90">股票代码</p>
+                  <p className="text-sm opacity-90">
+                    {results?.market === 'US' ? '美股' : results?.market === 'HK' ? '港股' : results?.market === 'CN' ? 'A股' : '股票'}
+                    {results?.company_name && ` | ${results.company_name}`}
+                  </p>
                   <p className="text-3xl font-bold">{results?.ticker}</p>
                 </div>
               </div>
@@ -1019,6 +1144,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
                 </p>
                 <p className="text-xs text-gray-500 mt-4">
                   报告生成时间：{results?.analysis_date} | 股票代码：{results?.ticker}
+                  {results?.company_name && ` (${results.company_name})`}
+                  {results?.market && ` | 市场：${results?.market === 'US' ? '美股' : results?.market === 'HK' ? '港股' : results?.market === 'CN' ? 'A股' : results?.market}`}
                 </p>
               </div>
             </div>
@@ -1038,36 +1165,51 @@ export function AnalysisResults({ analysisId, onBackToConfig, onShowToast }: Ana
               </div>
             </div>
           </div>
+
+          {/* PDF 导出页尾显示平台地址 */}
+          <div className="mt-2 text-right text-xs text-gray-500">
+            平台地址：{systemDomain}
+          </div>
         </div>
 
-        {/* 底部操作按钮 */}
+        {/* 底部操作区域 */}
         <div className="p-6 bg-gray-50 border-t border-gray-200 no-print">
-          <div className="flex flex-wrap gap-3 justify-center">
-            <button
-              onClick={() => handleExport('pdf')}
-              className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center font-medium"
-            >
-              <i className="fas fa-file-pdf mr-2" />
-              导出为PDF
-            </button>
-            <button
-              onClick={() => handleExport('markdown')}
-              className="px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center font-medium"
-            >
-              <i className="fas fa-file-code mr-2" />
-              导出为Markdown
-            </button>
-            <button
-              onClick={onBackToConfig}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center font-medium"
-            >
-              <i className="fas fa-plus-circle mr-2" />
-              新建分析
-            </button>
-          </div>
+          {/* 操作按钮 - 排行榜模式下隐藏 */}
+          {!fromLeaderboard && (
+            <div className="flex flex-wrap gap-3 justify-center mb-6">
+              <button
+                onClick={() => handleExport('pdf')}
+                className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center font-medium"
+              >
+                <i className="fas fa-file-pdf mr-2" />
+                导出为PDF
+              </button>
+              <button
+                onClick={() => handleExport('image')}
+                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center font-medium"
+              >
+                <i className="fas fa-image mr-2" />
+                导出为图片
+              </button>
+              <button
+                onClick={() => handleExport('markdown')}
+                className="px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center font-medium"
+              >
+                <i className="fas fa-file-code mr-2" />
+                导出为Markdown
+              </button>
+              <button
+                onClick={onBackToConfig}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center font-medium"
+              >
+                <i className="fas fa-plus-circle mr-2" />
+                新建分析
+              </button>
+            </div>
+          )}
 
-          {/* 免责声明 */}
-          <div className="mt-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+          {/* 免责声明 - 始终显示 */}
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
             <div className="flex items-start">
               <i className="fas fa-exclamation-triangle text-yellow-600 text-xl mr-3 mt-1" />
               <div>

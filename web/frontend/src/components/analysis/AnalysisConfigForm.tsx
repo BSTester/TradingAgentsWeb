@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { analysisAPI } from '@/lib/api';
+import { normalizeTicker, validateTicker, getTickerErrorMessage } from '@/utils/tickerValidator';
 
 interface AnalysisConfigFormProps {
   config: any;
@@ -18,6 +19,7 @@ interface FormData {
   api_key: string;
   shallow_thinker: string;
   deep_thinker: string;
+  is_public: boolean;  // Privacy setting for leaderboard
 }
 
 interface Analyst {
@@ -54,20 +56,23 @@ const CACHE_KEY = 'trading_agents_config_cache';
 
 export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: AnalysisConfigFormProps) {
   const [formData, setFormData] = useState<FormData>({
-    ticker: 'SPY',
+    ticker: '',
     analysis_date: new Date().toISOString().split('T')[0] || '',
-    analysts: [],
+    analysts: [],  // 初始为空，由缓存或默认值填充
     research_depth: 1,
     llm_provider: '',
     api_key: '',
     shallow_thinker: '',
     deep_thinker: '',
+    is_public: true,  // Default to public (checked)
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiKeyValidated, setApiKeyValidated] = useState(false);
   const [validatingKey, setValidatingKey] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [tickerError, setTickerError] = useState<string>('');
+  const [showPrivacyDialog, setShowPrivacyDialog] = useState(false);
 
   // 检查当前选择的LLM提供商是否需要API密钥
   const requiresApiKey = formData.llm_provider && formData.llm_provider !== 'ollama';
@@ -93,7 +98,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
         const cachedDate = new Date(cachedData.cached_at);
         const now = new Date();
         const diffHours = (now.getTime() - cachedDate.getTime()) / (1000 * 60 * 60);
-        
+
         // 缓存在24小时内有效
         if (diffHours < 24) {
           setFormData(prev => ({
@@ -101,13 +106,13 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
             ...cachedData,
             analysis_date: new Date().toISOString().split('T')[0] || '' // 始终使用今天的日期
           }));
-          
+
           // 如果缓存中包含API密钥且不是本地模型，设置验证状态为true
           // 这样用户就不需要重新输入已缓存的API密钥
           if (cachedData.api_key && cachedData.llm_provider && cachedData.llm_provider !== 'ollama') {
             setApiKeyValidated(true);
           }
-          
+
           return true;
         }
       }
@@ -122,6 +127,12 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     const loaded = loadConfigFromCache();
     if (loaded) {
       onShowToast('已加载上次配置', 'info');
+    } else {
+      // 如果没有缓存，设置默认值：全选分析师
+      setFormData(prev => ({
+        ...prev,
+        analysts: ['market', 'social', 'news', 'fundamentals']
+      }));
     }
   }, []);
 
@@ -143,18 +154,21 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     { value: 'anthropic', label: 'Anthropic', description: 'Claude系列模型' },
     { value: 'google', label: 'Google', description: 'Gemini系列模型' },
     { value: 'openrouter', label: 'OpenRouter', description: '多模型聚合平台' },
+    { value: 'deepseek', label: 'Deepseek', description: 'Deepseek系列模型' },
+    { value: 'qwen', label: 'Qwen', description: '通义千问系列模型' },
+    { value: 'oneai', label: 'OneAI', description: '多模型聚合平台' },
     { value: 'ollama', label: 'Ollama', description: '本地模型服务' }
   ];
 
   const getModelsForProvider = (provider: string, type: 'shallow' | 'deep'): Model[] => {
     // 将provider转换为小写以匹配后端返回的键名
     const providerKey = provider.toLowerCase();
-    
+
     // 如果config中有模型数据，使用config的数据
     if (config?.models?.[providerKey]?.[type]) {
       return config.models[providerKey][type];
     }
-    
+
     // 否则使用默认模型列表
     const defaultModels: Record<string, Record<string, Model[]>> = {
       openai: {
@@ -198,6 +212,17 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
           { value: 'google/gemini-pro', label: 'Gemini Pro' }
         ]
       },
+      oneai: {
+        shallow: [
+          { value: 'openai/gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+          { value: 'anthropic/claude-3-haiku', label: 'Claude 3 Haiku' }
+        ],
+        deep: [
+          { value: 'openai/gpt-4-turbo', label: 'GPT-4 Turbo' },
+          { value: 'anthropic/claude-3-opus', label: 'Claude 3 Opus' },
+          { value: 'google/gemini-pro', label: 'Gemini Pro' }
+        ]
+      },
       ollama: {
         shallow: [
           { value: 'llama3.2', label: 'Llama 3.2' },
@@ -211,13 +236,16 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
         ]
       }
     };
-    
+
     return defaultModels[providerKey]?.[type] || [];
   };
 
   const getApiKeyPlaceholder = (provider: string) => {
     const placeholders: Record<string, string> = {
       openai: '输入您的OpenAI API密钥 (sk-...)',
+      oneai: '输入您的OneAI API密钥 (sk-...)',
+      deepseek: '输入您的Deepseek API密钥 (sk-...)',
+      qwen: '输入您的Qwen API密钥 (sk-...)',
       anthropic: '输入您的Anthropic API密钥 (sk-ant-...)',
       google: '输入您的Google API密钥',
       openrouter: '输入您的OpenRouter API密钥 (sk-or-...)',
@@ -226,13 +254,42 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     return placeholders[provider] || '输入API密钥';
   };
 
+  // 验证股票代码格式（使用统一的校验工具）
+  const validateTickerFormat = (ticker: string): { valid: boolean; error: string } => {
+    if (!ticker || ticker.trim() === '') {
+      return { valid: false, error: '请输入股票代码' };
+    }
+
+    const normalized = normalizeTicker(ticker);
+    const isValid = validateTicker(normalized);
+
+    if (!isValid) {
+      return {
+        valid: false,
+        error: getTickerErrorMessage(ticker)
+      };
+    }
+
+    return { valid: true, error: '' };
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
+
     // 如果更改了LLM提供商或API密钥，重置验证状态
     if (name === 'llm_provider' || name === 'api_key') {
       setApiKeyValidated(false);
+    }
+
+    // 如果更改了股票代码，实时校验
+    if (name === 'ticker') {
+      if (value.trim() === '') {
+        setTickerError('');
+      } else {
+        const validation = validateTickerFormat(value);
+        setTickerError(validation.error);
+      }
     }
   };
 
@@ -279,7 +336,15 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    // 验证股票代码
+    const tickerValidation = validateTickerFormat(formData.ticker);
+    if (!tickerValidation.valid) {
+      setTickerError(tickerValidation.error);
+      onShowToast('请输入有效的股票代码', 'error');
+      return;
+    }
+
     if (formData.analysts.length === 0) {
       onShowToast('请至少选择一个分析师', 'error');
       return;
@@ -291,15 +356,26 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       return;
     }
 
+    // 只有勾选公开时才显示确认对话框，未勾选直接开始分析
+    if (formData.is_public) {
+      setShowPrivacyDialog(true);
+    } else {
+      confirmStartAnalysis();
+    }
+  };
+
+  // 确认开始分析
+  const confirmStartAnalysis = async () => {
+    setShowPrivacyDialog(false);
     setIsSubmitting(true);
 
     try {
       // 保存完整配置到缓存（包括API密钥）
       saveConfigToCache(formData);
-      
-      // 准备API请求数据
+
+      // 准备API请求数据（使用标准化的ticker）
       const requestData: any = {
-        ticker: formData.ticker,
+        ticker: normalizeTicker(formData.ticker),
         analysis_date: formData.analysis_date,
         analysts: formData.analysts,
         research_depth: formData.research_depth,
@@ -307,26 +383,25 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
         backend_url: config?.llm_providers?.find((p: any) => p.value === formData.llm_provider)?.url || '',
         shallow_thinker: formData.shallow_thinker,
         deep_thinker: formData.deep_thinker,
+        is_public: formData.is_public,  // Include privacy setting
       };
 
       // 根据提供商添加对应的API密钥
-      if (formData.llm_provider === 'openai') {
+      if (formData.llm_provider === 'openai' || formData.llm_provider === 'oneai' || formData.llm_provider === 'qwen' || formData.llm_provider === 'deepseek' || formData.llm_provider === 'openrouter') {
         requestData.openai_api_key = formData.api_key;
       } else if (formData.llm_provider === 'anthropic') {
         requestData.anthropic_api_key = formData.api_key;
       } else if (formData.llm_provider === 'google') {
         requestData.google_api_key = formData.api_key;
-      } else if (formData.llm_provider === 'openrouter') {
-        requestData.openrouter_api_key = formData.api_key;
       }
 
       // 调用后端API启动分析
       const response: AnalysisResponse = await analysisAPI.startAnalysis(requestData);
-      
+
       console.log('=== Analysis Started ===');
       console.log('Response:', response);
       console.log('Analysis ID:', response.analysis_id);
-      
+
       // 检查是否是重复任务
       if (response.message && response.status !== 'queued') {
         // 重复任务，显示明确的警告提示
@@ -377,10 +452,23 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
               name="ticker"
               value={formData.ticker}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="例如：SPY, AAPL, NVDA"
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:border-transparent ${tickerError
+                ? 'border-red-300 focus:ring-red-500'
+                : 'border-gray-300 focus:ring-blue-500'
+                }`}
+              placeholder="例如：TSLA, 600519, 00700.HK"
               required
             />
+            {tickerError && (
+              <div className="mt-2 text-sm text-red-600 whitespace-pre-line">
+                <i className="fas fa-exclamation-circle mr-1" />
+                {tickerError}
+              </div>
+            )}
+            <p className="text-sm text-gray-500 mt-2">
+              <i className="fas fa-info-circle mr-1" />
+              支持美股（如 AAPL）、A股（如 600519）、港股（如 00700.HK）
+            </p>
           </div>
         </div>
 
@@ -422,11 +510,10 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
               {availableAnalysts.map((analyst: Analyst) => (
                 <div
                   key={analyst.value}
-                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                    formData.analysts.includes(analyst.value)
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
+                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${formData.analysts.includes(analyst.value)
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-300 hover:border-gray-400'
+                    }`}
                   onClick={() => handleAnalystToggle(analyst.value)}
                 >
                   <div className="flex items-start space-x-3">
@@ -461,16 +548,15 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
               {researchDepths.map((depth: ResearchDepth) => (
                 <div
                   key={depth.value}
-                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                    formData.research_depth === depth.value
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
+                  className={`p-4 border rounded-lg cursor-pointer transition-colors ${formData.research_depth === depth.value
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-300 hover:border-gray-400'
+                    }`}
                   onClick={() => setFormData(prev => ({ ...prev, research_depth: depth.value }))}
                 >
                   <div className="flex items-start space-x-3">
                     <input
-                      type="radio" 
+                      type="radio"
                       name="research_depth"
                       value={depth.value}
                       checked={formData.research_depth === depth.value}
@@ -549,11 +635,10 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
                     type="button"
                     onClick={validateApiKey}
                     disabled={validatingKey || !formData.api_key}
-                    className={`px-4 py-2 rounded-md border font-medium transition-colors ${
-                      apiKeyValidated
-                        ? 'bg-green-50 border-green-200 text-green-700'
-                        : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    className={`px-4 py-2 rounded-md border font-medium transition-colors ${apiKeyValidated
+                      ? 'bg-green-50 border-green-200 text-green-700'
+                      : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {validatingKey ? (
                       <>
@@ -638,6 +723,33 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
           </div>
         </div>
 
+        {/* 隐私授权 */}
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <i className="fas fa-info-circle text-yellow-600 text-xl mt-0.5" />
+            </div>
+            <div className="ml-3 flex-1">
+              <h4 className="text-sm font-bold text-yellow-800 mb-2">隐私授权</h4>
+              <div className="flex items-start space-x-2">
+                <input
+                  type="checkbox"
+                  id="is_public"
+                  checked={formData.is_public}
+                  onChange={(e) => setFormData(prev => ({ ...prev, is_public: e.target.checked }))}
+                  className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                />
+                <label htmlFor="is_public" className="text-sm text-yellow-700 cursor-pointer">
+                  我同意将此分析结果公开展示在排行榜上，供其他用户参考学习。
+                  <span className="block mt-1 text-xs text-yellow-600">
+                    （不勾选则仅自己可见，勾选后将在首页排行榜中展示）
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* 提交按钮 */}
         <div className="text-center pt-6">
           <button
@@ -659,6 +771,62 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
           </button>
         </div>
       </form>
+
+      {/* 隐私确认对话框 */}
+      {showPrivacyDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 animate-fade-in">
+            <div className="flex items-start mb-4">
+              <div className="flex-shrink-0">
+                <i className="fas fa-shield-alt text-blue-600 text-3xl" />
+              </div>
+              <div className="ml-4">
+                <h3 className="text-lg font-bold text-gray-900 mb-2">
+                  隐私设置确认
+                </h3>
+                <div className="text-sm text-gray-600 space-y-2">
+                  {formData.is_public ? (
+                    <>
+                      <p className="flex items-start">
+                        <i className="fas fa-check-circle text-green-500 mr-2 mt-0.5" />
+                        <span>您已同意将分析结果<strong className="text-green-600">公开展示</strong>在排行榜上</span>
+                      </p>
+                      <p className="ml-6 text-xs text-gray-500">
+                        其他用户可以在首页排行榜中查看您的分析结果，这有助于社区学习交流
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="flex items-start">
+                        <i className="fas fa-lock text-gray-500 mr-2 mt-0.5" />
+                        <span>您的分析结果将<strong className="text-gray-700">仅自己可见</strong></span>
+                      </p>
+                      <p className="ml-6 text-xs text-gray-500">
+                        分析结果不会出现在公开排行榜中，只有您可以查看
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={() => setShowPrivacyDialog(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmStartAnalysis}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                确认并开始分析
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

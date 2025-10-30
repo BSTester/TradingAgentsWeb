@@ -5,7 +5,7 @@ Export Routes
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
 import time
 
@@ -21,13 +21,16 @@ async def export_analysis_pdf(
     analysis_id: str,
     export_request: dict,  # ExportRequest type
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """Export analysis results as PDF"""
-    analysis = db.query(AnalysisRecord).filter(
+    from sqlalchemy import select
+    stmt = select(AnalysisRecord).filter(
         AnalysisRecord.analysis_id == analysis_id,
         AnalysisRecord.user_id == current_user.id
-    ).first()
+    )
+    result = await db.execute(stmt)
+    analysis = result.scalars().first()
     
     if not analysis:
         raise HTTPException(status_code=404, detail="分析未找到")
