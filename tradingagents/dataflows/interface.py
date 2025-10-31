@@ -48,6 +48,7 @@ def get_alpha_vantage_indicator(symbol: str, indicator: str, curr_date: str, loo
 from .alpha_vantage_common import AlphaVantageRateLimitError
 from .akshare import (
     get_stock as get_akshare_stock,
+    get_stock_realtime_quote as get_akshare_realtime_quote,
     get_indicators as get_akshare_indicators,
     get_fundamentals as get_akshare_fundamentals,
     get_balance_sheet as get_akshare_balance_sheet,
@@ -67,7 +68,8 @@ TOOLS_CATEGORIES = {
     "core_stock_apis": {
         "description": "OHLCV stock price data",
         "tools": [
-            "get_stock_data"
+            "get_stock_data",
+            "get_realtime_quote"
         ]
     },
     "technical_indicators": {
@@ -112,6 +114,12 @@ VENDOR_METHODS = {
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
         "local": get_YFin_data,
+    },
+    "get_realtime_quote": {
+        "akshare": get_akshare_realtime_quote,
+        # Future: Add other vendors as they become available
+        # "yfinance": get_yfinance_realtime_quote,
+        # "alpha_vantage": get_alpha_vantage_realtime_quote,
     },
     # technical_indicators
     "get_indicators": {

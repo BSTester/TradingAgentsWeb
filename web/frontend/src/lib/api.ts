@@ -269,3 +269,68 @@ export class AnalysisWebSocket {
     }
   }
 }
+
+
+// Scheduled Tasks APIs
+export const scheduledTasksAPI = {
+  // Create a new scheduled task
+  create: (data: {
+    task_name: string;
+    ticker: string;
+    analysts: string[];
+    research_depth: number;
+    llm_provider: string;
+    backend_url: string;
+    shallow_thinker: string;
+    deep_thinker: string;
+    is_public: boolean;
+    execution_cycle: string;
+    execution_time: string;
+    interval_days?: number;
+    end_date?: string;
+  }) =>
+    apiRequest<any>('/api/scheduled-tasks/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // List scheduled tasks
+  list: (params?: { page?: number; limit?: number }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+    return apiRequest<{
+      items: any[];
+      total: number;
+      page: number;
+      limit: number;
+      has_next: boolean;
+      has_prev: boolean;
+    }>(`/api/scheduled-tasks/?${queryParams.toString()}`);
+  },
+
+  // Get a specific scheduled task
+  get: (taskId: number) =>
+    apiRequest<any>(`/api/scheduled-tasks/${taskId}`),
+
+  // Update a scheduled task
+  update: (taskId: number, data: { is_enabled?: boolean; task_name?: string }) =>
+    apiRequest<any>(`/api/scheduled-tasks/${taskId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  // Delete a scheduled task
+  delete: (taskId: number) =>
+    apiRequest<{
+      success: boolean;
+      message: string;
+      task_id: number;
+      task_name: string;
+      task_status: string;
+      scheduler_removed: boolean;
+    }>(`/api/scheduled-tasks/${taskId}`, {
+      method: 'DELETE',
+    }),
+};

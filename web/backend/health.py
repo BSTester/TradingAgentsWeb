@@ -16,9 +16,14 @@ async def health_check():
     健康检查端点
     返回服务状态和基本信息
     """
+    # Use Beijing time
+    from pytz import timezone as pytz_timezone
+    beijing_tz = pytz_timezone('Asia/Shanghai')
+    now_beijing = datetime.now(beijing_tz)
+    
     return {
         "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": now_beijing.isoformat(),
         "service": "TradingAgents Backend",
         "version": "1.0.0",
         "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
@@ -46,9 +51,14 @@ async def readiness_check():
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         
+        # Use Beijing time
+        from pytz import timezone as pytz_timezone
+        beijing_tz = pytz_timezone('Asia/Shanghai')
+        now_beijing = datetime.now(beijing_tz)
+        
         return {
             "status": "ready",
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": now_beijing.isoformat(),
             "checks": {
                 "config": "ok"
             }
@@ -66,7 +76,12 @@ async def liveness_check():
     存活检查端点
     检查服务是否还在运行
     """
+    # Use Beijing time
+    from pytz import timezone as pytz_timezone
+    beijing_tz = pytz_timezone('Asia/Shanghai')
+    now_beijing = datetime.now(beijing_tz)
+    
     return {
         "status": "alive",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": now_beijing.isoformat()
     }

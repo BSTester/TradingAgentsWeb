@@ -1,7 +1,7 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 import time
 import json
-from tradingagents.agents.utils.agent_utils import get_stock_data, get_indicators
+from tradingagents.agents.utils.agent_utils import get_stock_data, get_indicators, get_realtime_quote
 from tradingagents.dataflows.config import get_config
 
 
@@ -15,6 +15,7 @@ def create_market_analyst(llm):
         tools = [
             get_stock_data,
             get_indicators,
+            get_realtime_quote,
         ]
 
         system_message = (
@@ -42,7 +43,19 @@ Volatility Indicators:
 Volume-Based Indicators:
 - vwma: VWMA: A moving average weighted by volume. Usage: Confirm trends by integrating price action with volume data. Tips: Watch for skewed results from volume spikes; use in combination with other volume analyses.
 
-- Select indicators that provide diverse and complementary information. Avoid redundancy (e.g., do not select both rsi and stochrsi). Also briefly explain why they are suitable for the given market context. When you tool call, please use the exact name of the indicators provided above as they are defined parameters, otherwise your call will fail. Please make sure to call get_stock_data first to retrieve the CSV needed to generate indicators for the period from one month prior to the analysis date up to the analysis date (inclusive). Then use get_indicators with the specific indicator names. Write a very detailed and nuanced report of the trends you observe. Do not simply state the trends are mixed, provide detailed and finegrained analysis and insights that may help traders make decisions."""
+- Select indicators that provide diverse and complementary information. Avoid redundancy (e.g., do not select both rsi and stochrsi). Also briefly explain why they are suitable for the given market context. When you tool call, please use the exact name of the indicators provided above as they are defined parameters, otherwise your call will fail. 
+
+Available tools:
+1. get_realtime_quote: Get current real-time market data (current price, volume, P/E ratio, market cap, etc.) - Use this first to understand the current market situation
+2. get_stock_data: Retrieve historical price data (OHLCV) for a date range - Use this to analyze trends
+3. get_indicators: Calculate technical indicators based on historical data
+
+Recommended workflow:
+- First call get_realtime_quote to get the latest market snapshot
+- Then call get_stock_data for the period from one month prior to the analysis date up to the analysis date (inclusive)
+- Finally use get_indicators with specific indicator names to perform technical analysis
+
+Write a very detailed and nuanced report of the trends you observe. Do not simply state the trends are mixed, provide detailed and finegrained analysis and insights that may help traders make decisions."""
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
         )
 

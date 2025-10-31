@@ -2,7 +2,7 @@ import functools
 import time
 import json
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from tradingagents.agents.utils.agent_utils import get_stock_data, get_indicators
+from tradingagents.agents.utils.agent_utils import get_stock_data, get_indicators, get_realtime_quote
 
 
 def create_trader(llm, memory):
@@ -30,6 +30,7 @@ def create_trader(llm, memory):
         tools = [
             get_stock_data,
             get_indicators,
+            get_realtime_quote,
         ]
 
         system_message = f"""You are a trading agent analyzing market data to make investment decisions. 
@@ -39,9 +40,10 @@ Based on a comprehensive analysis by a team of analysts, here is an investment p
 Proposed Investment Plan: {investment_plan}
 
 Before making your final trading decision, you should:
-1. Use get_stock_data to retrieve recent price data from one month prior to the analysis date up to the analysis date (inclusive)
-2. Use get_indicators to calculate relevant technical indicators (e.g., RSI, MACD, moving averages, Bollinger Bands)
-3. Analyze the retrieved data along with the provided reports to make an informed decision
+1. Use get_realtime_quote to get the current market price and real-time metrics (current price, volume, P/E ratio, market cap, etc.)
+2. Use get_stock_data to retrieve recent price data from one month prior to the analysis date up to the analysis date (inclusive)
+3. Use get_indicators to calculate relevant technical indicators (e.g., RSI, MACD, moving averages, Bollinger Bands)
+4. Analyze the retrieved data along with the provided reports to make an informed decision
 
 After analyzing the data, provide a specific recommendation to buy, sell, or hold. Do not forget to utilize lessons from past decisions to learn from your mistakes. Here is some reflections from similar situations you traded in and the lessons learned: {past_memory_str}
 

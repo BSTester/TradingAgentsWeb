@@ -77,8 +77,11 @@ async def start_analysis(
     # Detect market
     market = detect_market(ticker)
     
-    # Generate analysis ID
-    analysis_id = f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{ticker}_{current_user.id}"
+    # Generate analysis ID (use Beijing time)
+    from pytz import timezone as pytz_timezone
+    beijing_tz = pytz_timezone('Asia/Shanghai')
+    now_beijing = datetime.now(beijing_tz)
+    analysis_id = f"analysis_{now_beijing.strftime('%Y%m%d_%H%M%S')}_{ticker}_{current_user.id}"
     
     # Create analysis record
     analysis_record = AnalysisRecord(
@@ -169,9 +172,14 @@ async def stop_analysis(
     if stopped:
         # 发送中断消息到 WebSocket
         import asyncio
+        # Use Beijing time for timestamp
+        from pytz import timezone as pytz_timezone
+        beijing_tz = pytz_timezone('Asia/Shanghai')
+        now_beijing = datetime.now(beijing_tz)
+        
         asyncio.create_task(manager.send_message({
             "type": "interrupted",
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": now_beijing.isoformat(),
             "data": {
                 "message": "分析已被用户中断"
             }

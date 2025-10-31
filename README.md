@@ -241,6 +241,8 @@ docker-compose up --build -d
 
 ### 核心功能
 - [公司名称显示功能](docs/COMPANY_NAME_FEATURE.md) - 中文公司名称提取和显示
+- [实时股票行情](docs/REALTIME_QUOTES_QUICKSTART.md) - A股/美股/港股实时行情获取
+- [雪球Token配置](docs/XUEQIU_TOKEN_SETUP.md) - 雪球API认证配置指南
 
 ### 数据库
 - [数据库初始化说明](docs/DATABASE_INIT_SUMMARY.md) - 应用启动时自动初始化
