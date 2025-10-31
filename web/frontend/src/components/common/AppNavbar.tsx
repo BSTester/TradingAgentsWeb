@@ -62,6 +62,17 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
               <i className="fas fa-history mr-1" />
               分析历史
             </button>
+            <button
+              onClick={() => router.push('/scheduled-tasks')}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                isActive('/scheduled-tasks')
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-300 hover:text-white hover:bg-gray-800'
+              }`}
+            >
+              <i className="fas fa-clock mr-1" />
+              定期报告
+            </button>
             {showUserManagement && user?.role === 'admin' && (
               <button
                 onClick={() => router.push('/admin/users')}

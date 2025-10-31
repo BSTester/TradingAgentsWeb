@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { analysisAPI } from '@/lib/api';
+import { analysisAPI, scheduledTasksAPI } from '@/lib/api';
 import { normalizeTicker, validateTicker, getTickerErrorMessage } from '@/utils/tickerValidator';
+import { ScheduleConfig, ScheduleData } from './ScheduleConfig';
 
 interface AnalysisConfigFormProps {
   config: any;
@@ -73,6 +74,16 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
   const [showApiKey, setShowApiKey] = useState(false);
   const [tickerError, setTickerError] = useState<string>('');
   const [showPrivacyDialog, setShowPrivacyDialog] = useState(false);
+
+  // 定期报告配置状态
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduleData, setScheduleData] = useState<ScheduleData>({
+    task_name: '',
+    execution_cycle: '',
+    execution_time: '',
+    interval_days: 1,
+    end_date: ''
+  });
 
   // 检查当前选择的LLM提供商是否需要API密钥
   const requiresApiKey = formData.llm_provider && formData.llm_provider !== 'ollama';
@@ -395,7 +406,57 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
         requestData.google_api_key = formData.api_key;
       }
 
-      // 调用后端API启动分析
+      // 检查是否是定期报告
+      if (isScheduled) {
+        // 验证定期报告配置
+        if (!scheduleData.task_name || !scheduleData.execution_cycle || !scheduleData.execution_time) {
+          onShowToast('请完整填写定期报告配置', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // 验证每周执行必须选择星期几
+        if (scheduleData.execution_cycle === 'weekly' && !scheduleData.day_of_week) {
+          onShowToast('请选择星期几执行', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        // 验证每N天执行必须填写间隔天数
+        if (scheduleData.execution_cycle === 'every_n_days' && (!scheduleData.interval_days || scheduleData.interval_days < 1)) {
+          onShowToast('请填写有效的间隔天数', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+
+        // 创建定期报告
+        const scheduledTaskData = {
+          ...requestData,
+          task_name: scheduleData.task_name,
+          execution_cycle: scheduleData.execution_cycle,
+          execution_time: scheduleData.execution_time,
+          interval_days: scheduleData.interval_days,
+          day_of_week: scheduleData.day_of_week,
+          end_date: scheduleData.end_date || undefined,
+        };
+
+        const response = await scheduledTasksAPI.create(scheduledTaskData);
+        
+        console.log('=== Scheduled Task Created ===');
+        console.log('Response:', response);
+        console.log('Task ID:', response.id);
+
+        onShowToast('✅ 定期报告创建成功！', 'success');
+        
+        // 跳转到定期报告页面
+        setTimeout(() => {
+          window.location.href = '/scheduled-tasks';
+        }, 1500);
+        
+        return; // 重要：阻止继续执行立即分析逻辑
+      }
+
+      // 调用后端API启动分析（立即执行）
       const response: AnalysisResponse = await analysisAPI.startAnalysis(requestData);
 
       console.log('=== Analysis Started ===');
@@ -750,6 +811,14 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
           </div>
         </div>
 
+        {/* 定期报告配置 */}
+        <ScheduleConfig
+          scheduleData={scheduleData}
+          onChange={(data) => setScheduleData(prev => ({ ...prev, ...data }))}
+          isScheduled={isScheduled}
+          onToggleSchedule={setIsScheduled}
+        />
+
         {/* 提交按钮 */}
         <div className="text-center pt-6">
           <button
@@ -760,12 +829,12 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
             {isSubmitting ? (
               <>
                 <i className="fas fa-spinner fa-spin mr-2" />
-                启动分析中...
+                {isScheduled ? '创建定期报告中...' : '启动分析中...'}
               </>
             ) : (
               <>
-                <i className="fas fa-play mr-2" />
-                开始分析
+                <i className={`fas ${isScheduled ? 'fa-clock' : 'fa-play'} mr-2`} />
+                {isScheduled ? '创建定期报告' : '开始分析'}
               </>
             )}
           </button>

@@ -27,9 +27,62 @@ class User(Base):
     # Relationships
     analysis_records = relationship("AnalysisRecord", back_populates="user", cascade="all, delete-orphan")
     export_records = relationship("ExportRecord", back_populates="user", cascade="all, delete-orphan")
+    scheduled_tasks = relationship("ScheduledTask", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"
+
+class ScheduledTask(Base):
+    """
+    Scheduled analysis task model for recurring analysis execution
+    """
+    __tablename__ = "scheduled_tasks"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    # Task identification
+    task_name = Column(String(255), nullable=False)
+    
+    # Analysis configuration (saved from AnalysisRequest)
+    ticker = Column(String(20), nullable=False, index=True)
+    market = Column(String(10), nullable=True)
+    analysts = Column(JSON, nullable=False)
+    research_depth = Column(Integer, nullable=False)
+    llm_provider = Column(String(50), nullable=False)
+    shallow_thinker = Column(String(100), nullable=False)
+    deep_thinker = Column(String(100), nullable=False)
+    backend_url = Column(String(255), nullable=False)
+    is_public = Column(Boolean, default=False)
+    
+    # Schedule configuration
+    execution_cycle = Column(String(20), nullable=False)  # daily, weekly, every_n_days, workdays
+    execution_time = Column(String(5), nullable=False)  # HH:MM format (Beijing time)
+    interval_days = Column(Integer, nullable=True)  # For every_n_days cycle
+    day_of_week = Column(String(1), nullable=True)  # For weekly cycle (0-6, 0=Sunday)
+    end_date = Column(DateTime(timezone=True), nullable=True)  # Optional task end date
+    
+    # Task status
+    is_enabled = Column(Boolean, default=True, nullable=False, index=True)
+    status = Column(String(20), default="pending", nullable=False, index=True)  # pending, completed
+    
+    # Execution tracking
+    next_run_time = Column(DateTime(timezone=True), nullable=True)
+    last_run_time = Column(DateTime(timezone=True), nullable=True)
+    total_executions = Column(Integer, default=0, nullable=False)
+    
+    # APScheduler job ID
+    scheduler_job_id = Column(String(255), unique=True, nullable=False)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationships
+    user = relationship("User", back_populates="scheduled_tasks")
+    
+    def __repr__(self):
+        return f"<ScheduledTask(id={self.id}, task_name='{self.task_name}', ticker='{self.ticker}', status='{self.status}')>"
 
 class AnalysisRecord(Base):
     """

@@ -9,6 +9,7 @@ import asyncio
 import json
 import threading
 import re
+import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict
@@ -59,6 +60,121 @@ def truncate_message(message: str, max_length: int = 200) -> str:
     return message[:max_length] + '...'
 
 
+def safe_commit(db, operation_name="operation"):
+    """
+    Safely commit database changes with proper error handling
+    
+    Args:
+        db: Database session
+        operation_name: Name of the operation for logging
+    """
+    try:
+        # Ensure we're in a transaction
+        if not db.in_transaction():
+            db.begin()
+        db.commit()
+    except Exception as e:
+        print(f"⚠️  Failed to commit {operation_name}: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        # Re-raise to let caller handle
+        raise
+
+
+class HeartbeatMonitor:
+    """
+    心跳监控器 - 在长时间操作期间定期发送日志,并在超时时主动停止任务
+    """
+    def __init__(self, send_log_func, analysis_record, stop_event, timeout_seconds=600):
+        """
+        初始化心跳监控器
+        
+        Args:
+            send_log_func: 日志发送函数
+            analysis_record: 分析记录对象
+            stop_event: 任务停止事件
+            timeout_seconds: 超时时间(秒),默认 600 秒(10分钟)
+        """
+        self.send_log = send_log_func
+        self.analysis_record = analysis_record
+        self.stop_event = stop_event
+        self.timeout_seconds = timeout_seconds
+        self.last_activity = time.time()
+        self.active = threading.Event()
+        self.active.set()
+        self.thread = None
+    
+    def start(self):
+        """启动心跳监控线程"""
+        self.thread = threading.Thread(target=self._heartbeat_worker, daemon=True)
+        self.thread.start()
+        print(f"💓 心跳监控已启动 (超时时间: {self.timeout_seconds}秒)")
+    
+    def _heartbeat_worker(self):
+        """心跳工作线程 - 每30秒检查一次"""
+        heartbeat_count = 0
+        while self.active.is_set():
+            time.sleep(30)  # 每 30 秒检查一次
+            
+            if self.active.is_set():
+                elapsed = time.time() - self.last_activity
+                
+                # 检查是否超时
+                if elapsed > self.timeout_seconds:
+                    # 超过 10 分钟没有活动,主动停止任务
+                    minutes = int(elapsed / 60)
+                    print(f"⚠️  任务超时: 已等待 {minutes} 分钟,超过限制 {self.timeout_seconds/60:.0f} 分钟")
+                    
+                    self.send_log(
+                        'error',
+                        f'❌ 任务超时: AI 响应时间过长(已等待 {minutes} 分钟),任务已自动终止',
+                        'system',
+                        '超时',
+                        self.analysis_record.progress_percentage,
+                        '错误'
+                    )
+                    
+                    # 设置停止事件
+                    self.stop_event.set()
+                    print(f"🛑 已设置停止事件,任务将被中断")
+                    
+                    # 停止心跳监控
+                    self.active.clear()
+                    break
+                
+                if elapsed > 30:
+                    # 超过 30 秒没有活动,发送心跳日志
+                    heartbeat_count += 1
+                    minutes = int(elapsed / 60)
+                    seconds = int(elapsed % 60)
+                    
+                    if minutes > 0:
+                        time_str = f"{minutes}分{seconds}秒"
+                    else:
+                        time_str = f"{seconds}秒"
+                    
+                    self.send_log(
+                        'info',
+                        f'⏳ AI 正在深度思考中,请耐心等待... (已等待 {time_str})',
+                        'system',
+                        '处理中',
+                        self.analysis_record.progress_percentage,
+                        '分析阶段'
+                    )
+                    print(f"💓 发送心跳日志 #{heartbeat_count} (已等待 {elapsed:.0f}秒)")
+    
+    def update(self):
+        """更新活动时间 - 在收到响应时调用"""
+        self.last_activity = time.time()
+    
+    def stop(self):
+        """停止心跳监控"""
+        self.active.clear()
+        print("💓 心跳监控已停止")
+
+
 def run_analysis_task(
     stop_event: threading.Event,
     analysis_id: str,
@@ -95,7 +211,11 @@ def run_analysis_task(
         
         def send_log(level: str, message: str, agent: str = 'system', step: str = '', progress: float = 0.0, phase: str = ''):
             """发送日志到控制台和 WebSocket"""
-            timestamp = datetime.utcnow().strftime('%H:%M:%S')
+            # Use Beijing time
+            from pytz import timezone as pytz_timezone
+            beijing_tz = pytz_timezone('Asia/Shanghai')
+            now_beijing = datetime.now(beijing_tz)
+            timestamp = now_beijing.strftime('%H:%M:%S')
             print(f"[{timestamp}] [{level.upper()}] [{agent}] {message} ({progress:.1f}%)")
             
             # 更新任务日志时间(用于监控)
@@ -110,7 +230,7 @@ def run_analysis_task(
                 asyncio.set_event_loop(loop)
                 loop.run_until_complete(manager.send_message({
                     'type': 'log',
-                    'timestamp': datetime.utcnow().isoformat(),
+                    'timestamp': now_beijing.isoformat(),
                     'data': {
                         'level': level,
                         'message': truncated_message,
@@ -138,11 +258,15 @@ def run_analysis_task(
         send_log('info', '🚀 分析任务已启动', 'system', '初始化', 0.0, '准备阶段')
         check_stop()
         
-        # 更新状态
+        # 更新状态 (use Beijing time)
+        from pytz import timezone as pytz_timezone
+        beijing_tz = pytz_timezone('Asia/Shanghai')
+        now_beijing = datetime.now(beijing_tz)
+        
         analysis_record.status = "initializing"
         analysis_record.current_step = "设置配置"
-        analysis_record.started_at = datetime.utcnow()
-        db.commit()
+        analysis_record.started_at = now_beijing
+        safe_commit(db, "update analysis status to initializing")
         
         # 配置 API 密钥
         send_log('info', '🔑 配置 API 密钥...', 'system', '配置', 2.0, '准备阶段')
@@ -205,7 +329,7 @@ def run_analysis_task(
         analysis_record.status = "running"
         analysis_record.current_step = "初始化分析图"
         analysis_record.progress_percentage = 8.0
-        db.commit()
+        safe_commit(db, "update progress to 8%")
         
         # 初始化图
         send_log('info', '🔧 初始化 TradingAgents 分析图...', 'system', '初始化', 8.0, '初始化阶段')
@@ -215,7 +339,7 @@ def run_analysis_task(
         
         analysis_record.current_step = "开始分析"
         analysis_record.progress_percentage = 10.0
-        db.commit()
+        safe_commit(db, "update progress to 10%")
         
         send_log('info', f'📊 开始分析 {request_data.get("ticker")}...', 'system', '分析开始', 10.0, '分析阶段')
         check_stop()
@@ -405,10 +529,18 @@ def run_analysis_task(
             # 等待读取线程结束
             reader_thread.join(timeout=1.0)
         
+        # 启动心跳监控(传入 stop_event 以支持超时停止)
+        heartbeat = HeartbeatMonitor(send_log, analysis_record, stop_event)
+        heartbeat.start()
+        
         try:
+            # 添加日志:开始流式处理
+            send_log('info', '🔄 开始流式处理分析图...', 'system', '流式处理', 12.0, '分析阶段')
+            
             stream_iterator = graph.graph.stream(init_agent_state, **args)
             for chunk in stream_with_interrupt_check(stream_iterator):
                 check_stop()
+                heartbeat.update()  # 更新活动时间
                 step_num += 1
                 
                 detected_agent = None
@@ -604,12 +736,9 @@ def run_analysis_task(
                         db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).update({
                             AnalysisRecord.progress_percentage: progress
                         })
-                        db2.commit()
-                    except Exception:
-                        try:
-                            db2.rollback()
-                        except Exception:
-                            pass
+                        safe_commit(db2, f"update progress to {progress}%")
+                    except Exception as e:
+                        print(f"⚠️  Failed to update progress: {e}")
                     finally:
                         try:
                             db2.close()
@@ -662,6 +791,8 @@ def run_analysis_task(
                         send_log('info', truncate_message(first_msg_content, 150), agent_to_use, '分析中', progress, '分析阶段')
         
         except InterruptedError:
+            # 停止心跳监控
+            heartbeat.stop()
             # 任务被中断，直接向上抛出
             raise
         except Exception as e:
@@ -685,11 +816,15 @@ def run_analysis_task(
         else:
             decision = '未明确'
         
-        # 获取基本信息（从收集的字段中）
+        # 获取基本信息（从收集的字段中）- use Beijing time
+        from pytz import timezone as pytz_timezone
+        beijing_tz = pytz_timezone('Asia/Shanghai')
+        now_beijing = datetime.now(beijing_tz)
+        
         ticker = report_sections.get("ticker", request_data.get('ticker', 'UNKNOWN'))
         company_of_interest = report_sections.get("company_of_interest") or ticker
-        trade_date = report_sections.get("trade_date") or request_data.get('analysis_date', datetime.now().strftime('%Y-%m-%d'))
-        analysis_date = request_data.get('analysis_date', datetime.now().strftime('%Y-%m-%d'))
+        trade_date = report_sections.get("trade_date") or request_data.get('analysis_date', now_beijing.strftime('%Y-%m-%d'))
+        analysis_date = request_data.get('analysis_date', now_beijing.strftime('%Y-%m-%d'))
         
         print(f"📊 最终信息: ticker={ticker}, company={company_of_interest}, date={trade_date}")
         
@@ -745,6 +880,9 @@ def run_analysis_task(
         send_log('info', '分析流程完成', 'system', '完成', 90.0, '完成阶段')
         check_stop()
         
+        # 停止心跳监控
+        heartbeat.stop()
+        
         # 清理内存集合
         send_log('info', '🧹 清理内存资源...', 'system', '清理', 92.0, '完成阶段')
         try:
@@ -777,13 +915,9 @@ def run_analysis_task(
         try:
             db2 = SessionLocal()
             db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).update(_update_fields)
-            db2.commit()
+            safe_commit(db2, "save analysis results")
         except Exception as e:
             print(f"保存分析结果失败: {e}")
-            try:
-                db2.rollback()
-            except Exception:
-                pass
             # 尝试只保存基本信息（不包含 final_state）
             try:
                 db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).update({
@@ -794,7 +928,7 @@ def run_analysis_task(
                     AnalysisRecord.final_state: None,
                     AnalysisRecord.trading_decision: str(decision) if decision else None,
                 })
-                db2.commit()
+                safe_commit(db2, "save basic analysis info")
             except Exception:
                 try:
                     db2.rollback()
@@ -821,20 +955,37 @@ def run_analysis_task(
         }, analysis_id))
         loop.close()
         
+    except RuntimeError as e:
+        # 处理解释器关闭错误
+        if 'interpreter shutdown' in str(e) or 'cannot schedule new futures' in str(e):
+            print(f"⚠️  应用正在关闭,任务 {analysis_id} 被终止")
+            # 停止心跳监控
+            try:
+                heartbeat.stop()
+            except Exception:
+                pass
+            # 不需要更新数据库或发送消息,因为应用正在关闭
+            return
+        else:
+            # 其他 RuntimeError,继续抛出
+            raise
+    
     except InterruptedError as e:
+        # 停止心跳监控
+        try:
+            heartbeat.stop()
+        except Exception:
+            pass
+        
         # 任务被中断
         print(f"⚠️  任务 {analysis_id} 被中断")
         analysis_record.status = "interrupted"
         analysis_record.current_step = "任务已中断"
         analysis_record.error_message = str(e)
         try:
-            db.commit()
-        except Exception:
-            # 会话可能已关闭/失败，回滚并使用新会话兜底更新
-            try:
-                db.rollback()
-            except Exception:
-                pass
+            safe_commit(db, "save error message")
+        except Exception as commit_error:
+            print(f"⚠️  Failed to save error message: {commit_error}")
             try:
                 db2 = SessionLocal()
                 db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).update({
@@ -842,7 +993,7 @@ def run_analysis_task(
                     AnalysisRecord.current_step: "任务已中断",
                     AnalysisRecord.error_message: str(e)
                 })
-                db2.commit()
+                safe_commit(db2, "save interrupted status")
             finally:
                 try:
                     db2.close()
@@ -886,6 +1037,17 @@ def run_analysis_task(
         
         print(f"❌ 任务 {analysis_id} 执行失败 [{error_type}]: {error_msg}")
         print(error_trace)  # 完整堆栈仅在控制台显示
+        
+        # 检测应用关闭错误
+        if error_type == 'RuntimeError' and ('interpreter shutdown' in error_msg or 'cannot schedule new futures' in error_msg):
+            print(f"⚠️  应用正在关闭,任务 {analysis_id} 被终止")
+            # 停止心跳监控
+            try:
+                heartbeat.stop()
+            except Exception:
+                pass
+            # 不需要更新数据库或发送消息,因为应用正在关闭
+            return
         
         # 友好的错误消息
         user_friendly_error = None
@@ -939,18 +1101,20 @@ def run_analysis_task(
             else:
                 user_friendly_error = error_msg
         
+        # 停止心跳监控
+        try:
+            heartbeat.stop()
+        except Exception:
+            pass
+        
         analysis_record.status = "error"
         analysis_record.current_step = f"错误: {user_friendly_error}"
         analysis_record.error_message = user_friendly_error
         analysis_record.error_traceback = error_trace
         try:
-            db.commit()
-        except Exception:
-            # 会话可能已关闭/失败，回滚并使用新会话兜底更新
-            try:
-                db.rollback()
-            except Exception:
-                pass
+            safe_commit(db, "save error traceback")
+        except Exception as commit_error:
+            print(f"⚠️  Failed to save error traceback: {commit_error}")
             try:
                 db2 = SessionLocal()
                 db2.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).update({
@@ -959,7 +1123,7 @@ def run_analysis_task(
                     AnalysisRecord.error_message: user_friendly_error,
                     AnalysisRecord.error_traceback: error_trace
                 })
-                db2.commit()
+                safe_commit(db2, "save error status")
             finally:
                 try:
                     db2.close()

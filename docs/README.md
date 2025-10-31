@@ -11,6 +11,21 @@
   - 数据流向和技术细节
   - 显示效果和使用说明
 
+- **[REALTIME_QUOTES_QUICKSTART.md](REALTIME_QUOTES_QUICKSTART.md)** - 实时股票行情快速开始
+  - 快速配置和使用指南
+  - 支持A股、美股、港股
+  - 代码示例和返回格式
+
+- **[REALTIME_QUOTES_IMPLEMENTATION.md](REALTIME_QUOTES_IMPLEMENTATION.md)** - 实时行情功能实现详解
+  - 完整的技术实现说明
+  - API使用方法和集成指南
+  - 故障排除和优化方向
+
+- **[XUEQIU_TOKEN_SETUP.md](XUEQIU_TOKEN_SETUP.md)** - 雪球Token配置指南
+  - Token获取详细步骤
+  - 多种配置方式说明
+  - 安全注意事项
+
 ### 数据库相关
 
 - **[DATABASE_INIT_SUMMARY.md](DATABASE_INIT_SUMMARY.md)** - 数据库初始化方式说明
@@ -63,6 +78,30 @@
   - 环境变量配置
   - API 密钥设置
   - 配置文件说明
+
+- **[QUICK_START_GUIDE.md](QUICK_START_GUIDE.md)** - 快速开始指南
+  - 项目快速启动步骤
+  - 基本使用说明
+
+### 项目管理
+
+- **[IMPLEMENTATION_CHECKLIST.md](IMPLEMENTATION_CHECKLIST.md)** - 实现检查清单
+  - 功能实现进度跟踪
+  - 待办事项列表
+
+- **[INTEGRATION_COMPLETE.md](INTEGRATION_COMPLETE.md)** - 集成完成说明
+  - 系统集成状态
+  - 完成的功能模块
+
+### 问题修复
+
+- **[TIMEZONE_AND_WEEKLY_UPDATE.md](TIMEZONE_AND_WEEKLY_UPDATE.md)** - 时区和周更新功能
+  - 时区处理说明
+  - 周更新功能实现
+
+- **[TIMEZONE_BUG_FIX.md](TIMEZONE_BUG_FIX.md)** - 时区Bug修复
+  - 时区相关问题修复记录
+  - 解决方案说明
 
 ### 股票代码相关
 

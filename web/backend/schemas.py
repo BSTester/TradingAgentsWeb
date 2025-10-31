@@ -220,3 +220,133 @@ class PaginatedResponse(BaseModel):
     limit: int
     has_next: bool
     has_prev: bool
+
+# Scheduled Task schemas
+class ScheduledTaskCreate(BaseModel):
+    """Schema for creating a scheduled task"""
+    task_name: str
+    ticker: str
+    analysts: List[str]
+    research_depth: int
+    llm_provider: str
+    backend_url: str
+    shallow_thinker: str
+    deep_thinker: str
+    is_public: bool = False
+    
+    # Schedule configuration (optional for immediate execution)
+    execution_cycle: Optional[str] = None  # daily, weekly, every_n_days, workdays
+    execution_time: Optional[str] = None  # HH:MM format (Beijing time)
+    interval_days: Optional[int] = None  # Required if execution_cycle is every_n_days
+    day_of_week: Optional[str] = None  # Required if execution_cycle is weekly (0-6, 0=Sunday)
+    end_date: Optional[str] = None  # Optional end date in YYYY-MM-DD format
+    
+    @validator('task_name')
+    def validate_task_name(cls, v):
+        if not v or len(v.strip()) == 0:
+            raise ValueError('Task name cannot be empty')
+        if len(v) > 255:
+            raise ValueError('Task name must be less than 255 characters')
+        return v.strip()
+    
+    @validator('execution_cycle')
+    def validate_execution_cycle(cls, v):
+        if v and v not in ['daily', 'weekly', 'every_n_days', 'workdays']:
+            raise ValueError('Invalid execution cycle. Must be one of: daily, weekly, every_n_days, workdays')
+        return v
+    
+    @validator('execution_time')
+    def validate_execution_time(cls, v):
+        if v:
+            import re
+            if not re.match(r'^([01]\d|2[0-3]):([0-5]\d)$', v):
+                raise ValueError('Invalid time format. Use HH:MM (24-hour format)')
+        return v
+    
+    @validator('interval_days')
+    def validate_interval_days(cls, v, values):
+        if values.get('execution_cycle') == 'every_n_days':
+            if not v or v < 1 or v > 365:
+                raise ValueError('interval_days must be between 1 and 365 when execution_cycle is every_n_days')
+        return v
+    
+    @validator('day_of_week')
+    def validate_day_of_week(cls, v, values):
+        if values.get('execution_cycle') == 'weekly':
+            if not v or v not in ['0', '1', '2', '3', '4', '5', '6']:
+                raise ValueError('day_of_week must be specified for weekly cycle (0-6, 0=Sunday)')
+        return v
+    
+    @validator('end_date')
+    def validate_end_date(cls, v):
+        if v:
+            from datetime import datetime, date
+            try:
+                end_date = datetime.strptime(v, '%Y-%m-%d').date()
+                if end_date < date.today():
+                    raise ValueError('End date cannot be in the past')
+            except ValueError as e:
+                if 'End date cannot be in the past' in str(e):
+                    raise
+                raise ValueError('Invalid date format. Use YYYY-MM-DD')
+        return v
+    
+    @validator('analysts')
+    def validate_analysts(cls, v):
+        if not v:
+            raise ValueError('At least one analyst must be selected')
+        return v
+
+class ScheduledTaskResponse(BaseModel):
+    """Schema for scheduled task response"""
+    id: int
+    user_id: int
+    task_name: str
+    ticker: str
+    market: Optional[str]
+    analysts: List[str]
+    research_depth: int
+    llm_provider: str
+    shallow_thinker: str
+    deep_thinker: str
+    backend_url: str
+    is_public: bool
+    execution_cycle: str
+    execution_time: str
+    interval_days: Optional[int]
+    day_of_week: Optional[str]
+    end_date: Optional[datetime]
+    is_enabled: bool
+    status: str
+    next_run_time: Optional[datetime]
+    last_run_time: Optional[datetime]
+    total_executions: int
+    created_at: datetime
+    updated_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True
+
+class ScheduledTaskUpdate(BaseModel):
+    """Schema for updating task status"""
+    is_enabled: Optional[bool] = None
+    task_name: Optional[str] = None
+    
+    @validator('task_name')
+    def validate_task_name(cls, v):
+        if v is not None:
+            if len(v.strip()) == 0:
+                raise ValueError('Task name cannot be empty')
+            if len(v) > 255:
+                raise ValueError('Task name must be less than 255 characters')
+            return v.strip()
+        return v
+
+class ScheduledTaskListResponse(BaseModel):
+    """Schema for paginated scheduled task list"""
+    items: List[ScheduledTaskResponse]
+    total: int
+    page: int
+    limit: int
+    has_next: bool
+    has_prev: bool

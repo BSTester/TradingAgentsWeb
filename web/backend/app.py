@@ -62,7 +62,7 @@ from web.backend.auth_routes import router as auth_router, get_current_active_us
 from web.backend.middleware import LoggingMiddleware
 
 # Import API routes
-from web.backend.routes import analysis_routes, config_routes, task_routes, page_routes, websocket_routes, export_routes, leaderboard_routes, user_management_routes
+from web.backend.routes import analysis_routes, config_routes, task_routes, page_routes, websocket_routes, export_routes, leaderboard_routes, user_management_routes, scheduled_task_routes
 
 
 @asynccontextmanager
@@ -93,6 +93,18 @@ async def lifespan(app: FastAPI):
             await cleanup_running_tasks()
             print("✅ Running tasks cleaned up")
             
+            # Initialize and start scheduler service
+            from web.backend.services.scheduler_service import init_scheduler_service
+            from web.backend.database import DATABASE_URL
+            scheduler = init_scheduler_service(DATABASE_URL)
+            scheduler.start()
+            app.state.scheduler = scheduler
+            print("✅ Scheduler service started")
+            
+            # Load existing enabled scheduled tasks
+            await load_scheduled_tasks(scheduler)
+            print("✅ Scheduled tasks loaded")
+            
             app.state.monitor_task = asyncio.create_task(task_monitor())
             print("✅ Task monitor started (leader)")
         except OSError:
@@ -112,9 +124,18 @@ async def lifespan(app: FastAPI):
     # Shutdown (cleanup if needed)
     print("🔌 Shutting down...")
     if getattr(app.state, "is_leader", False):
+        # Stop scheduler
+        scheduler = getattr(app.state, "scheduler", None)
+        if scheduler:
+            scheduler.shutdown(wait=True)
+            print("✅ Scheduler service stopped")
+        
+        # Stop task monitor
         monitor_task = getattr(app.state, "monitor_task", None)
         if monitor_task:
             monitor_task.cancel()
+        
+        # Close leader socket
         leader_sock = getattr(app.state, "leader_sock", None)
         if leader_sock:
             try:
@@ -152,6 +173,116 @@ async def cleanup_running_tasks():
                 
         except Exception as e:
             print(f"❌ 清理运行中任务失败: {e}")
+            await db.rollback()
+
+
+async def load_scheduled_tasks(scheduler):
+    """Load existing enabled scheduled tasks from database and register with scheduler"""
+    async with AsyncSessionLocal() as db:
+        try:
+            from sqlalchemy import select
+            from web.backend.models import ScheduledTask
+            
+            # Find all enabled pending tasks
+            result = await db.execute(
+                select(ScheduledTask).where(
+                    ScheduledTask.is_enabled == True,
+                    ScheduledTask.status == 'pending'
+                )
+            )
+            tasks = result.scalars().all()
+            
+            if tasks:
+                print(f"📋 Loading {len(tasks)} scheduled tasks...")
+                
+                loaded_count = 0
+                expired_count = 0
+                
+                for task in tasks:
+                    try:
+                        # Check if task has passed end date before loading
+                        if task.end_date:
+                            from pytz import timezone as pytz_timezone
+                            from datetime import datetime
+                            beijing_tz = pytz_timezone('Asia/Shanghai')
+                            now_beijing = datetime.now(beijing_tz)
+                            
+                            # Ensure end_date is timezone-aware
+                            if task.end_date.tzinfo is None:
+                                end_date_aware = beijing_tz.localize(task.end_date)
+                            else:
+                                end_date_aware = task.end_date.astimezone(beijing_tz)
+                            
+                            # If current time is past end date, mark as completed and skip
+                            if now_beijing > end_date_aware:
+                                print(f"  ⏰ Task {task.id} ({task.task_name}) has passed end date, marking as completed")
+                                task.status = 'completed'
+                                task.next_run_time = None
+                                expired_count += 1
+                                continue
+                        
+                        # Register with scheduler
+                        scheduler.add_scheduled_task(
+                            task_id=task.id,
+                            job_id=task.scheduler_job_id,
+                            execution_cycle=task.execution_cycle,
+                            execution_time=task.execution_time,
+                            interval_days=task.interval_days,
+                            day_of_week=task.day_of_week,
+                            start_date=task.next_run_time,
+                            end_date=task.end_date
+                        )
+                        
+                        # Update next run time
+                        next_run = scheduler.get_next_run_time(task.scheduler_job_id)
+                        if next_run:
+                            # Check if next run is after end date
+                            if task.end_date:
+                                from pytz import timezone as pytz_timezone
+                                from datetime import datetime
+                                beijing_tz = pytz_timezone('Asia/Shanghai')
+                                
+                                # Ensure end_date is timezone-aware
+                                if task.end_date.tzinfo is None:
+                                    end_date_aware = beijing_tz.localize(task.end_date)
+                                else:
+                                    end_date_aware = task.end_date.astimezone(beijing_tz)
+                                
+                                # Ensure next_run is timezone-aware
+                                if next_run.tzinfo is None:
+                                    next_run_aware = beijing_tz.localize(next_run)
+                                else:
+                                    next_run_aware = next_run.astimezone(beijing_tz)
+                                
+                                if next_run_aware > end_date_aware:
+                                    print(f"  ⏰ Task {task.id} ({task.task_name}) next run is after end date, marking as completed")
+                                    task.status = 'completed'
+                                    task.next_run_time = None
+                                    scheduler.remove_scheduled_task(task.scheduler_job_id)
+                                    expired_count += 1
+                                    continue
+                            
+                            task.next_run_time = next_run
+                            loaded_count += 1
+                            print(f"  ✅ Loaded task {task.id}: {task.task_name} (next run: {next_run})")
+                        else:
+                            # No next run scheduled
+                            print(f"  ⏰ Task {task.id} ({task.task_name}) has no more runs, marking as completed")
+                            task.status = 'completed'
+                            task.next_run_time = None
+                            scheduler.remove_scheduled_task(task.scheduler_job_id)
+                            expired_count += 1
+                        
+                    except Exception as e:
+                        print(f"  ❌ Failed to load task {task.id}: {e}")
+                
+                await db.commit()
+                print(f"✅ Loaded {loaded_count} scheduled tasks, {expired_count} tasks marked as completed")
+            else:
+                print("✅ No scheduled tasks to load")
+                
+        except Exception as e:
+            print(f"❌ Failed to load scheduled tasks: {e}")
             await db.rollback()
 
 
@@ -327,8 +458,10 @@ class TaskManager:
         self.user_running_tasks[user_id] = analysis_id
         self.running_count += 1
         
-        # 初始化监控
-        self.task_last_log_time[analysis_id] = datetime.now()
+        # 初始化监控 (use Beijing time)
+        from pytz import timezone as pytz_timezone
+        beijing_tz = pytz_timezone('Asia/Shanghai')
+        self.task_last_log_time[analysis_id] = datetime.now(beijing_tz)
         self.task_no_log_count[analysis_id] = 0
         
         print(f"✅ 提交任务 {analysis_id} (用户 {user_id}) ({self.running_count}/{self.max_workers} 运行中)")
@@ -376,45 +509,15 @@ class TaskManager:
                 self.submit_task(queued_id, queued_user_id, func, *args, **kwargs)
     
     def update_task_log_time(self, analysis_id: str):
-        """Update task last log time (called when task sends log)"""
-        with self.lock:
-            if analysis_id in self.task_last_log_time:
-                self.task_last_log_time[analysis_id] = datetime.now()
-                self.task_no_log_count[analysis_id] = 0  # 重置计数
+        """Update task last log time (called when task sends log) - kept for compatibility"""
+        # 保留此方法以保持兼容性,但不再使用
+        pass
     
     def check_stalled_tasks(self):
-        """Check for stalled tasks (no log output for too long)"""
-        with self.lock:
-            current_time = datetime.now()
-            stalled_tasks = []
-            
-            for analysis_id, last_log_time in list(self.task_last_log_time.items()):
-                time_diff = (current_time - last_log_time).total_seconds()
-                
-                # 如果超过 60 秒没有日志输出
-                if time_diff > 60:
-                    self.task_no_log_count[analysis_id] = self.task_no_log_count.get(analysis_id, 0) + 1
-                    print(f"⏰ 任务 {analysis_id} 无日志输出 {time_diff:.0f}秒 (计数: {self.task_no_log_count[analysis_id]}/5)")
-                    
-                    # 如果连续 5 次检测没有日志输出，判断为异常
-                    if self.task_no_log_count[analysis_id] >= 5:
-                        print(f"⚠️  任务 {analysis_id} 异常：连续 5 次检测无日志输出，准备中断")
-                        stalled_tasks.append(analysis_id)
-            
-            # 中断异常任务
-            for analysis_id in stalled_tasks:
-                if analysis_id in self.active_tasks:
-                    print(f"🛑 自动中断异常任务 {analysis_id}")
-                    print(f"   - stop_event 对象: {self.active_tasks[analysis_id]}")
-                    print(f"   - stop_event.is_set() 前: {self.active_tasks[analysis_id].is_set()}")
-                    self.active_tasks[analysis_id].set()
-                    print(f"   - stop_event.is_set() 后: {self.active_tasks[analysis_id].is_set()}")
-                    
-                    # 清理监控数据，避免重复触发
-                    if analysis_id in self.task_no_log_count:
-                        del self.task_no_log_count[analysis_id]
-                else:
-                    print(f"⚠️  任务 {analysis_id} 不在 active_tasks 中，无法中断")
+        """Check for stalled tasks - deprecated, now using HeartbeatMonitor"""
+        # 此方法已废弃,现在使用 HeartbeatMonitor 进行心跳检测
+        # 保留空方法以保持兼容性
+        pass
     
     def stop_task(self, analysis_id: str) -> bool:
         """Stop a running task"""
@@ -454,6 +557,7 @@ app.include_router(task_routes.router)
 app.include_router(export_routes.router)
 app.include_router(leaderboard_routes.router)
 app.include_router(user_management_routes.router)
+app.include_router(scheduled_task_routes.router)
 
 # Include page and WebSocket routes
 app.include_router(page_routes.router)

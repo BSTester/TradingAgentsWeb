@@ -4,6 +4,7 @@ Get fundamental data for stocks (company profile, key metrics, financial stateme
 """
 
 import logging
+import os
 import pandas as pd
 from datetime import datetime
 from .akshare_common import (
@@ -34,10 +35,19 @@ def get_fundamentals(ticker: str, curr_date: str = None) -> str:
     
     Returns:
         Formatted string with fundamental data
+    
+    Note:
+        XueQiu fallback sources require XUEQIU_TOKEN environment variable.
+        See docs/XUEQIU_TOKEN_SETUP.md for setup instructions.
     """
     ak = get_akshare()
     if not ak:
         return "Error: akshare not installed"
+    
+    # Get token from environment variable for XueQiu fallback
+    token = os.getenv('XUEQIU_TOKEN')
+    if token:
+        logging.info("Using XUEQIU_TOKEN from environment variable")
     
     market = _identify_market(ticker)
     logging.info(f"Getting fundamentals for {ticker}, identified market: {market}")
@@ -84,7 +94,7 @@ def get_fundamentals(ticker: str, curr_date: str = None) -> str:
                     elif ticker.startswith(('83', '87')):  # 北交所
                         xq_symbol = f"BJ{ticker}"
                     
-                    info_df = ak.stock_individual_basic_info_xq(symbol=xq_symbol)
+                    info_df = ak.stock_individual_basic_info_xq(symbol=xq_symbol, token=token)
                     
                     if not info_df.empty:
                         info_dict = dict(zip(info_df['item'], info_df['value']))
@@ -105,7 +115,7 @@ def get_fundamentals(ticker: str, curr_date: str = None) -> str:
         elif market == 'US_STOCK':
             try:
                 logging.info(f"Trying stock_individual_basic_info_us_xq for US stock {ticker}")
-                info_df = ak.stock_individual_basic_info_us_xq(symbol=ticker)
+                info_df = ak.stock_individual_basic_info_us_xq(symbol=ticker, token=token)
                 
                 if not info_df.empty:
                     info_dict = dict(zip(info_df['item'], info_df['value']))
@@ -133,7 +143,7 @@ def get_fundamentals(ticker: str, curr_date: str = None) -> str:
         elif market == 'HK_STOCK':
             try:
                 logging.info(f"Trying stock_individual_basic_info_hk_xq for HK stock {symbol_for_ak}")
-                info_df = ak.stock_individual_basic_info_hk_xq(symbol=symbol_for_ak)
+                info_df = ak.stock_individual_basic_info_hk_xq(symbol=symbol_for_ak, token=token)
                 
                 if not info_df.empty:
                     info_dict = dict(zip(info_df['item'], info_df['value']))
