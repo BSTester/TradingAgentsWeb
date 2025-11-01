@@ -113,7 +113,7 @@ VENDOR_METHODS = {
         "akshare": get_akshare_stock,
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
-        "local": get_YFin_data,
+        # "local": get_YFin_data,
     },
     "get_realtime_quote": {
         "akshare": get_akshare_realtime_quote,
@@ -126,7 +126,7 @@ VENDOR_METHODS = {
         "akshare": get_akshare_indicators,
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
-        "local": get_stock_stats_indicators_window
+        # "local": get_stock_stats_indicators_window
     },
     # fundamental_data
     "get_fundamentals": {
@@ -138,19 +138,19 @@ VENDOR_METHODS = {
         "akshare": get_akshare_balance_sheet,
         "alpha_vantage": get_alpha_vantage_balance_sheet,
         "yfinance": get_yfinance_balance_sheet,
-        "local": get_simfin_balance_sheet,
+        # "local": get_simfin_balance_sheet,
     },
     "get_cashflow": {
         "akshare": get_akshare_cashflow,
         "alpha_vantage": get_alpha_vantage_cashflow,
         "yfinance": get_yfinance_cashflow,
-        "local": get_simfin_cashflow,
+        # "local": get_simfin_cashflow,
     },
     "get_income_statement": {
         "akshare": get_akshare_income_statement,
         "alpha_vantage": get_alpha_vantage_income_statement,
         "yfinance": get_yfinance_income_statement,
-        "local": get_simfin_income_statements,
+        # "local": get_simfin_income_statements,
     },
     # news_data
     "get_news": {
@@ -158,22 +158,22 @@ VENDOR_METHODS = {
         "alpha_vantage": get_alpha_vantage_news,
         "openai": get_stock_news_openai,
         "google": get_google_news,
-        "local": [get_finnhub_news, get_reddit_company_news, get_google_news],
+        # "local": [get_finnhub_news, get_reddit_company_news, get_google_news],
     },
     "get_global_news": {
         "akshare": get_akshare_global_news,
         "openai": get_global_news_openai,
-        "local": get_reddit_global_news
+        # "local": get_reddit_global_news
     },
     "get_insider_sentiment": {
         "akshare": get_akshare_insider_sentiment,
-        "local": get_finnhub_company_insider_sentiment
+        # "local": get_finnhub_company_insider_sentiment
     },
     "get_insider_transactions": {
         "akshare": get_akshare_insider_transactions,
         "alpha_vantage": get_alpha_vantage_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
-        "local": get_finnhub_company_insider_transactions,
+        # "local": get_finnhub_company_insider_transactions,
     },
 }
 
