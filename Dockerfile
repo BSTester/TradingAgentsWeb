@@ -27,9 +27,9 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt pyproject.toml setup.py ./
 
 # 安装 Python 依赖
-RUN pip install --upgrade pip -i https://mirrors.aliyun.com/pypi/simple && \
-    pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple && \
-    pip install "uvicorn[standard]" "websockets" -i https://mirrors.aliyun.com/pypi/simple
+RUN pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip install "uvicorn[standard]" "websockets" -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 复制项目文件
 COPY tradingagents/ ./tradingagents/
