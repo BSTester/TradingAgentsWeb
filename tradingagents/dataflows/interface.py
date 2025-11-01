@@ -322,6 +322,9 @@ def route_to_vendor(method: str, *args, **kwargs):
     vendor_attempt_count = 0
     successful_vendor = None
     
+    # Determine if this method should collect from all vendors (news methods only)
+    should_collect_all = method in ['get_news', 'get_global_news']
+    
     # Determine primary vendors based on market preferences
     if symbol:
         market_prefs = {
@@ -384,10 +387,13 @@ def route_to_vendor(method: str, *args, **kwargs):
             result_summary = f"Got {len(vendor_results)} result(s)"
             print(f"SUCCESS: Vendor '{vendor}' succeeded - {result_summary}")
             
-            # Stopping logic: Stop after first successful vendor for single-vendor configs
-            # Multiple vendor configs (comma-separated) may want to collect from multiple sources
-            if len(primary_vendors) == 1:
-                print(f"DEBUG: Stopping after successful vendor '{vendor}' (single-vendor config)")
+            # Stopping logic: 
+            # - News methods (get_news, get_global_news): Collect from ALL vendors
+            # - Other methods: Stop after first successful vendor
+            if should_collect_all:
+                print(f"DEBUG: Continuing to collect from all vendors for '{method}' (news aggregation)")
+            else:
+                print(f"DEBUG: Stopping after successful vendor '{vendor}' (non-news method)")
                 break
         else:
             print(f"FAILED: Vendor '{vendor}' produced no results")
