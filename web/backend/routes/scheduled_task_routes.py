@@ -235,6 +235,35 @@ async def list_scheduled_tasks(
     result = await db.execute(count_stmt)
     total = result.scalar()
     
+    # Get statistics for all tasks (not filtered by status_filter)
+    all_tasks_filter = [ScheduledTask.user_id == current_user.id]
+    
+    # Count enabled tasks (pending + enabled)
+    enabled_stmt = select(func.count(ScheduledTask.id)).filter(
+        *all_tasks_filter,
+        ScheduledTask.status == 'pending',
+        ScheduledTask.is_enabled == True
+    )
+    result = await db.execute(enabled_stmt)
+    enabled_count = result.scalar()
+    
+    # Count paused tasks (pending + not enabled)
+    paused_stmt = select(func.count(ScheduledTask.id)).filter(
+        *all_tasks_filter,
+        ScheduledTask.status == 'pending',
+        ScheduledTask.is_enabled == False
+    )
+    result = await db.execute(paused_stmt)
+    paused_count = result.scalar()
+    
+    # Count completed tasks
+    completed_stmt = select(func.count(ScheduledTask.id)).filter(
+        *all_tasks_filter,
+        ScheduledTask.status == 'completed'
+    )
+    result = await db.execute(completed_stmt)
+    completed_count = result.scalar()
+    
     # Get paginated tasks
     offset = (page - 1) * limit
     stmt = select(ScheduledTask).filter(*base_filter).order_by(
@@ -250,7 +279,12 @@ async def list_scheduled_tasks(
         page=page,
         limit=limit,
         has_next=(page * limit) < total,
-        has_prev=page > 1
+        has_prev=page > 1,
+        stats={
+            "enabled": enabled_count,
+            "paused": paused_count,
+            "completed": completed_count
+        }
     )
 
 

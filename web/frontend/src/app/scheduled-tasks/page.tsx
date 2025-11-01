@@ -202,7 +202,7 @@ export default function ScheduledTasksPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">启用中</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {data?.items.filter(t => t.status === 'pending' && t.is_enabled).length || 0}
+                  {data?.stats?.enabled || 0}
                 </p>
               </div>
             </div>
@@ -216,7 +216,7 @@ export default function ScheduledTasksPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">已暂停</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {data?.items.filter(t => t.status === 'pending' && !t.is_enabled).length || 0}
+                  {data?.stats?.paused || 0}
                 </p>
               </div>
             </div>
@@ -230,7 +230,7 @@ export default function ScheduledTasksPage() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">已完成</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {data?.items.filter(t => t.status === 'completed').length || 0}
+                  {data?.stats?.completed || 0}
                 </p>
               </div>
             </div>

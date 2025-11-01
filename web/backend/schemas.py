@@ -350,3 +350,5 @@ class ScheduledTaskListResponse(BaseModel):
     limit: int
     has_next: bool
     has_prev: bool
+    # Statistics for all tasks (not just current page)
+    stats: Optional[dict] = None  # {"enabled": int, "paused": int, "completed": int}
