@@ -16,8 +16,9 @@ export default function ScheduledTasksPage() {
   const { toast, showToast, hideToast } = useToast();
   const [page, setPage] = useState(1);
   const [showDeleteDialog, setShowDeleteDialog] = useState<number | null>(null);
+  const limit = 10; // 每页显示10条
   
-  const { data, isLoading, error } = useScheduledTasks(page, 20);
+  const { data, isLoading, error } = useScheduledTasks(page, limit);
   const deleteTask = useDeleteScheduledTask();
   const updateTask = useUpdateScheduledTask();
 
@@ -56,6 +57,12 @@ export default function ScheduledTasksPage() {
     try {
       const result = await deleteTask.mutateAsync(taskId);
       setShowDeleteDialog(null);
+      
+      // 如果当前页删除后为空且页码>1，则回退到上一页
+      if (data?.items && data.items.length === 1 && page > 1) {
+        setPage(p => p - 1);
+      }
+      
       // Show detailed success message from backend
       showToast(result.message || '任务已删除', 'success');
     } catch (error: any) {
@@ -360,52 +367,101 @@ export default function ScheduledTasksPage() {
           )}
 
           {/* Pagination */}
-          {data && data.total > 20 && (
-            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-              <div className="flex-1 flex justify-between sm:hidden">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={!data.has_prev}
-                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  上一页
-                </button>
-                <button
-                  onClick={() => setPage(p => p + 1)}
-                  disabled={!data.has_next}
-                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  下一页
-                </button>
-              </div>
-              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-gray-700">
-                    显示第 <span className="font-medium">{(page - 1) * 20 + 1}</span> 到{' '}
-                    <span className="font-medium">{Math.min(page * 20, data.total)}</span> 条，
-                    共 <span className="font-medium">{data.total}</span> 条
-                  </p>
+          {data && data.items.length > 0 && data.total > limit && (
+            <div className="mt-6 p-4 border-t border-gray-200">
+              <div className="flex items-center justify-between">
+                {/* 左侧：显示信息 */}
+                <div className="text-sm text-gray-600">
+                  显示第 {(page - 1) * limit + 1} - {Math.min(page * limit, data.total)} 条，共 {data.total} 条记录
                 </div>
-                <div>
-                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                    <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={!data.has_prev}
-                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <i className="fas fa-chevron-left" />
-                    </button>
-                    <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                      {page}
-                    </span>
-                    <button
-                      onClick={() => setPage(p => p + 1)}
-                      disabled={!data.has_next}
-                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <i className="fas fa-chevron-right" />
-                    </button>
-                  </nav>
+
+                {/* 右侧：分页按钮 */}
+                <div className="flex items-center space-x-2">
+                  {/* 上一页 */}
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <i className="fas fa-chevron-left mr-1" />
+                    上一页
+                  </button>
+
+                  {/* 页码 */}
+                  <div className="flex items-center space-x-1">
+                    {(() => {
+                      const totalPages = Math.max(1, Math.ceil(data.total / limit));
+                      
+                      // 第一页
+                      if (page > 3) {
+                        return (
+                          <>
+                            <button
+                              onClick={() => setPage(1)}
+                              className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                            >
+                              1
+                            </button>
+                            {page > 4 && <span className="px-2 text-gray-500">...</span>}
+                          </>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    {/* 当前页附近的页码 */}
+                    {(() => {
+                      const totalPages = Math.max(1, Math.ceil(data.total / limit));
+                      return Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(p => p >= page - 2 && p <= page + 2)
+                        .map(p => (
+                          <button
+                            key={p}
+                            onClick={() => setPage(p)}
+                            className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                              p === page
+                                ? 'bg-blue-600 text-white'
+                                : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        ));
+                    })()}
+
+                    {/* 最后一页 */}
+                    {(() => {
+                      const totalPages = Math.max(1, Math.ceil(data.total / limit));
+                      
+                      if (page < totalPages - 2) {
+                        return (
+                          <>
+                            {page < totalPages - 3 && <span className="px-2 text-gray-500">...</span>}
+                            <button
+                              onClick={() => setPage(totalPages)}
+                              className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                            >
+                              {totalPages}
+                            </button>
+                          </>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+
+                  {/* 下一页 */}
+                  <button
+                    onClick={() => {
+                      const totalPages = Math.max(1, Math.ceil(data.total / limit));
+                      setPage(p => Math.min(totalPages, p + 1));
+                    }}
+                    disabled={page === Math.max(1, Math.ceil(data.total / limit))}
+                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    下一页
+                    <i className="fas fa-chevron-right ml-1" />
+                  </button>
                 </div>
               </div>
             </div>
