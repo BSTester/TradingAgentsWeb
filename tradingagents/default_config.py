@@ -36,4 +36,9 @@ DEFAULT_CONFIG = {
         # Example: "get_stock_data": "alpha_vantage",  # Override category default
         # Example: "get_news": "openai",               # Override category default
     },
+    # Futu Trading API configuration
+    "futu_api_base_url": os.getenv("FUTU_API_BASE_URL", "http://localhost:8000"),
+    "futu_api_timeout": int(os.getenv("FUTU_API_TIMEOUT", "30")),
+    # Auto-execute trading configuration
+    "auto_execute_trading": os.getenv("AUTO_EXECUTE_TRADING", "false").lower() == "true",
 }
