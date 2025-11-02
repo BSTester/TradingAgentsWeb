@@ -1,5 +1,6 @@
 import time
 import json
+from tradingagents.agents.utils.market_utils import detect_market_type
 
 
 def create_risk_manager(llm, memory):
@@ -88,11 +89,15 @@ Requirements:
         company_name_response = llm.invoke(extract_name_prompt)
         company_name = company_name_response.content.strip()
 
+        # Detect market type from ticker
+        market_type = detect_market_type(ticker)
+
         return {
             "risk_debate_state": new_risk_debate_state,
             "final_trade_decision": response.content,
             "ticker": ticker,
-            "company_of_interest": company_name
+            "company_of_interest": company_name,
+            "market_type": market_type
         }
 
     return risk_manager_node

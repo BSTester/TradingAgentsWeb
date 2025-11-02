@@ -120,11 +120,26 @@ class TradingAgentsGraph:
         self.ticker = None
         self.log_states_dict = {}  # date to full state dict
 
-        # Set up the graph
-        self.graph = self.graph_setup.setup_graph(selected_analysts)
+        # Set up the graph with auto-execute trading configuration
+        auto_execute_trading = self.config.get("auto_execute_trading", False)
+        self.graph = self.graph_setup.setup_graph(selected_analysts, auto_execute_trading)
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
         """Create tool nodes for different data sources using abstract methods."""
+        # Import Futu trading tools
+        from tradingagents.agents.utils.futu_trading_tools import (
+            get_futu_account_info,
+            get_futu_positions,
+            get_futu_quote,
+            place_futu_order,
+            cancel_futu_order,
+            get_futu_orders,
+            get_futu_kline,
+            get_futu_hot_stocks,
+            get_futu_hot_news,
+            get_futu_technical_analysis
+        )
+        
         return {
             "market": ToolNode(
                 [
@@ -165,6 +180,21 @@ class TradingAgentsGraph:
                     get_stock_data,
                     get_realtime_quote,
                     get_indicators,
+                ]
+            ),
+            "trading_executor": ToolNode(
+                [
+                    # Futu trading tools for order execution
+                    get_futu_account_info,
+                    get_futu_positions,
+                    get_futu_quote,
+                    place_futu_order,
+                    cancel_futu_order,
+                    get_futu_orders,
+                    get_futu_kline,
+                    get_futu_hot_stocks,
+                    get_futu_hot_news,
+                    get_futu_technical_analysis,
                 ]
             ),
         }
@@ -234,6 +264,7 @@ class TradingAgentsGraph:
             },
             "investment_plan": final_state["investment_plan"],
             "final_trade_decision": final_state["final_trade_decision"],
+            "execution_report": final_state.get("execution_report"),
         }
 
         # Save to file

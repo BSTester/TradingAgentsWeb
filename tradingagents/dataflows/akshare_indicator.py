@@ -1,18 +1,23 @@
 """
 AkShare Technical Indicators
 Calculate technical indicators using AKShare (compatible with Alpha Vantage interface)
+Returns CSV format with time series data
 """
 
 import logging
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 from typing import Annotated
 import time
+from io import StringIO
 
 from .akshare_common import _identify_market, MARKET_PATTERNS, get_akshare
 
+logger = logging.getLogger(__name__)
 
-def get_indicators(
+
+def get_indicator(
     symbol: Annotated[str, "Stock symbol"],
     indicator: Annotated[str, "Technical indicator name"],
     curr_date: Annotated[str, "Current date in YYYY-MM-DD format"],
@@ -36,23 +41,39 @@ def get_indicators(
     - boll_ub: Bollinger Upper Band
     - boll_lb: Bollinger Lower Band
     - atr: Average True Range
-    - kdj: KDJ indicator (AkShare specific)
+    - vwma: Volume Weighted Moving Average
     
     Args:
         symbol: Stock symbol
         indicator: Technical indicator name (see supported list above)
         curr_date: Current date in YYYY-MM-DD format
         look_back_days: Number of days to look back
-        interval: Time interval (daily, weekly, monthly) - currently only daily supported
+        interval: Time interval (daily, weekly, monthly)
         time_period: Number of periods for calculation (e.g., 14 for RSI-14, 50 for SMA-50)
         series_type: Price type to use (close, open, high, low)
     
     Returns:
-        Formatted string with indicator values
+        CSV formatted string with time series indicator values (matching Alpha Vantage format)
     """
     ak = get_akshare()
     if not ak:
         return "Error: akshare not installed"
+    
+    # Supported indicators mapping: indicator_key -> (indicator_name, series_type)
+    supported_indicators = {
+        "close_50_sma": ("50 SMA", "close"),
+        "close_200_sma": ("200 SMA", "close"),
+        "close_10_ema": ("10 EMA", "close"),
+        "macd": ("MACD", "close"),
+        "macds": ("MACD Signal", "close"),
+        "macdh": ("MACD Histogram", "close"),
+        "rsi": ("RSI", "close"),
+        "boll": ("Bollinger Middle", "close"),
+        "boll_ub": ("Bollinger Upper Band", "close"),
+        "boll_lb": ("Bollinger Lower Band", "close"),
+        "atr": ("ATR", None),  # ATR uses High, Low, Close
+        "vwma": ("VWMA", "close")
+    }
     
     # Indicator descriptions (matching Alpha Vantage)
     indicator_descriptions = {
@@ -67,75 +88,68 @@ def get_indicators(
         "boll_ub": "Bollinger Upper Band: Typically 2 standard deviations above the middle line. Usage: Signals potential overbought conditions and breakout zones. Tips: Confirm signals with other tools; prices may ride the band in strong trends.",
         "boll_lb": "Bollinger Lower Band: Typically 2 standard deviations below the middle line. Usage: Indicates potential oversold conditions. Tips: Use additional analysis to avoid false reversal signals.",
         "atr": "ATR: Averages true range to measure volatility. Usage: Set stop-loss levels and adjust position sizes based on current market volatility. Tips: It's a reactive measure, so use it as part of a broader risk management strategy.",
-        "kdj": "KDJ: A momentum indicator combining K, D, and J lines. Usage: Identify overbought/oversold conditions and trend reversals. Tips: Popular in Asian markets; use with other indicators for confirmation."
+        "vwma": "VWMA: A moving average weighted by volume. Usage: Confirm trends by integrating price action with volume data. Tips: Watch for skewed results from volume spikes; use in combination with other volume analyses."
     }
+    
+    # Normalize indicator name to lowercase for case-insensitive matching
+    indicator_lower = indicator.lower()
+    
+    # Validate indicator
+    if indicator_lower not in supported_indicators:
+        raise ValueError(
+            f"Indicator {indicator} is not supported. Please choose from: {list(supported_indicators.keys())}"
+        )
     
     try:
         # Import stock data function
         from .akshare_stock import get_stock
+        from dateutil.relativedelta import relativedelta
         
-        # Get historical data for indicator calculation
-        end_date = curr_date
-        # Add extra days for indicator calculation warmup
-        extra_days = max(200, time_period * 3)
-        start_date_dt = datetime.strptime(curr_date, "%Y-%m-%d") - timedelta(days=look_back_days + extra_days)
+        # Calculate date range
+        curr_date_dt = datetime.strptime(curr_date, "%Y-%m-%d")
+        before = curr_date_dt - relativedelta(days=look_back_days)
+        
+        # Get indicator name and required series type
+        indicator_name, required_series = supported_indicators[indicator_lower]
+        
+        # Determine period based on indicator
+        if "50" in indicator_name:
+            period = 50
+        elif "200" in indicator_name:
+            period = 200
+        elif "10" in indicator_name:
+            period = 10
+        elif "RSI" in indicator_name:
+            period = time_period
+        elif "Bollinger" in indicator_name:
+            period = 20
+        elif "ATR" in indicator_name:
+            period = time_period
+        elif "VWMA" in indicator_name:
+            period = time_period
+        else:
+            period = 26  # Default for MACD
+        
+        # Calculate extra days needed for indicator warmup based on interval
+        if interval == "weekly":
+            # For weekly, need more days (weeks * 7)
+            extra_periods = max(period * 7 if period else 200, 200)
+        elif interval == "monthly":
+            # For monthly, need even more days (months * 30)
+            extra_periods = max(period * 30 if period else 365, 365)
+        else:  # daily
+            extra_periods = max(period * 3 if period else 200, 200)
+        
+        start_date_dt = before - timedelta(days=extra_periods)
         start_date = start_date_dt.strftime("%Y-%m-%d")
+        end_date = curr_date
         
-        # Get price data with retries
-        attempts = 3
-        price_data_str = ""
-        for i in range(attempts):
-            price_data_str = get_stock(symbol, start_date, end_date)
-            if not (price_data_str.startswith("Error") or price_data_str.startswith("No data")):
-                break
-            if i < attempts - 1:
-                time.sleep(1.0)
+        # Get daily price data (always fetch daily, then resample if needed)
+        logger.info(f"Fetching price data for {symbol} from {start_date} to {end_date}")
+        price_data_str = get_stock(symbol, start_date, end_date)
         
         if price_data_str.startswith("Error") or price_data_str.startswith("No data"):
-            # Fallback: try yfinance
-            try:
-                import yfinance as yf
-                mk = _identify_market(symbol)
-                yf_symbol = symbol
-                if mk == 'A_STOCK':
-                    s = symbol.strip()
-                    if s.startswith(('60', '68')):
-                        yf_symbol = f"{s}.SS"
-                    elif s.startswith(('00', '30')):
-                        yf_symbol = f"{s}.SZ"
-                elif mk == 'HK_STOCK':
-                    s = symbol.upper()
-                    if s.endswith('.HK'):
-                        s = s[:-3]
-                    try:
-                        s4 = str(int(s)).zfill(4)
-                    except Exception:
-                        s4 = s[-4:]
-                    yf_symbol = f"{s4}.HK"
-                else:
-                    yf_symbol = symbol.upper()
-
-                df_yf = yf.download(yf_symbol, start=start_date, end=end_date, interval="1d", progress=False, auto_adjust=False)
-                if df_yf is not None and not df_yf.empty:
-                    df_yf = df_yf.reset_index()
-                    df_yf = df_yf.rename(columns={
-                        'Date': 'Date',
-                        'Open': 'Open',
-                        'High': 'High',
-                        'Low': 'Low',
-                        'Close': 'Close',
-                        'Volume': 'Volume'
-                    })
-                    csv_string = df_yf[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']].to_csv(index=False)
-                    header = f"# Stock data for {symbol} from {start_date} to {end_date} (yfinance fallback)\n"
-                    header += f"# Market: {MARKET_PATTERNS[mk]['description']}\n"
-                    header += f"# Total records: {len(df_yf)}\n"
-                    header += f"# Retrieved: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                    price_data_str = header + csv_string
-                else:
-                    return price_data_str
-            except Exception:
-                return price_data_str
+            return f"Error: Unable to fetch price data for {symbol}"
         
         # Parse CSV data
         lines = price_data_str.split('\n')
@@ -146,228 +160,85 @@ def get_indicators(
                 break
         
         csv_data = '\n'.join(lines[csv_start:])
-        from io import StringIO
         df = pd.read_csv(StringIO(csv_data))
         
         if df.empty:
-            return f"No price data available for indicator calculation"
+            return f"Error: No price data available for {symbol}"
         
-        # Get price series based on series_type
+        # Standardize column names
+        column_mapping = {
+            '日期': 'Date',
+            '开盘': 'Open',
+            '最高': 'High',
+            '最低': 'Low',
+            '收盘': 'Close',
+            '成交量': 'Volume',
+            'volume': 'Volume'
+        }
+        df = df.rename(columns=column_mapping)
+        
+        # Ensure Date column is datetime
+        df['Date'] = pd.to_datetime(df['Date'])
+        df = df.sort_values('Date')
+        df = df.set_index('Date')
+        
+        # Resample data based on interval
+        if interval == "weekly":
+            # Resample to weekly (week ending Friday)
+            df_resampled = df.resample('W-FRI').agg({
+                'Open': 'first',
+                'High': 'max',
+                'Low': 'min',
+                'Close': 'last',
+                'Volume': 'sum'
+            }).dropna()
+        elif interval == "monthly":
+            # Resample to monthly (month end)
+            df_resampled = df.resample('M').agg({
+                'Open': 'first',
+                'High': 'max',
+                'Low': 'min',
+                'Close': 'last',
+                'Volume': 'sum'
+            }).dropna()
+        else:  # daily
+            df_resampled = df
+        
+        if df_resampled.empty:
+            return f"Error: No data available after resampling to {interval}"
+        
+        # Determine which price column to use
+        # Use required_series from indicator definition, or fall back to series_type parameter
+        effective_series = required_series if required_series else series_type
+        
         series_type_map = {
             'close': 'Close',
             'open': 'Open',
             'high': 'High',
             'low': 'Low'
         }
-        price_col = series_type_map.get(series_type.lower(), 'Close')
+        price_col = series_type_map.get(effective_series.lower() if effective_series else 'close', 'Close')
         
-        # Fallback to Chinese column names if English not found
-        if price_col not in df.columns:
-            chinese_map = {
-                'Close': '收盘',
-                'Open': '开盘',
-                'High': '最高',
-                'Low': '最低'
-            }
-            price_col = chinese_map.get(price_col, '收盘')
+        if price_col not in df_resampled.columns and indicator_name != "ATR":
+            return f"Error: Price column '{price_col}' not found in data"
         
-        # Calculate indicators based on type
-        indicator_lower = indicator.lower()
+        # Calculate indicator
+        result_df = _calculate_indicator(
+            df_resampled, 
+            indicator_lower, 
+            indicator_name, 
+            period, 
+            price_col, 
+            time_period
+        )
         
-        # === SMA Indicators ===
-        if indicator_lower in ['close_50_sma', 'close_200_sma']:
-            period = 50 if indicator_lower == 'close_50_sma' else 200
-            price_series = df[price_col]
-            
-            try:
-                import talib
-                sma_data = talib.SMA(price_series.values, timeperiod=period)
-            except Exception:
-                # Fallback: pandas SMA
-                sma_data = price_series.rolling(window=period, min_periods=1).mean()
-            
-            result_df = pd.DataFrame({
-                'Date': df['Date'] if 'Date' in df.columns else df['日期'],
-                'SMA': sma_data
-            })
-            
-        # === EMA Indicators ===
-        elif indicator_lower == 'close_10_ema':
-            period = time_period if time_period != 14 else 10
-            price_series = df[price_col]
-            
-            try:
-                import talib
-                ema_data = talib.EMA(price_series.values, timeperiod=period)
-            except Exception:
-                # Fallback: pandas EMA
-                ema_data = price_series.ewm(span=period, adjust=False).mean()
-            
-            result_df = pd.DataFrame({
-                'Date': df['Date'] if 'Date' in df.columns else df['日期'],
-                'EMA': ema_data
-            })
-        
-        # === MACD Indicators ===
-        elif indicator_lower in ['macd', 'macds', 'macdh']:
-            close_series = df[price_col]
-            
-            try:
-                import talib
-                macd, signal, histogram = talib.MACD(close_series.values)
-                macd_data = pd.DataFrame({
-                    'MACD': macd,
-                    'Signal': signal,
-                    'Histogram': histogram
-                })
-            except Exception:
-                # Fallback: simple MACD calculation
-                exp1 = close_series.ewm(span=12, adjust=False).mean()
-                exp2 = close_series.ewm(span=26, adjust=False).mean()
-                macd_line = exp1 - exp2
-                signal_line = macd_line.ewm(span=9, adjust=False).mean()
-                histogram = macd_line - signal_line
-                macd_data = pd.DataFrame({
-                    'MACD': macd_line,
-                    'Signal': signal_line,
-                    'Histogram': histogram
-                })
-            
-            # Return specific component based on indicator
-            date_col = df['Date'] if 'Date' in df.columns else df['日期']
-            if indicator_lower == 'macd':
-                result_df = pd.DataFrame({
-                    'Date': date_col,
-                    'MACD': macd_data['MACD']
-                })
-            elif indicator_lower == 'macds':
-                result_df = pd.DataFrame({
-                    'Date': date_col,
-                    'MACD_Signal': macd_data['Signal']
-                })
-            else:  # macdh
-                result_df = pd.DataFrame({
-                    'Date': date_col,
-                    'MACD_Hist': macd_data['Histogram']
-                })
-            
-        # === RSI Indicator ===
-        elif indicator_lower == 'rsi':
-            price_series = df[price_col]
-            
-            try:
-                import talib
-                rsi_data = talib.RSI(price_series.values, timeperiod=time_period)
-            except Exception:
-                # Fallback: simple RSI calculation
-                delta = price_series.diff()
-                gain = (delta.where(delta > 0, 0)).rolling(window=time_period, min_periods=1).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(window=time_period, min_periods=1).mean()
-                rs = gain / loss.replace(0, pd.NA)
-                rsi_data = 100 - (100 / (1 + rs))
-            
-            result_df = pd.DataFrame({
-                'Date': df['Date'] if 'Date' in df.columns else df['日期'],
-                'RSI': rsi_data
-            })
-            
-        # === Bollinger Bands ===
-        elif indicator_lower in ['boll', 'boll_ub', 'boll_lb']:
-            close_series = df[price_col]
-            
-            try:
-                import talib
-                upper, middle, lower = talib.BBANDS(close_series.values, timeperiod=20)
-                boll_data = pd.DataFrame({'Upper': upper, 'Middle': middle, 'Lower': lower})
-            except Exception:
-                # Fallback: simple Bollinger Bands calculation
-                middle = close_series.rolling(window=20, min_periods=1).mean()
-                std = close_series.rolling(window=20, min_periods=1).std()
-                upper = middle + (std * 2)
-                lower = middle - (std * 2)
-                boll_data = pd.DataFrame({'Upper': upper, 'Middle': middle, 'Lower': lower})
-            
-            # Return specific band based on indicator
-            date_col = df['Date'] if 'Date' in df.columns else df['日期']
-            if indicator_lower == 'boll':
-                result_df = pd.DataFrame({
-                    'Date': date_col,
-                    'Real Middle Band': boll_data['Middle']
-                })
-            elif indicator_lower == 'boll_ub':
-                result_df = pd.DataFrame({
-                    'Date': date_col,
-                    'Real Upper Band': boll_data['Upper']
-                })
-            else:  # boll_lb
-                result_df = pd.DataFrame({
-                    'Date': date_col,
-                    'Real Lower Band': boll_data['Lower']
-                })
-        
-        # === ATR Indicator ===
-        elif indicator_lower == 'atr':
-            high_series = df['High'] if 'High' in df.columns else df['最高']
-            low_series = df['Low'] if 'Low' in df.columns else df['最低']
-            close_series = df['Close'] if 'Close' in df.columns else df['收盘']
-            
-            try:
-                import talib
-                atr_data = talib.ATR(high_series.values, low_series.values, close_series.values, timeperiod=time_period)
-            except Exception:
-                # Fallback: simple ATR calculation
-                high_low = high_series - low_series
-                high_close = abs(high_series - close_series.shift())
-                low_close = abs(low_series - close_series.shift())
-                true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-                atr_data = true_range.rolling(window=time_period, min_periods=1).mean()
-            
-            result_df = pd.DataFrame({
-                'Date': df['Date'] if 'Date' in df.columns else df['日期'],
-                'ATR': atr_data
-            })
-            
-        # === KDJ Indicator (AkShare specific) ===
-        elif indicator_lower == 'kdj':
-            high_series = df['High'] if 'High' in df.columns else df['最高']
-            low_series = df['Low'] if 'Low' in df.columns else df['最低']
-            close_series = df['Close'] if 'Close' in df.columns else df['收盘']
-            
-            try:
-                import talib
-                k_percent, d_percent = talib.STOCH(high_series.values, low_series.values, close_series.values)
-                j_percent = 3 * k_percent - 2 * d_percent
-                kdj_data = pd.DataFrame({'K': k_percent, 'D': d_percent, 'J': j_percent})
-            except Exception:
-                # Fallback: simple KDJ calculation
-                low_min = low_series.rolling(window=9, min_periods=1).min()
-                high_max = high_series.rolling(window=9, min_periods=1).max()
-                rsv = (close_series - low_min) / (high_max - low_min).replace(0, pd.NA) * 100
-                k_percent = rsv.ewm(alpha=1 / 3, adjust=False).mean()
-                d_percent = k_percent.ewm(alpha=1 / 3, adjust=False).mean()
-                j_percent = 3 * k_percent - 2 * d_percent
-                kdj_data = pd.DataFrame({'K': k_percent, 'D': d_percent, 'J': j_percent})
-            
-            result_df = pd.DataFrame({
-                'Date': df['Date'] if 'Date' in df.columns else df['日期'],
-                'K': kdj_data['K'],
-                'D': kdj_data['D'],
-                'J': kdj_data['J']
-            })
-            
-        else:
-            supported = ["close_50_sma", "close_200_sma", "close_10_ema", "macd", "macds", "macdh",
-                        "rsi", "boll", "boll_ub", "boll_lb", "atr", "kdj"]
-            return f"Indicator '{indicator}' not supported. Available: {', '.join(supported)}"
+        if result_df is None or result_df.empty:
+            return f"Error: Failed to calculate {indicator}"
         
         # Filter to requested date range
-        result_df['Date'] = pd.to_datetime(result_df['Date'])
-        end_date_dt = datetime.strptime(curr_date, "%Y-%m-%d")
-        start_date_dt = end_date_dt - timedelta(days=look_back_days)
-        
         filtered_df = result_df[
-            (result_df['Date'] >= start_date_dt) &
-            (result_df['Date'] <= end_date_dt)
+            (result_df['time'] >= before) &
+            (result_df['time'] <= curr_date_dt)
         ].copy()
         
         if filtered_df.empty:
@@ -375,54 +246,141 @@ def get_indicators(
             n = max(1, min(look_back_days, len(result_df)))
             filtered_df = result_df.tail(n).copy()
         
-        # Drop rows with invalid dates
-        filtered_df = filtered_df.dropna(subset=['Date'])
+        # Format as CSV (matching Alpha Vantage format)
+        csv_output = filtered_df.to_csv(index=False)
         
-        # Sort by date ascending
-        filtered_df = filtered_df.sort_values('Date')
-        
-        # Format output
-        ind_string = ""
-        for _, row in filtered_df.iterrows():
-            date_val = row['Date']
-            try:
-                date_str = date_val.strftime('%Y-%m-%d') if hasattr(date_val, 'strftime') and not pd.isna(date_val) else str(date_val)[:10]
-            except Exception:
-                date_str = str(date_val)
-            
-            # Get the value(s) for this row
-            values = []
-            for col in filtered_df.columns:
-                if col != 'Date':
-                    try:
-                        value = float(row[col])
-                        # Format with appropriate precision
-                        if abs(value) < 0.01:
-                            values.append(f"{value:.6f}")
-                        else:
-                            values.append(f"{value:.4f}")
-                    except Exception:
-                        values.append(str(row[col]))
-            
-            # Single value per line
-            if len(values) == 1:
-                ind_string += f"{date_str}: {values[0]}\n"
-            else:
-                # Multiple values (for KDJ or full MACD)
-                ind_string += f"{date_str}: {', '.join(values)}\n"
-        
-        if not ind_string:
-            ind_string = "No data available for the specified date range.\n"
-        
-        # Build result string
-        result_str = (
-            f"## {indicator.upper()} values for {symbol} from {start_date_dt.strftime('%Y-%m-%d')} to {curr_date}:\n\n"
-            + ind_string
-            + "\n\n"
-            + indicator_descriptions.get(indicator_lower, "No description available.")
-        )
-        
-        return result_str
+        return csv_output
         
     except Exception as e:
+        logger.error(f"Error calculating {indicator} for {symbol}: {str(e)}")
         return f"Error calculating {indicator} for {symbol}: {str(e)}"
+
+
+def _calculate_indicator(df: pd.DataFrame, indicator_key: str, indicator_name: str, 
+                         period: int, price_col: str, time_period: int) -> pd.DataFrame:
+    """
+    Calculate technical indicator and return DataFrame with time and value columns
+    
+    Args:
+        df: DataFrame with OHLCV data (index is Date)
+        indicator_key: Indicator key (e.g., 'close_50_sma')
+        indicator_name: Indicator display name (e.g., '50 SMA')
+        period: Period for calculation
+        price_col: Price column to use
+        time_period: Time period parameter
+    
+    Returns:
+        DataFrame with 'time' and indicator value column(s)
+    """
+    try:
+        import talib
+        has_talib = True
+    except ImportError:
+        has_talib = False
+        logger.warning("TA-Lib not available, using pandas fallback")
+    
+    result_df = pd.DataFrame()
+    result_df['time'] = df.index
+    
+    # === SMA Indicators ===
+    if "SMA" in indicator_name:
+        if has_talib:
+            values = talib.SMA(df[price_col].values, timeperiod=period)
+        else:
+            values = df[price_col].rolling(window=period, min_periods=1).mean()
+        result_df[indicator_name] = values
+    
+    # === EMA Indicators ===
+    elif "EMA" in indicator_name:
+        if has_talib:
+            values = talib.EMA(df[price_col].values, timeperiod=period)
+        else:
+            values = df[price_col].ewm(span=period, adjust=False).mean()
+        result_df[indicator_name] = values
+    
+    # === MACD Indicators ===
+    elif "MACD" in indicator_name:
+        if has_talib:
+            macd, signal, hist = talib.MACD(df[price_col].values)
+        else:
+            # Fallback: simple MACD calculation
+            exp1 = df[price_col].ewm(span=12, adjust=False).mean()
+            exp2 = df[price_col].ewm(span=26, adjust=False).mean()
+            macd = exp1 - exp2
+            signal = macd.ewm(span=9, adjust=False).mean()
+            hist = macd - signal
+        
+        if indicator_name == "MACD":
+            result_df['MACD'] = macd
+        elif indicator_name == "MACD Signal":
+            result_df['MACD Signal'] = signal
+        else:  # MACD Histogram
+            result_df['MACD Histogram'] = hist
+    
+    # === RSI Indicator ===
+    elif indicator_name == "RSI":
+        if has_talib:
+            values = talib.RSI(df[price_col].values, timeperiod=period)
+        else:
+            # Fallback: simple RSI calculation
+            delta = df[price_col].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=period, min_periods=1).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=period, min_periods=1).mean()
+            rs = gain / loss.replace(0, np.nan)
+            values = 100 - (100 / (1 + rs))
+        result_df['RSI'] = values
+    
+    # === Bollinger Bands ===
+    elif "Bollinger" in indicator_name:
+        if has_talib:
+            upper, middle, lower = talib.BBANDS(df[price_col].values, timeperiod=period)
+        else:
+            # Fallback: simple Bollinger Bands calculation
+            middle = df[price_col].rolling(window=period, min_periods=1).mean()
+            std = df[price_col].rolling(window=period, min_periods=1).std()
+            upper = middle + (std * 2)
+            lower = middle - (std * 2)
+        
+        if "Middle" in indicator_name:
+            result_df['Real Middle Band'] = middle
+        elif "Upper" in indicator_name:
+            result_df['Real Upper Band'] = upper
+        else:  # Lower Band
+            result_df['Real Lower Band'] = lower
+    
+    # === ATR Indicator ===
+    elif indicator_name == "ATR":
+        if has_talib:
+            values = talib.ATR(df['High'].values, df['Low'].values, df['Close'].values, timeperiod=period)
+        else:
+            # Fallback: simple ATR calculation
+            high_low = df['High'] - df['Low']
+            high_close = abs(df['High'] - df['Close'].shift())
+            low_close = abs(df['Low'] - df['Close'].shift())
+            true_range = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+            values = true_range.rolling(window=period, min_periods=1).mean()
+        result_df['ATR'] = values
+    
+    # === VWMA Indicator ===
+    elif indicator_name == "VWMA":
+        if 'Volume' not in df.columns:
+            logger.error("VWMA requires volume data")
+            return None
+        
+        # Calculate VWMA: sum(price * volume) / sum(volume) over period
+        values = (df[price_col] * df['Volume']).rolling(window=period, min_periods=1).sum() / \
+                 df['Volume'].rolling(window=period, min_periods=1).sum()
+        result_df['VWMA'] = values
+    
+    else:
+        logger.error(f"Unknown indicator: {indicator_name}")
+        return None
+    
+    # Drop rows with NaN in indicator columns
+    indicator_cols = [col for col in result_df.columns if col != 'time']
+    result_df = result_df.dropna(subset=indicator_cols)
+    
+    # Reset index
+    result_df = result_df.reset_index(drop=True)
+    
+    return result_df

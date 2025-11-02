@@ -49,7 +49,7 @@ from .alpha_vantage_common import AlphaVantageRateLimitError
 from .akshare import (
     get_stock as get_akshare_stock,
     get_stock_realtime_quote as get_akshare_realtime_quote,
-    get_indicators as get_akshare_indicators,
+    get_indicator as get_akshare_indicators,
     get_fundamentals as get_akshare_fundamentals,
     get_balance_sheet as get_akshare_balance_sheet,
     get_cashflow as get_akshare_cashflow,

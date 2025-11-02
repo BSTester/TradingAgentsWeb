@@ -49,6 +49,7 @@ class RiskDebateState(TypedDict):
 
 class AgentState(MessagesState):
     company_of_interest: Annotated[str, "Company that we are interested in trading"]
+    ticker: Annotated[Optional[str], "Stock ticker symbol (e.g., AAPL, 00700, 600519)"]
     trade_date: Annotated[str, "What date we are trading at"]
 
     sender: Annotated[str, "Agent that sent this message"]
@@ -74,3 +75,7 @@ class AgentState(MessagesState):
         RiskDebateState, "Current state of the debate on evaluating risk"
     ]
     final_trade_decision: Annotated[str, "Final decision made by the Risk Analysts"]
+    
+    # trading execution fields
+    market_type: Annotated[Optional[str], "Market classification (US/HK/CN)"]
+    execution_report: Annotated[Optional[str], "Trading execution report"]

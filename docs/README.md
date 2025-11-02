@@ -26,6 +26,53 @@
   - 多种配置方式说明
   - 安全注意事项
 
+### 交易执行功能
+
+- **[TRADING_EXECUTOR_INDEX.md](TRADING_EXECUTOR_INDEX.md)** - 交易执行节点文档索引 ⭐
+  - 所有交易执行相关文档的导航
+  - 推荐阅读顺序
+  - 快速查找指南
+
+- **[QUICK_START_TRADING_EXECUTOR.md](QUICK_START_TRADING_EXECUTOR.md)** - 交易执行快速开始
+  - 快速启动指南
+  - 配置步骤说明
+  - 使用示例和常见问题
+
+- **[TRADING_EXECUTOR_SUMMARY.md](TRADING_EXECUTOR_SUMMARY.md)** - 交易执行实现总结
+  - 功能概述和架构
+  - 修改的文件列表
+  - 使用流程和关键特性
+
+- **[TRADING_EXECUTOR_IMPLEMENTATION.md](TRADING_EXECUTOR_IMPLEMENTATION.md)** - 交易执行完整实现
+  - 详细实现说明
+  - 技术细节和代码示例
+  - 配置选项和注意事项
+
+- **[TRADING_EXECUTOR_CHECKLIST.md](TRADING_EXECUTOR_CHECKLIST.md)** - 交易执行检查清单
+  - 功能实现检查
+  - 代码质量验证
+  - 测试建议和完成状态
+
+- **[FUTU_INTEGRATION_SUMMARY.md](FUTU_INTEGRATION_SUMMARY.md)** - Futu交易集成总结
+  - Futu API集成说明
+  - 交易工具和功能
+
+- **[FUTU_TRADING_SETUP.md](FUTU_TRADING_SETUP.md)** - Futu交易设置指南
+  - Futu OpenD配置
+  - API密钥设置
+
+- **[FUTU_TRADING_TOOLS.md](FUTU_TRADING_TOOLS.md)** - Futu交易工具文档
+  - 可用的交易工具
+  - 使用方法和示例
+
+- **[AUTO_EXECUTE_TRADING_CONFIG.md](AUTO_EXECUTE_TRADING_CONFIG.md)** - 自动交易配置
+  - 自动交易开关配置
+  - 配置选项说明
+
+- **[CLI_AUTO_TRADING.md](CLI_AUTO_TRADING.md)** - CLI自动交易
+  - CLI中的自动交易功能
+  - 使用方法和示例
+
 ### 数据库相关
 
 - **[DATABASE_INIT_SUMMARY.md](DATABASE_INIT_SUMMARY.md)** - 数据库初始化方式说明
@@ -121,6 +168,12 @@
 3. 参考 [DATABASE_INIT_SUMMARY.md](DATABASE_INIT_SUMMARY.md) 了解数据库初始化
 4. 查看 [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md) 开始开发
 
+### 交易执行功能使用
+1. 查看 [TRADING_EXECUTOR_INDEX.md](TRADING_EXECUTOR_INDEX.md) 了解文档结构 ⭐
+2. 阅读 [QUICK_START_TRADING_EXECUTOR.md](QUICK_START_TRADING_EXECUTOR.md) 快速开始
+3. 参考 [FUTU_TRADING_SETUP.md](FUTU_TRADING_SETUP.md) 配置Futu交易
+4. 查看 [TRADING_EXECUTOR_SUMMARY.md](TRADING_EXECUTOR_SUMMARY.md) 了解功能详情
+
 ### 部署人员
 1. 查看 [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)
 2. 参考 [DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md) 或 [NGINX_CONFIG_GUIDE.md](NGINX_CONFIG_GUIDE.md)
@@ -128,8 +181,9 @@
 
 ### 功能开发
 1. 查看 [COMPANY_NAME_FEATURE.md](COMPANY_NAME_FEATURE.md) 了解功能实现示例
-2. 参考 [DATABASE_SETUP.md](DATABASE_SETUP.md) 了解数据库操作
-3. 查看 [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md) 了解开发流程
+2. 查看 [TRADING_EXECUTOR_IMPLEMENTATION.md](TRADING_EXECUTOR_IMPLEMENTATION.md) 了解交易执行实现
+3. 参考 [DATABASE_SETUP.md](DATABASE_SETUP.md) 了解数据库操作
+4. 查看 [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md) 了解开发流程
 
 ## 📝 文档维护
 

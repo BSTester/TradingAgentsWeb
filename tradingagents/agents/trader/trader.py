@@ -42,8 +42,27 @@ Proposed Investment Plan: {investment_plan}
 Before making your final trading decision, you should:
 1. Use get_realtime_quote to get the current market price and real-time metrics (current price, volume, P/E ratio, market cap, etc.)
 2. Use get_stock_data to retrieve recent price data from one month prior to the analysis date up to the analysis date (inclusive)
-3. Use get_indicators to calculate relevant technical indicators (e.g., RSI, MACD, moving averages, Bollinger Bands)
+3. Use get_indicators to calculate relevant technical indicators
 4. Analyze the retrieved data along with the provided reports to make an informed decision
+
+Available Technical Indicators (via get_indicators):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- close_50_sma: 50-period Simple Moving Average (medium-term trend)
+- close_200_sma: 200-period Simple Moving Average (long-term trend)
+- close_10_ema: 10-period Exponential Moving Average (short-term momentum)
+- macd: MACD line (momentum indicator)
+- macds: MACD Signal line (MACD smoothing)
+- macdh: MACD Histogram (momentum strength)
+- rsi: Relative Strength Index (overbought/oversold, 0-100)
+- boll: Bollinger Middle Band (volatility baseline)
+- boll_ub: Bollinger Upper Band (resistance level)
+- boll_lb: Bollinger Lower Band (support level)
+- atr: Average True Range (volatility measure)
+- vwma: Volume Weighted Moving Average (volume-price trend)
+
+Usage Example:
+get_indicators(symbol="{ticker}", indicator="rsi", curr_date="{current_date}", look_back_days=30, interval="daily")
+get_indicators(symbol="{ticker}", indicator="macd", curr_date="{current_date}", look_back_days=60, interval="daily")
 
 After analyzing the data, provide a specific recommendation to buy, sell, or hold. Do not forget to utilize lessons from past decisions to learn from your mistakes. Here is some reflections from similar situations you traded in and the lessons learned: {past_memory_str}
 
