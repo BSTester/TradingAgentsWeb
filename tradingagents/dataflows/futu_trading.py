@@ -61,6 +61,36 @@ def _get_timeout() -> int:
         return 30
 
 
+def _get_api_key() -> Optional[str]:
+    """
+    Get Futu API key from environment variable or config.
+    
+    Returns:
+        str: API key or None if not configured
+    """
+    import os
+    
+    # Try environment variable first
+    api_key = os.getenv("FUTU_API_KEY")
+    if api_key:
+        logger.debug("Using Futu API key from environment variable")
+        return api_key
+    
+    # Try config as fallback
+    try:
+        from .config import get_config
+        config = get_config()
+        api_key = config.get("futu_api_key")
+        if api_key:
+            logger.debug("Using Futu API key from config")
+            return api_key
+    except Exception as e:
+        logger.debug(f"Failed to get API key from config: {e}")
+    
+    logger.warning("No Futu API key configured - requests may fail if authentication is required")
+    return None
+
+
 def _create_session() -> requests.Session:
     """
     Create a requests session with retry logic and connection pooling.
@@ -112,7 +142,14 @@ def _make_request(
     """
     base_url = _get_base_url()
     timeout = _get_timeout()
+    api_key = _get_api_key()
     url = f"{base_url}{endpoint}"
+    
+    # Prepare headers
+    headers = {}
+    if api_key:
+        headers["X-API-Key"] = api_key
+        logger.debug("Added X-API-Key header to request")
     
     logger.debug(f"Making {method} request to {url}")
     logger.debug(f"Params: {params}, JSON: {json_data}")
@@ -121,9 +158,9 @@ def _make_request(
     
     try:
         if method.upper() == "GET":
-            response = _session.get(url, params=params, timeout=timeout)
+            response = _session.get(url, params=params, headers=headers, timeout=timeout)
         elif method.upper() == "POST":
-            response = _session.post(url, json=json_data, timeout=timeout)
+            response = _session.post(url, json=json_data, headers=headers, timeout=timeout)
         else:
             raise ValueError(f"Unsupported HTTP method: {method}")
         
