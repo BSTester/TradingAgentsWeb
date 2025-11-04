@@ -224,8 +224,8 @@ def get_futu_orders(
 def get_futu_kline(
     symbol: Annotated[str, "Stock symbol"],
     interval: Annotated[str, "Time interval: 1min, 5min, 15min, 30min, 60min, daily, weekly, monthly, quarterly, yearly"] = "daily",
-    start_date: Annotated[Optional[str], "Start date (format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)"] = None,
-    end_date: Annotated[Optional[str], "End date (format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)"] = None,
+    start_date: Annotated[Optional[str], "Start date in YYYY-MM-DD format (date only, no time component)"] = None,
+    end_date: Annotated[Optional[str], "End date in YYYY-MM-DD format (date only, no time component)"] = None,
     format: Annotated[str, "Return format: json or csv"] = "csv"
 ) -> str:
     """
@@ -255,8 +255,8 @@ def get_futu_kline(
     Args:
         symbol: Stock symbol
         interval: Time interval (1min, 5min, 15min, 30min, 60min, daily, weekly, monthly, quarterly, yearly)
-        start_date: Start date (optional, format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
-        end_date: End date (optional, format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
+        start_date: Start date (YYYY-MM-DD format only, e.g., "2025-10-04")
+        end_date: End date (YYYY-MM-DD format only, e.g., "2025-11-03")
         format: Return format (json or csv), defaults to csv
         
     Returns:
@@ -272,7 +272,7 @@ def get_futu_kline(
         >>> klines_json = get_futu_kline("AAPL", interval="5min", start_date="2025-10-04", end_date="2025-11-03", format="json")
         
         >>> # Get weekly data (can use longer range)
-        >>> klines_weekly = get_futu_kline("AAPL", interval="weekly")
+        >>> klines_weekly = get_futu_kline("AAPL", interval="weekly", start_date="2025-01-01", end_date="2025-11-03")
     """
     try:
         result = _get_kline_data(symbol, interval, start_date, end_date, format)
@@ -340,8 +340,8 @@ def get_futu_technical_analysis(
     symbol: Annotated[str, "Stock symbol"],
     interval: Annotated[str, "Time interval: 1min, 5min, 15min, 30min, 60min, daily, weekly, monthly, quarterly, yearly"] = "daily",
     indicator: Annotated[str, "Technical indicator: close_50_sma, close_200_sma, close_10_ema, macd, rsi, boll, atr, vwma"] = "macd",
-    start_date: Annotated[Optional[str], "Start date (format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)"] = None,
-    end_date: Annotated[Optional[str], "End date (format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)"] = None,
+    start_date: Annotated[Optional[str], "Start date in YYYY-MM-DD format (date only, no time component)"] = None,
+    end_date: Annotated[Optional[str], "End date in YYYY-MM-DD format (date only, no time component)"] = None,
     format: Annotated[str, "Return format: json or csv"] = "csv"
 ) -> str:
     """
@@ -378,8 +378,8 @@ def get_futu_technical_analysis(
         symbol: Stock symbol
         interval: Time interval (1min, 5min, 15min, 30min, 60min, daily, weekly, monthly, quarterly, yearly)
         indicator: Technical indicator name
-        start_date: Start date (optional, format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
-        end_date: End date (optional, format: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS)
+        start_date: Start date (YYYY-MM-DD format only, e.g., "2025-10-04")
+        end_date: End date (YYYY-MM-DD format only, e.g., "2025-11-03")
         format: Return format (json or csv), defaults to csv
         
     Returns:

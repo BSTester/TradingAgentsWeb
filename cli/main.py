@@ -63,7 +63,7 @@ class MessageBuffer:
             "Safe Analyst": "pending",
             # Portfolio Management Team
             "Portfolio Manager": "pending",
-            # Trading Execution Team
+            # Trading Execution Team (after Risk Management)
             "Trading Executor": "pending",
         }
         self.current_agent = None
@@ -239,7 +239,7 @@ def update_display(layout, spinner_text=None):
         "Trading Team": ["Trader"],
         "Risk Management": ["Risky Analyst", "Neutral Analyst", "Safe Analyst"],
         "Portfolio Management": ["Portfolio Manager"],
-        "Trading Execution": ["Trading Executor"],
+        "Trading Execution": ["Trading Executor"],  # Trading Executor is after Risk Management
     }
 
     for team, agents in teams.items():
@@ -419,7 +419,7 @@ def get_user_selections():
     welcome_content = f"{welcome_ascii}\n"
     welcome_content += "[bold green]TradingAgents: Multi-Agents LLM Financial Trading Framework - CLI[/bold green]\n\n"
     welcome_content += "[bold]Workflow Steps:[/bold]\n"
-    welcome_content += "I. Analyst Team → II. Research Team → III. Trader → IV. Risk Management → V. Portfolio Management\n\n"
+    welcome_content += "I. Analyst Team → II. Research Team → III. Trading Team → IV. Risk Management → V. Portfolio Management → VI. Trading Execution (if enabled)\n\n"
     welcome_content += (
         "[dim]Built by [Tauric Research](https://github.com/TauricResearch)[/dim]"
     )
@@ -502,7 +502,7 @@ def get_user_selections():
     console.print(
         create_question_box(
             "Step 7: Auto-Execute Trading",
-            "Do you want to automatically execute trades after analysis?",
+            "Enable automatic trade execution? (Trading Executor will run after Risk Management)",
             "No"
         )
     )
@@ -512,7 +512,7 @@ def get_user_selections():
     )
     
     if auto_execute_trading:
-        console.print("[yellow]⚠️  Auto-execute trading is enabled. Trades will be executed automatically after analysis.[/yellow]")
+        console.print("[yellow]⚠️  Auto-execute trading is enabled. Trading Executor will run after Risk Management.[/yellow]")
     else:
         console.print("[green]✓ Auto-execute trading is disabled. Only analysis will be performed.[/green]")
 
@@ -742,13 +742,12 @@ def display_complete_report(final_state):
                 )
             )
 
-    # VI. Trading Execution Result
+    # VI. Trading Execution Result (if enabled)
     if final_state.get("execution_report"):
-        execution_report = final_state["execution_report"]
         console.print(
             Panel(
                 Panel(
-                    Markdown(execution_report),
+                    Markdown(final_state["execution_report"]),
                     title="Trading Executor",
                     border_style="blue",
                     padding=(1, 2),
@@ -761,10 +760,12 @@ def display_complete_report(final_state):
 
 
 def update_research_team_status(status):
-    """Update status for all research team members and trader."""
-    research_team = ["Bull Researcher", "Bear Researcher", "Research Manager", "Trader"]
+    """Update status for all research team members."""
+    research_team = ["Bull Researcher", "Bear Researcher", "Research Manager"]
     for agent in research_team:
         message_buffer.update_agent_status(agent, status)
+
+
 
 def extract_content_string(content):
     """Extract string content from various message formats."""
@@ -1067,34 +1068,44 @@ def run_analysis():
                         )
                         # Mark all research team members as completed
                         update_research_team_status("completed")
-                        # Set first risk analyst to in_progress
-                        message_buffer.update_agent_status(
-                            "Risky Analyst", "in_progress"
-                        )
+                        # Set Trader to in_progress
+                        message_buffer.update_agent_status("Trader", "in_progress")
 
                 # Trading Team
                 if (
                     "trader_investment_plan" in chunk_data
                     and chunk_data["trader_investment_plan"]
                 ):
+                    # Update Trader status
+                    message_buffer.update_agent_status("Trader", "in_progress")
+                    message_buffer.add_message(
+                        "Reasoning",
+                        f"Trader: {chunk_data['trader_investment_plan'][:200]}...",
+                    )
                     message_buffer.update_report_section(
                         "trader_investment_plan", chunk_data["trader_investment_plan"]
                     )
+                    # Mark Trader as completed
+                    message_buffer.update_agent_status("Trader", "completed")
                     # Set first risk analyst to in_progress
                     message_buffer.update_agent_status("Risky Analyst", "in_progress")
 
                 # Risk Management Team - Handle Risk Debate State
                 if "risk_debate_state" in chunk_data and chunk_data["risk_debate_state"]:
                     risk_state = chunk_data["risk_debate_state"]
+                    latest_speaker = risk_state.get("latest_speaker", "")
 
                     # Update Risky Analyst status and report
                     if (
                         "current_risky_response" in risk_state
                         and risk_state["current_risky_response"]
                     ):
-                        message_buffer.update_agent_status(
-                            "Risky Analyst", "in_progress"
-                        )
+                        # Set to in_progress if currently pending
+                        if message_buffer.agent_status["Risky Analyst"] == "pending":
+                            message_buffer.update_agent_status(
+                                "Risky Analyst", "in_progress"
+                            )
+                        
                         message_buffer.add_message(
                             "Reasoning",
                             f"Risky Analyst: {risk_state['current_risky_response']}",
@@ -1104,15 +1115,26 @@ def run_analysis():
                             "final_trade_decision",
                             f"### Risky Analyst Analysis\n{risk_state['current_risky_response']}",
                         )
+                        
+                        # Mark as completed only if another analyst has started speaking
+                        if latest_speaker in ["Safe", "Neutral", "Judge"]:
+                            message_buffer.update_agent_status("Risky Analyst", "completed")
 
                     # Update Safe Analyst status and report
                     if (
                         "current_safe_response" in risk_state
                         and risk_state["current_safe_response"]
                     ):
-                        message_buffer.update_agent_status(
-                            "Safe Analyst", "in_progress"
-                        )
+                        # Complete Risky Analyst if it was in progress
+                        if message_buffer.agent_status["Risky Analyst"] == "in_progress":
+                            message_buffer.update_agent_status("Risky Analyst", "completed")
+                        
+                        # Set to in_progress if currently pending
+                        if message_buffer.agent_status["Safe Analyst"] == "pending":
+                            message_buffer.update_agent_status(
+                                "Safe Analyst", "in_progress"
+                            )
+                        
                         message_buffer.add_message(
                             "Reasoning",
                             f"Safe Analyst: {risk_state['current_safe_response']}",
@@ -1122,15 +1144,26 @@ def run_analysis():
                             "final_trade_decision",
                             f"### Safe Analyst Analysis\n{risk_state['current_safe_response']}",
                         )
+                        
+                        # Mark as completed only if another analyst has started speaking
+                        if latest_speaker in ["Neutral", "Judge"]:
+                            message_buffer.update_agent_status("Safe Analyst", "completed")
 
                     # Update Neutral Analyst status and report
                     if (
                         "current_neutral_response" in risk_state
                         and risk_state["current_neutral_response"]
                     ):
-                        message_buffer.update_agent_status(
-                            "Neutral Analyst", "in_progress"
-                        )
+                        # Complete Safe Analyst if it was in progress
+                        if message_buffer.agent_status["Safe Analyst"] == "in_progress":
+                            message_buffer.update_agent_status("Safe Analyst", "completed")
+                        
+                        # Set to in_progress if currently pending
+                        if message_buffer.agent_status["Neutral Analyst"] == "pending":
+                            message_buffer.update_agent_status(
+                                "Neutral Analyst", "in_progress"
+                            )
+                        
                         message_buffer.add_message(
                             "Reasoning",
                             f"Neutral Analyst: {risk_state['current_neutral_response']}",
@@ -1140,9 +1173,21 @@ def run_analysis():
                             "final_trade_decision",
                             f"### Neutral Analyst Analysis\n{risk_state['current_neutral_response']}",
                         )
+                        
+                        # Mark as completed only if Portfolio Manager has started
+                        if latest_speaker == "Judge":
+                            message_buffer.update_agent_status("Neutral Analyst", "completed")
 
                     # Update Portfolio Manager status and final decision
                     if "judge_decision" in risk_state and risk_state["judge_decision"]:
+                        # Complete all risk analysts if they were in progress
+                        if message_buffer.agent_status["Risky Analyst"] == "in_progress":
+                            message_buffer.update_agent_status("Risky Analyst", "completed")
+                        if message_buffer.agent_status["Safe Analyst"] == "in_progress":
+                            message_buffer.update_agent_status("Safe Analyst", "completed")
+                        if message_buffer.agent_status["Neutral Analyst"] == "in_progress":
+                            message_buffer.update_agent_status("Neutral Analyst", "completed")
+                        
                         message_buffer.update_agent_status(
                             "Portfolio Manager", "in_progress"
                         )
@@ -1155,12 +1200,7 @@ def run_analysis():
                             "final_trade_decision",
                             f"### Portfolio Manager Decision\n{risk_state['judge_decision']}",
                         )
-                        # Mark risk analysts as completed
-                        message_buffer.update_agent_status("Risky Analyst", "completed")
-                        message_buffer.update_agent_status("Safe Analyst", "completed")
-                        message_buffer.update_agent_status(
-                            "Neutral Analyst", "completed"
-                        )
+                        # Mark Portfolio Manager as completed
                         message_buffer.update_agent_status(
                             "Portfolio Manager", "completed"
                         )

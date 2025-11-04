@@ -41,6 +41,7 @@ interface WebSocketMessage {
     error?: string;
     selected_analysts?: string[];
     research_depth?: number;
+    enable_trading_executor?: boolean;
   };
 }
 
@@ -136,6 +137,8 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
       ]
     }
   ]);
+  
+  const [enableTradingExecutor, setEnableTradingExecutor] = useState(false);
 
   // WebSocket 连接和消息处理
   useEffect(() => {
@@ -189,15 +192,21 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
 
             if (message.type === 'config') {
               // 接收配置信息，更新显示的智能体
-              const { selected_analysts } = message.data;
+              const { selected_analysts, enable_trading_executor } = message.data;
               console.log('📋 Received config message');
               console.log('Selected analysts:', selected_analysts);
+              console.log('Enable trading executor:', enable_trading_executor);
+
+              // 更新执行交易状态
+              if (enable_trading_executor !== undefined) {
+                setEnableTradingExecutor(enable_trading_executor);
+              }
 
               if (selected_analysts && Array.isArray(selected_analysts)) {
                 console.log(`🔄 Updating analyst team with ${selected_analysts.length} analysts`);
 
                 setPhases(prevPhases => {
-                  const newPhases = [...prevPhases];
+                  let newPhases = [...prevPhases];
 
                   // 更新分析师团队，只显示选中的分析师
                   const analystPhase = newPhases[0];
@@ -234,6 +243,27 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                     console.warn('⚠️ Analyst phase not found!');
                   }
 
+                  // 如果启用了执行交易，添加第5个阶段（交易执行）
+                  if (enable_trading_executor) {
+                    const hasTradingExecutorPhase = newPhases.some(p => p.id === 5);
+                    if (!hasTradingExecutorPhase) {
+                      console.log('✅ 添加交易执行阶段');
+                      newPhases.push({
+                        id: 5,
+                        name: '交易执行',
+                        description: '执行交易操作',
+                        icon: 'fa-robot',
+                        status: 'pending',
+                        agents: [
+                          { name: '执行交易员', status: 'pending', logs: [] }
+                        ]
+                      });
+                    }
+                  } else {
+                    // 如果未启用，移除交易执行阶段
+                    newPhases = newPhases.filter(p => p.id !== 5);
+                  }
+
                   return newPhases;
                 });
               } else {
@@ -268,7 +298,8 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                     'risky': 3,
                     'neutral': 3,
                     'safe': 3,
-                    'risk_manager': 3
+                    'risk_manager': 3,
+                    'trading_executor': 4,  // 执行交易员在风险管理之后（阶段索引4，对应id=5）
                   };
 
                   // 阶段名称到索引的映射（兼容旧格式）
@@ -287,7 +318,8 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                     '交易团队': 2,
                     '风险评估': 3,
                     '风险管理': 3,
-                    '完成阶段': 3
+                    '完成阶段': 4,
+                    'Trading Executor': 4  // 执行交易员在风险管理之后
                   };
 
                   // 优先使用智能体映射，其次使用阶段映射
@@ -322,7 +354,8 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                         'risky': '激进风险分析师',
                         'neutral': '中性风险分析师',
                         'safe': '保守风险分析师',
-                        'risk_manager': '风险管理评审及投资组合分析'
+                        'risk_manager': '风险管理评审及投资组合分析',
+                        'trading_executor': '执行交易员'
                       };
 
                       const displayName = agentNameMap[agent] || agent;

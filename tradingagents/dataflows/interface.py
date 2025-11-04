@@ -295,7 +295,6 @@ def route_to_vendor(method: str, *args, **kwargs):
     if symbol:
         market = identify_market(symbol)
         fallback_vendors = get_market_preferred_vendors(market, method)
-        print(f"DEBUG: Symbol '{symbol}' identified as {market} market")
     else:
         # No symbol provided, use default configuration
         vendor_config = get_vendor(category, method)
@@ -308,14 +307,6 @@ def route_to_vendor(method: str, *args, **kwargs):
                 fallback_vendors.append(vendor)
         
         market = 'UNKNOWN'
-        print(f"DEBUG: No symbol provided, using default vendor configuration")
-
-    # Debug: Print market-aware routing information
-    fallback_str = " → ".join(fallback_vendors)
-    if symbol:
-        print(f"DEBUG: {method} for {market} market ('{symbol}') - Vendor order: [{fallback_str}]")
-    else:
-        print(f"DEBUG: {method} - Default vendor order: [{fallback_str}]")
 
     # Track results and execution state
     results = []
@@ -348,15 +339,9 @@ def route_to_vendor(method: str, *args, **kwargs):
         is_primary_vendor = vendor in primary_vendors
         vendor_attempt_count += 1
 
-        # Debug: Print current attempt with market context
-        vendor_type = "PRIMARY" if is_primary_vendor else "FALLBACK"
-        market_info = f" ({market})" if symbol else ""
-        print(f"DEBUG: Attempting {vendor_type} vendor '{vendor}' for {method}{market_info} (attempt #{vendor_attempt_count})")
-
         # Handle list of methods for a vendor
         if isinstance(vendor_impl, list):
             vendor_methods = [(impl, vendor) for impl in vendor_impl]
-            print(f"DEBUG: Vendor '{vendor}' has multiple implementations: {len(vendor_methods)} functions")
         else:
             vendor_methods = [(vendor_impl, vendor)]
 
@@ -364,7 +349,6 @@ def route_to_vendor(method: str, *args, **kwargs):
         vendor_results = []
         for impl_func, vendor_name in vendor_methods:
             try:
-                print(f"DEBUG: Calling {impl_func.__name__} from vendor '{vendor_name}'...")
                 result = impl_func(*args, **kwargs)
                 vendor_results.append(result)
                 print(f"SUCCESS: {impl_func.__name__} from vendor '{vendor_name}' completed successfully")
@@ -372,7 +356,6 @@ def route_to_vendor(method: str, *args, **kwargs):
             except AlphaVantageRateLimitError as e:
                 if vendor == "alpha_vantage":
                     print(f"RATE_LIMIT: Alpha Vantage rate limit exceeded, falling back to next available vendor")
-                    print(f"DEBUG: Rate limit details: {e}")
                 # Continue to next vendor for fallback
                 continue
             except Exception as e:
@@ -390,10 +373,7 @@ def route_to_vendor(method: str, *args, **kwargs):
             # Stopping logic: 
             # - News methods (get_news, get_global_news): Collect from ALL vendors
             # - Other methods: Stop after first successful vendor
-            if should_collect_all:
-                print(f"DEBUG: Continuing to collect from all vendors for '{method}' (news aggregation)")
-            else:
-                print(f"DEBUG: Stopping after successful vendor '{vendor}' (non-news method)")
+            if not should_collect_all:
                 break
         else:
             print(f"FAILED: Vendor '{vendor}' produced no results")

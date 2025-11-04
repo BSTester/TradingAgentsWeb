@@ -112,7 +112,10 @@ def execute_scheduled_task(scheduled_task_id: int):
             'backend_url': task.backend_url,
             'shallow_thinker': task.shallow_thinker,
             'deep_thinker': task.deep_thinker,
-            'analysis_date': now_beijing.strftime('%Y-%m-%d')
+            'analysis_date': now_beijing.strftime('%Y-%m-%d'),
+            'enable_trading_executor': task.enable_trading_executor,
+            'futu_api_base_url': task.futu_api_base_url,
+            'futu_api_key': task.futu_api_key
         }
         
         # Submit task (task_manager handles user-level queuing)

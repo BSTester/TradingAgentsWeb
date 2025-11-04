@@ -82,11 +82,12 @@ class AnalysisRequest(BaseModel):
     deep_thinker: str
     # Privacy settings
     is_public: bool = False  # Whether to show in public leaderboard
-    # API Keys
-    openai_api_key: Optional[str] = None
-    anthropic_api_key: Optional[str] = None
-    google_api_key: Optional[str] = None
-    openrouter_api_key: Optional[str] = None
+    # Trading executor settings
+    enable_trading_executor: bool = False  # Whether to enable trading executor
+    futu_api_base_url: Optional[str] = None  # Futu API base URL
+    futu_api_key: Optional[str] = None  # Futu API key
+    # API Key (single field for all LLM providers)
+    api_key: Optional[str] = None  # API key for the selected LLM provider
     
     @validator('analysis_date')
     def validate_date(cls, v):
@@ -234,6 +235,11 @@ class ScheduledTaskCreate(BaseModel):
     deep_thinker: str
     is_public: bool = False
     
+    # Trading executor configuration
+    enable_trading_executor: bool = False
+    futu_api_base_url: Optional[str] = None
+    futu_api_key: Optional[str] = None
+    
     # Schedule configuration (optional for immediate execution)
     execution_cycle: Optional[str] = None  # daily, weekly, every_n_days, workdays
     execution_time: Optional[str] = None  # HH:MM format (Beijing time)
@@ -311,6 +317,9 @@ class ScheduledTaskResponse(BaseModel):
     deep_thinker: str
     backend_url: str
     is_public: bool
+    enable_trading_executor: bool
+    futu_api_base_url: Optional[str]
+    futu_api_key: Optional[str]
     execution_cycle: str
     execution_time: str
     interval_days: Optional[int]
@@ -352,3 +361,45 @@ class ScheduledTaskListResponse(BaseModel):
     has_prev: bool
     # Statistics for all tasks (not just current page)
     stats: Optional[dict] = None  # {"enabled": int, "paused": int, "completed": int}
+
+# User Configuration schemas
+class UserConfigUpdate(BaseModel):
+    """Schema for updating user configuration - all analysis settings"""
+    # Analysis configuration cache (previously stored in frontend localStorage)
+    last_ticker: Optional[str] = None  # 最后分析的股票代码
+    last_analysts: Optional[List[str]] = None
+    last_research_depth: Optional[int] = None
+    last_llm_provider: Optional[str] = None
+    last_shallow_thinker: Optional[str] = None
+    last_deep_thinker: Optional[str] = None
+    last_backend_url: Optional[str] = None
+    
+    # Trading executor configuration
+    enable_trading_executor: Optional[bool] = None
+    futu_api_base_url: Optional[str] = None
+    futu_api_key: Optional[str] = None
+    
+    # API Key (single field for all LLM providers)
+    last_api_key: Optional[str] = None  # Last used API key (matches last_llm_provider)
+
+class UserConfigResponse(BaseModel):
+    """Schema for user configuration response - returns all cached settings"""
+    # Analysis configuration cache
+    last_ticker: Optional[str] = None  # 最后分析的股票代码
+    last_analysts: Optional[List[str]] = None
+    last_research_depth: Optional[int] = None
+    last_llm_provider: Optional[str] = None
+    last_shallow_thinker: Optional[str] = None
+    last_deep_thinker: Optional[str] = None
+    last_backend_url: Optional[str] = None
+    
+    # Trading executor configuration
+    enable_trading_executor: bool = False
+    futu_api_base_url: Optional[str] = None
+    futu_api_key: Optional[str] = None
+    
+    # API Key (returns actual key for frontend to use)
+    last_api_key: Optional[str] = None  # Last used API key (matches last_llm_provider)
+    
+    class Config:
+        from_attributes = True

@@ -54,6 +54,41 @@ async def start_analysis(
             message=f"您已有运行中的分析任务，已自动连接"
         )
     
+    # Load and save user configuration
+    from web.backend.models import UserConfig
+    stmt = select(UserConfig).filter(UserConfig.user_id == current_user.id)
+    result = await db.execute(stmt)
+    user_config = result.scalars().first()
+    
+    if not user_config:
+        user_config = UserConfig(user_id=current_user.id)
+        db.add(user_config)
+    
+    # Update configuration cache with current request
+    user_config.last_ticker = request.ticker  # 保存股票代码
+    user_config.last_analysts = request.analysts
+    user_config.last_research_depth = request.research_depth
+    user_config.last_llm_provider = request.llm_provider
+    user_config.last_shallow_thinker = request.shallow_thinker
+    user_config.last_deep_thinker = request.deep_thinker
+    user_config.last_backend_url = request.backend_url
+    user_config.enable_trading_executor = request.enable_trading_executor
+    
+    # Update Futu API config if provided
+    if request.futu_api_base_url:
+        user_config.futu_api_base_url = request.futu_api_base_url
+    if request.futu_api_key:
+        user_config.futu_api_key = request.futu_api_key
+    
+    # Update API key if provided (single field for all providers)
+    if request.api_key:
+        user_config.last_api_key = request.api_key
+    
+    await db.commit()
+    
+    # Use cached API key if not provided in request
+    api_key = request.api_key or user_config.last_api_key
+    
     # Normalize and validate ticker
     ticker = normalize_ticker(request.ticker)
     
@@ -106,7 +141,7 @@ async def start_analysis(
     await db.commit()
     await db.refresh(analysis_record)
     
-    # Convert request to dict (use normalized ticker)
+    # Convert request to dict (use normalized ticker and cached API key)
     request_data = {
         'ticker': ticker,
         'analysis_date': request.analysis_date,
@@ -116,10 +151,10 @@ async def start_analysis(
         'shallow_thinker': request.shallow_thinker,
         'deep_thinker': request.deep_thinker,
         'backend_url': request.backend_url,
-        'openai_api_key': request.openai_api_key,
-        'anthropic_api_key': request.anthropic_api_key,
-        'google_api_key': request.google_api_key,
-        'openrouter_api_key': request.openrouter_api_key,
+        'enable_trading_executor': request.enable_trading_executor,
+        'futu_api_base_url': request.futu_api_base_url or user_config.futu_api_base_url,
+        'futu_api_key': request.futu_api_key or user_config.futu_api_key,
+        'api_key': api_key,  # Single API key field
     }
     
     # Submit task to task manager
@@ -330,6 +365,18 @@ async def get_analysis_results(
             "agents": risk_agents
         })
     
+    # 阶段5：交易执行（在风险管理之后，仅在启用时显示）
+    if final_state.get("execution_report"):
+        phases.append({
+            "id": 5,
+            "name": "交易执行",
+            "icon": "fa-robot",
+            "color": "cyan",
+            "agents": [
+                {"name": "执行交易员", "result": final_state["execution_report"]}
+            ]
+        })
+    
     # 构建最终摘要（综合所有阶段的结论）
     final_summary = analysis.final_summary
     if not final_summary:
@@ -536,6 +583,12 @@ async def get_analysis_markdown(
             markdown_parts.append("## 风险管理评审\n")
             markdown_parts.append(risk_state["judge_decision"] + "\n")
     
+    # 阶段5：交易执行（如果启用）
+    if final_state.get("execution_report"):
+        markdown_parts.append("\n---\n\n# 🤖 交易执行\n")
+        markdown_parts.append("## 执行交易员\n")
+        markdown_parts.append(final_state["execution_report"] + "\n")
+    
     # 最后：交易决策分析（final_summary）
     if final_state.get("investment_plan") or final_state.get("final_trade_decision"):
         markdown_parts.append("\n---\n\n# 📋 交易决策分析\n")
@@ -706,6 +759,20 @@ async def get_public_analysis_results(
             "color": "red",
             "agents": risk_agents
         })
+    
+    # 阶段5：交易执行（在风险管理之后，仅在启用时显示）
+    if final_state.get("execution_report"):
+        phases.append({
+            "id": 5,
+            "name": "交易执行",
+            "icon": "fa-robot",
+            "color": "cyan",
+            "agents": [
+                {"name": "执行交易员", "result": final_state["execution_report"]}
+            ]
+        })
+    
+    # 注意：执行交易员已合并到交易团队（阶段3）中
     
     # 构建最终摘要
     final_summary = analysis.final_summary

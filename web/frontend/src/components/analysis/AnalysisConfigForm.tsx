@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { analysisAPI, scheduledTasksAPI } from '@/lib/api';
 import { normalizeTicker, validateTicker, getTickerErrorMessage } from '@/utils/tickerValidator';
 import { ScheduleConfig, ScheduleData } from './ScheduleConfig';
+import { useUserConfig } from '@/hooks/useUserConfig';
+import { useAuth } from '@/lib/auth';
 
 interface AnalysisConfigFormProps {
   config: any;
@@ -53,9 +55,10 @@ interface AnalysisResponse {
   message?: string;
 }
 
-const CACHE_KEY = 'trading_agents_config_cache';
-
 export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: AnalysisConfigFormProps) {
+  const { token } = useAuth();
+  const { config: userConfig, loading: configLoading } = useUserConfig(token);
+  
   const [formData, setFormData] = useState<FormData>({
     ticker: '',
     analysis_date: new Date().toISOString().split('T')[0] || '',
@@ -75,6 +78,24 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
   const [tickerError, setTickerError] = useState<string>('');
   const [showPrivacyDialog, setShowPrivacyDialog] = useState(false);
 
+  // 执行交易状态
+  const [enableTradingExecutor, setEnableTradingExecutor] = useState(false);
+  const [futuApiBaseUrl, setFutuApiBaseUrl] = useState('');
+  const [futuApiKey, setFutuApiKey] = useState('');
+  const [futuApiValidated, setFutuApiValidated] = useState(false);
+  const [validatingFutuApi, setValidatingFutuApi] = useState(false);
+
+  // 当富途API配置改变时，重置验证状态
+  const handleFutuApiBaseUrlChange = (value: string) => {
+    setFutuApiBaseUrl(value);
+    setFutuApiValidated(false);
+  };
+
+  const handleFutuApiKeyChange = (value: string) => {
+    setFutuApiKey(value);
+    setFutuApiValidated(false);
+  };
+
   // 定期报告配置状态
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduleData, setScheduleData] = useState<ScheduleData>({
@@ -88,64 +109,59 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
   // 检查当前选择的LLM提供商是否需要API密钥
   const requiresApiKey = formData.llm_provider && formData.llm_provider !== 'ollama';
 
-  // 缓存配置（包含API密钥）
-  const saveConfigToCache = (data: FormData) => {
-    try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify({
-        ...data,
-        cached_at: new Date().toISOString()
-      }));
-    } catch (_error) {
-      console.warn('缓存配置失败:', _error);
-    }
-  };
-
-  // 加载缓存配置（包含API密钥）
-  const loadConfigFromCache = () => {
-    try {
-      const cached = localStorage.getItem(CACHE_KEY);
-      if (cached) {
-        const cachedData = JSON.parse(cached);
-        const cachedDate = new Date(cachedData.cached_at);
-        const now = new Date();
-        const diffHours = (now.getTime() - cachedDate.getTime()) / (1000 * 60 * 60);
-
-        // 缓存在24小时内有效
-        if (diffHours < 24) {
-          setFormData(prev => ({
-            ...prev,
-            ...cachedData,
-            analysis_date: new Date().toISOString().split('T')[0] || '' // 始终使用今天的日期
-          }));
-
-          // 如果缓存中包含API密钥且不是本地模型，设置验证状态为true
-          // 这样用户就不需要重新输入已缓存的API密钥
-          if (cachedData.api_key && cachedData.llm_provider && cachedData.llm_provider !== 'ollama') {
-            setApiKeyValidated(true);
-          }
-
-          return true;
-        }
-      }
-    } catch (_error) {
-      console.warn('加载缓存配置失败:', _error);
-    }
-    return false;
-  };
-
+  // 从服务器加载配置（只加载一次）
+  const [configLoaded, setConfigLoaded] = useState(false);
+  
   useEffect(() => {
-    // 加载缓存的配置
-    const loaded = loadConfigFromCache();
-    if (loaded) {
+    // 防止重复加载
+    if (configLoaded) return;
+    
+    if (userConfig && !configLoading) {
+      console.log('📋 加载用户配置:', userConfig);
+      
+      // 加载服务端缓存的配置
+      setFormData(prev => ({
+        ...prev,
+        ticker: userConfig.last_ticker || '',  // 加载最后的股票代码
+        analysts: userConfig.last_analysts || ['market', 'social', 'news', 'fundamentals'],
+        research_depth: userConfig.last_research_depth || 1,
+        llm_provider: userConfig.last_llm_provider || '',
+        shallow_thinker: userConfig.last_shallow_thinker || '',
+        deep_thinker: userConfig.last_deep_thinker || '',
+        api_key: userConfig.last_api_key || '', // 从服务器加载实际密钥
+        analysis_date: new Date().toISOString().split('T')[0] || ''
+      }));
+      
+      // 加载执行交易配置
+      setEnableTradingExecutor(userConfig.enable_trading_executor || false);
+      setFutuApiBaseUrl(userConfig.futu_api_base_url || '');
+      setFutuApiKey(userConfig.futu_api_key || '');
+      
+      // 如果服务器有缓存的 API 密钥，设置验证状态
+      if (userConfig.last_api_key) {
+        setApiKeyValidated(true);
+        console.log('✅ API Key 已验证（从缓存）');
+      }
+      
+      // 如果有富途 API 配置，设置为已验证
+      if (userConfig.enable_trading_executor && userConfig.futu_api_base_url && userConfig.futu_api_key) {
+        setFutuApiValidated(true);
+        console.log('✅ 富途 API 已验证（从缓存）');
+      }
+      
+      console.log('✅ 配置加载完成');
+      setConfigLoaded(true);
       onShowToast('已加载上次配置', 'info');
-    } else {
-      // 如果没有缓存，设置默认值：全选分析师
+    } else if (!configLoading && !userConfig && !configLoaded) {
+      // 如果没有配置，设置默认值
+      console.log('⚠️ 未找到用户配置，使用默认值');
       setFormData(prev => ({
         ...prev,
         analysts: ['market', 'social', 'news', 'fundamentals']
       }));
+      setConfigLoaded(true);
     }
-  }, []);
+  }, [userConfig, configLoading, configLoaded, onShowToast]);
 
   const availableAnalysts: Analyst[] = config?.analysts || [
     { value: 'market', label: '市场分析师', description: '分析市场趋势和技术指标' },
@@ -331,8 +347,6 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       if (result.valid) {
         setApiKeyValidated(true);
         onShowToast('API密钥验证成功', 'success');
-        // 保存包含API密钥的配置到缓存
-        saveConfigToCache(formData);
       } else {
         setApiKeyValidated(false);
         onShowToast(result.message || 'API密钥格式不正确', 'error');
@@ -342,6 +356,48 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       onShowToast(error.message || 'API密钥验证失败', 'error');
     } finally {
       setValidatingKey(false);
+    }
+  };
+
+  // 验证富途API配置
+  const validateFutuApi = async () => {
+    if (!futuApiBaseUrl || !futuApiKey) {
+      onShowToast('请先输入富途 API Base URL 和 API Key', 'error');
+      return;
+    }
+
+    setValidatingFutuApi(true);
+    try {
+      // 调用富途API的 /api/hot-news 接口验证
+      const url = `${futuApiBaseUrl.replace(/\/$/, '')}/api/hot-news?lang=en-us`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'X-API-Key': futuApiKey,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // 检查返回的数据是否有效
+        if (data && (Array.isArray(data) || data.data)) {
+          setFutuApiValidated(true);
+          onShowToast('富途 API 配置验证成功', 'success');
+        } else {
+          setFutuApiValidated(false);
+          onShowToast('富途 API 返回数据格式不正确', 'error');
+        }
+      } else {
+        setFutuApiValidated(false);
+        const errorText = await response.text();
+        onShowToast(`富途 API 验证失败: ${response.status} ${errorText}`, 'error');
+      }
+    } catch (error: any) {
+      setFutuApiValidated(false);
+      onShowToast(`富途 API 连接失败: ${error.message}`, 'error');
+    } finally {
+      setValidatingFutuApi(false);
     }
   };
 
@@ -367,6 +423,18 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       return;
     }
 
+    // 验证执行交易配置
+    if (enableTradingExecutor) {
+      if (!futuApiBaseUrl || !futuApiKey) {
+        onShowToast('启用执行交易时必须填写富途 API 配置', 'error');
+        return;
+      }
+      if (!futuApiValidated) {
+        onShowToast('请先验证富途 API 配置', 'error');
+        return;
+      }
+    }
+
     // 只有勾选公开时才显示确认对话框，未勾选直接开始分析
     if (formData.is_public) {
       setShowPrivacyDialog(true);
@@ -381,9 +449,6 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     setIsSubmitting(true);
 
     try {
-      // 保存完整配置到缓存（包括API密钥）
-      saveConfigToCache(formData);
-
       // 准备API请求数据（使用标准化的ticker）
       const requestData: any = {
         ticker: normalizeTicker(formData.ticker),
@@ -394,16 +459,15 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
         backend_url: config?.llm_providers?.find((p: any) => p.value === formData.llm_provider)?.url || '',
         shallow_thinker: formData.shallow_thinker,
         deep_thinker: formData.deep_thinker,
-        is_public: formData.is_public,  // Include privacy setting
+        is_public: formData.is_public,
+        enable_trading_executor: enableTradingExecutor,
+        futu_api_base_url: enableTradingExecutor ? futuApiBaseUrl : undefined,
+        futu_api_key: enableTradingExecutor ? futuApiKey : undefined,
       };
 
-      // 根据提供商添加对应的API密钥
-      if (formData.llm_provider === 'openai' || formData.llm_provider === 'oneai' || formData.llm_provider === 'qwen' || formData.llm_provider === 'deepseek' || formData.llm_provider === 'openrouter') {
-        requestData.openai_api_key = formData.api_key;
-      } else if (formData.llm_provider === 'anthropic') {
-        requestData.anthropic_api_key = formData.api_key;
-      } else if (formData.llm_provider === 'google') {
-        requestData.google_api_key = formData.api_key;
+      // 添加API密钥（如果提供了新密钥，否则后端会使用缓存的）
+      if (formData.api_key) {
+        requestData.api_key = formData.api_key;
       }
 
       // 检查是否是定期报告
@@ -438,6 +502,9 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
           interval_days: scheduleData.interval_days,
           day_of_week: scheduleData.day_of_week,
           end_date: scheduleData.end_date || undefined,
+          enable_trading_executor: enableTradingExecutor,
+          futu_api_base_url: enableTradingExecutor ? futuApiBaseUrl : undefined,
+          futu_api_key: enableTradingExecutor ? futuApiKey : undefined,
         };
 
         const response = await scheduledTasksAPI.create(scheduledTaskData);
@@ -782,6 +849,133 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
               </div>
             )}
           </div>
+        </div>
+
+        {/* 执行交易配置 */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <i className="fas fa-robot text-blue-600"></i>
+                执行交易
+              </h4>
+              <p className="text-sm text-gray-600 mt-1">
+                启用模拟交易执行功能（需要富途 API）。部署模拟交易服务可访问{' '}
+                <a 
+                  href="https://github.com/BSTester/futu-paper-trade-api" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800 underline"
+                >
+                  GitHub
+                </a>
+                {' '}获取代码
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={enableTradingExecutor}
+                onChange={(e) => setEnableTradingExecutor(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+          
+          {enableTradingExecutor && (
+            <div className="space-y-4 pl-6 border-l-2 border-blue-500">
+              <div>
+                <label htmlFor="futu_api_base_url" className="block text-sm font-medium text-gray-700 mb-2">
+                  富途 API Base URL
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="futu_api_base_url"
+                  value={futuApiBaseUrl}
+                  onChange={(e) => handleFutuApiBaseUrlChange(e.target.value)}
+                  placeholder="http://localhost:8000"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required={enableTradingExecutor}
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="futu_api_key" className="block text-sm font-medium text-gray-700 mb-2">
+                  富途 API Key
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showApiKey ? 'text' : 'password'}
+                    id="futu_api_key"
+                    value={futuApiKey}
+                    onChange={(e) => handleFutuApiKeyChange(e.target.value)}
+                    placeholder="输入富途 API Key"
+                    className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required={enableTradingExecutor}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  >
+                    <i className={`fas fa-eye${showApiKey ? '-slash' : ''}`}></i>
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  <i className="fas fa-lock mr-1"></i>
+                  API Key 将安全地保存在服务器上
+                </p>
+              </div>
+
+              {/* 验证按钮和状态 */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={validateFutuApi}
+                  disabled={!futuApiBaseUrl || !futuApiKey || validatingFutuApi}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    futuApiValidated
+                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      : 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed'
+                  }`}
+                >
+                  {validatingFutuApi ? (
+                    <>
+                      <i className="fas fa-spinner fa-spin mr-2"></i>
+                      验证中...
+                    </>
+                  ) : futuApiValidated ? (
+                    <>
+                      <i className="fas fa-check-circle mr-2"></i>
+                      已验证
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-shield-alt mr-2"></i>
+                      验证配置
+                    </>
+                  )}
+                </button>
+                
+                {futuApiValidated && (
+                  <span className="text-sm text-green-600 flex items-center">
+                    <i className="fas fa-check-circle mr-1"></i>
+                    富途 API 配置有效
+                  </span>
+                )}
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-800">
+                  <i className="fas fa-info-circle mr-2"></i>
+                  <strong>注意：</strong>执行交易将在分析完成后自动执行模拟交易操作，包括投资组合管理、仓位控制和自动止盈止损。
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 隐私授权 */}

@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# Database URL - use SQLite by default
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./tradingagents.db")
+# Database URL - use SQLite by default (db/tradingagents.db in project root)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./db/tradingagents.db")
 
 # Create Base class for models
 Base = declarative_base()
@@ -115,12 +115,25 @@ def get_sync_db():
         db.close()
 
 
-async def init_db():
+def init_db_sync():
     """
-    Initialize database tables (async operation)
+    Initialize database tables (sync operation for scripts)
     """
     # Import all models to ensure they are registered with Base
-    from web.backend.models import User, AnalysisRecord, AnalysisLog, ExportRecord, ScheduledTask
+    from web.backend.models import User, UserConfig, AnalysisRecord, AnalysisLog, ExportRecord, ScheduledTask
+    
+    # Create all tables using sync engine
+    Base.metadata.create_all(bind=sync_engine)
+    
+    print("✅ Database tables created successfully")
+
+
+async def init_db():
+    """
+    Initialize database tables (async operation for app startup)
+    """
+    # Import all models to ensure they are registered with Base
+    from web.backend.models import User, UserConfig, AnalysisRecord, AnalysisLog, ExportRecord, ScheduledTask
     
     # Create all tables using async engine
     async with async_engine.begin() as conn:

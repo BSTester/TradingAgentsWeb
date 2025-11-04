@@ -238,4 +238,88 @@ export const analysisAPI = {
   },
 };
 
+// User Config API (需要认证)
+export const userConfigAPI = {
+  getConfig: async () => {
+    try {
+      const response = await apiClient.get('/api/user/config');
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取用户配置失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  updateConfig: async (data: any) => {
+    try {
+      const response = await apiClient.put('/api/user/config', data);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '更新用户配置失败';
+      throw new Error(errorMessage);
+    }
+  },
+};
+
+// Scheduled Tasks API (需要认证)
+export const scheduledTasksAPI = {
+  createTask: async (data: any) => {
+    try {
+      const response = await apiClient.post('/api/scheduled-tasks', data);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '创建定时任务失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  getTasks: async (page = 1, limit = 10) => {
+    try {
+      const response = await apiClient.get(`/api/scheduled-tasks?page=${page}&limit=${limit}`);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取定时任务列表失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  updateTask: async (taskId: number, data: any) => {
+    try {
+      const response = await apiClient.patch(`/api/scheduled-tasks/${taskId}`, data);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '更新定时任务失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  deleteTask: async (taskId: number) => {
+    try {
+      const response = await apiClient.delete(`/api/scheduled-tasks/${taskId}`);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '删除定时任务失败';
+      throw new Error(errorMessage);
+    }
+  },
+};
+
 export default apiClient;
