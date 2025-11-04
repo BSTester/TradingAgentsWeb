@@ -107,7 +107,7 @@ class GraphSetup:
         if auto_execute_trading:
             from tradingagents.agents.trader.trading_executor import create_trading_executor
             trading_executor_node = create_trading_executor(
-                self.quick_think_llm, self.trader_memory
+                self.quick_thinking_llm, self.trader_memory
             )
             trading_executor_msg_delete = create_msg_delete()
 
