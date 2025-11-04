@@ -85,7 +85,7 @@ class ConditionalLogic:
                 tool_call_count += 1
         
         # Limit to maximum 2 tool call rounds (first batch + optional second batch)
-        if tool_call_count > 10:
+        if tool_call_count >= 20:
             print(f"⚠️ Trading Executor: 已达到工具调用次数限制 ({tool_call_count}次)，强制生成报告")
             return "Msg Clear Trading Executor"
         

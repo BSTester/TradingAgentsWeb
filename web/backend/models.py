@@ -152,6 +152,11 @@ class AnalysisRecord(Base):
     # Privacy settings
     is_public = Column(Boolean, default=False, nullable=False, index=True)  # Whether to show in public leaderboard
     
+    # Trading executor configuration
+    enable_trading_executor = Column(Boolean, default=False, nullable=False)  # Whether to enable trading executor
+    futu_api_base_url = Column(String(255), nullable=True)  # Futu API base URL
+    futu_api_key = Column(String(255), nullable=True)  # Futu API key
+    
     # Analysis status and results
     status = Column(String(20), default="queued", nullable=False, index=True)  # queued, running, completed, error
     current_step = Column(String(255), nullable=True)

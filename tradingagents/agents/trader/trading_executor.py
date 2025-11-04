@@ -80,6 +80,9 @@ def create_trading_executor(llm, memory):
         market_tz = market_timezones.get(market_type, pytz.UTC)
         market_local_time = utc_now.astimezone(market_tz)
         
+        # Get market local date for tool calls (YYYY-MM-DD format)
+        market_local_date = market_local_time.strftime('%Y-%m-%d')
+        
         is_open, market_status_msg = is_market_open(market_type, market_local_time)
         if not is_open:
             # Market is closed, skip execution
@@ -258,12 +261,17 @@ Rule 4: POSITION SIZING REFERENCE
 Evaluate existing positions for take-profit/stop-loss:
 For each position (EXCLUDING {ticker} - handle separately), get technical data:
 - get_futu_quote(stock_code="position_stock") - current price, change%, P&L
-- get_futu_kline(symbol="position_stock", interval="1min", start_date="{current_date}", end_date="{current_date}") - short-term trend (date format: YYYY-MM-DD only)
-- get_futu_technical_analysis(symbol="position_stock", interval="1min", indicator="rsi", start_date="{current_date}", end_date="{current_date}") - overbought/oversold (date format: YYYY-MM-DD only)
-- get_futu_technical_analysis(symbol="position_stock", interval="1min", indicator="macd", start_date="{current_date}", end_date="{current_date}") - trend direction (date format: YYYY-MM-DD only)
+- get_futu_kline(symbol="position_stock", interval="1min", start_date="{market_local_date}", end_date="{market_local_date}") - short-term trend
+- get_futu_technical_analysis(symbol="position_stock", interval="1min", indicator="rsi", start_date="{market_local_date}", end_date="{market_local_date}") - overbought/oversold
+- get_futu_technical_analysis(symbol="position_stock", interval="1min", indicator="macd", start_date="{market_local_date}", end_date="{market_local_date}") - trend direction
 - get_futu_hot_news(lang="zh-cn") - real-time news (optional)
 
-IMPORTANT: When calling get_futu_kline and get_futu_technical_analysis, date parameters MUST be in YYYY-MM-DD format (e.g., "2025-11-04"), WITHOUT time component.
+CRITICAL DATE PARAMETER RULES:
+- ALWAYS use market local date: {market_local_date} (format: YYYY-MM-DD)
+- Market: {market_type}, Local Time: {market_local_time}
+- DO NOT use Beijing time or any other timezone
+- Date format MUST be YYYY-MM-DD only, WITHOUT time component
+- Example: get_futu_kline(symbol="AAPL", interval="1min", start_date="{market_local_date}", end_date="{market_local_date}")
 
 Take-Profit/Stop-Loss Considerations (for OTHER positions, NOT {ticker}):
 - Evaluate profit/loss levels and technical indicators
@@ -342,11 +350,11 @@ You have flexibility to adjust based on technical analysis and market conditions
 
 Price and Order Type Judgment:
 Get target stock technical data:
-- get_futu_kline(symbol="{ticker}", interval="1min", start_date="{current_date}", end_date="{current_date}") - short-term trend (date format: YYYY-MM-DD only)
-- get_futu_technical_analysis(symbol="{ticker}", interval="1min", indicator="rsi", start_date="{current_date}", end_date="{current_date}") - overbought/oversold (date format: YYYY-MM-DD only)
-- get_futu_technical_analysis(symbol="{ticker}", interval="1min", indicator="macd", start_date="{current_date}", end_date="{current_date}") - trend direction (date format: YYYY-MM-DD only)
+- get_futu_kline(symbol="{ticker}", interval="1min", start_date="{market_local_date}", end_date="{market_local_date}") - short-term trend
+- get_futu_technical_analysis(symbol="{ticker}", interval="1min", indicator="rsi", start_date="{market_local_date}", end_date="{market_local_date}") - overbought/oversold
+- get_futu_technical_analysis(symbol="{ticker}", interval="1min", indicator="macd", start_date="{market_local_date}", end_date="{market_local_date}") - trend direction
 
-IMPORTANT: When calling get_futu_kline and get_futu_technical_analysis, date parameters MUST be in YYYY-MM-DD format (e.g., "2025-11-04"), WITHOUT time component.
+REMINDER: Use market local date {market_local_date} for all date parameters (YYYY-MM-DD format only).
 
 Based on technical indicators and market conditions, autonomously decide appropriate trade price and order type (limit/market).
 
@@ -453,6 +461,8 @@ get_futu_account_info, get_futu_positions, get_futu_orders, get_futu_quote, plac
         prompt = prompt.partial(current_date=current_date)
         prompt = prompt.partial(ticker=ticker)
         prompt = prompt.partial(market_type=market_type)
+        prompt = prompt.partial(market_local_date=market_local_date)
+        prompt = prompt.partial(market_local_time=market_local_time.strftime('%Y-%m-%d %H:%M:%S %Z'))
         
         chain = prompt | llm.bind_tools(tools)
         
