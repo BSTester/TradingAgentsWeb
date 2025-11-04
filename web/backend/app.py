@@ -85,6 +85,21 @@ async def lifespan(app: FastAPI):
             await init_db()
             print("✅ Database tables initialized successfully")
             
+            # Run auto migrations (leader only)
+            print("🔄 Running auto migrations...")
+            try:
+                from web.backend.migrations.auto_migrate import auto_migrate
+                success, failed, skipped = auto_migrate(verbose=False)
+                if failed > 0:
+                    print(f"⚠️  {failed} migration(s) failed")
+                elif success > 0:
+                    print(f"✅ {success} migration(s) applied successfully")
+                else:
+                    print("✅ Database schema is up to date")
+            except Exception as e:
+                print(f"⚠️  Auto migration error: {e}")
+                # Continue startup even if migrations fail
+            
             # Ensure first user is admin
             from web.backend.utils.admin_helper import ensure_first_user_is_admin_async
             async with AsyncSessionLocal() as db:
