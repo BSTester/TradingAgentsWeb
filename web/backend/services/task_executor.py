@@ -72,6 +72,33 @@ def execute_scheduled_task(scheduled_task_id: int):
         if running_task:
             print(f"⚠️  User {task.user_id} has running task {running_task.analysis_id}, scheduled task {task.id} will be queued")
         
+        # Update user configuration cache with task settings
+        from web.backend.models import UserConfig
+        user_config = db.query(UserConfig).filter(UserConfig.user_id == task.user_id).first()
+        
+        if not user_config:
+            user_config = UserConfig(user_id=task.user_id)
+            db.add(user_config)
+        
+        # Cache configuration from scheduled task
+        user_config.last_ticker = task.ticker
+        user_config.last_analysts = task.analysts
+        user_config.last_research_depth = task.research_depth
+        user_config.last_llm_provider = task.llm_provider
+        user_config.last_shallow_thinker = task.shallow_thinker
+        user_config.last_deep_thinker = task.deep_thinker
+        user_config.last_backend_url = task.backend_url
+        user_config.enable_trading_executor = task.enable_trading_executor
+        
+        # Update Futu API config if available
+        if task.futu_api_base_url:
+            user_config.futu_api_base_url = task.futu_api_base_url
+        if task.futu_api_key:
+            user_config.futu_api_key = task.futu_api_key
+        
+        db.commit()
+        print(f"✅ Updated user configuration cache for user {task.user_id}")
+        
         # Create analysis record (use Beijing time)
         from pytz import timezone as pytz_timezone
         beijing_tz = pytz_timezone('Asia/Shanghai')
@@ -94,6 +121,9 @@ def execute_scheduled_task(scheduled_task_id: int):
             deep_thinker=task.deep_thinker,
             backend_url=task.backend_url,
             is_public=task.is_public,
+            enable_trading_executor=task.enable_trading_executor,  # Copy from scheduled task
+            futu_api_base_url=task.futu_api_base_url,  # Copy Futu API config
+            futu_api_key=task.futu_api_key,  # Copy Futu API key
             status="queued"
         )
         db.add(analysis_record)

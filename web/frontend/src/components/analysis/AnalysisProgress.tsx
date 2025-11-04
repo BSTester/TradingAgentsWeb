@@ -139,11 +139,101 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
   ]);
   
   const [enableTradingExecutor, setEnableTradingExecutor] = useState(false);
+  const [configInitialized, setConfigInitialized] = useState(false);
+
+  // Fetch analysis status to get configuration on mount
+  useEffect(() => {
+    const fetchAnalysisConfig = async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch(buildApiUrl(`/api/analysis/${analysisId}/status`), {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const status = await response.json();
+          console.log('📋 Fetched analysis config:', status);
+
+          // Update phases based on configuration
+          if (status.selected_analysts && Array.isArray(status.selected_analysts)) {
+            setPhases(prevPhases => {
+              const newPhases = [...prevPhases];
+
+              // Update analyst team
+              const analystPhase = newPhases[0];
+              if (analystPhase) {
+                const analystMap: { [key: string]: string } = {
+                  'market': '市场分析师',
+                  'social': '社交媒体分析师',
+                  'news': '新闻分析师',
+                  'fundamentals': '基本面分析师'
+                };
+
+                const newAgents: PhaseAgent[] = status.selected_analysts
+                  .filter((a: string) => !!analystMap[a])
+                  .map((a: string) => ({
+                    name: analystMap[a]!,
+                    status: 'pending' as const,
+                    logs: []
+                  }));
+
+                analystPhase.agents = newAgents;
+                console.log(`✅ Initialized analyst team with ${newAgents.length} analysts`);
+              }
+
+              return newPhases;
+            });
+          }
+
+          // Add trading executor phase if enabled
+          if (status.enable_trading_executor) {
+            setEnableTradingExecutor(true);
+            setPhases(prevPhases => {
+              const hasTradingExecutorPhase = prevPhases.some(p => p.id === 5);
+              if (!hasTradingExecutorPhase) {
+                console.log('✅ Adding trading executor phase from status');
+                return [
+                  ...prevPhases,
+                  {
+                    id: 5,
+                    name: '交易执行',
+                    description: '执行交易操作',
+                    icon: 'fa-robot',
+                    status: 'pending',
+                    agents: [
+                      { name: '执行交易员', status: 'pending', logs: [] }
+                    ]
+                  }
+                ];
+              }
+              return prevPhases;
+            });
+          }
+
+          setConfigInitialized(true);
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch analysis config:', error);
+        // Continue anyway, will rely on config message from WebSocket
+        setConfigInitialized(true);
+      }
+    };
+
+    fetchAnalysisConfig();
+  }, [analysisId]);
 
   // WebSocket 连接和消息处理
   useEffect(() => {
     console.log('=== AnalysisProgress mounted ===');
     console.log('Analysis ID:', analysisId);
+
+    // Wait for config initialization before connecting WebSocket
+    if (!configInitialized) {
+      console.log('⏳ Waiting for config initialization...');
+      return;
+    }
 
     // 防止重复连接
     if (wsRef.current && (wsRef.current.readyState === WebSocket.CONNECTING || wsRef.current.readyState === WebSocket.OPEN)) {
@@ -573,7 +663,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
         wsRef.current.close();
       }
     };
-  }, [analysisId]);
+  }, [analysisId, configInitialized]);
 
   // 当分析完成时调用 onComplete
   useEffect(() => {

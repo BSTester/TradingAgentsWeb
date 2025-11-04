@@ -120,6 +120,9 @@ class AnalysisStatus(BaseModel):
     progress_percentage: float = 0.0
     started_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    # Configuration info for UI initialization
+    selected_analysts: Optional[List[str]] = None
+    enable_trading_executor: bool = False
 
 class AnalysisRecord(BaseModel):
     id: int

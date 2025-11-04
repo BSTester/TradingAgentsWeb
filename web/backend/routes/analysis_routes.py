@@ -132,6 +132,9 @@ async def start_analysis(
         deep_thinker=request.deep_thinker,
         backend_url=request.backend_url,
         is_public=request.is_public,  # Save privacy setting
+        enable_trading_executor=request.enable_trading_executor,  # Save trading executor setting
+        futu_api_base_url=request.futu_api_base_url,  # Save Futu API config
+        futu_api_key=request.futu_api_key,  # Save Futu API key
         status="queued",
         current_step="Analysis queued",
         progress_percentage=0.0
@@ -245,13 +248,21 @@ async def get_analysis_status(
     if not analysis:
         raise HTTPException(status_code=404, detail="分析未找到")
     
+    # Get selected_analysts from analysts field (JSON)
+    selected_analysts = analysis.analysts if analysis.analysts else []
+    
+    # Get enable_trading_executor (need to add this field to model if not exists)
+    enable_trading_executor = getattr(analysis, 'enable_trading_executor', False)
+    
     return AnalysisStatus(
         analysis_id=analysis.analysis_id,
         status=analysis.status,
         current_step=analysis.current_step,
         progress_percentage=analysis.progress_percentage,
         started_at=analysis.started_at,
-        updated_at=analysis.updated_at
+        updated_at=analysis.updated_at,
+        selected_analysts=selected_analysts,
+        enable_trading_executor=enable_trading_executor
     )
 
 
