@@ -134,20 +134,40 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
           // 动态导入 html2canvas
           const html2canvas = (await import('html2canvas')).default;
 
+          // 调试：检查results数据
+          console.log('Results data:', results);
+          console.log('Phases:', results?.phases);
+          
+          // 检查数据完整性
+          if (!results?.phases || results.phases.length === 0) {
+            throw new Error('分析报告数据不完整，无法导出图片。请刷新页面后重试。');
+          }
+          
           // 使用与 PDF 相同的完整内容容器
           const exportContent = document.querySelector('.pdf-export-content') as HTMLElement;
           if (!exportContent) {
             throw new Error('找不到导出内容区域');
           }
+          
+          // 调试：检查exportContent内容
+          console.log('Export content HTML length:', exportContent.innerHTML.length);
+          console.log('Export content children:', exportContent.children.length);
+          
+          // 检查内容是否为空
+          if (exportContent.innerHTML.length < 100) {
+            throw new Error('导出内容为空，无法生成图片。请刷新页面后重试。');
+          }
 
           // 克隆内容到临时容器以便完整渲染
           const tempContainer = document.createElement('div');
-          tempContainer.style.position = 'absolute';
-          tempContainer.style.left = '-9999px';
+          tempContainer.style.position = 'fixed'; // 使用fixed而不是absolute
+          tempContainer.style.left = '0';
           tempContainer.style.top = '0';
           tempContainer.style.width = '794px'; // A4 宽度对应的像素基准
           tempContainer.style.backgroundColor = 'white';
           tempContainer.style.padding = '40px';
+          tempContainer.style.zIndex = '-9999'; // 放到最底层，但保持可见
+          tempContainer.style.opacity = '0'; // 完全透明，用户看不到
 
           const clonedContent = exportContent.cloneNode(true) as HTMLElement;
           clonedContent.style.display = 'block';
@@ -157,8 +177,16 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
           tempContainer.appendChild(clonedContent);
           document.body.appendChild(tempContainer);
 
-          // 等待渲染稳定
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // 等待渲染稳定 - 增加等待时间
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          // 调试：检查临时容器内容
+          console.log('Temp container dimensions:', {
+            width: tempContainer.offsetWidth,
+            height: tempContainer.offsetHeight,
+            scrollHeight: tempContainer.scrollHeight,
+            childrenCount: tempContainer.children.length
+          });
 
           const canvas = await html2canvas(tempContainer, {
             useCORS: true,
@@ -172,19 +200,66 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
           // 移除临时容器
           document.body.removeChild(tempContainer);
 
+          console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
+
           if (canvas.width === 0 || canvas.height === 0) {
-            throw new Error('内容渲染失败，请重试');
+            throw new Error('内容渲染失败，canvas尺寸为0。请检查浏览器控制台的调试信息。');
+          }
+
+          // 检查canvas尺寸是否过大
+          const maxCanvasSize = 32767; // 大多数浏览器的限制
+          if (canvas.height > maxCanvasSize) {
+            throw new Error(`图片高度过大（${canvas.height}px），超过浏览器限制（${maxCanvasSize}px）。建议使用PDF导出。`);
           }
 
           // 生成 PNG 并下载
-          const imgData = canvas.toDataURL('image/png');
+          console.log('Generating PNG data...');
+          
+          // 使用JPEG格式和较低质量以减小文件大小
+          let imgData: string;
+          try {
+            imgData = canvas.toDataURL('image/jpeg', 0.85);
+          } catch (e) {
+            console.error('toDataURL failed:', e);
+            throw new Error('图片数据生成失败，内容可能过大。建议使用PDF导出。');
+          }
+          
+          console.log('Image data length:', imgData.length);
+          console.log('Image data prefix:', imgData.substring(0, 50));
+          
+          // 检查是否生成了有效的图片数据
+          if (!imgData || imgData === 'data:,' || imgData.length < 100) {
+            throw new Error('图片数据生成失败，可能是内容过大。建议使用PDF导出。');
+          }
+
+          // 创建Blob以支持大文件
+          const base64Data = imgData.split(',')[1] || '';
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'image/jpeg' });
+          
+          console.log('Blob size:', blob.size, 'bytes');
+          
+          if (blob.size === 0) {
+            throw new Error('生成的图片文件为空。建议使用PDF导出。');
+          }
+
+          // 使用Blob URL下载
+          const blobUrl = URL.createObjectURL(blob);
           const link = document.createElement('a');
-          const filename = `${results?.ticker || 'analysis'}_${results?.analysis_date || 'report'}.png`;
-          link.href = imgData;
+          const filename = `${results?.ticker || 'analysis'}_${results?.analysis_date || 'report'}.jpg`;
+          link.href = blobUrl;
           link.download = filename;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
+          
+          // 清理Blob URL
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
 
           onShowToast('图片已下载', 'success');
         } catch (error) {
@@ -224,107 +299,29 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
 
         onShowToast('Markdown 文件已下载', 'success');
       } else if (format === 'pdf') {
-        // 导出 PDF - 使用 jspdf 和 html2canvas 直接生成 PDF
-        onShowToast('正在生成 PDF，请稍候...', 'info');
-
+        // 导出 PDF - 使用浏览器打印功能
         try {
-          // 动态导入库
-          const { default: jsPDF } = await import('jspdf');
-          const html2canvas = (await import('html2canvas')).default;
-
-          // 找到打印专用的完整内容区域
-          const printContent = document.querySelector('.pdf-export-content') as HTMLElement;
-          if (!printContent) {
-            throw new Error('找不到打印内容');
+          // 检查数据完整性
+          if (!results?.phases || results.phases.length === 0) {
+            throw new Error('分析报告数据不完整，无法导出PDF。请刷新页面后重试。');
           }
 
-          // 创建一个临时容器，克隆内容到body中（可见但在屏幕外）
-          const tempContainer = document.createElement('div');
-          tempContainer.style.position = 'absolute';
-          tempContainer.style.left = '-9999px';
-          tempContainer.style.top = '0';
-          tempContainer.style.width = '794px'; // A4 宽度
-          tempContainer.style.backgroundColor = 'white';
-          tempContainer.style.padding = '40px';
+          // 添加打印标记
+          document.body.classList.add('printing-pdf');
+          
+          // 触发打印对话框
+          window.print();
+          
+          // 移除打印标记
+          setTimeout(() => {
+            document.body.classList.remove('printing-pdf');
+          }, 100);
 
-          // 克隆内容
-          const clonedContent = printContent.cloneNode(true) as HTMLElement;
-          clonedContent.style.display = 'block';
-          clonedContent.style.position = 'static';
-          clonedContent.style.width = '100%';
+          onShowToast('请在打印对话框中选择"另存为PDF"或"Microsoft Print to PDF"', 'info');
 
-          tempContainer.appendChild(clonedContent);
-          document.body.appendChild(tempContainer);
-
-          // 等待渲染完成
-          await new Promise(resolve => setTimeout(resolve, 500));
-
-          // 转换为 canvas
-          const canvas = await html2canvas(tempContainer, {
-            useCORS: true,
-            logging: true,
-            backgroundColor: '#ffffff',
-            scale: 2, // 提高清晰度
-            windowWidth: 874, // 794 + 80 (padding)
-            allowTaint: true,
-          } as any);
-
-          logger.log('Canvas size:', canvas.width, 'x', canvas.height);
-
-          // 移除临时容器
-          document.body.removeChild(tempContainer);
-
-          // 验证 canvas 尺寸
-          if (canvas.width === 0 || canvas.height === 0) {
-            throw new Error('内容渲染失败，请重试');
-          }
-
-          // 创建 PDF
-          const pdf = new jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4'
-          });
-
-          const imgData = canvas.toDataURL('image/jpeg', 0.95);
-          const pdfWidth = pdf.internal.pageSize.getWidth();
-          const pdfHeight = pdf.internal.pageSize.getHeight();
-
-          // 计算图片在 PDF 中的尺寸（保持宽高比）
-          const imgWidth = pdfWidth;
-          const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-          logger.log('PDF size:', pdfWidth, 'x', pdfHeight);
-          logger.log('Image size in PDF:', imgWidth, 'x', imgHeight);
-
-          // 验证尺寸
-          if (imgWidth <= 0 || imgHeight <= 0 || !isFinite(imgWidth) || !isFinite(imgHeight)) {
-            throw new Error('PDF 尺寸计算错误');
-          }
-
-          let heightLeft = imgHeight;
-          let position = 0;
-
-          // 添加第一页
-          pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-          heightLeft -= pdfHeight;
-
-          // 如果内容超过一页，添加更多页
-          while (heightLeft > 0) {
-            position = heightLeft - imgHeight;
-            pdf.addPage();
-            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-            heightLeft -= pdfHeight;
-          }
-
-          // 保存 PDF
-          const filename = `${results?.ticker || 'analysis'}_${results?.analysis_date || 'report'}.pdf`;
-          logger.log('Saving PDF:', filename);
-          pdf.save(filename);
-
-          onShowToast('PDF 文件已下载', 'success');
         } catch (error) {
           console.error('PDF generation error:', error);
+          document.body.classList.remove('printing-pdf');
           onShowToast(`PDF 生成失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error');
         }
       }
@@ -371,21 +368,278 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
             display: none !important;
           }
           
+          /* 隐藏页面header、footer、导航等 */
+          header,
+          footer,
+          nav,
+          .header,
+          .footer,
+          .navbar,
+          .breadcrumb,
+          .back-to-top,
+          [class*="Header"],
+          [class*="Footer"],
+          [class*="Navigation"],
+          [class*="Breadcrumb"],
+          [id*="header"],
+          [id*="footer"],
+          [id*="nav"] {
+            display: none !important;
+          }
+          
+          /* 打印时：隐藏头部、tabs、当前tab内容、底部按钮 */
+          body.printing-pdf .bg-white.rounded-lg.shadow-lg > div:not(.pdf-export-content) {
+            display: none !important;
+          }
+          
+          /* 打印时：移除主容器的样式 */
+          body.printing-pdf .bg-white.rounded-lg.shadow-lg {
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          
+          /* 显示PDF导出内容 */
+          body.printing-pdf .pdf-export-content {
+            display: block !important;
+            position: static !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+          }
+          
+          /* 打印时：隐藏所有固定定位的元素（通常是导航、返回顶部按钮等） */
+          body.printing-pdf [style*="position: fixed"],
+          body.printing-pdf [style*="position:fixed"],
+          body.printing-pdf .fixed {
+            display: none !important;
+          }
+          
+          /* 打印时：确保body没有额外的padding/margin */
+          body.printing-pdf {
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          
+          /* 打印时：隐藏所有可能的浮动按钮 */
+          body.printing-pdf button:not(.pdf-export-content button),
+          body.printing-pdf .floating-button,
+          body.printing-pdf .fab,
+          body.printing-pdf [class*="float"],
+          body.printing-pdf [class*="sticky"] {
+            display: none !important;
+          }
+          
+          /* 打印时：封面页样式 */
+          body.printing-pdf .pdf-export-content .report-cover {
+            page-break-after: always !important;
+            page-break-inside: avoid !important;
+            height: calc(100vh - 24mm) !important;
+            max-height: calc(297mm - 24mm) !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%) !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            overflow: hidden !important;
+          }
+          
+          /* 打印时：优化报告标题 */
+          body.printing-pdf .pdf-export-content h1 {
+            font-size: 1.5rem !important;
+            margin-bottom: 0.5rem !important;
+          }
+          
+          /* 打印时：缩小股票信息横幅 */
+          body.printing-pdf .pdf-export-content > div:nth-child(2) {
+            padding: 1rem !important;
+            margin-bottom: 1rem !important;
+          }
+          
+          body.printing-pdf .pdf-export-content > div:nth-child(2) .w-16 {
+            width: 2.5rem !important;
+            height: 2.5rem !important;
+          }
+          
+          body.printing-pdf .pdf-export-content > div:nth-child(2) .text-3xl {
+            font-size: 1.5rem !important;
+          }
+          
+          body.printing-pdf .pdf-export-content > div:nth-child(2) .text-5xl {
+            font-size: 2rem !important;
+          }
+          
+          body.printing-pdf .pdf-export-content > div:nth-child(2) .w-20 {
+            width: 3rem !important;
+            height: 3rem !important;
+          }
+          
+          body.printing-pdf .pdf-export-content > div:nth-child(2) i.text-5xl {
+            font-size: 2rem !important;
+          }
+          
+          /* 打印时：专业研报标题样式 */
+          body.printing-pdf .pdf-export-content h1 {
+            font-size: 14pt !important;
+            margin-bottom: 0.75rem !important;
+            margin-top: 1rem !important;
+            font-weight: 600 !important;
+            color: #1a202c !important;
+            letter-spacing: 0.02em !important;
+          }
+          
+          body.printing-pdf .pdf-export-content h2 {
+            font-size: 13pt !important;
+            margin-bottom: 0.75rem !important;
+            margin-top: 1rem !important;
+            padding-bottom: 0.5rem !important;
+            font-weight: 600 !important;
+            color: #2d3748 !important;
+            letter-spacing: 0.01em !important;
+          }
+          
+          body.printing-pdf .pdf-export-content h3 {
+            font-size: 11.5pt !important;
+            margin-bottom: 0.6rem !important;
+            margin-top: 0.8rem !important;
+            font-weight: 500 !important;
+            color: #2d3748 !important;
+          }
+          
+          body.printing-pdf .pdf-export-content h4 {
+            font-size: 10.5pt !important;
+            margin-bottom: 0.5rem !important;
+            margin-top: 0.6rem !important;
+            font-weight: 500 !important;
+            color: #4a5568 !important;
+          }
+          
+          /* 打印时：减小agent卡片的padding */
+          body.printing-pdf .pdf-export-content .border.border-gray-200 > div:first-child {
+            padding: 0.75rem !important;
+          }
+          
+          body.printing-pdf .pdf-export-content .border.border-gray-200 > div:last-child {
+            padding: 1rem !important;
+          }
+          
+          /* 打印时：专业研报段落样式 */
+          body.printing-pdf .pdf-export-content p {
+            margin-bottom: 0.75rem !important;
+            line-height: 1.8 !important;
+            text-align: justify !important;
+            text-indent: 2em !important;
+            font-size: 10.5pt !important;
+            color: #2c3e50 !important;
+            font-weight: 400 !important;
+          }
+          
+          /* 标题后的第一段不缩进 */
+          body.printing-pdf .pdf-export-content h1 + p,
+          body.printing-pdf .pdf-export-content h2 + p,
+          body.printing-pdf .pdf-export-content h3 + p,
+          body.printing-pdf .pdf-export-content h4 + p,
+          body.printing-pdf .pdf-export-content h1 + div > p:first-child,
+          body.printing-pdf .pdf-export-content h2 + div > p:first-child,
+          body.printing-pdf .pdf-export-content h3 + div > p:first-child,
+          body.printing-pdf .pdf-export-content h4 + div > p:first-child {
+            text-indent: 0 !important;
+          }
+          
+          /* 报告来源说明部分：左对齐，不缩进 */
+          body.printing-pdf .pdf-export-content .report-source-section p {
+            text-align: left !important;
+            text-indent: 0 !important;
+          }
+          
+          body.printing-pdf .pdf-export-content .report-source-section div {
+            text-align: left !important;
+          }
+          
+          /* 打印时：专业研报列表样式 */
+          body.printing-pdf .pdf-export-content ul,
+          body.printing-pdf .pdf-export-content ol {
+            margin-bottom: 0.75rem !important;
+            margin-top: 0.5rem !important;
+            padding-left: 2em !important;
+          }
+          
+          body.printing-pdf .pdf-export-content li {
+            margin-bottom: 0.4rem !important;
+            line-height: 1.8 !important;
+            font-size: 10.5pt !important;
+            color: #2c3e50 !important;
+            font-weight: 400 !important;
+          }
+          
+          /* 列表项内的段落不缩进 */
+          body.printing-pdf .pdf-export-content li p {
+            text-indent: 0 !important;
+            margin-bottom: 0.3rem !important;
+          }
+          
+          /* 打印时：减小卡片间距 */
+          body.printing-pdf .pdf-export-content .mb-8 {
+            margin-bottom: 1rem !important;
+          }
+          
+          body.printing-pdf .pdf-export-content .mb-6 {
+            margin-bottom: 0.75rem !important;
+          }
+          
+          body.printing-pdf .pdf-export-content .mb-4 {
+            margin-bottom: 0.5rem !important;
+          }
+          
           /* 页面设置 */
           @page {
             size: A4;
-            margin: 15mm;
+            margin: 12mm;
           }
           
           /* 确保内容适合打印 */
           body {
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
+            background: white !important;
           }
           
-          /* 标题样式 */
+          /* 打印时：使用更舒适的字体 */
+          body.printing-pdf .pdf-export-content {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+          }
+          
+          body.printing-pdf .pdf-export-content * {
+            font-family: inherit !important;
+          }
+          
+          /* 打印时：隐藏所有图标和表情符号 */
+          body.printing-pdf .pdf-export-content i,
+          body.printing-pdf .pdf-export-content .fa,
+          body.printing-pdf .pdf-export-content .fas,
+          body.printing-pdf .pdf-export-content .far,
+          body.printing-pdf .pdf-export-content .fab,
+          body.printing-pdf .pdf-export-content [class*="fa-"],
+          body.printing-pdf .pdf-export-content .icon,
+          body.printing-pdf .pdf-export-content .emoji {
+            display: none !important;
+          }
+          
+          /* 封面页的图标保留（如果需要） */
+          body.printing-pdf .pdf-export-content .report-cover i {
+            display: inline !important;
+          }
+          
+          /* 标题样式 - 避免标题后立即分页 */
           h1, h2, h3, h4 {
             page-break-after: avoid;
+            page-break-inside: avoid;
           }
           
           /* 表格样式 */
@@ -393,21 +647,97 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
             page-break-inside: avoid;
           }
           
-          /* 卡片样式 */
+          /* 卡片样式 - 尽量避免分页，但允许在必要时分页 */
           .print-card {
-            page-break-inside: avoid;
-            margin-bottom: 1rem;
+            page-break-inside: auto;
+            margin-bottom: 0.5rem !important;
           }
           
-          /* 打印时显示所有阶段 */
-          .print-all-content {
-            display: block !important;
+          /* 阶段容器 - 允许分页 */
+          .page-break-inside-avoid {
+            page-break-inside: auto;
+          }
+          
+          /* Agent卡片 - 允许分页 */
+          body.printing-pdf .pdf-export-content .border.border-gray-200 {
+            page-break-inside: auto;
+            margin-bottom: 0.5rem !important;
           }
           
           /* 确保渐变背景打印 */
-          [style*="gradient"] {
+          [style*="gradient"],
+          [class*="gradient"] {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+          }
+          
+          /* 确保所有颜色和背景都打印 */
+          * {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          
+          /* 避免孤行和寡行 */
+          p {
+            orphans: 3;
+            widows: 3;
+          }
+          
+          /* 打印时：优化加粗和强调文本 */
+          body.printing-pdf .pdf-export-content strong {
+            font-weight: 700 !important;
+            color: #1a1a1a !important;
+          }
+          
+          body.printing-pdf .pdf-export-content em {
+            font-style: italic !important;
+            color: #444 !important;
+          }
+          
+          /* 打印时：优化表格样式 */
+          body.printing-pdf .pdf-export-content table {
+            margin: 1rem 0 !important;
+            font-size: 9pt !important;
+            line-height: 1.5 !important;
+            width: 100% !important;
+            table-layout: auto !important;
+            border-collapse: collapse !important;
+          }
+          
+          body.printing-pdf .pdf-export-content th {
+            font-weight: 600 !important;
+            background-color: #f5f5f5 !important;
+            padding: 0.4rem 0.3rem !important;
+            border: 1px solid #ddd !important;
+            word-wrap: break-word !important;
+            white-space: normal !important;
+          }
+          
+          body.printing-pdf .pdf-export-content td {
+            padding: 0.3rem 0.3rem !important;
+            border: 1px solid #ddd !important;
+            word-wrap: break-word !important;
+            white-space: normal !important;
+          }
+          
+          /* 表格容器 */
+          body.printing-pdf .pdf-export-content .overflow-x-auto {
+            overflow: visible !important;
+          }
+          
+          /* 表格不要设置固定宽度 */
+          body.printing-pdf .pdf-export-content td.whitespace-nowrap,
+          body.printing-pdf .pdf-export-content th.whitespace-nowrap {
+            white-space: normal !important;
+          }
+          
+          /* 打印时：优化引用块 */
+          body.printing-pdf .pdf-export-content blockquote {
+            margin: 1rem 0 !important;
+            padding: 0.75rem 1rem !important;
+            font-size: 10.5pt !important;
+            line-height: 1.7 !important;
+            border-left-width: 3px !important;
           }
         }
         
@@ -881,65 +1211,106 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
 
         {/* PDF导出专用：完整内容（包含投资建议和报告来源） */}
         <div className="pdf-export-content" style={{ display: 'none' }}>
-          {/* 报告标题 */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              <i className="fas fa-file-alt mr-2 text-blue-600" />
-              股票分析报告
-            </h1>
-            <div className="text-sm text-gray-600">
-              <i className="far fa-calendar mr-1" />
-              分析日期: {results?.analysis_date}
+          {/* 封面页 - 专业研报样式 */}
+          <div className="report-cover" style={{ pageBreakAfter: 'always', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '0', margin: '0', background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)' }}>
+            {/* 顶部区域 */}
+            <div style={{ padding: '2.5rem 0 0 0', width: '100%' }}>
+              <div style={{ textAlign: 'center', color: 'white', width: '100%' }}>
+                <p style={{ fontSize: '14pt', letterSpacing: '0.3em', marginBottom: '0.75rem', opacity: '0.95', fontFamily: 'system-ui, -apple-system, sans-serif', textAlign: 'center', margin: '0 auto 0.75rem auto' }}>TRADING ANALYSIS REPORT</p>
+                <h1 style={{ fontSize: '48pt', fontWeight: '300', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '0.05em', textAlign: 'center' }}>股票分析报告</h1>
+              </div>
             </div>
-          </div>
 
-          {/* 投资建议横幅 */}
-          <div className="bg-gradient-to-r from-green-500 to-blue-500 rounded-xl p-6 text-white shadow-lg mb-6">
-            <div className="flex items-center justify-between">
-              {/* 左侧：股票代码 */}
-              <div className="flex items-center space-x-3">
-                <div className="w-16 h-16 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                  <i className="fas fa-chart-line text-3xl" />
+            {/* 中间区域 - 股票信息 */}
+            <div style={{ padding: '0', flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+              <div style={{ background: 'rgba(255, 255, 255, 0.95)', borderRadius: '16px', padding: '2.5rem 2rem', width: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', margin: '0 auto' }}>
+                {/* 市场标签 */}
+                <div style={{ textAlign: 'center', marginBottom: '1.5rem', width: '100%' }}>
+                  <span style={{ 
+                    display: 'inline-block',
+                    background: 'linear-gradient(135deg, #10b981, #3b82f6)', 
+                    color: 'white',
+                    padding: '0.5rem 1.8rem',
+                    borderRadius: '20px',
+                    fontSize: '11pt',
+                    fontWeight: '500',
+                    fontFamily: 'system-ui, -apple-system, sans-serif'
+                  }}>
+                    {results?.market === 'US' ? '美国股票市场' : results?.market === 'HK' ? '香港股票市场' : results?.market === 'CN' ? 'A股市场' : '股票市场'}
+                  </span>
                 </div>
-                <div>
-                  <p className="text-sm opacity-90">
-                    {results?.market === 'US' ? '美股' : results?.market === 'HK' ? '港股' : results?.market === 'CN' ? 'A股' : '股票'}
-                    {results?.company_name && ` | ${results.company_name}`}
-                  </p>
-                  <p className="text-3xl font-bold">{results?.ticker}</p>
+
+                {/* 股票代码 - 参考市场标签的居中方式 */}
+                <div style={{ textAlign: 'center', marginBottom: '0.8rem', width: '100%' }}>
+                  <h2 style={{ fontSize: '56pt', fontWeight: 'bold', margin: '0', padding: '0', color: '#1a1a1a', letterSpacing: '0.05em', fontFamily: 'system-ui, -apple-system, sans-serif', lineHeight: '1.1', display: 'inline-block' }}>
+                    {results?.ticker}
+                  </h2>
+                </div>
+
+                {/* 公司名称 - 参考市场标签的居中方式 */}
+                {results?.company_name && (
+                  <div style={{ textAlign: 'center', marginBottom: '1.8rem', width: '100%' }}>
+                    <p style={{ fontSize: '15pt', margin: '0', padding: '0', color: '#666', fontFamily: 'system-ui, -apple-system, sans-serif', fontWeight: '400', lineHeight: '1.4', display: 'inline-block' }}>
+                      {results.company_name}
+                    </p>
+                  </div>
+                )}
+
+                {/* 分隔线 */}
+                <div style={{ height: '2px', background: 'linear-gradient(to right, transparent, #e5e7eb, transparent)', margin: '1.8rem 0', width: '100%' }}></div>
+
+                {/* 投资建议标签 - 参考市场标签的居中方式 */}
+                <div style={{ textAlign: 'center', marginBottom: '1rem', width: '100%' }}>
+                  <p style={{ fontSize: '12pt', color: '#666', letterSpacing: '0.2em', fontFamily: 'system-ui, -apple-system, sans-serif', margin: '0', padding: '0', display: 'inline-block' }}>投资建议</p>
+                </div>
+
+                {/* 投资建议卡片 - 参考市场标签的居中方式 */}
+                <div style={{ textAlign: 'center', width: '100%' }}>
+                  <div style={{ 
+                    background: 'linear-gradient(135deg, #10b981, #3b82f6)',
+                    borderRadius: '12px',
+                    padding: '1.2rem 3rem',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                    display: 'inline-block'
+                  }}>
+                    <p style={{ fontSize: '42pt', fontWeight: 'bold', margin: '0', padding: '0', color: 'white', fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '0.05em', display: 'inline-block' }}>
+                      {results?.trading_decision}
+                    </p>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              {/* 中间：交易决策 */}
-              <div className="flex-1 text-center px-6">
-                <p className="text-sm opacity-90 mb-1">最终交易决策</p>
-                <p className="text-5xl font-bold">{results?.trading_decision}</p>
-              </div>
-
-              {/* 右侧：勾选图标 */}
-              <div className="w-20 h-20 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <i className="fas fa-check-circle text-5xl" />
+            {/* 底部区域 - 报告信息 */}
+            <div style={{ padding: '0 0 2.5rem 0', width: '100%' }}>
+              <div style={{ textAlign: 'center', color: 'white', fontSize: '10pt', fontFamily: 'system-ui, -apple-system, sans-serif', width: '100%' }}>
+                <p style={{ marginBottom: '0.4rem', opacity: '0.95', textAlign: 'center', margin: '0 auto 0.4rem auto' }}>
+                  分析日期：{results?.analysis_date}
+                </p>
+                <p style={{ margin: '0 auto', opacity: '0.95', textAlign: 'center' }}>
+                  生成系统：TradingAgents 多智能体分析系统
+                </p>
               </div>
             </div>
           </div>
 
           {/* 所有阶段按顺序显示 */}
           {results?.phases?.map((phase: PhaseResult, phaseIdx: number) => (
-            <div key={phaseIdx} className="mb-8 page-break-inside-avoid">
-              <h2 className="text-2xl font-bold text-blue-600 mb-4 border-b-2 border-blue-600 pb-2">
+            <div key={phaseIdx} className="mb-4 page-break-inside-avoid">
+              <h2 className="text-xl font-bold text-blue-600 mb-2 border-b-2 border-blue-600 pb-1">
                 <i className={`fas ${phase.icon} mr-2`} />
                 {phase.name}
               </h2>
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {phase.agents.map((agent: any, agentIdx: number) => (
-                  <div key={agentIdx} className="border border-gray-200 rounded-lg overflow-hidden mb-4">
-                    <div className={`bg-gradient-to-r ${getPhaseColor(phase.color)} p-4 text-white`}>
-                      <h4 className="font-bold text-lg">
+                  <div key={agentIdx} className="border border-gray-200 rounded-lg overflow-hidden mb-2">
+                    <div className={`bg-gradient-to-r ${getPhaseColor(phase.color)} p-3 text-white`}>
+                      <h4 className="font-bold text-base">
                         <i className="fas fa-user-tie mr-2" />
                         {agent.name}
                       </h4>
                     </div>
-                    <div className="p-6 bg-white">
+                    <div className="p-4 bg-white">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm, remarkBreaks]}
                         components={{
@@ -1027,8 +1398,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
 
           {/* 交易决策分析 */}
           {results?.final_summary && (
-            <div className="mb-8 page-break-inside-avoid">
-              <h2 className="text-2xl font-bold text-orange-600 mb-4 border-b-2 border-orange-600 pb-2">
+            <div className="mb-4 page-break-inside-avoid">
+              <h2 className="text-xl font-bold text-orange-600 mb-2 border-b-2 border-orange-600 pb-1">
                 <i className="fas fa-chart-bar mr-2" />
                 交易决策分析
               </h2>
@@ -1038,11 +1409,11 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                 const content = lines.slice(1).join('\n').trim();
 
                 return (
-                  <div key={index} className="border border-gray-200 rounded-lg overflow-hidden mb-4">
-                    <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4 text-white">
-                      <h3 className="font-bold text-lg">{title}</h3>
+                  <div key={index} className="border border-gray-200 rounded-lg overflow-hidden mb-2">
+                    <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-3 text-white">
+                      <h3 className="font-bold text-base">{title}</h3>
                     </div>
-                    <div className="p-6 bg-white">
+                    <div className="p-4 bg-white">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm, remarkBreaks]}
                         components={{
@@ -1128,21 +1499,21 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
             </div>
           )}
 
-          {/* 报告来源说明 */}
-          <div className="mt-8 pt-6 border-t-2 border-gray-300">
-            <div className="bg-gray-50 rounded-lg p-6 mb-6">
-              <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center">
+          {/* 报告来源说明 - 左对齐 */}
+          <div className="mt-4 pt-3 border-t border-gray-300 report-source-section">
+            <div className="bg-gray-50 rounded-lg p-3 mb-2">
+              <h3 className="text-sm font-bold text-gray-800 mb-2 flex items-center">
                 <i className="fas fa-info-circle mr-2 text-blue-600" />
                 报告来源说明
               </h3>
-              <div className="text-sm text-gray-600 space-y-2">
-                <p>
+              <div className="text-xs text-gray-600 space-y-1 text-left">
+                <p className="text-left">
                   <strong>生成系统：</strong>TradingAgents 多智能体分析系统
                 </p>
-                <p>
+                <p className="text-left">
                   <strong>分析方法：</strong>本报告由多个专业智能体协同分析生成，包括基本面分析师、市场分析师、新闻分析师、社交媒体分析师、多空研究员、风险管理团队等。
                 </p>
-                <p className="text-xs text-gray-500 mt-4">
+                <p className="text-xs text-gray-500 mt-2 text-left">
                   报告生成时间：{results?.analysis_date} | 股票代码：{results?.ticker}
                   {results?.company_name && ` (${results.company_name})`}
                   {results?.market && ` | 市场：${results?.market === 'US' ? '美股' : results?.market === 'HK' ? '港股' : results?.market === 'CN' ? 'A股' : results?.market}`}
@@ -1150,14 +1521,14 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
               </div>
             </div>
 
-            {/* 免责声明 */}
-            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-6 rounded">
-              <h3 className="text-lg font-bold text-yellow-800 mb-3 flex items-center">
+            {/* 免责声明 - 左对齐 */}
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+              <h3 className="text-sm font-bold text-yellow-800 mb-2 flex items-center">
                 <i className="fas fa-exclamation-triangle mr-2 text-yellow-600" />
                 免责声明
               </h3>
-              <div className="text-sm text-yellow-700 space-y-2 leading-relaxed">
-                <p>
+              <div className="text-xs text-yellow-700 leading-relaxed text-left">
+                <p className="text-left">
                   本报告由AI智能体系统生成，仅供参考，不构成任何投资建议。股市有风险，投资需谨慎。
                   投资者应当根据自身风险承受能力、投资目标和财务状况，独立做出投资决策并自行承担投资风险。
                   过往业绩不代表未来表现，市场波动可能导致本金损失。

@@ -341,16 +341,21 @@ async def get_analysis_results(
             "agents": research_agents
         })
     
-    # 阶段3：交易团队
+    # 阶段3：交易团队（包含交易员和执行交易员）
     if final_state.get("trader_investment_plan"):
+        trading_agents = [
+            {"name": "交易员", "result": final_state["trader_investment_plan"]}
+        ]
+        # 如果有执行交易报告，添加到交易团队
+        if final_state.get("execution_report"):
+            trading_agents.append({"name": "执行交易员", "result": final_state["execution_report"]})
+        
         phases.append({
             "id": 3,
             "name": "交易团队",
             "icon": "fa-chart-line",
             "color": "purple",
-            "agents": [
-                {"name": "交易员", "result": final_state["trader_investment_plan"]}
-            ]
+            "agents": trading_agents
         })
     
     # 阶段4：风险管理
@@ -374,18 +379,6 @@ async def get_analysis_results(
             "icon": "fa-shield-alt",
             "color": "red",
             "agents": risk_agents
-        })
-    
-    # 阶段5：交易执行（在风险管理之后，仅在启用时显示）
-    if final_state.get("execution_report"):
-        phases.append({
-            "id": 5,
-            "name": "交易执行",
-            "icon": "fa-robot",
-            "color": "cyan",
-            "agents": [
-                {"name": "执行交易员", "result": final_state["execution_report"]}
-            ]
         })
     
     # 构建最终摘要（综合所有阶段的结论）
@@ -567,11 +560,16 @@ async def get_analysis_markdown(
             markdown_parts.append("## 投资评审\n")
             markdown_parts.append(debate_state["judge_decision"] + "\n")
     
-    # 阶段3：交易团队
+    # 阶段3：交易团队（包含交易员和执行交易员）
     if final_state.get("trader_investment_plan"):
         markdown_parts.append("\n---\n\n# 📈 交易团队\n")
         markdown_parts.append("## 交易员\n")
         markdown_parts.append(final_state["trader_investment_plan"] + "\n")
+        
+        # 如果有执行交易报告，添加到交易团队
+        if final_state.get("execution_report"):
+            markdown_parts.append("## 执行交易员\n")
+            markdown_parts.append(final_state["execution_report"] + "\n")
     
     # 阶段4：风险管理
     if final_state.get("risk_debate_state"):
@@ -593,12 +591,6 @@ async def get_analysis_markdown(
         if risk_state.get("judge_decision"):
             markdown_parts.append("## 风险管理评审\n")
             markdown_parts.append(risk_state["judge_decision"] + "\n")
-    
-    # 阶段5：交易执行（如果启用）
-    if final_state.get("execution_report"):
-        markdown_parts.append("\n---\n\n# 🤖 交易执行\n")
-        markdown_parts.append("## 执行交易员\n")
-        markdown_parts.append(final_state["execution_report"] + "\n")
     
     # 最后：交易决策分析（final_summary）
     if final_state.get("investment_plan") or final_state.get("final_trade_decision"):
@@ -744,9 +736,7 @@ async def get_public_analysis_results(
             "name": "交易团队",
             "icon": "fa-chart-line",
             "color": "purple",
-            "agents": [
-                {"name": "交易员", "result": final_state["trader_investment_plan"]}
-            ]
+            "agents": trading_agents
         })
     
     # 阶段4：风险管理
@@ -770,20 +760,6 @@ async def get_public_analysis_results(
             "color": "red",
             "agents": risk_agents
         })
-    
-    # 阶段5：交易执行（在风险管理之后，仅在启用时显示）
-    if final_state.get("execution_report"):
-        phases.append({
-            "id": 5,
-            "name": "交易执行",
-            "icon": "fa-robot",
-            "color": "cyan",
-            "agents": [
-                {"name": "执行交易员", "result": final_state["execution_report"]}
-            ]
-        })
-    
-    # 注意：执行交易员已合并到交易团队（阶段3）中
     
     # 构建最终摘要
     final_summary = analysis.final_summary
