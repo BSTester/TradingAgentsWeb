@@ -28,9 +28,47 @@ class User(Base):
     analysis_records = relationship("AnalysisRecord", back_populates="user", cascade="all, delete-orphan")
     export_records = relationship("ExportRecord", back_populates="user", cascade="all, delete-orphan")
     scheduled_tasks = relationship("ScheduledTask", back_populates="user", cascade="all, delete-orphan")
+    user_config = relationship("UserConfig", back_populates="user", uselist=False, cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"
+
+class UserConfig(Base):
+    """
+    User configuration model for storing user-specific settings
+    Replaces frontend localStorage for better security and cross-device sync
+    """
+    __tablename__ = "user_configs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    
+    # Analysis configuration cache (previously in frontend localStorage)
+    last_ticker = Column(String(20), nullable=True)  # Last analyzed stock ticker
+    last_analysts = Column(JSON, nullable=True)  # Last selected analysts
+    last_research_depth = Column(Integer, nullable=True)  # Last research depth
+    last_llm_provider = Column(String(50), nullable=True)  # Last LLM provider
+    last_shallow_thinker = Column(String(100), nullable=True)  # Last shallow thinker model
+    last_deep_thinker = Column(String(100), nullable=True)  # Last deep thinker model
+    last_backend_url = Column(String(255), nullable=True)  # Last backend URL
+    
+    # Trading executor configuration
+    enable_trading_executor = Column(Boolean, default=False, nullable=False)  # Whether to enable trading executor
+    futu_api_base_url = Column(String(255), nullable=True)  # Futu API base URL
+    futu_api_key = Column(String(255), nullable=True)  # Futu API key (should be encrypted in production)
+    
+    # API Key cache (single field for all LLM providers, should be encrypted in production)
+    last_api_key = Column(String(255), nullable=True)  # Last used API key (matches last_llm_provider)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationships
+    user = relationship("User", back_populates="user_config")
+    
+    def __repr__(self):
+        return f"<UserConfig(id={self.id}, user_id={self.user_id})>"
 
 class ScheduledTask(Base):
     """
@@ -54,6 +92,11 @@ class ScheduledTask(Base):
     deep_thinker = Column(String(100), nullable=False)
     backend_url = Column(String(255), nullable=False)
     is_public = Column(Boolean, default=False)
+    
+    # Trading executor configuration
+    enable_trading_executor = Column(Boolean, default=False, nullable=False)
+    futu_api_base_url = Column(String(255), nullable=True)
+    futu_api_key = Column(String(255), nullable=True)
     
     # Schedule configuration
     execution_cycle = Column(String(20), nullable=False)  # daily, weekly, every_n_days, workdays

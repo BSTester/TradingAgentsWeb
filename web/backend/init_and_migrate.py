@@ -12,7 +12,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 os.chdir(project_root)
 
-from web.backend.database import init_db
+from web.backend.database import init_db_sync
 
 if __name__ == "__main__":
     print("=" * 60)
@@ -20,7 +20,7 @@ if __name__ == "__main__":
     print("=" * 60)
     
     try:
-        init_db()
+        init_db_sync()
         print("=" * 60)
         print("✅ Database initialized successfully!")
         print("=" * 60)

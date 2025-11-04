@@ -14,7 +14,11 @@ export function Providers({ children }: ProvidersProps) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 1 * 60 * 1000, // 1 minute
+        staleTime: 0, // 禁用缓存，始终获取最新数据
+        cacheTime: 0, // 不缓存数据
+        refetchOnMount: true, // 组件挂载时重新获取
+        refetchOnWindowFocus: true, // 窗口聚焦时重新获取
+        refetchOnReconnect: true, // 重新连接时重新获取
         retry: (failureCount, error: any) => {
           if (error?.response?.status === 401) {
             return false

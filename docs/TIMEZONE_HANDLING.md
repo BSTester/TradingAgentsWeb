@@ -1,222 +1,143 @@
-# 时区处理规范
+# 时区处理说明
 
 ## 概述
 
-TradingAgentsWeb 系统统一使用**北京时间(Asia/Shanghai, UTC+8)**作为标准时区。所有时间相关的操作都应该使用北京时间,确保时间的一致性和准确性。
+TradingAgentsWeb 系统需要正确处理不同市场的交易时间，这涉及到时区转换。系统可能部署在中国（UTC+8），但需要判断美国（EST/EDT）、香港（HKT）、中国（CST）市场是否开盘。
 
-## 时区标准
+## 时区转换流程
 
-- **标准时区**: Asia/Shanghai (北京时间, UTC+8)
-- **数据库时间**: 所有 DateTime 字段都使用 `timezone=True` 存储时区感知的时间戳
-- **API 响应**: 所有时间字段都包含时区信息(ISO 8601 格式)
-- **前端显示**: 前端接收到的时间已经是北京时间,可以直接显示
+### 1. 系统时间获取
 
-## 代码规范
+系统使用 `datetime.now()` 获取的是本地时间（通常是北京时间 UTC+8）。
 
-### 1. 获取当前时间
+### 2. 转换为 UTC
 
-**正确做法**:
+为了统一处理，首先将本地时间转换为 UTC：
+
 ```python
+import pytz
 from datetime import datetime
-from pytz import timezone as pytz_timezone
 
-beijing_tz = pytz_timezone('Asia/Shanghai')
-now_beijing = datetime.now(beijing_tz)
+# 获取 UTC 时间
+utc_now = datetime.now(pytz.UTC)
 ```
 
-**错误做法**:
-```python
-# ❌ 不要使用无时区的 datetime.now()
-now = datetime.now()
+### 3. 传递给市场时间检查
 
-# ❌ 不要使用 UTC 时间
-now_utc = datetime.now(timezone.utc)
-
-# ❌ 不要使用 datetime.utcnow()
-now_utc = datetime.utcnow()
-```
-
-### 2. 时间比较
-
-在比较时间时,确保两个时间都是时区感知的:
+`is_market_open()` 函数接受 UTC 时间或带时区的 datetime，并自动转换为市场本地时间：
 
 ```python
-from pytz import timezone as pytz_timezone
+from tradingagents.agents.utils.market_utils import is_market_open
 
-beijing_tz = pytz_timezone('Asia/Shanghai')
-
-# 如果时间是 naive (无时区),先转换为时区感知
-if datetime_obj.tzinfo is None:
-    datetime_aware = beijing_tz.localize(datetime_obj)
-else:
-    datetime_aware = datetime_obj.astimezone(beijing_tz)
-
-# 现在可以安全比较
-if datetime_aware > another_datetime_aware:
-    # ...
+# 检查美股是否开盘
+is_open, message = is_market_open("US", utc_now)
 ```
 
-### 3. 数据库模型
+### 4. 内部转换
 
-所有时间字段都应该使用 `DateTime(timezone=True)`:
+`is_market_open()` 函数内部会：
+1. 将传入的时间转换为市场本地时间
+2. 检查是否在交易时段内
+3. 返回结果和说明信息
+
+## 市场交易时间
+
+### 美国市场 (US)
+- **时区**: EST/EDT (America/New_York)
+- **交易时间**: 09:30-16:00
+- **工作日**: 周一至周五
+
+### 香港市场 (HK)
+- **时区**: HKT (Asia/Hong_Kong)
+- **交易时间**: 09:30-12:00, 13:00-16:00（有午休）
+- **工作日**: 周一至周五
+
+### 中国市场 (CN)
+- **时区**: CST (Asia/Shanghai)
+- **交易时间**: 09:30-11:30, 13:00-15:00（有午休）
+- **工作日**: 周一至周五
+
+## 时区对应关系
+
+### 北京时间与各市场时间对应
+
+| 北京时间 | 美东时间 (EST) | 香港时间 (HKT) | 上海时间 (CST) |
+|---------|---------------|---------------|---------------|
+| 22:30   | 09:30 (当天)   | 22:30 (当天)   | 22:30 (当天)   |
+| 05:00   | 16:00 (前一天) | 05:00 (当天)   | 05:00 (当天)   |
+
+**注意**: 
+- 北京时间与香港时间、上海时间相同（都是 UTC+8）
+- 美东时间比北京时间晚 13 小时（EST）或 12 小时（EDT）
+
+### 美股交易时间（北京时间）
+
+- **冬令时 (EST)**: 北京时间 22:30 - 次日 05:00
+- **夏令时 (EDT)**: 北京时间 21:30 - 次日 04:00
+
+## 代码示例
+
+### Trading Executor 中的使用
 
 ```python
-from sqlalchemy import Column, DateTime
+import pytz
+from datetime import datetime
+from tradingagents.agents.utils.market_utils import is_market_open
 
-class MyModel(Base):
-    created_at = Column(DateTime(timezone=True), nullable=False)
-    updated_at = Column(DateTime(timezone=True), nullable=False)
+# 获取 UTC 时间
+utc_now = datetime.now(pytz.UTC)
+
+# 获取市场时区
+market_timezones = {
+    "US": pytz.timezone("America/New_York"),
+    "HK": pytz.timezone("Asia/Hong_Kong"),
+    "CN": pytz.timezone("Asia/Shanghai"),
+}
+market_tz = market_timezones.get(market_type, pytz.UTC)
+market_local_time = utc_now.astimezone(market_tz)
+
+# 检查市场是否开盘
+is_open, market_status_msg = is_market_open(market_type, market_local_time)
+
+if not is_open:
+    # 生成报告，显示系统时间和市场本地时间
+    report = f"""
+    系统时间（北京）: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+    市场本地时间: {market_local_time.strftime('%Y-%m-%d %H:%M:%S %Z')}
+    市场状态: 休市
+    """
 ```
 
-### 4. 格式化时间字符串
+## 测试场景
 
-```python
-# 生成 ISO 8601 格式(包含时区信息)
-timestamp_str = now_beijing.isoformat()
+### 场景 1: 美股开盘时间
+- **北京时间**: 2025-11-04 22:30 (周二晚上)
+- **美东时间**: 2025-11-04 09:30 EST (周二早上)
+- **预期结果**: 开盘 ✓
 
-# 生成自定义格式
-date_str = now_beijing.strftime('%Y-%m-%d')
-datetime_str = now_beijing.strftime('%Y-%m-%d %H:%M:%S')
-```
+### 场景 2: 美股关闭时间
+- **北京时间**: 2025-11-04 14:00 (周二下午)
+- **美东时间**: 2025-11-04 01:00 EST (周二凌晨)
+- **预期结果**: 关闭 ✓
 
-## 已修复的文件
+### 场景 3: 港股午休时间
+- **北京时间**: 2025-11-04 12:30 (周二中午)
+- **香港时间**: 2025-11-04 12:30 HKT (周二中午)
+- **预期结果**: 关闭（午休）✓
 
-以下文件已经更新为使用北京时间:
+## 注意事项
 
-### 后端核心文件
-
-1. **web/backend/services/task_executor.py**
-   - 定时任务执行时使用北京时间
-   - 创建 analysis_id 时使用北京时间
-   - 更新 last_run_time 时使用北京时间
-
-2. **web/backend/services/scheduler_service.py**
-   - 调度器配置使用 Asia/Shanghai 时区
-   - 计算下次执行时间时使用北京时间
-
-3. **web/backend/routes/scheduled_task_routes.py**
-   - 创建任务时验证结束日期使用北京时间
-   - 更新任务时使用北京时间
-
-4. **web/backend/routes/analysis_routes.py**
-   - 生成 analysis_id 时使用北京时间
-   - WebSocket 消息时间戳使用北京时间
-
-5. **web/backend/app.py**
-   - TaskManager 监控时间使用北京时间
-   - 启动加载任务时检查使用北京时间
-
-6. **web/backend/health.py**
-   - 健康检查接口返回北京时间
-
-7. **web/backend/analysis_task.py**
-   - 分析任务完成时间使用北京时间
-   - 默认分析日期使用北京时间
-
-### 数据库模型
-
-**web/backend/models.py**
-- 所有时间字段都使用 `DateTime(timezone=True)`
-- 包括: created_at, updated_at, started_at, completed_at, next_run_time, last_run_time, end_date 等
-
-## 前端处理
-
-前端接收到的时间已经是北京时间(带时区信息),可以直接使用:
-
-```typescript
-// 接收到的时间格式: "2025-11-01T21:10:00+08:00"
-const date = new Date(task.next_run_time);
-
-// 显示本地化时间
-const localTime = date.toLocaleString('zh-CN');
-
-// 使用 date-fns 格式化
-import { formatDistanceToNow } from 'date-fns';
-import { zhCN } from 'date-fns/locale';
-
-const relativeTime = formatDistanceToNow(date, {
-  addSuffix: true,
-  locale: zhCN
-});
-```
-
-## 测试建议
-
-### 1. 时区一致性测试
-
-```python
-# 测试创建任务时的时间
-task = create_scheduled_task(...)
-assert task.created_at.tzinfo is not None
-assert task.created_at.tzinfo.zone == 'Asia/Shanghai'
-```
-
-### 2. 时间比较测试
-
-```python
-# 测试结束日期检查
-end_date = datetime(2025, 12, 31, 23, 59, 59)
-end_date_aware = beijing_tz.localize(end_date)
-now_beijing = datetime.now(beijing_tz)
-
-assert now_beijing < end_date_aware  # 应该可以正常比较
-```
-
-### 3. 跨时区测试
-
-在不同时区的服务器上运行,确保时间仍然正确:
-- 服务器时区设置为 UTC
-- 服务器时区设置为其他时区
-- 验证所有时间操作仍然使用北京时间
-
-## 常见问题
-
-### Q: 为什么不使用 UTC 时间?
-
-A: 虽然 UTC 是国际标准,但考虑到:
-1. 目标用户主要在中国
-2. 股票市场交易时间基于北京时间
-3. 用户更容易理解北京时间
-4. 避免前端需要频繁转换时区
-
-因此统一使用北京时间更符合业务需求。
-
-### Q: 数据库时区如何配置?
-
-A: 
-- SQLite: 自动处理时区信息
-- MySQL: 建议设置 `time_zone = '+08:00'`
-- PostgreSQL: 建议设置 `timezone = 'Asia/Shanghai'`
-
-### Q: 如何处理夏令时?
-
-A: 中国不使用夏令时,Asia/Shanghai 时区全年固定为 UTC+8,无需特殊处理。
-
-### Q: 前端用户在其他时区怎么办?
-
-A: 前端可以根据用户浏览器时区自动转换显示,但后端统一使用北京时间存储和处理。
-
-## 检查清单
-
-在添加新功能时,确保:
-
-- [ ] 所有 `datetime.now()` 都指定了 `beijing_tz` 参数
-- [ ] 所有时间比较前都检查了时区感知
-- [ ] 数据库模型的时间字段使用 `DateTime(timezone=True)`
-- [ ] API 响应的时间字段包含时区信息
-- [ ] 文档中说明了时间使用北京时间
+1. **始终使用 UTC 时间**: 在系统内部传递时间时，使用 UTC 可以避免时区混淆
+2. **显示本地时间**: 在报告中同时显示系统时间和市场本地时间，便于用户理解
+3. **夏令时处理**: pytz 会自动处理夏令时转换（EST/EDT）
+4. **周末检查**: 所有市场周末都不开盘
+5. **节假日**: 当前实现不检查节假日，可以在未来扩展
 
 ## 相关文件
 
-- `web/backend/services/task_executor.py` - 定时任务执行
-- `web/backend/services/scheduler_service.py` - 任务调度
-- `web/backend/routes/scheduled_task_routes.py` - 定时任务 API
-- `web/backend/routes/analysis_routes.py` - 分析 API
-- `web/backend/app.py` - 应用主文件
-- `web/backend/models.py` - 数据库模型
-- `web/backend/health.py` - 健康检查
-- `web/backend/analysis_task.py` - 分析任务执行
+- `tradingagents/agents/utils/market_utils.py` - 市场时间检查函数
+- `tradingagents/agents/trader/trading_executor.py` - 交易执行器（使用时区转换）
 
 ## 更新日期
 
-最后更新: 2025-10-31
+2025-11-04

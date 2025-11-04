@@ -268,16 +268,20 @@ def run_analysis_task(
         analysis_record.started_at = now_beijing
         safe_commit(db, "update analysis status to initializing")
         
-        # 配置 API 密钥
+        # 配置 API 密钥（单个字段，根据provider设置对应的环境变量）
         send_log('info', '🔑 配置 API 密钥...', 'system', '配置', 2.0, '准备阶段')
         check_stop()
         
-        if request_data.get('openai_api_key') and request_data.get('llm_provider', '').lower() in ("openai", "oneai", "openrouter", "deepseek", "qwen"):
-            os.environ["OPENAI_API_KEY"] = request_data['openai_api_key']
-        elif request_data.get('anthropic_api_key') and request_data.get('llm_provider', '').lower() == "anthropic":
-            os.environ["ANTHROPIC_API_KEY"] = request_data['anthropic_api_key']
-        elif request_data.get('google_api_key') and request_data.get('llm_provider', '').lower() == "google":
-            os.environ["GOOGLE_API_KEY"] = request_data['google_api_key']
+        api_key = request_data.get('api_key')
+        llm_provider = request_data.get('llm_provider', '').lower()
+        
+        if api_key:
+            if llm_provider in ("openai", "oneai", "openrouter", "deepseek", "qwen"):
+                os.environ["OPENAI_API_KEY"] = api_key
+            elif llm_provider == "anthropic":
+                os.environ["ANTHROPIC_API_KEY"] = api_key
+            elif llm_provider == "google":
+                os.environ["GOOGLE_API_KEY"] = api_key
         
         # 准备配置
         send_log('info', '⚙️ 准备分析配置...', 'system', '配置', 4.0, '准备阶段')
@@ -292,6 +296,10 @@ def run_analysis_task(
         config["max_risk_discuss_rounds"] = request_data.get('research_depth', 1)
         # Pass analysis_id to ensure unique memory collections per analysis (multi-user safety)
         config["analysis_id"] = analysis_id
+        # Trading executor configuration
+        config["auto_execute_trading"] = request_data.get('enable_trading_executor', False)
+        config["futu_api_base_url"] = request_data.get('futu_api_base_url')
+        config["futu_api_key"] = request_data.get('futu_api_key')
         
         # 转换分析师类型
         analyst_types = []
@@ -309,7 +317,7 @@ def run_analysis_task(
         import time
         time.sleep(0.5)
         
-        print(f"📋 发送配置消息: selected_analysts={analyst_types}")
+        print(f"📋 发送配置消息: selected_analysts={analyst_types}, enable_trading_executor={config.get('auto_execute_trading', False)}")
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -318,7 +326,8 @@ def run_analysis_task(
                 'timestamp': datetime.utcnow().isoformat(),
                 'data': {
                     'selected_analysts': analyst_types,
-                    'research_depth': request_data.get('research_depth', 1)
+                    'research_depth': request_data.get('research_depth', 1),
+                    'enable_trading_executor': config.get('auto_execute_trading', False)
                 }
             }, analysis_id))
             loop.close()
@@ -358,7 +367,7 @@ def run_analysis_task(
         
         # 计算进度分配
         # 总进度: 10% -> 90%, 共 80% 的进度空间
-        # 估算总智能体数量: 分析师 + 研究员(2-3个) + 投资评审(1个) + 交易员(1个) + 风险分析(3-4个) + 风险管理(1个)
+        # 估算总智能体数量: 分析师 + 研究员(2-3个) + 投资评审(1个) + 交易员(1个) + 风险分析(3-4个) + 风险管理(1个) + 交易执行(可选)
         num_analysts = len(analyst_types)
         # 固定的其他智能体: 研究员(bull+bear) + 投资评审 + 交易员 + 风险分析(risky+neutral+safe) + 风险管理
         # 根据配置的辩论轮数估算
@@ -367,9 +376,10 @@ def run_analysis_task(
         num_trader = 1
         num_risk_analysts = 3  # risky + neutral + safe
         num_risk_manager = 1
+        num_trading_executor = 1 if config.get("auto_execute_trading", False) else 0  # 执行交易员（可选）
         
         # 总智能体数量
-        total_agents = num_analysts + num_researchers + num_invest_judge + num_trader + num_risk_analysts + num_risk_manager
+        total_agents = num_analysts + num_researchers + num_invest_judge + num_trader + num_risk_analysts + num_risk_manager + num_trading_executor
         
         progress_per_agent = 80.0 / max(total_agents, 1)  # 每个智能体分配的进度
         base_progress = 10.0
@@ -391,7 +401,8 @@ def run_analysis_task(
             'risky': '激进风险分析师',
             'safe': '保守风险分析师',
             'neutral': '中性风险分析师',
-            'risk_manager': '风险管理评审及投资组合分析'
+            'risk_manager': '风险管理评审及投资组合分析',
+            'trading_executor': '执行交易员'
         }
         
         # LangGraph 节点名称到内部智能体代码的映射
@@ -408,6 +419,8 @@ def run_analysis_task(
             'Safe Analyst': 'safe',
             'Neutral Analyst': 'neutral',
             'Portfolio Manager': 'risk_manager',
+            'Risk Judge': 'risk_manager',
+            'Trading Executor': 'trading_executor',
         }
         
         # 智能体对应的报告字段（用于判断节点完成）
@@ -424,6 +437,7 @@ def run_analysis_task(
             'safe': 'risk_debate_state',
             'neutral': 'risk_debate_state',
             'risk_manager': 'investment_plan',
+            'trading_executor': 'execution_report',
         }
         
         # 报告字段收集器
@@ -440,6 +454,7 @@ def run_analysis_task(
             "risk_debate_state": None,
             "investment_plan": None,
             "final_trade_decision": None,
+            "execution_report": None,
         }
         
         # 预定义节点执行顺序（用于追踪智能体切换）
@@ -448,6 +463,9 @@ def run_analysis_task(
         
         # 后面的固定顺序（按 node_to_agent_map 的顺序）
         fixed_order = ['bull', 'bear', 'invest_judge', 'trader', 'risky', 'safe', 'neutral', 'risk_manager']
+        # Add trading executor if enabled
+        if request_data.get('enable_trading_executor', False):
+            fixed_order.append('trading_executor')
         agent_execution_order.extend(fixed_order)
         
         print(f"📋 预定义智能体执行顺序: {agent_execution_order}")
@@ -667,33 +685,59 @@ def run_analysis_task(
                             
                             if "risk_debate_state" in state_update and state_update["risk_debate_state"]:
                                 report_sections["risk_debate_state"] = state_update["risk_debate_state"]
-                                print(f"  📊 收集到 risk_debate_state")
-                                if current_agent in ['risky', 'safe', 'neutral'] and not agent_completed:
-                                    agent_completed = True
-                                    print(f"  ✅ {current_agent} 节点完成（收集到报告）")
-                                    # 立即触发切换到下一个智能体
-                                    if current_agent_index < len(agent_execution_order) - 1:
-                                        next_agent_index = current_agent_index + 1
-                                        next_agent = agent_execution_order[next_agent_index]
-                                        detected_agent = next_agent
-                                        print(f"  🔄 触发切换: {current_agent} -> {next_agent} (收集到报告)")
+                                risk_state = state_update["risk_debate_state"]
+                                latest_speaker = risk_state.get("latest_speaker", "")
+                                print(f"  📊 收集到 risk_debate_state, latest_speaker={latest_speaker}")
+                                
+                                # 基于 latest_speaker 判断是否需要切换智能体
+                                # 只有当 latest_speaker 指示下一个分析师时才切换
+                                if current_agent in ['risky', 'safe', 'neutral']:
+                                    # 检查是否应该切换到下一个分析师
+                                    should_switch = False
+                                    next_agent_name = None
+                                    
+                                    if current_agent == 'risky' and latest_speaker in ['Safe', 'Judge']:
+                                        should_switch = True
+                                        next_agent_name = 'safe' if latest_speaker == 'Safe' else 'risk_manager'
+                                    elif current_agent == 'safe' and latest_speaker in ['Neutral', 'Judge']:
+                                        should_switch = True
+                                        next_agent_name = 'neutral' if latest_speaker == 'Neutral' else 'risk_manager'
+                                    elif current_agent == 'neutral' and latest_speaker == 'Judge':
+                                        should_switch = True
+                                        next_agent_name = 'risk_manager'
+                                    
+                                    if should_switch and next_agent_name and not agent_completed:
+                                        agent_completed = True
+                                        print(f"  ✅ {current_agent} 节点完成（latest_speaker={latest_speaker}）")
+                                        # 触发切换到下一个智能体
+                                        detected_agent = next_agent_name
+                                        print(f"  🔄 触发切换: {current_agent} -> {next_agent_name} (基于latest_speaker)")
                             
                             if "investment_plan" in state_update and state_update["investment_plan"]:
                                 report_sections["investment_plan"] = state_update["investment_plan"]
                                 print(f"  📊 收集到 investment_plan")
+                                # investment_plan 是由 research_manager 生成的，不是 risk_manager
+                            
+                            if "execution_report" in state_update and state_update["execution_report"]:
+                                report_sections["execution_report"] = state_update["execution_report"]
+                                print(f"  📊 收集到 execution_report")
+                                if current_agent == 'trading_executor' and not agent_completed:
+                                    agent_completed = True
+                                    print(f"  ✅ trading_executor 节点完成（收集到报告）")
+                                    # 交易执行是最后一个节点，不需要触发切换
+                            
+                            if "final_trade_decision" in state_update and state_update["final_trade_decision"]:
+                                report_sections["final_trade_decision"] = state_update["final_trade_decision"]
+                                print(f"  📊 收集到 final_trade_decision")
                                 if current_agent == 'risk_manager' and not agent_completed:
                                     agent_completed = True
                                     print(f"  ✅ risk_manager 节点完成（收集到报告）")
-                                    # 立即触发切换到下一个智能体
+                                    # 立即触发切换到下一个智能体（如果启用了交易执行）
                                     if current_agent_index < len(agent_execution_order) - 1:
                                         next_agent_index = current_agent_index + 1
                                         next_agent = agent_execution_order[next_agent_index]
                                         detected_agent = next_agent
                                         print(f"  🔄 触发切换: {current_agent} -> {next_agent} (收集到报告)")
-                            
-                            if "final_trade_decision" in state_update and state_update["final_trade_decision"]:
-                                report_sections["final_trade_decision"] = state_update["final_trade_decision"]
-                                print(f"  📊 收集到 final_trade_decision")
                 
                 # 获取消息列表（从 state_update 或 chunk 中）
                 messages = []
@@ -841,6 +885,7 @@ def run_analysis_task(
             "risk_debate_state": report_sections.get("risk_debate_state", {}),
             "investment_plan": report_sections.get("investment_plan", ""),
             "final_trade_decision": decision_raw,
+            "execution_report": report_sections.get("execution_report", ""),  # 添加交易执行报告
         }
         
         # 保存状态到文件(按用户、股票代码和分析ID分开，避免覆盖)
@@ -867,6 +912,7 @@ def run_analysis_task(
                 "risk_debate_state": report_sections.get("risk_debate_state", {}),
                 "investment_plan": report_sections.get("investment_plan", ""),
                 "final_trade_decision": decision_raw,
+                "execution_report": report_sections.get("execution_report", ""),  # 添加交易执行报告
             }
         }
         

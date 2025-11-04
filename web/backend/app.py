@@ -559,6 +559,10 @@ app.include_router(leaderboard_routes.router)
 app.include_router(user_management_routes.router)
 app.include_router(scheduled_task_routes.router)
 
+# Include user config routes
+from web.backend.routes import user_config_routes
+app.include_router(user_config_routes.router)
+
 # Include page and WebSocket routes
 app.include_router(page_routes.router)
 app.include_router(websocket_routes.router)

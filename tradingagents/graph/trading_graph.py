@@ -122,6 +122,15 @@ class TradingAgentsGraph:
 
         # Set up the graph with auto-execute trading configuration
         auto_execute_trading = self.config.get("auto_execute_trading", False)
+        futu_api_base_url = self.config.get("futu_api_base_url")
+        futu_api_key = self.config.get("futu_api_key")
+        
+        # Set Futu API environment variables if provided
+        if auto_execute_trading and futu_api_base_url:
+            os.environ["FUTU_API_BASE_URL"] = futu_api_base_url
+        if auto_execute_trading and futu_api_key:
+            os.environ["FUTU_API_KEY"] = futu_api_key
+        
         self.graph = self.graph_setup.setup_graph(selected_analysts, auto_execute_trading)
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
