@@ -120,6 +120,11 @@ async def lifespan(app: FastAPI):
             await load_scheduled_tasks(scheduler)
             print("✅ Scheduled tasks loaded")
             
+            # Initialize email service
+            from web.backend.services.email_service import init_email_service
+            email_service = init_email_service()
+            app.state.email_service = email_service
+            
             app.state.monitor_task = asyncio.create_task(task_monitor())
             print("✅ Task monitor started (leader)")
         except OSError:

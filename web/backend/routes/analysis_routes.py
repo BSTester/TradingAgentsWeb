@@ -118,6 +118,13 @@ async def start_analysis(
     now_beijing = datetime.now(beijing_tz)
     analysis_id = f"analysis_{now_beijing.strftime('%Y%m%d_%H%M%S')}_{ticker}_{current_user.id}"
     
+    # Validate email notification request
+    if request.email_notification and not current_user.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="无法启用邮件通知：您的账户未绑定邮箱地址。请先在账户设置中添加邮箱。"
+        )
+    
     # Create analysis record
     analysis_record = AnalysisRecord(
         analysis_id=analysis_id,
@@ -135,6 +142,7 @@ async def start_analysis(
         enable_trading_executor=request.enable_trading_executor,  # Save trading executor setting
         futu_api_base_url=request.futu_api_base_url,  # Save Futu API config
         futu_api_key=request.futu_api_key,  # Save Futu API key
+        email_notification_enabled=request.email_notification,  # Save email notification preference
         status="queued",
         current_step="Analysis queued",
         progress_percentage=0.0

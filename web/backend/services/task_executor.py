@@ -124,6 +124,7 @@ def execute_scheduled_task(scheduled_task_id: int):
             enable_trading_executor=task.enable_trading_executor,  # Copy from scheduled task
             futu_api_base_url=task.futu_api_base_url,  # Copy Futu API config
             futu_api_key=task.futu_api_key,  # Copy Futu API key
+            email_notification_enabled=task.email_notification_enabled,  # Copy email notification setting
             status="queued"
         )
         db.add(analysis_record)

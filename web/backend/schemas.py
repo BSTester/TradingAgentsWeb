@@ -88,6 +88,8 @@ class AnalysisRequest(BaseModel):
     futu_api_key: Optional[str] = None  # Futu API key
     # API Key (single field for all LLM providers)
     api_key: Optional[str] = None  # API key for the selected LLM provider
+    # Email notification settings
+    email_notification: bool = False  # Whether to send email notification when analysis completes
     
     @validator('analysis_date')
     def validate_date(cls, v):
@@ -123,6 +125,7 @@ class AnalysisStatus(BaseModel):
     # Configuration info for UI initialization
     selected_analysts: Optional[List[str]] = None
     enable_trading_executor: bool = False
+    email_notification_enabled: bool = False
 
 class AnalysisRecord(BaseModel):
     id: int
@@ -135,6 +138,9 @@ class AnalysisRecord(BaseModel):
     updated_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    email_notification_enabled: bool = False
+    email_sent: bool = False
+    email_sent_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True
@@ -155,6 +161,10 @@ class AnalysisResults(BaseModel):
     created_at: datetime
     updated_at: datetime
     completed_at: Optional[datetime] = None
+    email_notification_enabled: bool = False
+    email_sent: bool = False
+    email_sent_at: Optional[datetime] = None
+    email_error: Optional[str] = None
     
     class Config:
         from_attributes = True
@@ -243,6 +253,9 @@ class ScheduledTaskCreate(BaseModel):
     futu_api_base_url: Optional[str] = None
     futu_api_key: Optional[str] = None
     
+    # Email notification settings
+    email_notification: bool = False  # Whether to send email notification when task completes
+    
     # Schedule configuration (optional for immediate execution)
     execution_cycle: Optional[str] = None  # daily, weekly, every_n_days, workdays
     execution_time: Optional[str] = None  # HH:MM format (Beijing time)
@@ -323,6 +336,7 @@ class ScheduledTaskResponse(BaseModel):
     enable_trading_executor: bool
     futu_api_base_url: Optional[str]
     futu_api_key: Optional[str]
+    email_notification_enabled: bool
     execution_cycle: str
     execution_time: str
     interval_days: Optional[int]

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradingAgents 分析报告</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        .summary {
+            background-color: #f8f9fa;
+            padding: 25px 30px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+        .summary-item:last-child {
+            margin-bottom: 0;
+        }
+        .summary-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        .summary-value {
+            color: #212529;
+        }
+        .decision {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .decision-buy {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .decision-sell {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .decision-hold {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .content {
+            padding: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section:last-child {
+            margin-bottom: 0;
+        }
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #212529;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        .section-content {
+            color: #495057;
+            font-size: 14px;
+            line-height: 1.8;
+            word-wrap: break-word;
+        }
+        .cta {
+            text-align: center;
+            padding: 30px;
+            background-color: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+        }
+        .cta-button {
+            display: inline-block;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: transform 0.2s;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+        .footer {
+            text-align: center;
+            padding: 20px 30px;
+            background-color: #212529;
+            color: #adb5bd;
+            font-size: 12px;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .risk-warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 13px;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📊 TradingAgents 分析报告</h1>
+            <p>AI 驱动的多智能体股票分析系统</p>
+        </div>
+        
+        <!-- Summary -->
+        <div class="summary">
+            <div class="summary-item">
+                <span class="summary-label">股票代码:</span>
+                <span class="summary-value">{{ ticker }}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">公司名称:</span>
+                <span class="summary-value">{{ company_name }}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">分析日期:</span>
+                <span class="summary-value">{{ analysis_date }}</span>
+            </div>
+            <div class="summary-item">
+                <span class="summary-label">交易决策:</span>
+                <span class="summary-value">
+                    {% if trading_decision == '买入' %}
+                    <span class="decision decision-buy">{{ trading_decision }}</span>
+                    {% elif trading_decision == '卖出' %}
+                    <span class="decision decision-sell">{{ trading_decision }}</span>
+                    {% else %}
+                    <span class="decision decision-hold">{{ trading_decision }}</span>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+        
+        <!-- Content -->
+        <div class="content">
+            {% if market_analysis %}
+            <div class="section">
+                <h2 class="section-title">📈 市场环境分析</h2>
+                <div class="section-content">{{ market_analysis | safe }}</div>
+            </div>
+            {% endif %}
+            
+            {% if fundamentals_analysis %}
+            <div class="section">
+                <h2 class="section-title">💼 基本面评估</h2>
+                <div class="section-content">{{ fundamentals_analysis | safe }}</div>
+            </div>
+            {% endif %}
+            
+            {% if sentiment_analysis %}
+            <div class="section">
+                <h2 class="section-title">💬 情绪与舆论</h2>
+                <div class="section-content">{{ sentiment_analysis | safe }}</div>
+            </div>
+            {% endif %}
+            
+            {% if news_analysis %}
+            <div class="section">
+                <h2 class="section-title">📰 新闻分析</h2>
+                <div class="section-content">{{ news_analysis | safe }}</div>
+            </div>
+            {% endif %}
+            
+            {% if risk_assessment %}
+            <div class="section">
+                <h2 class="section-title">⚠️ 风险评估</h2>
+                <div class="section-content">{{ risk_assessment | safe }}</div>
+            </div>
+            {% endif %}
+            
+            <div class="risk-warning">
+                <strong>⚠️ 风险提示:</strong> 投资有风险，入市需谨慎。本报告仅供参考，不构成投资建议。请根据自身风险承受能力谨慎决策。
+            </div>
+        </div>
+        
+        <!-- CTA -->
+        <div class="cta">
+            <p style="margin-bottom: 15px; color: #495057;">查看完整的交互式分析报告</p>
+            <a href="{{ analysis_url }}" class="cta-button">查看网页版报告</a>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>TradingAgents</strong> - AI 驱动的智能投资分析平台</p>
+            <p>
+                <a href="{{ app_base_url }}">访问平台</a>
+            </p>
+            <p style="margin-top: 15px; font-size: 11px;">
+                本邮件由系统自动发送，请勿直接回复。
+            </p>
+        </div>
+    </div>
+</body>
+</html>

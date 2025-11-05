@@ -98,6 +98,9 @@ class ScheduledTask(Base):
     futu_api_base_url = Column(String(255), nullable=True)
     futu_api_key = Column(String(255), nullable=True)
     
+    # Email notification settings
+    email_notification_enabled = Column(Boolean, default=False, nullable=False)  # Whether to send email notification
+    
     # Schedule configuration
     execution_cycle = Column(String(20), nullable=False)  # daily, weekly, every_n_days, workdays
     execution_time = Column(String(5), nullable=False)  # HH:MM format (Beijing time)
@@ -156,6 +159,12 @@ class AnalysisRecord(Base):
     enable_trading_executor = Column(Boolean, default=False, nullable=False)  # Whether to enable trading executor
     futu_api_base_url = Column(String(255), nullable=True)  # Futu API base URL
     futu_api_key = Column(String(255), nullable=True)  # Futu API key
+    
+    # Email notification settings
+    email_notification_enabled = Column(Boolean, default=False, nullable=False)  # Whether to send email notification
+    email_sent = Column(Boolean, default=False, nullable=False)  # Whether email was sent
+    email_sent_at = Column(DateTime(timezone=True), nullable=True)  # When email was sent
+    email_error = Column(Text, nullable=True)  # Email sending error message
     
     # Analysis status and results
     status = Column(String(20), default="queued", nullable=False, index=True)  # queued, running, completed, error
