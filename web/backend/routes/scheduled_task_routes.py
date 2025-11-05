@@ -121,6 +121,13 @@ async def create_scheduled_task(
                 detail="End date cannot be in the past"
             )
     
+    # Validate email notification request
+    if request.email_notification and not current_user.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="无法启用邮件通知：您的账户未绑定邮箱地址。请先在账户设置中添加邮箱。"
+        )
+    
     # Create scheduled task record
     scheduled_task = ScheduledTask(
         user_id=current_user.id,
@@ -137,6 +144,7 @@ async def create_scheduled_task(
         enable_trading_executor=request.enable_trading_executor,
         futu_api_base_url=request.futu_api_base_url,
         futu_api_key=request.futu_api_key,
+        email_notification_enabled=request.email_notification,  # Save email notification preference
         execution_cycle=request.execution_cycle,
         execution_time=request.execution_time,
         interval_days=request.interval_days,

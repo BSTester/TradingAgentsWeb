@@ -23,6 +23,7 @@ interface FormData {
   shallow_thinker: string;
   deep_thinker: string;
   is_public: boolean;  // Privacy setting for leaderboard
+  email_notification: boolean;  // Email notification setting
 }
 
 interface Analyst {
@@ -69,6 +70,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     shallow_thinker: '',
     deep_thinker: '',
     is_public: true,  // Default to public (checked)
+    email_notification: false,  // Default to disabled
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -463,6 +465,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
         enable_trading_executor: enableTradingExecutor,
         futu_api_base_url: enableTradingExecutor ? futuApiBaseUrl : undefined,
         futu_api_key: enableTradingExecutor ? futuApiKey : undefined,
+        email_notification: formData.email_notification,
       };
 
       // 添加API密钥（如果提供了新密钥，否则后端会使用缓存的）
@@ -978,28 +981,59 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
           )}
         </div>
 
-        {/* 隐私授权 */}
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <i className="fas fa-info-circle text-yellow-600 text-xl mt-0.5" />
+        {/* 隐私授权和邮件通知 - 左右排列 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 隐私授权 */}
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <i className="fas fa-info-circle text-yellow-600 text-xl mt-0.5" />
+              </div>
+              <div className="ml-3 flex-1">
+                <h4 className="text-sm font-bold text-yellow-800 mb-2">隐私授权</h4>
+                <div className="flex items-start space-x-2">
+                  <input
+                    type="checkbox"
+                    id="is_public"
+                    checked={formData.is_public}
+                    onChange={(e) => setFormData(prev => ({ ...prev, is_public: e.target.checked }))}
+                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                  />
+                  <label htmlFor="is_public" className="text-sm text-yellow-700 cursor-pointer">
+                    我同意将此分析结果公开展示在排行榜上，供其他用户参考学习。
+                    <span className="block mt-1 text-xs text-yellow-600">
+                      （不勾选则仅自己可见，勾选后将在首页排行榜中展示）
+                    </span>
+                  </label>
+                </div>
+              </div>
             </div>
-            <div className="ml-3 flex-1">
-              <h4 className="text-sm font-bold text-yellow-800 mb-2">隐私授权</h4>
-              <div className="flex items-start space-x-2">
-                <input
-                  type="checkbox"
-                  id="is_public"
-                  checked={formData.is_public}
-                  onChange={(e) => setFormData(prev => ({ ...prev, is_public: e.target.checked }))}
-                  className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
-                />
-                <label htmlFor="is_public" className="text-sm text-yellow-700 cursor-pointer">
-                  我同意将此分析结果公开展示在排行榜上，供其他用户参考学习。
-                  <span className="block mt-1 text-xs text-yellow-600">
-                    （不勾选则仅自己可见，勾选后将在首页排行榜中展示）
-                  </span>
-                </label>
+          </div>
+
+          {/* 邮件通知 */}
+          <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <i className="fas fa-envelope text-blue-600 text-xl mt-0.5" />
+              </div>
+              <div className="ml-3 flex-1">
+                <h4 className="text-sm font-bold text-blue-800 mb-2">邮件通知</h4>
+                <div className="flex items-start space-x-2">
+                  <input
+                    type="checkbox"
+                    id="email_notification"
+                    checked={formData.email_notification}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email_notification: e.target.checked }))}
+                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+                  />
+                  <label htmlFor="email_notification" className="text-sm text-blue-700 cursor-pointer">
+                    分析完成后发送邮件通知到我的注册邮箱
+                    <span className="block mt-1 text-xs text-blue-600">
+                      <i className="fas fa-info-circle mr-1" />
+                      邮件将包含完整的分析报告和网页版链接
+                    </span>
+                  </label>
+                </div>
               </div>
             </div>
           </div>

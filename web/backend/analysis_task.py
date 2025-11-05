@@ -22,8 +22,8 @@ from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 from cli.models import AnalystType
 
-from web.backend.database import SessionLocal
-from web.backend.models import AnalysisRecord
+from web.backend.database import SessionLocal, AsyncSessionLocal
+from web.backend.models import AnalysisRecord, User
 
 
 def serialize_state(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -999,6 +999,18 @@ def run_analysis_task(
                 'trading_decision': str(decision)
             }
         }, analysis_id))
+        
+        # Trigger email sending if enabled
+        if analysis_record.email_notification_enabled:
+            print(f"📧 Email notification enabled, triggering email send for analysis {analysis_id}")
+            try:
+                # Run email sending in the same event loop
+                loop.run_until_complete(send_analysis_email(analysis_id, user_id))
+            except Exception as e:
+                print(f"⚠️  Failed to send email: {e}")
+                import traceback
+                traceback.print_exc()
+        
         loop.close()
         
     except RuntimeError as e:
@@ -1200,3 +1212,116 @@ def run_analysis_task(
             print(f"⚠️  清理内存失败（可忽略）: {e}")
         
         db.close()
+
+
+
+async def send_analysis_email(analysis_id: str, user_id: int):
+    """
+    Background task to send analysis report email
+    
+    Args:
+        analysis_id: Analysis ID
+        user_id: User ID
+    """
+    db = AsyncSessionLocal()
+    
+    try:
+        from sqlalchemy import select
+        from web.backend.services.email_service import get_email_service
+        
+        # Fetch analysis record
+        stmt = select(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id)
+        result = await db.execute(stmt)
+        analysis = result.scalars().first()
+        
+        if not analysis:
+            print(f"❌ Analysis record not found: {analysis_id}")
+            return
+        
+        # Fetch user
+        stmt = select(User).filter(User.id == user_id)
+        result = await db.execute(stmt)
+        user = result.scalars().first()
+        
+        if not user or not user.email:
+            print(f"❌ User not found or has no email: {user_id}")
+            return
+        
+        # Get email service
+        print(f"📧 [Email] Getting email service...")
+        email_service = get_email_service()
+        print(f"📧 [Email] Email service enabled: {email_service.enabled}")
+        
+        if not email_service.enabled:
+            print("⚠️  [Email] Email service not configured, skipping email send")
+            print(f"   SMTP Host: {email_service.smtp_host}")
+            print(f"   SMTP Port: {email_service.smtp_port}")
+            print(f"   SMTP Username: {email_service.smtp_username}")
+            print(f"   SMTP From: {email_service.smtp_from_email}")
+            analysis.email_error = "Email service not configured"
+            await db.commit()
+            return
+        
+        print(f"📧 [Email] SMTP Configuration:")
+        print(f"   Host: {email_service.smtp_host}:{email_service.smtp_port}")
+        print(f"   From: {email_service.smtp_from_email}")
+        print(f"   Use TLS: {email_service.smtp_use_tls}")
+        
+        # Prepare report data
+        report_sections = {
+            "market_analysis": analysis.market_analysis or "",
+            "fundamentals_analysis": analysis.fundamentals_analysis or "",
+            "sentiment_analysis": analysis.sentiment_analysis or "",
+            "news_analysis": analysis.news_analysis or "",
+            "risk_assessment": analysis.risk_assessment or ""
+        }
+        
+        print(f"📧 [Email] Report sections prepared:")
+        for section, content in report_sections.items():
+            content_preview = content[:100] if content else "(empty)"
+            print(f"   - {section}: {len(content)} chars - {content_preview}...")
+        
+        # Send email
+        print(f"📧 [Email] Sending analysis report email...")
+        print(f"   To: {user.email}")
+        print(f"   Ticker: {analysis.ticker}")
+        print(f"   Company: {analysis.company_name or analysis.ticker}")
+        print(f"   Decision: {analysis.trading_decision or '未明确'}")
+        
+        success = await email_service.send_analysis_report(
+            user_email=user.email,
+            analysis_id=analysis.analysis_id,
+            ticker=analysis.ticker,
+            company_name=analysis.company_name or analysis.ticker,
+            analysis_date=analysis.analysis_date,
+            trading_decision=analysis.trading_decision or "未明确",
+            report_sections=report_sections
+        )
+        
+        print(f"📧 [Email] Send result: {'SUCCESS' if success else 'FAILED'}")
+        
+        # Update database
+        from pytz import timezone as pytz_timezone
+        beijing_tz = pytz_timezone('Asia/Shanghai')
+        now_beijing = datetime.now(beijing_tz)
+        
+        analysis.email_sent = success
+        analysis.email_sent_at = now_beijing if success else None
+        if not success:
+            analysis.email_error = "Failed to send email after retries"
+        
+        await db.commit()
+        print(f"📧 [Email] Database updated: email_sent={success}")
+        
+        if success:
+            print(f"✅ [Email] Email sent successfully to {user.email} for analysis {analysis_id}")
+        else:
+            print(f"❌ [Email] Failed to send email to {user.email} for analysis {analysis_id}")
+            print(f"   Error: {analysis.email_error}")
+        
+    except Exception as e:
+        print(f"❌ Error sending email for analysis {analysis_id}: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        await db.close()

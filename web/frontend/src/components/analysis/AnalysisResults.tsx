@@ -767,70 +767,135 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
 
           const pageWidth = 210; // A4 宽度 mm
           const pageHeight = 297; // A4 高度 mm
-
-          // 获取封面页和报告内容（分别处理）
-          const children = Array.from(exportContent.children) as HTMLElement[];
           
-          for (let i = 0; i < children.length; i++) {
-            const element = children[i];
-            if (!element) continue;
+          // 获取内容总高度
+          const totalHeight = exportContent.scrollHeight;
+          console.log('PDF: Total content height:', totalHeight);
 
-            // 渲染当前元素为 canvas
-            const canvas = await html2canvas(element, {
+          // 浏览器 canvas 高度限制
+          const MAX_CANVAS_HEIGHT = 25000;
+          
+          // 判断是否需要分段渲染
+          const needsSegmentation = totalHeight > MAX_CANVAS_HEIGHT;
+
+          if (!needsSegmentation) {
+            // 内容不长，直接渲染
+            console.log('PDF: Content fits in single render');
+            
+            const canvas = await html2canvas(exportContent, {
               scale: 2,
               useCORS: true,
               logging: false,
-              backgroundColor: element.classList.contains('bg-gradient-to-r') ? null : '#ffffff',
+              backgroundColor: '#ffffff',
               allowTaint: true,
+              windowWidth: exportContent.scrollWidth,
+              windowHeight: exportContent.scrollHeight,
             } as any);
 
             const imgData = canvas.toDataURL('image/jpeg', 0.95);
             const imgWidth = pageWidth;
             const imgHeight = (canvas.height * pageWidth) / canvas.width;
 
-            // 如果不是第一个元素，添加新页
-            if (i > 0) {
-              pdf.addPage();
+            // 分页添加到 PDF
+            let position = 0;
+            let pageIndex = 0;
+
+            while (position < imgHeight) {
+              if (pageIndex > 0) {
+                pdf.addPage();
+              }
+
+              pdf.addImage(
+                imgData,
+                'JPEG',
+                0,
+                -position,
+                imgWidth,
+                imgHeight
+              );
+
+              position += pageHeight;
+              pageIndex++;
             }
 
-            // 如果是封面页（第一个元素），确保适配一页
-            if (i === 0) {
-              // 封面页：缩放以适应一页
-              const scale = Math.min(1, pageHeight / imgHeight);
-              const scaledHeight = imgHeight * scale;
-              const scaledWidth = imgWidth * scale;
-              const xOffset = (pageWidth - scaledWidth) / 2;
-              const yOffset = (pageHeight - scaledHeight) / 2;
-              
-              pdf.addImage(imgData, 'JPEG', xOffset, yOffset, scaledWidth, scaledHeight);
-            } else {
-              // 报告内容：如果超过一页，分页显示
-              if (imgHeight > pageHeight) {
-                let position = 0;
-                let isFirstPage = true;
+          } else {
+            // 内容过长，需要分段渲染
+            console.log(`PDF: Content too long (${totalHeight}px), using segmented rendering`);
+            
+            // 计算需要多少段
+            const segmentCount = Math.ceil(totalHeight / MAX_CANVAS_HEIGHT);
+            const avgSegmentHeight = Math.ceil(totalHeight / segmentCount);
+            
+            console.log(`PDF: Will render in ${segmentCount} segments, avg height: ${avgSegmentHeight}px`);
 
-                while (position < imgHeight) {
-                  if (!isFirstPage) {
-                    pdf.addPage();
-                  }
+            // 克隆整个内容到临时容器
+            const tempContainer = document.createElement('div');
+            tempContainer.style.position = 'absolute';
+            tempContainer.style.left = '-99999px';
+            tempContainer.style.top = '0';
+            tempContainer.style.width = '794px';
+            tempContainer.style.backgroundColor = 'white';
 
-                  pdf.addImage(
-                    imgData,
-                    'JPEG',
-                    0,
-                    -position,
-                    imgWidth,
-                    imgHeight
-                  );
+            const clonedContent = exportContent.cloneNode(true) as HTMLElement;
+            tempContainer.appendChild(clonedContent);
+            document.body.appendChild(tempContainer);
 
-                  position += pageHeight;
-                  isFirstPage = false;
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            let pdfPageIndex = 0;
+
+            // 分段渲染
+            for (let segmentIndex = 0; segmentIndex < segmentCount; segmentIndex++) {
+              const startY = segmentIndex * avgSegmentHeight;
+              const endY = Math.min(startY + avgSegmentHeight, totalHeight);
+              const segmentHeight = endY - startY;
+
+              console.log(`PDF: Rendering segment ${segmentIndex + 1}/${segmentCount}: ${startY}px to ${endY}px`);
+
+              // 渲染当前段
+              const canvas = await html2canvas(tempContainer, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff',
+                allowTaint: true,
+                y: startY,
+                height: segmentHeight,
+                windowHeight: tempContainer.scrollHeight,
+              } as any);
+
+              if (canvas.width === 0 || canvas.height === 0) {
+                console.warn(`PDF: Segment ${segmentIndex + 1} is empty, skipping`);
+                continue;
+              }
+
+              const imgData = canvas.toDataURL('image/jpeg', 0.95);
+              const imgWidth = pageWidth;
+              const imgHeight = (canvas.height * pageWidth) / canvas.width;
+
+              // 将当前段分页添加到 PDF
+              let position = 0;
+
+              while (position < imgHeight) {
+                if (pdfPageIndex > 0) {
+                  pdf.addPage();
                 }
-              } else {
-                // 内容适合单页
-                pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+
+                pdf.addImage(
+                  imgData,
+                  'JPEG',
+                  0,
+                  -position,
+                  imgWidth,
+                  imgHeight
+                );
+
+                position += pageHeight;
+                pdfPageIndex++;
               }
             }
+
+            document.body.removeChild(tempContainer);
           }
 
           // 下载 PDF
