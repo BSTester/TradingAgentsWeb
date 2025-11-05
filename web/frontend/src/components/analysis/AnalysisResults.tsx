@@ -543,7 +543,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
         return;
       }
 
-      // 新增：导出为图片（PNG）
+      // 新增：导出为图片（PNG）- 智能分页导出
       if (format === 'image') {
         try {
           onShowToast('正在生成图片，请稍候...', 'info');
@@ -562,42 +562,145 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
             throw new Error('找不到导出内容区域，请先打开导出预览');
           }
 
-          // 直接渲染整个内容为图片
-          const canvas = await html2canvas(exportContent, {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            backgroundColor: '#ffffff',
-            allowTaint: true,
-            windowWidth: exportContent.scrollWidth,
-            windowHeight: exportContent.scrollHeight,
-          } as any);
+          // 获取内容总高度
+          const totalHeight = exportContent.scrollHeight;
+          console.log('Total content height:', totalHeight);
 
-          console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
+          // 浏览器 canvas 高度限制（保守值）
+          const MAX_CANVAS_HEIGHT = 32767; // Chrome/Edge 限制
+          const MAX_SAFE_HEIGHT = 25000; // 保守安全值
+          
+          // 判断是否需要分页
+          const needsPagination = totalHeight > MAX_SAFE_HEIGHT;
 
-          if (canvas.width === 0 || canvas.height === 0) {
-            throw new Error('内容渲染失败，canvas尺寸为0。');
-          }
+          if (!needsPagination) {
+            // 内容不长，直接导出单张图片
+            console.log('Content fits in single image, exporting...');
+            
+            const canvas = await html2canvas(exportContent, {
+              scale: 2,
+              useCORS: true,
+              logging: false,
+              backgroundColor: '#ffffff',
+              allowTaint: true,
+              windowWidth: exportContent.scrollWidth,
+              windowHeight: exportContent.scrollHeight,
+            } as any);
 
-          // 转换为 blob 并下载
-          canvas.toBlob((blob) => {
-            if (!blob) {
-              onShowToast('生成图片失败', 'error');
-              return;
+            console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
+
+            if (canvas.width === 0 || canvas.height === 0) {
+              throw new Error('内容渲染失败，canvas尺寸为0。');
             }
 
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            const filename = `${results.ticker}_分析报告_${results.analysis_date}.png`;
-            link.href = url;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
+            // 转换为 blob 并下载
+            await new Promise<void>((resolve) => {
+              canvas.toBlob((blob) => {
+                if (!blob) {
+                  onShowToast('生成图片失败', 'error');
+                  resolve();
+                  return;
+                }
 
-            onShowToast('图片已下载', 'success');
-          }, 'image/png', 0.95);
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                const filename = `${results.ticker}_分析报告_${results.analysis_date}.png`;
+                link.href = url;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                onShowToast('图片已下载', 'success');
+                resolve();
+              }, 'image/png', 0.95);
+            });
+
+          } else {
+            // 内容过长，需要分页导出 - 平均分配高度
+            console.log(`Content too long (${totalHeight}px), splitting into pages...`);
+            
+            // 计算需要多少页（向上取整）
+            const pageCount = Math.ceil(totalHeight / MAX_SAFE_HEIGHT);
+            
+            // 计算每页的平均高度
+            const avgPageHeight = Math.ceil(totalHeight / pageCount);
+            
+            console.log(`Will split into ${pageCount} pages, avg height: ${avgPageHeight}px per page`);
+            onShowToast(`内容较长，将分成 ${pageCount} 张图片导出...`, 'info');
+
+            // 克隆整个内容到临时容器
+            const tempContainer = document.createElement('div');
+            tempContainer.style.position = 'absolute';
+            tempContainer.style.left = '-99999px';
+            tempContainer.style.top = '0';
+            tempContainer.style.width = '794px';
+            tempContainer.style.backgroundColor = 'white';
+
+            const clonedContent = exportContent.cloneNode(true) as HTMLElement;
+            tempContainer.appendChild(clonedContent);
+            document.body.appendChild(tempContainer);
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // 按平均高度切割导出
+            for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+              const startY = pageIndex * avgPageHeight;
+              const endY = Math.min(startY + avgPageHeight, totalHeight);
+              const pageHeight = endY - startY;
+
+              console.log(`Rendering page ${pageIndex + 1}/${pageCount}: ${startY}px to ${endY}px (height: ${pageHeight}px)`);
+
+              // 渲染当前页
+              const canvas = await html2canvas(tempContainer, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff',
+                allowTaint: true,
+                y: startY,
+                height: pageHeight,
+                windowHeight: tempContainer.scrollHeight,
+              } as any);
+
+              console.log(`Page ${pageIndex + 1} canvas:`, canvas.width, 'x', canvas.height);
+
+              if (canvas.width === 0 || canvas.height === 0) {
+                console.warn(`Page ${pageIndex + 1} is empty, skipping...`);
+                continue;
+              }
+
+              // 下载图片
+              await new Promise<void>((resolve) => {
+                canvas.toBlob((blob) => {
+                  if (!blob) {
+                    console.error(`Page ${pageIndex + 1} blob generation failed`);
+                    resolve();
+                    return;
+                  }
+
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  const filename = `${results.ticker}_分析报告_${results.analysis_date}_第${pageIndex + 1}页.png`;
+                  link.href = url;
+                  link.download = filename;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+
+                  resolve();
+                }, 'image/png', 0.95);
+              });
+
+              // 添加延迟
+              await new Promise(resolve => setTimeout(resolve, 300));
+            }
+
+            document.body.removeChild(tempContainer);
+            onShowToast(`已成功导出 ${pageCount} 张图片`, 'success');
+          }
 
         } catch (error) {
           console.error('Image generation error:', error);

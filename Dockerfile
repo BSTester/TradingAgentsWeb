@@ -1,7 +1,7 @@
 # ============================================
 # 后端 (FastAPI) Dockerfile - 单阶段精简版
 # ============================================
-FROM python:3.10-slim AS backend
+FROM python:3.11-slim AS backend
 
 WORKDIR /app
 
