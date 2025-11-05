@@ -165,11 +165,12 @@ async def lifespan(app: FastAPI):
 
 
 async def cleanup_running_tasks():
-    """Clean up running tasks on server restart"""
+    """Clean up running tasks on server restart and restore queued tasks"""
     async with AsyncSessionLocal() as db:
         try:
             from sqlalchemy import select
-            # 查找所有运行中或初始化中的任务
+            
+            # 1. 查找所有运行中或初始化中的任务
             result = await db.execute(
                 select(AnalysisRecord).where(
                     AnalysisRecord.status.in_(["initializing", "running"])
@@ -190,9 +191,88 @@ async def cleanup_running_tasks():
                 print(f"✅ 已中断 {len(running_tasks)} 个任务")
             else:
                 print("✅ 没有需要清理的运行中任务")
+            
+            # 2. 查找所有排队中的任务并恢复
+            result = await db.execute(
+                select(AnalysisRecord).where(
+                    AnalysisRecord.status == "queued"
+                ).order_by(AnalysisRecord.created_at)  # 按创建时间排序
+            )
+            queued_tasks = result.scalars().all()
+            
+            if queued_tasks:
+                print(f"🔄 发现 {len(queued_tasks)} 个排队中的任务，准备恢复...")
+                
+                # 导入必要的模块
+                from web.backend.analysis_task import run_analysis_task
+                
+                restored_count = 0
+                for task in queued_tasks:
+                    try:
+                        # 优先使用任务中保存的 API 密钥，如果没有则从用户配置中读取（兜底）
+                        api_key = task.api_key
+                        
+                        if not api_key:
+                            # 兜底：从用户配置中读取
+                            from web.backend.models import UserConfig
+                            user_config_result = await db.execute(
+                                select(UserConfig).where(UserConfig.user_id == task.user_id)
+                            )
+                            user_config = user_config_result.scalars().first()
+                            api_key = user_config.last_api_key if user_config else ''
+                        
+                        # 准备请求数据（严格使用任务保存的配置）
+                        request_data = {
+                            'ticker': task.ticker,
+                            'analysis_date': task.analysis_date,
+                            'analysts': task.analysts if task.analysts else [],
+                            'research_depth': task.research_depth or 1,
+                            'llm_provider': task.llm_provider or 'openai',
+                            'deep_thinker': task.deep_thinker or 'gpt-4o',
+                            'shallow_thinker': task.shallow_thinker or 'gpt-4o-mini',
+                            'api_key': api_key,  # 优先任务配置，兜底用户配置
+                            'backend_url': task.backend_url or '',
+                            'enable_trading_executor': task.enable_trading_executor or False,
+                            'futu_api_base_url': task.futu_api_base_url,
+                            'futu_api_key': task.futu_api_key,
+                        }
+                        
+                        # 提交任务到任务管理器
+                        from web.backend.app import task_manager, manager as ws_manager
+                        
+                        success = task_manager.submit_task(
+                            task.analysis_id,
+                            task.user_id,
+                            run_analysis_task,
+                            task.analysis_id,
+                            task.user_id,
+                            request_data,
+                            ws_manager,
+                            task_manager
+                        )
+                        
+                        if success:
+                            print(f"  ✅ 恢复任务: {task.analysis_id} ({task.ticker})")
+                            restored_count += 1
+                        else:
+                            print(f"  ⏳ 任务已加入队列: {task.analysis_id} ({task.ticker})")
+                            restored_count += 1
+                            
+                    except Exception as e:
+                        print(f"  ❌ 恢复任务失败 {task.analysis_id}: {e}")
+                        # 将失败的任务标记为错误
+                        task.status = "error"
+                        task.error_message = f"服务重启后恢复失败: {str(e)}"
+                        await db.commit()
+                
+                print(f"✅ 已恢复 {restored_count}/{len(queued_tasks)} 个排队任务")
+            else:
+                print("✅ 没有需要恢复的排队任务")
                 
         except Exception as e:
-            print(f"❌ 清理运行中任务失败: {e}")
+            print(f"❌ 清理和恢复任务失败: {e}")
+            import traceback
+            traceback.print_exc()
             await db.rollback()
 
 
@@ -418,9 +498,10 @@ class TaskManager:
         self.task_queue = Queue()
         self.running_count = 0
         self.lock = threading.Lock()
-        # 用户级别的任务管理
-        self.user_running_tasks: Dict[int, str] = {}  # user_id -> analysis_id
+        # 用户级别的任务管理（允许每个用户同时运行2个任务）
+        self.user_running_tasks: Dict[int, set] = {}  # user_id -> set of analysis_ids
         self.user_task_queues: Dict[int, Queue] = {}  # user_id -> Queue
+        self.max_concurrent_tasks_per_user = 2  # 每个用户最多同时运行2个任务
         # 任务监控
         self.task_last_log_time: Dict[str, datetime] = {}  # analysis_id -> last_log_time
         self.task_no_log_count: Dict[str, int] = {}  # analysis_id -> no_log_count
@@ -451,13 +532,14 @@ class TaskManager:
                     print(f"ℹ️ 任务 {analysis_id} 已在用户队列中，忽略重复提交")
                     return False
 
-            # 检查该用户是否已有运行中的任务
-            if user_id in self.user_running_tasks:
-                # 用户已有运行中的任务，加入用户队列
+            # 检查该用户当前运行的任务数
+            user_running_count = len(self.user_running_tasks.get(user_id, set()))
+            if user_running_count >= self.max_concurrent_tasks_per_user:
+                # 用户已达到并发上限，加入用户队列
                 if user_id not in self.user_task_queues:
                     self.user_task_queues[user_id] = Queue()
                 self.user_task_queues[user_id].put((analysis_id, func, args, kwargs))
-                print(f"⚠️  用户 {user_id} 已有运行中的任务，任务 {analysis_id} 加入用户队列")
+                print(f"⚠️  用户 {user_id} 已有 {user_running_count} 个运行中的任务（上限 {self.max_concurrent_tasks_per_user}），任务 {analysis_id} 加入用户队列")
                 return False
             
             # 检查全局任务数
@@ -475,7 +557,12 @@ class TaskManager:
         # Create stop event for this task
         stop_event = threading.Event()
         self.active_tasks[analysis_id] = stop_event
-        self.user_running_tasks[user_id] = analysis_id
+        
+        # Add to user's running tasks set
+        if user_id not in self.user_running_tasks:
+            self.user_running_tasks[user_id] = set()
+        self.user_running_tasks[user_id].add(analysis_id)
+        
         self.running_count += 1
         
         # 初始化监控 (use Beijing time)
@@ -504,8 +591,14 @@ class TaskManager:
             # 清理任务
             if analysis_id in self.active_tasks:
                 del self.active_tasks[analysis_id]
+            
+            # Remove from user's running tasks set
             if user_id in self.user_running_tasks:
-                del self.user_running_tasks[user_id]
+                self.user_running_tasks[user_id].discard(analysis_id)
+                # Clean up empty set
+                if not self.user_running_tasks[user_id]:
+                    del self.user_running_tasks[user_id]
+            
             if analysis_id in self.task_last_log_time:
                 del self.task_last_log_time[analysis_id]
             if analysis_id in self.task_no_log_count:
@@ -513,14 +606,16 @@ class TaskManager:
             
             self.running_count -= 1
             
-            print(f"✅ 任务 {analysis_id} 完成 ({self.running_count}/{self.max_workers} 运行中)")
+            user_running_count = len(self.user_running_tasks.get(user_id, set()))
+            print(f"✅ 任务 {analysis_id} 完成 (全局: {self.running_count}/{self.max_workers}, 用户 {user_id}: {user_running_count}/{self.max_concurrent_tasks_per_user})")
             
-            # 处理该用户的队列
-            if user_id in self.user_task_queues and not self.user_task_queues[user_id].empty():
-                queued_id, func, args, kwargs = self.user_task_queues[user_id].get()
-                print(f"📤 从用户 {user_id} 队列中取出任务 {queued_id}")
-                self._start_task(queued_id, user_id, func, *args, **kwargs)
-                return
+            # 处理该用户的队列（如果用户还有空闲槽位）
+            if user_running_count < self.max_concurrent_tasks_per_user:
+                if user_id in self.user_task_queues and not self.user_task_queues[user_id].empty():
+                    queued_id, func, args, kwargs = self.user_task_queues[user_id].get()
+                    print(f"📤 从用户 {user_id} 队列中取出任务 {queued_id}")
+                    self._start_task(queued_id, user_id, func, *args, **kwargs)
+                    return
             
             # 处理全局队列
             if not self.task_queue.empty():

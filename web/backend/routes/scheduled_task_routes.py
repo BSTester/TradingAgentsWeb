@@ -128,6 +128,15 @@ async def create_scheduled_task(
             detail="无法启用邮件通知：您的账户未绑定邮箱地址。请先在账户设置中添加邮箱。"
         )
     
+    # Get user config for API key fallback
+    from web.backend.models import UserConfig
+    stmt = select(UserConfig).filter(UserConfig.user_id == current_user.id)
+    result = await db.execute(stmt)
+    user_config = result.scalars().first()
+    
+    # Use API key from request, or fallback to user config
+    api_key = request.api_key or (user_config.last_api_key if user_config else '')
+    
     # Create scheduled task record
     scheduled_task = ScheduledTask(
         user_id=current_user.id,
@@ -140,6 +149,7 @@ async def create_scheduled_task(
         shallow_thinker=request.shallow_thinker,
         deep_thinker=request.deep_thinker,
         backend_url=request.backend_url,
+        api_key=api_key,  # Save API key with the scheduled task
         is_public=request.is_public,
         enable_trading_executor=request.enable_trading_executor,
         futu_api_base_url=request.futu_api_base_url,

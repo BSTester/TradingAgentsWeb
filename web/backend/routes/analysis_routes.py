@@ -37,21 +37,26 @@ async def start_analysis(
 ):
     """Start a new trading analysis (requires authentication)"""
     
-    # 检查用户是否已有运行中的任务
+    # 检查用户是否已有相同股票的运行中任务（允许不同股票并行）
+    # 先规范化股票代码以便比较
+    from web.backend.utils.ticker_utils import normalize_ticker, normalize_ticker_with_suffix
+    normalized_ticker = normalize_ticker_with_suffix(normalize_ticker(request.ticker))
+    
     stmt = select(AnalysisRecord).filter(
         AnalysisRecord.user_id == current_user.id,
-        AnalysisRecord.status.in_(["initializing", "running"])
+        AnalysisRecord.ticker == normalized_ticker,  # 只检查相同股票
+        AnalysisRecord.status.in_(["initializing", "running", "queued"])  # 包括排队中的任务
     )
     result = await db.execute(stmt)
     running_analysis = result.scalars().first()
     
     if running_analysis:
         # 返回运行中的任务，前端会自动跳转到进度页面
-        print(f"⚠️  用户 {current_user.id} 已有运行中的任务: {running_analysis.analysis_id}")
+        print(f"⚠️  用户 {current_user.id} 已有 {normalized_ticker} 的运行中任务: {running_analysis.analysis_id}")
         return AnalysisResponse(
             analysis_id=running_analysis.analysis_id,
             status=running_analysis.status,
-            message=f"您已有运行中的分析任务，已自动连接"
+            message=f"该股票的分析任务已在进行中，已自动连接"
         )
     
     # Load and save user configuration
@@ -138,6 +143,7 @@ async def start_analysis(
         shallow_thinker=request.shallow_thinker,
         deep_thinker=request.deep_thinker,
         backend_url=request.backend_url,
+        api_key=api_key,  # Save API key with the task
         is_public=request.is_public,  # Save privacy setting
         enable_trading_executor=request.enable_trading_executor,  # Save trading executor setting
         futu_api_base_url=request.futu_api_base_url,  # Save Futu API config

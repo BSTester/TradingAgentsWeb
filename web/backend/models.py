@@ -91,6 +91,7 @@ class ScheduledTask(Base):
     shallow_thinker = Column(String(100), nullable=False)
     deep_thinker = Column(String(100), nullable=False)
     backend_url = Column(String(255), nullable=False)
+    api_key = Column(String(255), nullable=True)  # LLM API key for this scheduled task
     is_public = Column(Boolean, default=False)
     
     # Trading executor configuration
@@ -151,6 +152,7 @@ class AnalysisRecord(Base):
     shallow_thinker = Column(String(100), nullable=False)
     deep_thinker = Column(String(100), nullable=False)
     backend_url = Column(String(255), nullable=False)
+    api_key = Column(String(255), nullable=True)  # LLM API key for this specific task
     
     # Privacy settings
     is_public = Column(Boolean, default=False, nullable=False, index=True)  # Whether to show in public leaderboard
