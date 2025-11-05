@@ -39,7 +39,7 @@ async def start_analysis(
     
     # 检查用户是否已有相同股票的运行中任务（允许不同股票并行）
     # 先规范化股票代码以便比较
-    from web.backend.utils.ticker_utils import normalize_ticker, normalize_ticker_with_suffix
+    from web.backend.utils.market_detector import normalize_ticker, normalize_ticker_with_suffix
     normalized_ticker = normalize_ticker_with_suffix(normalize_ticker(request.ticker))
     
     stmt = select(AnalysisRecord).filter(
