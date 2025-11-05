@@ -730,7 +730,11 @@ async def get_public_analysis_results(
         })
     
     # 阶段3：交易团队
+    trading_agents = []
     if final_state.get("trader_investment_plan"):
+        trading_agents.append({"name": "交易员", "result": final_state["trader_investment_plan"]})
+    
+    if trading_agents:
         phases.append({
             "id": 3,
             "name": "交易团队",

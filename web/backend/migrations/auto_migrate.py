@@ -2,14 +2,16 @@
 """
 Auto Migration Manager
 Automatically runs pending database migrations on application startup
+Compares table schemas and adds missing columns
 """
 
 import os
 import sys
 from pathlib import Path
 from datetime import datetime
-from sqlalchemy import create_engine, text, Column, String, DateTime
+from sqlalchemy import create_engine, text, Column, String, DateTime, inspect, Table, MetaData
 from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.exc import OperationalError, ProgrammingError
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent.parent
@@ -18,7 +20,7 @@ sys.path.insert(0, str(project_root))
 from web.backend.database import DATABASE_URL
 
 # Convert async database URL to sync for migrations
-SYNC_DATABASE_URL = DATABASE_URL.replace('+aiosqlite', '').replace('+aiomysql', '')
+SYNC_DATABASE_URL = DATABASE_URL.replace('+aiosqlite', '').replace('+aiomysql', '+pymysql')
 
 # Create a separate base for migration tracking
 Base = declarative_base()
@@ -110,9 +112,128 @@ def run_migration(migration_file):
         print(f"   ❌ Error running migration: {e}")
         return False
 
+def get_column_type_sql(column, dialect_name):
+    """Generate SQL type string for a column based on dialect"""
+    col_type = column.type
+    type_name = str(col_type)
+    
+    # Handle common types
+    if 'VARCHAR' in type_name or 'String' in str(type(col_type)):
+        length = getattr(col_type, 'length', 255)
+        return f"VARCHAR({length})"
+    elif 'TEXT' in type_name or 'Text' in str(type(col_type)):
+        return "TEXT"
+    elif 'INTEGER' in type_name or 'Integer' in str(type(col_type)):
+        return "INTEGER"
+    elif 'FLOAT' in type_name or 'Float' in str(type(col_type)):
+        return "FLOAT"
+    elif 'BOOLEAN' in type_name or 'Boolean' in str(type(col_type)):
+        if dialect_name == 'mysql':
+            return "TINYINT(1)"
+        return "BOOLEAN"
+    elif 'DATETIME' in type_name or 'DateTime' in str(type(col_type)):
+        return "DATETIME"
+    elif 'JSON' in type_name or 'JSON' in str(type(col_type)):
+        if dialect_name == 'mysql':
+            return "JSON"
+        return "TEXT"  # SQLite doesn't have native JSON
+    else:
+        return str(col_type)
+
+def compare_and_sync_schema(engine, verbose=True):
+    """
+    Compare model schema with database schema and add missing columns
+    
+    Args:
+        engine: SQLAlchemy engine
+        verbose: Whether to print detailed output
+        
+    Returns:
+        tuple: (columns_added, errors)
+    """
+    from web.backend.models import User, UserConfig, AnalysisRecord, AnalysisLog, ExportRecord, ScheduledTask
+    from web.backend.database import Base
+    
+    inspector = inspect(engine)
+    metadata = Base.metadata
+    dialect_name = engine.dialect.name
+    
+    columns_added = 0
+    errors = 0
+    
+    if verbose:
+        print("\n[SCHEMA SYNC] Comparing database schema with models...")
+    
+    # Get all tables from models
+    for table_name, table in metadata.tables.items():
+        # Check if table exists
+        if not inspector.has_table(table_name):
+            if verbose:
+                print(f"   ⚠️  Table '{table_name}' does not exist, skipping column sync")
+            continue
+        
+        # Get existing columns in database
+        existing_columns = {col['name']: col for col in inspector.get_columns(table_name)}
+        
+        # Compare with model columns
+        for column in table.columns:
+            col_name = column.name
+            
+            if col_name not in existing_columns:
+                # Column is missing, add it
+                try:
+                    col_type_sql = get_column_type_sql(column, dialect_name)
+                    
+                    # Build ALTER TABLE statement
+                    nullable = "NULL" if column.nullable else "NOT NULL"
+                    default_clause = ""
+                    
+                    # Handle default values
+                    if column.default is not None:
+                        if hasattr(column.default, 'arg'):
+                            default_val = column.default.arg
+                            if isinstance(default_val, str):
+                                default_clause = f" DEFAULT '{default_val}'"
+                            elif isinstance(default_val, bool):
+                                default_clause = f" DEFAULT {1 if default_val else 0}"
+                            elif isinstance(default_val, (int, float)):
+                                default_clause = f" DEFAULT {default_val}"
+                    
+                    # For MySQL, handle server_default
+                    if dialect_name == 'mysql' and column.server_default is not None:
+                        if 'now()' in str(column.server_default).lower() or 'current_timestamp' in str(column.server_default).lower():
+                            default_clause = " DEFAULT CURRENT_TIMESTAMP"
+                    
+                    alter_sql = f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type_sql}{default_clause} {nullable}"
+                    
+                    if verbose:
+                        print(f"   [ADD] {table_name}.{col_name} ({col_type_sql})")
+                    
+                    with engine.begin() as conn:
+                        conn.execute(text(alter_sql))
+                    
+                    columns_added += 1
+                    
+                except (OperationalError, ProgrammingError) as e:
+                    if verbose:
+                        print(f"   ❌ Failed to add column {table_name}.{col_name}: {e}")
+                    errors += 1
+                except Exception as e:
+                    if verbose:
+                        print(f"   ❌ Unexpected error adding column {table_name}.{col_name}: {e}")
+                    errors += 1
+    
+    if verbose:
+        if columns_added > 0:
+            print(f"   ✅ Added {columns_added} missing column(s)")
+        else:
+            print(f"   ✅ Schema is up to date")
+    
+    return columns_added, errors
+
 def auto_migrate(verbose=True):
     """
-    Automatically run pending migrations
+    Automatically run pending migrations and sync schema
     
     Args:
         verbose: Whether to print detailed output
@@ -134,7 +255,7 @@ def auto_migrate(verbose=True):
         print("=" * 60)
     
     # Create engine and session (use sync URL)
-    engine = create_engine(SYNC_DATABASE_URL)
+    engine = create_engine(SYNC_DATABASE_URL, echo=False)
     Session = sessionmaker(bind=engine)
     session = Session()
     
@@ -146,7 +267,9 @@ def auto_migrate(verbose=True):
         applied = get_applied_migrations(session)
         
         if verbose:
-            print(f"Database: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL.split(':///')[-1]}")
+            db_display = DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL.split(':///')[-1]
+            print(f"Database: {db_display}")
+            print(f"Driver: {engine.dialect.name}")
             print(f"Applied migrations: {len(applied)}")
             print()
         
@@ -154,6 +277,7 @@ def auto_migrate(verbose=True):
         failed_count = 0
         skipped_count = 0
         
+        # Run file-based migrations
         for migration in MIGRATIONS:
             name = migration["name"]
             file = migration["file"]
@@ -186,19 +310,26 @@ def auto_migrate(verbose=True):
             if verbose:
                 print()
         
+        # Run schema comparison and sync
+        columns_added, schema_errors = compare_and_sync_schema(engine, verbose)
+        
+        if schema_errors > 0:
+            failed_count += schema_errors
+        
         # Summary
         if verbose:
             print("=" * 60)
             print("Migration Summary")
             print("=" * 60)
             print(f"[OK] Successful: {success_count}")
+            print(f"[OK] Columns added: {columns_added}")
             print(f"[FAIL] Failed: {failed_count}")
             print(f"[SKIP] Skipped: {skipped_count}")
-            print(f"Total: {len(MIGRATIONS)}")
+            print(f"Total migrations: {len(MIGRATIONS)}")
             print()
             
             if failed_count == 0:
-                if success_count > 0:
+                if success_count > 0 or columns_added > 0:
                     print("[SUCCESS] All pending migrations completed successfully!")
                 else:
                     print("[INFO] Database is up to date!")
