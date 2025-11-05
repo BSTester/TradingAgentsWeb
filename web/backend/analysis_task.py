@@ -1000,18 +1000,24 @@ def run_analysis_task(
             }
         }, analysis_id))
         
-        # Trigger email sending if enabled
+        loop.close()
+        
+        # Trigger email sending if enabled (in background thread)
         if analysis_record.email_notification_enabled:
             print(f"📧 Email notification enabled, triggering email send for analysis {analysis_id}")
             try:
-                # Run email sending in the same event loop
-                loop.run_until_complete(send_analysis_email(analysis_id, user_id))
+                # Run email sending in a separate thread with its own event loop
+                email_thread = threading.Thread(
+                    target=_send_email_in_thread,
+                    args=(analysis_id, user_id),
+                    daemon=True
+                )
+                email_thread.start()
+                print(f"📧 Email sending thread started for analysis {analysis_id}")
             except Exception as e:
-                print(f"⚠️  Failed to send email: {e}")
+                print(f"⚠️  Failed to start email thread: {e}")
                 import traceback
                 traceback.print_exc()
-        
-        loop.close()
         
     except RuntimeError as e:
         # 处理解释器关闭错误
@@ -1214,58 +1220,57 @@ def run_analysis_task(
         db.close()
 
 
-
-async def send_analysis_email(analysis_id: str, user_id: int):
+def _send_email_in_thread(analysis_id: str, user_id: int):
     """
-    Background task to send analysis report email
+    Send email in a separate thread using synchronous database operations
     
     Args:
         analysis_id: Analysis ID
         user_id: User ID
     """
-    db = AsyncSessionLocal()
+    # Use synchronous database session
+    db = SessionLocal()
     
     try:
-        from sqlalchemy import select
         from web.backend.services.email_service import get_email_service
         
-        # Fetch analysis record
-        stmt = select(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id)
-        result = await db.execute(stmt)
-        analysis = result.scalars().first()
+        print(f"📧 [Email] Fetching analysis record for {analysis_id}...")
+        
+        # Fetch analysis record (synchronous)
+        analysis = db.query(AnalysisRecord).filter(
+            AnalysisRecord.analysis_id == analysis_id
+        ).first()
         
         if not analysis:
-            print(f"❌ Analysis record not found: {analysis_id}")
+            print(f"❌ [Email] Analysis record not found: {analysis_id}")
             return
         
-        # Fetch user
-        stmt = select(User).filter(User.id == user_id)
-        result = await db.execute(stmt)
-        user = result.scalars().first()
+        print(f"📧 [Email] Analysis found: {analysis.ticker}")
         
-        if not user or not user.email:
-            print(f"❌ User not found or has no email: {user_id}")
+        # Fetch user (synchronous)
+        user = db.query(User).filter(User.id == user_id).first()
+        
+        if not user:
+            print(f"❌ [Email] User not found: {user_id}")
             return
+        
+        if not user.email:
+            print(f"❌ [Email] User {user.username} has no email address")
+            return
+        
+        print(f"📧 [Email] User found: {user.username}, email: {user.email}")
         
         # Get email service
-        print(f"📧 [Email] Getting email service...")
+        print(f"📧 [Email] Initializing email service...")
         email_service = get_email_service()
-        print(f"📧 [Email] Email service enabled: {email_service.enabled}")
         
         if not email_service.enabled:
             print("⚠️  [Email] Email service not configured, skipping email send")
-            print(f"   SMTP Host: {email_service.smtp_host}")
-            print(f"   SMTP Port: {email_service.smtp_port}")
-            print(f"   SMTP Username: {email_service.smtp_username}")
-            print(f"   SMTP From: {email_service.smtp_from_email}")
             analysis.email_error = "Email service not configured"
-            await db.commit()
+            db.commit()
             return
         
-        print(f"📧 [Email] SMTP Configuration:")
-        print(f"   Host: {email_service.smtp_host}:{email_service.smtp_port}")
-        print(f"   From: {email_service.smtp_from_email}")
-        print(f"   Use TLS: {email_service.smtp_use_tls}")
+        print(f"✅ [Email] Email service enabled")
         
         # Prepare report data
         report_sections = {
@@ -1276,31 +1281,29 @@ async def send_analysis_email(analysis_id: str, user_id: int):
             "risk_assessment": analysis.risk_assessment or ""
         }
         
-        print(f"📧 [Email] Report sections prepared:")
-        for section, content in report_sections.items():
-            content_preview = content[:100] if content else "(empty)"
-            print(f"   - {section}: {len(content)} chars - {content_preview}...")
+        # Send email synchronously (we're already in a background thread)
+        print(f"📧 [Email] Sending email to {user.email}...")
         
-        # Send email
-        print(f"📧 [Email] Sending analysis report email...")
-        print(f"   To: {user.email}")
-        print(f"   Ticker: {analysis.ticker}")
-        print(f"   Company: {analysis.company_name or analysis.ticker}")
-        print(f"   Decision: {analysis.trading_decision or '未明确'}")
+        # Create a new event loop for the async email service
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         
-        success = await email_service.send_analysis_report(
-            user_email=user.email,
-            analysis_id=analysis.analysis_id,
-            ticker=analysis.ticker,
-            company_name=analysis.company_name or analysis.ticker,
-            analysis_date=analysis.analysis_date,
-            trading_decision=analysis.trading_decision or "未明确",
-            report_sections=report_sections
-        )
+        try:
+            success = loop.run_until_complete(
+                email_service.send_analysis_report(
+                    user_email=user.email,
+                    analysis_id=analysis.analysis_id,
+                    ticker=analysis.ticker,
+                    company_name=analysis.company_name or analysis.ticker,
+                    analysis_date=analysis.analysis_date,
+                    trading_decision=analysis.trading_decision or "未明确",
+                    report_sections=report_sections
+                )
+            )
+        finally:
+            loop.close()
         
-        print(f"📧 [Email] Send result: {'SUCCESS' if success else 'FAILED'}")
-        
-        # Update database
+        # Update database (synchronous)
         from pytz import timezone as pytz_timezone
         beijing_tz = pytz_timezone('Asia/Shanghai')
         now_beijing = datetime.now(beijing_tz)
@@ -1309,19 +1312,21 @@ async def send_analysis_email(analysis_id: str, user_id: int):
         analysis.email_sent_at = now_beijing if success else None
         if not success:
             analysis.email_error = "Failed to send email after retries"
+        else:
+            analysis.email_error = None
         
-        await db.commit()
-        print(f"📧 [Email] Database updated: email_sent={success}")
+        db.commit()
         
         if success:
-            print(f"✅ [Email] Email sent successfully to {user.email} for analysis {analysis_id}")
+            print(f"✅ [Email] Email sent successfully to {user.email}")
         else:
-            print(f"❌ [Email] Failed to send email to {user.email} for analysis {analysis_id}")
-            print(f"   Error: {analysis.email_error}")
+            print(f"❌ [Email] Failed to send email to {user.email}")
+        
+        print(f"✅ [Email] Email thread completed for analysis {analysis_id}")
         
     except Exception as e:
-        print(f"❌ Error sending email for analysis {analysis_id}: {e}")
+        print(f"❌ [Email] Error in email thread for analysis {analysis_id}: {e}")
         import traceback
         traceback.print_exc()
     finally:
-        await db.close()
+        db.close()
