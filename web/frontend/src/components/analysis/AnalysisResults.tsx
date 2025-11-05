@@ -126,17 +126,13 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
         return;
       }
 
-      // 新增：导出为图片（PNG）
+      // 新增：导出为图片（PNG）- 支持分页导出
       if (format === 'image') {
         try {
           onShowToast('正在生成图片，请稍候...', 'info');
 
           // 动态导入 html2canvas
           const html2canvas = (await import('html2canvas')).default;
-
-          // 调试：检查results数据
-          console.log('Results data:', results);
-          console.log('Phases:', results?.phases);
           
           // 检查数据完整性
           if (!results?.phases || results.phases.length === 0) {
@@ -149,25 +145,19 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
             throw new Error('找不到导出内容区域');
           }
           
-          // 调试：检查exportContent内容
-          console.log('Export content HTML length:', exportContent.innerHTML.length);
-          console.log('Export content children:', exportContent.children.length);
-          
           // 检查内容是否为空
           if (exportContent.innerHTML.length < 100) {
             throw new Error('导出内容为空，无法生成图片。请刷新页面后重试。');
           }
 
-          // 克隆内容到临时容器以便完整渲染
+          // 克隆内容到临时容器 - 使用可见位置以确保正确渲染
           const tempContainer = document.createElement('div');
-          tempContainer.style.position = 'fixed'; // 使用fixed而不是absolute
-          tempContainer.style.left = '0';
+          tempContainer.style.position = 'absolute';
+          tempContainer.style.left = '-99999px'; // 移到屏幕外但保持可渲染
           tempContainer.style.top = '0';
-          tempContainer.style.width = '794px'; // A4 宽度对应的像素基准
+          tempContainer.style.width = '794px';
           tempContainer.style.backgroundColor = 'white';
           tempContainer.style.padding = '40px';
-          tempContainer.style.zIndex = '-9999'; // 放到最底层，但保持可见
-          tempContainer.style.opacity = '0'; // 完全透明，用户看不到
 
           const clonedContent = exportContent.cloneNode(true) as HTMLElement;
           clonedContent.style.display = 'block';
@@ -177,91 +167,162 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
           tempContainer.appendChild(clonedContent);
           document.body.appendChild(tempContainer);
 
-          // 等待渲染稳定 - 增加等待时间
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // 等待渲染稳定
+          await new Promise(resolve => setTimeout(resolve, 1500));
 
-          // 调试：检查临时容器内容
-          console.log('Temp container dimensions:', {
-            width: tempContainer.offsetWidth,
-            height: tempContainer.offsetHeight,
-            scrollHeight: tempContainer.scrollHeight,
-            childrenCount: tempContainer.children.length
-          });
+          // 获取完整内容高度
+          const totalHeight = tempContainer.scrollHeight;
+          console.log('Total content height:', totalHeight);
 
-          const canvas = await html2canvas(tempContainer, {
-            useCORS: true,
-            logging: true,
-            backgroundColor: '#ffffff',
-            scale: 2,
-            windowWidth: 874, // 794 + 80 padding
-            allowTaint: true,
-          } as any);
+          // 定义单张图片的最大高度
+          const MAX_PAGE_HEIGHT = 25000; // 保守值，确保兼容性
+          const needsPagination = totalHeight > MAX_PAGE_HEIGHT;
 
-          // 移除临时容器
-          document.body.removeChild(tempContainer);
+          if (!needsPagination) {
+            // 内容不长，直接导出单张图片
+            console.log('Generating single image...');
+            const canvas = await html2canvas(tempContainer, {
+              useCORS: true,
+              logging: true,
+              backgroundColor: '#ffffff',
+              scale: 2,
+              allowTaint: true,
+            } as any);
 
-          console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
+            document.body.removeChild(tempContainer);
 
-          if (canvas.width === 0 || canvas.height === 0) {
-            throw new Error('内容渲染失败，canvas尺寸为0。请检查浏览器控制台的调试信息。');
+            console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
+
+            if (canvas.width === 0 || canvas.height === 0) {
+              throw new Error('内容渲染失败，canvas尺寸为0。');
+            }
+
+            // 生成并下载图片
+            const imgData = canvas.toDataURL('image/jpeg', 0.85);
+            const base64Data = imgData.split(',')[1] || '';
+            const byteCharacters = atob(base64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'image/jpeg' });
+
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const filename = `${results?.ticker || 'analysis'}_${results?.analysis_date || 'report'}.jpg`;
+            link.href = blobUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+
+            onShowToast('图片已下载', 'success');
+          } else {
+            // 内容过长，分页导出 - 使用分段克隆方式
+            const pageCount = Math.ceil(totalHeight / MAX_PAGE_HEIGHT);
+            console.log(`Content too long (${totalHeight}px), splitting into ${pageCount} pages`);
+            onShowToast(`内容较长，将分成 ${pageCount} 张图片导出...`, 'info');
+
+            // 获取所有子元素
+            const children = Array.from(clonedContent.children) as HTMLElement[];
+            console.log(`Total children: ${children.length}`);
+
+            let currentPageIndex = 0;
+            let currentPageHeight = 0;
+            let pageElements: HTMLElement[] = [];
+
+            for (let i = 0; i < children.length; i++) {
+              const child = children[i];
+              const childHeight = child.offsetHeight;
+
+              // 如果添加这个元素会超过页面高度，先导出当前页
+              if (currentPageHeight + childHeight > MAX_PAGE_HEIGHT && pageElements.length > 0) {
+                // 导出当前页
+                await exportPage(pageElements, currentPageIndex, pageCount);
+                currentPageIndex++;
+                currentPageHeight = 0;
+                pageElements = [];
+              }
+
+              pageElements.push(child);
+              currentPageHeight += childHeight;
+            }
+
+            // 导出最后一页
+            if (pageElements.length > 0) {
+              await exportPage(pageElements, currentPageIndex, pageCount);
+            }
+
+            document.body.removeChild(tempContainer);
+            onShowToast(`已成功导出 ${pageCount} 张图片`, 'success');
           }
 
-          // 检查canvas尺寸是否过大
-          const maxCanvasSize = 32767; // 大多数浏览器的限制
-          if (canvas.height > maxCanvasSize) {
-            throw new Error(`图片高度过大（${canvas.height}px），超过浏览器限制（${maxCanvasSize}px）。建议使用PDF导出。`);
+          // 辅助函数：导出单页
+          async function exportPage(elements: HTMLElement[], pageIndex: number, totalPages: number) {
+            console.log(`Exporting page ${pageIndex + 1}/${totalPages} with ${elements.length} elements`);
+
+            // 创建页面容器
+            const pageContainer = document.createElement('div');
+            pageContainer.style.position = 'absolute';
+            pageContainer.style.left = '-99999px';
+            pageContainer.style.top = '0';
+            pageContainer.style.width = '794px';
+            pageContainer.style.backgroundColor = 'white';
+            pageContainer.style.padding = '40px';
+
+            // 克隆元素到页面容器
+            elements.forEach(el => {
+              const clonedEl = el.cloneNode(true) as HTMLElement;
+              pageContainer.appendChild(clonedEl);
+            });
+
+            document.body.appendChild(pageContainer);
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // 生成canvas
+            const canvas = await html2canvas(pageContainer, {
+              useCORS: true,
+              logging: false,
+              backgroundColor: '#ffffff',
+              scale: 2,
+              allowTaint: true,
+            } as any);
+
+            document.body.removeChild(pageContainer);
+
+            console.log(`Page ${pageIndex + 1} canvas:`, canvas.width, 'x', canvas.height);
+
+            if (canvas.width === 0 || canvas.height === 0) {
+              console.error(`Page ${pageIndex + 1} canvas is empty, skipping...`);
+              return;
+            }
+
+            // 生成并下载图片
+            const imgData = canvas.toDataURL('image/jpeg', 0.85);
+            const base64Data = imgData.split(',')[1] || '';
+            const byteCharacters = atob(base64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'image/jpeg' });
+
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const filename = `${results?.ticker || 'analysis'}_${results?.analysis_date || 'report'}_page${pageIndex + 1}.jpg`;
+            link.href = blobUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+
+            await new Promise(resolve => setTimeout(resolve, 300));
           }
 
-          // 生成 PNG 并下载
-          console.log('Generating PNG data...');
-          
-          // 使用JPEG格式和较低质量以减小文件大小
-          let imgData: string;
-          try {
-            imgData = canvas.toDataURL('image/jpeg', 0.85);
-          } catch (e) {
-            console.error('toDataURL failed:', e);
-            throw new Error('图片数据生成失败，内容可能过大。建议使用PDF导出。');
-          }
-          
-          console.log('Image data length:', imgData.length);
-          console.log('Image data prefix:', imgData.substring(0, 50));
-          
-          // 检查是否生成了有效的图片数据
-          if (!imgData || imgData === 'data:,' || imgData.length < 100) {
-            throw new Error('图片数据生成失败，可能是内容过大。建议使用PDF导出。');
-          }
-
-          // 创建Blob以支持大文件
-          const base64Data = imgData.split(',')[1] || '';
-          const byteCharacters = atob(base64Data);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], { type: 'image/jpeg' });
-          
-          console.log('Blob size:', blob.size, 'bytes');
-          
-          if (blob.size === 0) {
-            throw new Error('生成的图片文件为空。建议使用PDF导出。');
-          }
-
-          // 使用Blob URL下载
-          const blobUrl = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          const filename = `${results?.ticker || 'analysis'}_${results?.analysis_date || 'report'}.jpg`;
-          link.href = blobUrl;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          
-          // 清理Blob URL
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-
-          onShowToast('图片已下载', 'success');
         } catch (error) {
           console.error('Image generation error:', error);
           onShowToast(`图片生成失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error');
@@ -447,7 +508,25 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
             background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%) !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            color-adjust: exact !important;
             overflow: hidden !important;
+          }
+          
+          /* 打印时：确保封面页内的flex布局生效 */
+          body.printing-pdf .pdf-export-content .report-cover > div {
+            display: flex !important;
+          }
+          
+          /* 打印时：确保渐变色背景和文字颜色正确显示 */
+          body.printing-pdf .pdf-export-content [style*="linear-gradient"] {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          
+          body.printing-pdf .pdf-export-content [style*="color: white"],
+          body.printing-pdf .pdf-export-content [style*="color:white"] {
+            color: white !important;
           }
           
           /* 打印时：优化报告标题 */
@@ -1212,45 +1291,63 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
         {/* PDF导出专用：完整内容（包含投资建议和报告来源） */}
         <div className="pdf-export-content" style={{ display: 'none' }}>
           {/* 封面页 - 专业研报样式 */}
-          <div className="report-cover" style={{ pageBreakAfter: 'always', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '0', margin: '0', background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)' }}>
+          <div className="report-cover" style={{ pageBreakAfter: 'always', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '0', margin: '0', background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' } as React.CSSProperties}>
             {/* 顶部区域 */}
             <div style={{ padding: '2.5rem 0 0 0', width: '100%' }}>
               <div style={{ textAlign: 'center', color: 'white', width: '100%' }}>
                 <p style={{ fontSize: '14pt', letterSpacing: '0.3em', marginBottom: '0.75rem', opacity: '0.95', fontFamily: 'system-ui, -apple-system, sans-serif', textAlign: 'center', margin: '0 auto 0.75rem auto' }}>TRADING ANALYSIS REPORT</p>
-                <h1 style={{ fontSize: '48pt', fontWeight: '300', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '0.05em', textAlign: 'center' }}>股票分析报告</h1>
+                <h1 style={{ fontSize: '48pt', fontWeight: '300', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '0.05em', textAlign: 'center' }}>股票投资分析报告</h1>
               </div>
             </div>
 
             {/* 中间区域 - 股票信息 */}
-            <div style={{ padding: '0', flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-              <div style={{ background: 'rgba(255, 255, 255, 0.95)', borderRadius: '16px', padding: '2.5rem 2rem', width: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', margin: '0 auto' }}>
+            <div style={{ padding: '0', flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: '0' }}>
+              <div style={{ 
+                background: 'rgba(255, 255, 255, 0.95)', 
+                borderRadius: '16px', 
+                padding: '3rem 2rem', 
+                width: '480px', 
+                boxShadow: '0 20px 60px rgba(0,0,0,0.2)', 
+                margin: '0 auto',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0'
+              }}>
                 {/* 市场标签 */}
-                <div style={{ textAlign: 'center', marginBottom: '1.5rem', width: '100%' }}>
+                <div style={{ marginBottom: '1.5rem' }}>
                   <span style={{ 
-                    display: 'inline-block',
                     background: 'linear-gradient(135deg, #10b981, #3b82f6)', 
                     color: 'white',
-                    padding: '0.5rem 1.8rem',
+                    padding: '0.6rem 1.8rem',
                     borderRadius: '20px',
                     fontSize: '11pt',
                     fontWeight: '500',
-                    fontFamily: 'system-ui, -apple-system, sans-serif'
-                  }}>
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    lineHeight: '1',
+                    minHeight: '2.5rem',
+                    WebkitPrintColorAdjust: 'exact',
+                    printColorAdjust: 'exact'
+                  } as React.CSSProperties}>
                     {results?.market === 'US' ? '美国股票市场' : results?.market === 'HK' ? '香港股票市场' : results?.market === 'CN' ? 'A股市场' : '股票市场'}
                   </span>
                 </div>
 
-                {/* 股票代码 - 参考市场标签的居中方式 */}
-                <div style={{ textAlign: 'center', marginBottom: '0.8rem', width: '100%' }}>
-                  <h2 style={{ fontSize: '56pt', fontWeight: 'bold', margin: '0', padding: '0', color: '#1a1a1a', letterSpacing: '0.05em', fontFamily: 'system-ui, -apple-system, sans-serif', lineHeight: '1.1', display: 'inline-block' }}>
+                {/* 股票代码 */}
+                <div style={{ marginBottom: '0.8rem' }}>
+                  <h2 style={{ fontSize: '56pt', fontWeight: 'bold', margin: '0', padding: '0', color: '#1a1a1a', letterSpacing: '0.05em', fontFamily: 'system-ui, -apple-system, sans-serif', lineHeight: '1.1', textAlign: 'center' }}>
                     {results?.ticker}
                   </h2>
                 </div>
 
-                {/* 公司名称 - 参考市场标签的居中方式 */}
+                {/* 公司名称 */}
                 {results?.company_name && (
-                  <div style={{ textAlign: 'center', marginBottom: '1.8rem', width: '100%' }}>
-                    <p style={{ fontSize: '15pt', margin: '0', padding: '0', color: '#666', fontFamily: 'system-ui, -apple-system, sans-serif', fontWeight: '400', lineHeight: '1.4', display: 'inline-block' }}>
+                  <div style={{ marginBottom: '1.8rem' }}>
+                    <p style={{ fontSize: '15pt', margin: '0', padding: '0', color: '#666', fontFamily: 'system-ui, -apple-system, sans-serif', fontWeight: '400', lineHeight: '1.4', textAlign: 'center' }}>
                       {results.company_name}
                     </p>
                   </div>
@@ -1259,23 +1356,42 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                 {/* 分隔线 */}
                 <div style={{ height: '2px', background: 'linear-gradient(to right, transparent, #e5e7eb, transparent)', margin: '1.8rem 0', width: '100%' }}></div>
 
-                {/* 投资建议标签 - 参考市场标签的居中方式 */}
-                <div style={{ textAlign: 'center', marginBottom: '1rem', width: '100%' }}>
-                  <p style={{ fontSize: '12pt', color: '#666', letterSpacing: '0.2em', fontFamily: 'system-ui, -apple-system, sans-serif', margin: '0', padding: '0', display: 'inline-block' }}>投资建议</p>
+                {/* 投资建议标签 */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <p style={{ fontSize: '12pt', color: '#666', letterSpacing: '0.2em', fontFamily: 'system-ui, -apple-system, sans-serif', margin: '0', padding: '0', textAlign: 'center' }}>投资建议</p>
                 </div>
 
-                {/* 投资建议卡片 - 参考市场标签的居中方式 */}
-                <div style={{ textAlign: 'center', width: '100%' }}>
+                {/* 投资建议卡片 */}
+                <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
                   <div style={{ 
                     background: 'linear-gradient(135deg, #10b981, #3b82f6)',
                     borderRadius: '12px',
-                    padding: '1.2rem 3rem',
                     boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-                    display: 'inline-block'
-                  }}>
-                    <p style={{ fontSize: '42pt', fontWeight: 'bold', margin: '0', padding: '0', color: 'white', fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '0.05em', display: 'inline-block' }}>
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '200px',
+                    maxWidth: '90%',
+                    paddingTop: '1rem',
+                    paddingBottom: '1.2rem',
+                    paddingLeft: '2.5rem',
+                    paddingRight: '2.5rem',
+                    WebkitPrintColorAdjust: 'exact',
+                    printColorAdjust: 'exact'
+                  } as React.CSSProperties}>
+                    <span style={{ 
+                      fontSize: '36pt', 
+                      fontWeight: 'bold', 
+                      color: 'white', 
+                      fontFamily: 'system-ui, -apple-system, sans-serif', 
+                      letterSpacing: '0.05em', 
+                      lineHeight: '1',
+                      whiteSpace: 'nowrap',
+                      display: 'block',
+                      transform: 'translateY(-2px)'
+                    }}>
                       {results?.trading_decision}
-                    </p>
+                    </span>
                   </div>
                 </div>
               </div>
