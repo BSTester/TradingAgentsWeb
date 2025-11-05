@@ -537,7 +537,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       if (response.message && response.status !== 'queued') {
         // 重复任务，显示明确的警告提示
         console.log('Duplicate task detected, connecting to existing analysis:', response.analysis_id);
-        onShowToast('⚠️ 您已有正在进行的分析任务，不能同时运行多个分析。已自动连接到现有任务。', 'warning');
+        onShowToast('⚠️ 该股票的分析任务已在进行中，已自动连接到现有任务。', 'warning');
         // 延迟一下再跳转，让用户看到提示
         setTimeout(() => {
           onAnalysisStart(response.analysis_id);

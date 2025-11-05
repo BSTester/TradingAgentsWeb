@@ -63,14 +63,17 @@ def execute_scheduled_task(scheduled_task_id: int):
                 print(f"✅ Task {scheduled_task_id} removed from scheduler due to end date")
                 return
         
-        # Check if user already has a running task
+        # Check if user already has a running task for the same ticker
         running_task = db.query(AnalysisRecord).filter(
             AnalysisRecord.user_id == task.user_id,
+            AnalysisRecord.ticker == task.ticker,  # Only check same ticker
             AnalysisRecord.status.in_(["initializing", "running", "queued"])
         ).first()
         
         if running_task:
-            print(f"⚠️  User {task.user_id} has running task {running_task.analysis_id}, scheduled task {task.id} will be queued")
+            print(f"⚠️  User {task.user_id} already has task for {task.ticker}: {running_task.analysis_id}, skipping scheduled task {task.id}")
+            # Skip this execution to avoid duplicate analysis of the same ticker
+            return
         
         # Update user configuration cache with task settings
         from web.backend.models import UserConfig
@@ -120,6 +123,7 @@ def execute_scheduled_task(scheduled_task_id: int):
             shallow_thinker=task.shallow_thinker,
             deep_thinker=task.deep_thinker,
             backend_url=task.backend_url,
+            api_key=task.api_key,  # Copy API key from scheduled task
             is_public=task.is_public,
             enable_trading_executor=task.enable_trading_executor,  # Copy from scheduled task
             futu_api_base_url=task.futu_api_base_url,  # Copy Futu API config
@@ -135,6 +139,9 @@ def execute_scheduled_task(scheduled_task_id: int):
         from web.backend.analysis_task import run_analysis_task
         from web.backend.app import manager as websocket_manager
         
+        # Use API key from scheduled task, fallback to user config if not available
+        api_key = task.api_key or (user_config.last_api_key if user_config else '')
+        
         request_data = {
             'ticker': task.ticker,
             'analysts': task.analysts,
@@ -144,6 +151,7 @@ def execute_scheduled_task(scheduled_task_id: int):
             'shallow_thinker': task.shallow_thinker,
             'deep_thinker': task.deep_thinker,
             'analysis_date': now_beijing.strftime('%Y-%m-%d'),
+            'api_key': api_key,  # Use task's API key, fallback to user config
             'enable_trading_executor': task.enable_trading_executor,
             'futu_api_base_url': task.futu_api_base_url,
             'futu_api_key': task.futu_api_key
