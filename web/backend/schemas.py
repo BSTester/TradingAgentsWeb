@@ -256,6 +256,9 @@ class ScheduledTaskCreate(BaseModel):
     # Email notification settings
     email_notification: bool = False  # Whether to send email notification when task completes
     
+    # API Key (single field for all LLM providers)
+    api_key: Optional[str] = None  # API key for the selected LLM provider
+    
     # Schedule configuration (optional for immediate execution)
     execution_cycle: Optional[str] = None  # daily, weekly, every_n_days, workdays
     execution_time: Optional[str] = None  # HH:MM format (Beijing time)
