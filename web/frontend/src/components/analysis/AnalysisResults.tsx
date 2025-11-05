@@ -30,6 +30,7 @@ interface PhaseResult {
 export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, onShowToast, fromLeaderboard = false }: AnalysisResultsProps) {
   const [activePhase, setActivePhase] = useState(-1); // -1 表示显示最终分析说明
   const [systemDomain, setSystemDomain] = useState('');
+  const [showExportPreview, setShowExportPreview] = useState(false);
 
   // 使用 useQuery 获取分析结果
   const { data: results, isLoading: loading, isError, error } = useQuery({
@@ -118,6 +119,422 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
     }
   }, []);
 
+  // 渲染导出内容（预览和导出共用）
+  const renderExportContent = () => {
+    if (!results) return null;
+
+    return (
+      <>
+        {/* 封面页 - 专业研报样式 */}
+        <div className="report-cover" style={{ pageBreakAfter: 'always', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '0', margin: '0', background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' } as React.CSSProperties}>
+          {/* 顶部区域 */}
+          <div style={{ padding: '2.5rem 0 0 0', width: '100%' }}>
+            <div style={{ textAlign: 'center', color: 'white', width: '100%' }}>
+              <p style={{ fontSize: '14pt', letterSpacing: '0.3em', marginBottom: '0.75rem', opacity: '0.95', fontFamily: 'system-ui, -apple-system, sans-serif', textAlign: 'center', margin: '0 auto 0.75rem auto' }}>TRADING ANALYSIS REPORT</p>
+              <h1 style={{ fontSize: '48pt', fontWeight: '300', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '0.05em', textAlign: 'center' }}>股票投资分析报告</h1>
+            </div>
+          </div>
+
+          {/* 中间区域 - 股票信息 */}
+          <div style={{ padding: '0', flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: '0' }}>
+            <div style={{ 
+              background: 'rgba(255, 255, 255, 0.95)', 
+              borderRadius: '16px', 
+              padding: '3rem 2rem', 
+              width: '480px', 
+              boxShadow: '0 20px 60px rgba(0,0,0,0.2)', 
+              margin: '0 auto',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0'
+            }}>
+              {/* 市场标签 */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <span style={{ 
+                  background: 'linear-gradient(135deg, #10b981, #3b82f6)', 
+                  color: 'white',
+                  padding: '0.6rem 1.8rem',
+                  borderRadius: '20px',
+                  fontSize: '11pt',
+                  fontWeight: '500',
+                  fontFamily: 'system-ui, -apple-system, sans-serif',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  lineHeight: '1',
+                  minHeight: '2.5rem',
+                  WebkitPrintColorAdjust: 'exact',
+                  printColorAdjust: 'exact'
+                } as React.CSSProperties}>
+                  {results?.market === 'US' ? '美国股票市场' : results?.market === 'HK' ? '香港股票市场' : results?.market === 'CN' ? 'A股市场' : '股票市场'}
+                </span>
+              </div>
+
+              {/* 股票代码 */}
+              <div style={{ marginBottom: '0.8rem' }}>
+                <h2 style={{ fontSize: '56pt', fontWeight: 'bold', margin: '0', padding: '0', color: '#1a1a1a', letterSpacing: '0.05em', fontFamily: 'system-ui, -apple-system, sans-serif', lineHeight: '1.1', textAlign: 'center' }}>
+                  {results?.ticker}
+                </h2>
+              </div>
+
+              {/* 公司名称 */}
+              {results?.company_name && (
+                <div style={{ marginBottom: '1.8rem' }}>
+                  <p style={{ fontSize: '15pt', margin: '0', padding: '0', color: '#666', fontFamily: 'system-ui, -apple-system, sans-serif', fontWeight: '400', lineHeight: '1.4', textAlign: 'center' }}>
+                    {results.company_name}
+                  </p>
+                </div>
+              )}
+
+              {/* 分隔线 */}
+              <div style={{ height: '2px', background: 'linear-gradient(to right, transparent, #e5e7eb, transparent)', margin: '1.8rem 0', width: '100%' }}></div>
+
+              {/* 投资建议标签 */}
+              <div style={{ marginBottom: '1rem' }}>
+                <p style={{ fontSize: '12pt', color: '#666', letterSpacing: '0.2em', fontFamily: 'system-ui, -apple-system, sans-serif', margin: '0', padding: '0', textAlign: 'center' }}>投资建议</p>
+              </div>
+
+              {/* 投资建议卡片 */}
+              <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                <div style={{ 
+                  background: 'linear-gradient(135deg, #10b981, #3b82f6)',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: '200px',
+                  maxWidth: '90%',
+                  paddingTop: '1rem',
+                  paddingBottom: '1.2rem',
+                  paddingLeft: '2.5rem',
+                  paddingRight: '2.5rem',
+                  WebkitPrintColorAdjust: 'exact',
+                  printColorAdjust: 'exact'
+                } as React.CSSProperties}>
+                  <span style={{ 
+                    fontSize: '36pt', 
+                    fontWeight: 'bold', 
+                    color: 'white', 
+                    fontFamily: 'system-ui, -apple-system, sans-serif', 
+                    letterSpacing: '0.05em', 
+                    lineHeight: '1',
+                    whiteSpace: 'nowrap',
+                    display: 'block',
+                    transform: 'translateY(-2px)'
+                  }}>
+                    {results?.trading_decision}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 底部区域 - 报告信息 */}
+          <div style={{ padding: '0 0 2.5rem 0', width: '100%' }}>
+            <div style={{ textAlign: 'center', color: 'white', fontSize: '10pt', fontFamily: 'system-ui, -apple-system, sans-serif', width: '100%' }}>
+              <p style={{ marginBottom: '0.4rem', opacity: '0.95', textAlign: 'center', margin: '0 auto 0.4rem auto' }}>
+                分析日期：{results?.analysis_date}
+              </p>
+              <p style={{ opacity: '0.9', textAlign: 'center', margin: '0 auto' }}>
+                生成系统：TradingAgents 多智能体分析系统
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 股票信息横幅 */}
+        <div style={{ 
+          background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', 
+          padding: '1.5rem 2rem', 
+          marginBottom: '2rem',
+          borderRadius: '12px',
+          border: '2px solid #bae6fd',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '1rem',
+          pageBreakInside: 'avoid'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ 
+              width: '4rem', 
+              height: '4rem', 
+              background: 'linear-gradient(135deg, #10b981, #3b82f6)',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+            }}>
+              <i className="fas fa-chart-line" style={{ fontSize: '1.5rem', color: 'white' }} />
+            </div>
+            <div>
+              <h2 style={{ fontSize: '2rem', fontWeight: 'bold', margin: '0', color: '#0c4a6e', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                {results?.ticker}
+              </h2>
+              {results?.company_name && (
+                <p style={{ fontSize: '0.875rem', color: '#0369a1', margin: '0.25rem 0 0 0', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                  {results.company_name}
+                </p>
+              )}
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '0.75rem', color: '#0369a1', margin: '0 0 0.25rem 0', fontFamily: 'system-ui, -apple-system, sans-serif' }}>市场</p>
+              <p style={{ fontSize: '1rem', fontWeight: 'bold', color: '#0c4a6e', margin: '0', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                {results?.market === 'US' ? '美股' : results?.market === 'HK' ? '港股' : results?.market === 'CN' ? 'A股' : '未知'}
+              </p>
+            </div>
+            
+            <div style={{ 
+              background: results?.trading_decision === '买入' ? 'linear-gradient(135deg, #10b981, #059669)' : 
+                          results?.trading_decision === '卖出' ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 
+                          'linear-gradient(135deg, #f59e0b, #d97706)',
+              color: 'white',
+              padding: '0.75rem 2rem',
+              borderRadius: '9999px',
+              fontSize: '1.25rem',
+              fontWeight: 'bold',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              WebkitPrintColorAdjust: 'exact',
+              printColorAdjust: 'exact'
+            } as React.CSSProperties}>
+              {results?.trading_decision}
+            </div>
+          </div>
+        </div>
+
+        {/* 最终分析说明 */}
+        {results?.final_analysis && (
+          <div style={{ 
+            background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+            border: '2px solid #fbbf24',
+            borderRadius: '12px',
+            padding: '1.5rem',
+            marginBottom: '2rem',
+            pageBreakInside: 'avoid'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
+              <div style={{ 
+                width: '3rem',
+                height: '3rem',
+                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: '1rem',
+                boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+              }}>
+                <i className="fas fa-lightbulb" style={{ fontSize: '1.25rem', color: 'white' }} />
+              </div>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#78350f', margin: '0', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                最终投资建议
+              </h3>
+            </div>
+            <div style={{ 
+              fontSize: '11pt',
+              lineHeight: '1.8',
+              color: '#78350f',
+              fontFamily: 'system-ui, -apple-system, sans-serif'
+            }}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm, remarkBreaks]}
+                components={{
+                  p: ({ children }) => <p style={{ marginBottom: '0.75rem' }}>{children}</p>,
+                  strong: ({ children }) => <strong style={{ fontWeight: 'bold' }}>{children}</strong>,
+                  ul: ({ children }) => <ul style={{ marginLeft: '1.5rem', marginBottom: '0.75rem' }}>{children}</ul>,
+                  ol: ({ children }) => <ol style={{ marginLeft: '1.5rem', marginBottom: '0.75rem' }}>{children}</ol>,
+                  li: ({ children }) => <li style={{ marginBottom: '0.25rem' }}>{children}</li>,
+                }}
+              >
+                {results.final_analysis}
+              </ReactMarkdown>
+            </div>
+          </div>
+        )}
+
+        {/* 各阶段分析 */}
+        {results?.phases?.map((phase: PhaseResult) => (
+          <div key={phase.id} style={{ marginBottom: '2rem', pageBreakInside: 'avoid' }}>
+            <div style={{ 
+              background: `linear-gradient(135deg, ${
+                phase.color === 'blue' ? '#3b82f6, #2563eb' :
+                phase.color === 'green' ? '#10b981, #059669' :
+                phase.color === 'purple' ? '#8b5cf6, #7c3aed' :
+                phase.color === 'orange' ? '#f59e0b, #d97706' :
+                '#6b7280, #4b5563'
+              })`,
+              color: 'white',
+              padding: '1.25rem 1.5rem',
+              borderRadius: '12px',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+              WebkitPrintColorAdjust: 'exact',
+              printColorAdjust: 'exact'
+            } as React.CSSProperties}>
+              <i className={`fas ${phase.icon}`} style={{ fontSize: '1.75rem', marginRight: '1rem' }} />
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: '0', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                {phase.name}
+              </h2>
+            </div>
+
+            {phase.agents.map((agent, agentIndex) => (
+              <div key={agentIndex} style={{ 
+                background: '#ffffff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                padding: '1.5rem',
+                marginBottom: '1.5rem',
+                pageBreakInside: 'avoid'
+              }}>
+                <h3 style={{ 
+                  fontSize: '1.125rem',
+                  fontWeight: 'bold',
+                  color: '#1f2937',
+                  marginBottom: '1rem',
+                  paddingBottom: '0.5rem',
+                  borderBottom: '2px solid #e5e7eb',
+                  fontFamily: 'system-ui, -apple-system, sans-serif'
+                }}>
+                  {agent.name}
+                </h3>
+                <div style={{ 
+                  fontSize: '11pt',
+                  lineHeight: '1.8',
+                  color: '#374151',
+                  fontFamily: 'system-ui, -apple-system, sans-serif'
+                }}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
+                    components={{
+                      h2: ({ children }) => (
+                        <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1f2937', marginTop: '1.5rem', marginBottom: '0.75rem', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                          {children}
+                        </h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 style={{ fontSize: '1.125rem', fontWeight: 'bold', color: '#374151', marginTop: '1.25rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                          <i className="fas fa-chevron-right" style={{ marginRight: '0.5rem', color: '#3b82f6', fontSize: '0.75rem' }} />
+                          {children}
+                        </h3>
+                      ),
+                      h4: ({ children }) => (
+                        <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#4b5563', marginTop: '0.75rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                          <span style={{ width: '0.5rem', height: '0.5rem', background: '#3b82f6', borderRadius: '50%', marginRight: '0.5rem' }}></span>
+                          {children}
+                        </h4>
+                      ),
+                      p: ({ children }) => {
+                        const text = typeof children === 'string' ? children : (Array.isArray(children) ? children.join('') : String(children));
+                        const decoratedTitleMatch = text.match(/^[_\-]{3,}(.+?)[_\-]{3,}$/);
+                        if (decoratedTitleMatch && decoratedTitleMatch[1]) {
+                          const titleText = decoratedTitleMatch[1].trim();
+                          return (
+                            <div style={{ margin: '1.5rem 0', textAlign: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ flex: '1', height: '1px', background: 'linear-gradient(to right, transparent, #3b82f6, #3b82f6)' }}></div>
+                                <h3 style={{ padding: '0 1rem', fontSize: '1.25rem', fontWeight: 'bold', color: '#1e40af', whiteSpace: 'nowrap', fontFamily: 'system-ui, -apple-system, sans-serif' }}>{titleText}</h3>
+                                <div style={{ flex: '1', height: '1px', background: 'linear-gradient(to left, transparent, #3b82f6, #3b82f6)' }}></div>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return <p style={{ color: '#4b5563', lineHeight: '1.75', marginBottom: '1rem', textAlign: 'justify', fontFamily: 'system-ui, -apple-system, sans-serif' }}>{children}</p>;
+                      },
+                      strong: ({ children }) => (
+                        <strong style={{ fontWeight: 'bold', color: '#1f2937', background: '#fef3c7', padding: '0 0.25rem', fontFamily: 'system-ui, -apple-system, sans-serif' }}>{children}</strong>
+                      ),
+                      ul: ({ children }) => (
+                        <ul style={{ marginBottom: '1rem', marginLeft: '0', listStyle: 'none', fontFamily: 'system-ui, -apple-system, sans-serif' }}>{children}</ul>
+                      ),
+                      ol: ({ children }) => (
+                        <ol style={{ marginBottom: '1rem', marginLeft: '1.5rem', fontFamily: 'system-ui, -apple-system, sans-serif' }}>{children}</ol>
+                      ),
+                      li: ({ children }) => (
+                        <li style={{ marginLeft: '1.5rem', paddingLeft: '0.5rem', position: 'relative', marginBottom: '0.5rem', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                          <span style={{ position: 'absolute', left: '-0.75rem', color: '#3b82f6', fontWeight: 'bold' }}>•</span>
+                          {children}
+                        </li>
+                      ),
+                      table: ({ children }) => (
+                        <div style={{ overflowX: 'auto', margin: '1.5rem 0', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                          <table style={{ minWidth: '100%', borderCollapse: 'collapse' }}>{children}</table>
+                        </div>
+                      ),
+                      thead: ({ children }) => (
+                        <thead style={{ background: '#f9fafb' }}>
+                          {children}
+                        </thead>
+                      ),
+                      tbody: ({ children }) => (
+                        <tbody style={{ background: 'white' }}>
+                          {children}
+                        </tbody>
+                      ),
+                      tr: ({ children }) => (
+                        <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                          {children}
+                        </tr>
+                      ),
+                      th: ({ children }) => (
+                        <th style={{ padding: '0.75rem 1.5rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 'bold', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                          {children}
+                        </th>
+                      ),
+                      td: ({ children }) => (
+                        <td style={{ padding: '0.75rem 1.5rem', fontSize: '0.875rem', color: '#4b5563', whiteSpace: 'nowrap', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                          {children}
+                        </td>
+                      ),
+                      hr: () => (
+                        <hr style={{ margin: '1.5rem 0', border: 'none', borderTop: '1px solid #d1d5db' }} />
+                      ),
+                      code: ({ inline, children }: any) =>
+                        inline ? (
+                          <code style={{ background: '#f3f4f6', color: '#dc2626', padding: '0.125rem 0.5rem', borderRadius: '0.25rem', fontSize: '0.875rem', fontFamily: 'monospace' }}>
+                            {children}
+                          </code>
+                        ) : (
+                          <code style={{ display: 'block', background: '#1f2937', color: '#f3f4f6', padding: '1rem', borderRadius: '8px', overflowX: 'auto', fontSize: '0.875rem', fontFamily: 'monospace', margin: '1rem 0' }}>
+                            {children}
+                          </code>
+                        ),
+                      a: ({ href, children }) => (
+                        <a
+                          href={href}
+                          style={{ color: '#2563eb', textDecoration: 'underline', fontWeight: '500', fontFamily: 'system-ui, -apple-system, sans-serif' }}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {children}
+                        </a>
+                      ),
+                    }}
+                  >{agent.result}</ReactMarkdown>
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+
+        {/* PDF 导出页尾显示平台地址 */}
+        <div style={{ marginTop: '2rem', textAlign: 'right', fontSize: '0.75rem', color: '#6b7280', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+          平台地址：{systemDomain}
+        </div>
+      </>
+    );
+  };
+
   const handleExport = async (format: 'pdf' | 'markdown' | 'image') => {
     try {
       const token = localStorage.getItem('access_token');
@@ -126,7 +543,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
         return;
       }
 
-      // 新增：导出为图片（PNG）- 支持分页导出
+      // 新增：导出为图片（PNG）
       if (format === 'image') {
         try {
           onShowToast('正在生成图片，请稍候...', 'info');
@@ -139,189 +556,48 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
             throw new Error('分析报告数据不完整，无法导出图片。请刷新页面后重试。');
           }
           
-          // 使用与 PDF 相同的完整内容容器
-          const exportContent = document.querySelector('.pdf-export-content') as HTMLElement;
+          // 从预览弹窗中获取内容
+          const exportContent = document.getElementById('export-preview-content');
           if (!exportContent) {
-            throw new Error('找不到导出内容区域');
-          }
-          
-          // 检查内容是否为空
-          if (exportContent.innerHTML.length < 100) {
-            throw new Error('导出内容为空，无法生成图片。请刷新页面后重试。');
+            throw new Error('找不到导出内容区域，请先打开导出预览');
           }
 
-          // 克隆内容到临时容器 - 使用可见位置以确保正确渲染
-          const tempContainer = document.createElement('div');
-          tempContainer.style.position = 'absolute';
-          tempContainer.style.left = '-99999px'; // 移到屏幕外但保持可渲染
-          tempContainer.style.top = '0';
-          tempContainer.style.width = '794px';
-          tempContainer.style.backgroundColor = 'white';
-          tempContainer.style.padding = '40px';
+          // 直接渲染整个内容为图片
+          const canvas = await html2canvas(exportContent, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            allowTaint: true,
+            windowWidth: exportContent.scrollWidth,
+            windowHeight: exportContent.scrollHeight,
+          } as any);
 
-          const clonedContent = exportContent.cloneNode(true) as HTMLElement;
-          clonedContent.style.display = 'block';
-          clonedContent.style.position = 'static';
-          clonedContent.style.width = '100%';
+          console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
 
-          tempContainer.appendChild(clonedContent);
-          document.body.appendChild(tempContainer);
-
-          // 等待渲染稳定
-          await new Promise(resolve => setTimeout(resolve, 1500));
-
-          // 获取完整内容高度
-          const totalHeight = tempContainer.scrollHeight;
-          console.log('Total content height:', totalHeight);
-
-          // 定义单张图片的最大高度
-          const MAX_PAGE_HEIGHT = 25000; // 保守值，确保兼容性
-          const needsPagination = totalHeight > MAX_PAGE_HEIGHT;
-
-          if (!needsPagination) {
-            // 内容不长，直接导出单张图片
-            console.log('Generating single image...');
-            const canvas = await html2canvas(tempContainer, {
-              useCORS: true,
-              logging: true,
-              backgroundColor: '#ffffff',
-              scale: 2,
-              allowTaint: true,
-            } as any);
-
-            document.body.removeChild(tempContainer);
-
-            console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
-
-            if (canvas.width === 0 || canvas.height === 0) {
-              throw new Error('内容渲染失败，canvas尺寸为0。');
-            }
-
-            // 生成并下载图片
-            const imgData = canvas.toDataURL('image/jpeg', 0.85);
-            const base64Data = imgData.split(',')[1] || '';
-            const byteCharacters = atob(base64Data);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-              byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: 'image/jpeg' });
-
-            const blobUrl = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            const filename = `${results?.ticker || 'analysis'}_${results?.analysis_date || 'report'}.jpg`;
-            link.href = blobUrl;
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-
-            onShowToast('图片已下载', 'success');
-          } else {
-            // 内容过长，分页导出 - 使用分段克隆方式
-            const pageCount = Math.ceil(totalHeight / MAX_PAGE_HEIGHT);
-            console.log(`Content too long (${totalHeight}px), splitting into ${pageCount} pages`);
-            onShowToast(`内容较长，将分成 ${pageCount} 张图片导出...`, 'info');
-
-            // 获取所有子元素
-            const children = Array.from(clonedContent.children) as HTMLElement[];
-            console.log(`Total children: ${children.length}`);
-
-            let currentPageIndex = 0;
-            let currentPageHeight = 0;
-            let pageElements: HTMLElement[] = [];
-
-            for (let i = 0; i < children.length; i++) {
-              const child = children[i];
-              const childHeight = child.offsetHeight;
-
-              // 如果添加这个元素会超过页面高度，先导出当前页
-              if (currentPageHeight + childHeight > MAX_PAGE_HEIGHT && pageElements.length > 0) {
-                // 导出当前页
-                await exportPage(pageElements, currentPageIndex, pageCount);
-                currentPageIndex++;
-                currentPageHeight = 0;
-                pageElements = [];
-              }
-
-              pageElements.push(child);
-              currentPageHeight += childHeight;
-            }
-
-            // 导出最后一页
-            if (pageElements.length > 0) {
-              await exportPage(pageElements, currentPageIndex, pageCount);
-            }
-
-            document.body.removeChild(tempContainer);
-            onShowToast(`已成功导出 ${pageCount} 张图片`, 'success');
+          if (canvas.width === 0 || canvas.height === 0) {
+            throw new Error('内容渲染失败，canvas尺寸为0。');
           }
 
-          // 辅助函数：导出单页
-          async function exportPage(elements: HTMLElement[], pageIndex: number, totalPages: number) {
-            console.log(`Exporting page ${pageIndex + 1}/${totalPages} with ${elements.length} elements`);
-
-            // 创建页面容器
-            const pageContainer = document.createElement('div');
-            pageContainer.style.position = 'absolute';
-            pageContainer.style.left = '-99999px';
-            pageContainer.style.top = '0';
-            pageContainer.style.width = '794px';
-            pageContainer.style.backgroundColor = 'white';
-            pageContainer.style.padding = '40px';
-
-            // 克隆元素到页面容器
-            elements.forEach(el => {
-              const clonedEl = el.cloneNode(true) as HTMLElement;
-              pageContainer.appendChild(clonedEl);
-            });
-
-            document.body.appendChild(pageContainer);
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // 生成canvas
-            const canvas = await html2canvas(pageContainer, {
-              useCORS: true,
-              logging: false,
-              backgroundColor: '#ffffff',
-              scale: 2,
-              allowTaint: true,
-            } as any);
-
-            document.body.removeChild(pageContainer);
-
-            console.log(`Page ${pageIndex + 1} canvas:`, canvas.width, 'x', canvas.height);
-
-            if (canvas.width === 0 || canvas.height === 0) {
-              console.error(`Page ${pageIndex + 1} canvas is empty, skipping...`);
+          // 转换为 blob 并下载
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              onShowToast('生成图片失败', 'error');
               return;
             }
 
-            // 生成并下载图片
-            const imgData = canvas.toDataURL('image/jpeg', 0.85);
-            const base64Data = imgData.split(',')[1] || '';
-            const byteCharacters = atob(base64Data);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-              byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: 'image/jpeg' });
-
-            const blobUrl = URL.createObjectURL(blob);
+            const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            const filename = `${results?.ticker || 'analysis'}_${results?.analysis_date || 'report'}_page${pageIndex + 1}.jpg`;
-            link.href = blobUrl;
+            const filename = `${results.ticker}_分析报告_${results.analysis_date}.png`;
+            link.href = url;
             link.download = filename;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+            URL.revokeObjectURL(url);
 
-            await new Promise(resolve => setTimeout(resolve, 300));
-          }
+            onShowToast('图片已下载', 'success');
+          }, 'image/png', 0.95);
 
         } catch (error) {
           console.error('Image generation error:', error);
@@ -360,29 +636,107 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
 
         onShowToast('Markdown 文件已下载', 'success');
       } else if (format === 'pdf') {
-        // 导出 PDF - 使用浏览器打印功能
+        // 导出 PDF - 使用 html2canvas 和 jsPDF
         try {
+          onShowToast('正在生成 PDF，请稍候...', 'info');
+
           // 检查数据完整性
           if (!results?.phases || results.phases.length === 0) {
             throw new Error('分析报告数据不完整，无法导出PDF。请刷新页面后重试。');
           }
 
-          // 添加打印标记
-          document.body.classList.add('printing-pdf');
-          
-          // 触发打印对话框
-          window.print();
-          
-          // 移除打印标记
-          setTimeout(() => {
-            document.body.classList.remove('printing-pdf');
-          }, 100);
+          // 动态导入库
+          const html2canvas = (await import('html2canvas')).default;
+          const { jsPDF } = await import('jspdf');
 
-          onShowToast('请在打印对话框中选择"另存为PDF"或"Microsoft Print to PDF"', 'info');
+          // 从预览弹窗中获取内容
+          const exportContent = document.getElementById('export-preview-content');
+          if (!exportContent) {
+            throw new Error('找不到导出内容区域，请先打开导出预览');
+          }
+
+          // 创建 PDF 文档
+          const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4',
+          });
+
+          const pageWidth = 210; // A4 宽度 mm
+          const pageHeight = 297; // A4 高度 mm
+
+          // 获取封面页和报告内容（分别处理）
+          const children = Array.from(exportContent.children) as HTMLElement[];
+          
+          for (let i = 0; i < children.length; i++) {
+            const element = children[i];
+            if (!element) continue;
+
+            // 渲染当前元素为 canvas
+            const canvas = await html2canvas(element, {
+              scale: 2,
+              useCORS: true,
+              logging: false,
+              backgroundColor: element.classList.contains('bg-gradient-to-r') ? null : '#ffffff',
+              allowTaint: true,
+            } as any);
+
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            const imgWidth = pageWidth;
+            const imgHeight = (canvas.height * pageWidth) / canvas.width;
+
+            // 如果不是第一个元素，添加新页
+            if (i > 0) {
+              pdf.addPage();
+            }
+
+            // 如果是封面页（第一个元素），确保适配一页
+            if (i === 0) {
+              // 封面页：缩放以适应一页
+              const scale = Math.min(1, pageHeight / imgHeight);
+              const scaledHeight = imgHeight * scale;
+              const scaledWidth = imgWidth * scale;
+              const xOffset = (pageWidth - scaledWidth) / 2;
+              const yOffset = (pageHeight - scaledHeight) / 2;
+              
+              pdf.addImage(imgData, 'JPEG', xOffset, yOffset, scaledWidth, scaledHeight);
+            } else {
+              // 报告内容：如果超过一页，分页显示
+              if (imgHeight > pageHeight) {
+                let position = 0;
+                let isFirstPage = true;
+
+                while (position < imgHeight) {
+                  if (!isFirstPage) {
+                    pdf.addPage();
+                  }
+
+                  pdf.addImage(
+                    imgData,
+                    'JPEG',
+                    0,
+                    -position,
+                    imgWidth,
+                    imgHeight
+                  );
+
+                  position += pageHeight;
+                  isFirstPage = false;
+                }
+              } else {
+                // 内容适合单页
+                pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+              }
+            }
+          }
+
+          // 下载 PDF
+          const filename = `${results.ticker}_分析报告_${results.analysis_date}.pdf`;
+          pdf.save(filename);
+          onShowToast('PDF 已下载', 'success');
 
         } catch (error) {
           console.error('PDF generation error:', error);
-          document.body.classList.remove('printing-pdf');
           onShowToast(`PDF 生成失败: ${error instanceof Error ? error.message : '未知错误'}`, 'error');
         }
       }
@@ -1288,402 +1642,17 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
           )}
         </div>
 
-        {/* PDF导出专用：完整内容（包含投资建议和报告来源） */}
-        <div className="pdf-export-content" style={{ display: 'none' }}>
-          {/* 封面页 - 专业研报样式 */}
-          <div className="report-cover" style={{ pageBreakAfter: 'always', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '0', margin: '0', background: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' } as React.CSSProperties}>
-            {/* 顶部区域 */}
-            <div style={{ padding: '2.5rem 0 0 0', width: '100%' }}>
-              <div style={{ textAlign: 'center', color: 'white', width: '100%' }}>
-                <p style={{ fontSize: '14pt', letterSpacing: '0.3em', marginBottom: '0.75rem', opacity: '0.95', fontFamily: 'system-ui, -apple-system, sans-serif', textAlign: 'center', margin: '0 auto 0.75rem auto' }}>TRADING ANALYSIS REPORT</p>
-                <h1 style={{ fontSize: '48pt', fontWeight: '300', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif', letterSpacing: '0.05em', textAlign: 'center' }}>股票投资分析报告</h1>
-              </div>
-            </div>
-
-            {/* 中间区域 - 股票信息 */}
-            <div style={{ padding: '0', flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: '0' }}>
-              <div style={{ 
-                background: 'rgba(255, 255, 255, 0.95)', 
-                borderRadius: '16px', 
-                padding: '3rem 2rem', 
-                width: '480px', 
-                boxShadow: '0 20px 60px rgba(0,0,0,0.2)', 
-                margin: '0 auto',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0'
-              }}>
-                {/* 市场标签 */}
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <span style={{ 
-                    background: 'linear-gradient(135deg, #10b981, #3b82f6)', 
-                    color: 'white',
-                    padding: '0.6rem 1.8rem',
-                    borderRadius: '20px',
-                    fontSize: '11pt',
-                    fontWeight: '500',
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    lineHeight: '1',
-                    minHeight: '2.5rem',
-                    WebkitPrintColorAdjust: 'exact',
-                    printColorAdjust: 'exact'
-                  } as React.CSSProperties}>
-                    {results?.market === 'US' ? '美国股票市场' : results?.market === 'HK' ? '香港股票市场' : results?.market === 'CN' ? 'A股市场' : '股票市场'}
-                  </span>
-                </div>
-
-                {/* 股票代码 */}
-                <div style={{ marginBottom: '0.8rem' }}>
-                  <h2 style={{ fontSize: '56pt', fontWeight: 'bold', margin: '0', padding: '0', color: '#1a1a1a', letterSpacing: '0.05em', fontFamily: 'system-ui, -apple-system, sans-serif', lineHeight: '1.1', textAlign: 'center' }}>
-                    {results?.ticker}
-                  </h2>
-                </div>
-
-                {/* 公司名称 */}
-                {results?.company_name && (
-                  <div style={{ marginBottom: '1.8rem' }}>
-                    <p style={{ fontSize: '15pt', margin: '0', padding: '0', color: '#666', fontFamily: 'system-ui, -apple-system, sans-serif', fontWeight: '400', lineHeight: '1.4', textAlign: 'center' }}>
-                      {results.company_name}
-                    </p>
-                  </div>
-                )}
-
-                {/* 分隔线 */}
-                <div style={{ height: '2px', background: 'linear-gradient(to right, transparent, #e5e7eb, transparent)', margin: '1.8rem 0', width: '100%' }}></div>
-
-                {/* 投资建议标签 */}
-                <div style={{ marginBottom: '1rem' }}>
-                  <p style={{ fontSize: '12pt', color: '#666', letterSpacing: '0.2em', fontFamily: 'system-ui, -apple-system, sans-serif', margin: '0', padding: '0', textAlign: 'center' }}>投资建议</p>
-                </div>
-
-                {/* 投资建议卡片 */}
-                <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-                  <div style={{ 
-                    background: 'linear-gradient(135deg, #10b981, #3b82f6)',
-                    borderRadius: '12px',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minWidth: '200px',
-                    maxWidth: '90%',
-                    paddingTop: '1rem',
-                    paddingBottom: '1.2rem',
-                    paddingLeft: '2.5rem',
-                    paddingRight: '2.5rem',
-                    WebkitPrintColorAdjust: 'exact',
-                    printColorAdjust: 'exact'
-                  } as React.CSSProperties}>
-                    <span style={{ 
-                      fontSize: '36pt', 
-                      fontWeight: 'bold', 
-                      color: 'white', 
-                      fontFamily: 'system-ui, -apple-system, sans-serif', 
-                      letterSpacing: '0.05em', 
-                      lineHeight: '1',
-                      whiteSpace: 'nowrap',
-                      display: 'block',
-                      transform: 'translateY(-2px)'
-                    }}>
-                      {results?.trading_decision}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 底部区域 - 报告信息 */}
-            <div style={{ padding: '0 0 2.5rem 0', width: '100%' }}>
-              <div style={{ textAlign: 'center', color: 'white', fontSize: '10pt', fontFamily: 'system-ui, -apple-system, sans-serif', width: '100%' }}>
-                <p style={{ marginBottom: '0.4rem', opacity: '0.95', textAlign: 'center', margin: '0 auto 0.4rem auto' }}>
-                  分析日期：{results?.analysis_date}
-                </p>
-                <p style={{ margin: '0 auto', opacity: '0.95', textAlign: 'center' }}>
-                  生成系统：TradingAgents 多智能体分析系统
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* 所有阶段按顺序显示 */}
-          {results?.phases?.map((phase: PhaseResult, phaseIdx: number) => (
-            <div key={phaseIdx} className="mb-4 page-break-inside-avoid">
-              <h2 className="text-xl font-bold text-blue-600 mb-2 border-b-2 border-blue-600 pb-1">
-                <i className={`fas ${phase.icon} mr-2`} />
-                {phase.name}
-              </h2>
-              <div className="space-y-2">
-                {phase.agents.map((agent: any, agentIdx: number) => (
-                  <div key={agentIdx} className="border border-gray-200 rounded-lg overflow-hidden mb-2">
-                    <div className={`bg-gradient-to-r ${getPhaseColor(phase.color)} p-3 text-white`}>
-                      <h4 className="font-bold text-base">
-                        <i className="fas fa-user-tie mr-2" />
-                        {agent.name}
-                      </h4>
-                    </div>
-                    <div className="p-4 bg-white">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm, remarkBreaks]}
-                        components={{
-                          h1: ({ children }) => (
-                            <h1 className="text-xl font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 rounded-lg mb-3 shadow-sm flex items-center">
-                              <i className="fas fa-star mr-2 text-yellow-300 text-sm" />
-                              {children}
-                            </h1>
-                          ),
-                          h2: ({ children }) => (
-                            <h2 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b-2 border-blue-500 flex items-center">
-                              <i className="fas fa-bookmark mr-2 text-blue-500 text-sm" />
-                              {children}
-                            </h2>
-                          ),
-                          h3: ({ children }) => (
-                            <h3 className="text-base font-semibold text-gray-800 mt-4 mb-2 pl-4 pr-3 py-2 border-l-4 border-blue-500 bg-blue-50 rounded-r flex items-center">
-                              <i className="fas fa-chevron-right mr-2 text-blue-500 text-xs" />
-                              {children}
-                            </h3>
-                          ),
-                          h4: ({ children }) => (
-                            <h4 className="text-sm font-semibold text-gray-700 mt-3 mb-2 flex items-center">
-                              <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                              {children}
-                            </h4>
-                          ),
-                          p: ({ children }) => {
-                            const text = typeof children === 'string' ? children : (Array.isArray(children) ? children.join('') : String(children));
-                            const decoratedTitleMatch = text.match(/^[_\-]{3,}(.+?)[_\-]{3,}$/);
-                            if (decoratedTitleMatch && decoratedTitleMatch[1]) {
-                              const titleText = decoratedTitleMatch[1].trim();
-                              return (
-                                <div className="my-6 text-center">
-                                  <div className="flex items-center justify-center">
-                                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-500 to-blue-500"></div>
-                                    <h3 className="px-4 text-xl font-bold text-blue-700 whitespace-nowrap">{titleText}</h3>
-                                    <div className="flex-1 h-px bg-gradient-to-l from-transparent via-blue-500 to-blue-500"></div>
-                                  </div>
-                                </div>
-                              );
-                            }
-                            return <p className="text-gray-700 leading-7 mb-4 text-justify">{children}</p>;
-                          },
-                          strong: ({ children }) => (
-                            <strong className="font-bold text-gray-900 bg-yellow-50 px-1">{children}</strong>
-                          ),
-                          ul: ({ children }) => (
-                            <ul className="mb-4 space-y-2 text-gray-700">{children}</ul>
-                          ),
-                          ol: ({ children }) => (
-                            <ol className="mb-4 space-y-2 text-gray-700">{children}</ol>
-                          ),
-                          li: ({ children }) => (
-                            <li className="ml-6 pl-2 relative before:content-['•'] before:absolute before:left-[-12px] before:text-blue-500 before:font-bold">{children}</li>
-                          ),
-                          table: ({ children }) => (
-                            <div className="overflow-x-auto my-6 shadow-sm rounded-lg border border-gray-200">
-                              <table className="min-w-full divide-y divide-gray-200">{children}</table>
-                            </div>
-                          ),
-                          thead: ({ children }) => (
-                            <thead className="bg-gray-50">{children}</thead>
-                          ),
-                          tbody: ({ children }) => (
-                            <tbody className="bg-white divide-y divide-gray-200">{children}</tbody>
-                          ),
-                          tr: ({ children }) => (
-                            <tr className="hover:bg-gray-50 transition-colors">{children}</tr>
-                          ),
-                          th: ({ children }) => (
-                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{children}</th>
-                          ),
-                          td: ({ children }) => (
-                            <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{children}</td>
-                          ),
-                        }}
-                      >{agent.result}</ReactMarkdown>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-
-          {/* 交易决策分析 */}
-          {results?.final_summary && (
-            <div className="mb-4 page-break-inside-avoid">
-              <h2 className="text-xl font-bold text-orange-600 mb-2 border-b-2 border-orange-600 pb-1">
-                <i className="fas fa-chart-bar mr-2" />
-                交易决策分析
-              </h2>
-              {results.final_summary.split(/(?=##\s)/).filter((section: string) => section.trim()).map((section: string, index: number) => {
-                const lines = section.trim().split('\n');
-                const title = lines[0]?.replace(/^##\s*/, '') || '';
-                const content = lines.slice(1).join('\n').trim();
-
-                return (
-                  <div key={index} className="border border-gray-200 rounded-lg overflow-hidden mb-2">
-                    <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-3 text-white">
-                      <h3 className="font-bold text-base">{title}</h3>
-                    </div>
-                    <div className="p-4 bg-white">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm, remarkBreaks]}
-                        components={{
-                          h1: ({ children }) => (
-                            <h1 className="text-xl font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 rounded-lg mb-3 shadow-sm flex items-center">
-                              <i className="fas fa-star mr-2 text-yellow-300 text-sm" />
-                              {children}
-                            </h1>
-                          ),
-                          h2: ({ children }) => (
-                            <h2 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b-2 border-blue-500 flex items-center">
-                              <i className="fas fa-bookmark mr-2 text-blue-500 text-sm" />
-                              {children}
-                            </h2>
-                          ),
-                          h3: ({ children }) => (
-                            <h3 className="text-base font-semibold text-gray-800 mt-4 mb-2 pl-4 pr-3 py-2 border-l-4 border-blue-500 bg-blue-50 rounded-r flex items-center">
-                              <i className="fas fa-chevron-right mr-2 text-blue-500 text-xs" />
-                              {children}
-                            </h3>
-                          ),
-                          h4: ({ children }) => (
-                            <h4 className="text-sm font-semibold text-gray-700 mt-3 mb-2 flex items-center">
-                              <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                              {children}
-                            </h4>
-                          ),
-                          p: ({ children }) => {
-                            const text = typeof children === 'string' ? children : (Array.isArray(children) ? children.join('') : String(children));
-                            const decoratedTitleMatch = text.match(/^[_\-]{3,}(.+?)[_\-]{3,}$/);
-                            if (decoratedTitleMatch && decoratedTitleMatch[1]) {
-                              const titleText = decoratedTitleMatch[1].trim();
-                              return (
-                                <div className="my-6 text-center">
-                                  <div className="flex items-center justify-center">
-                                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-500 to-blue-500"></div>
-                                    <h3 className="px-4 text-xl font-bold text-blue-700 whitespace-nowrap">{titleText}</h3>
-                                    <div className="flex-1 h-px bg-gradient-to-l from-transparent via-blue-500 to-blue-500"></div>
-                                  </div>
-                                </div>
-                              );
-                            }
-                            return <p className="text-gray-700 leading-7 mb-4 text-justify">{children}</p>;
-                          },
-                          strong: ({ children }) => (
-                            <strong className="font-bold text-gray-900 bg-yellow-50 px-1">{children}</strong>
-                          ),
-                          ul: ({ children }) => (
-                            <ul className="mb-4 space-y-2 text-gray-700">{children}</ul>
-                          ),
-                          ol: ({ children }) => (
-                            <ol className="mb-4 space-y-2 text-gray-700">{children}</ol>
-                          ),
-                          li: ({ children }) => (
-                            <li className="ml-6 pl-2 relative before:content-['•'] before:absolute before:left-[-12px] before:text-blue-500 before:font-bold">{children}</li>
-                          ),
-                          table: ({ children }) => (
-                            <div className="overflow-x-auto my-6 shadow-sm rounded-lg border border-gray-200">
-                              <table className="min-w-full divide-y divide-gray-200">{children}</table>
-                            </div>
-                          ),
-                          thead: ({ children }) => (
-                            <thead className="bg-gray-50">{children}</thead>
-                          ),
-                          tbody: ({ children }) => (
-                            <tbody className="bg-white divide-y divide-gray-200">{children}</tbody>
-                          ),
-                          tr: ({ children }) => (
-                            <tr className="hover:bg-gray-50 transition-colors">{children}</tr>
-                          ),
-                          th: ({ children }) => (
-                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{children}</th>
-                          ),
-                          td: ({ children }) => (
-                            <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{children}</td>
-                          ),
-                        }}
-                      >{content}</ReactMarkdown>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* 报告来源说明 - 左对齐 */}
-          <div className="mt-4 pt-3 border-t border-gray-300 report-source-section">
-            <div className="bg-gray-50 rounded-lg p-3 mb-2">
-              <h3 className="text-sm font-bold text-gray-800 mb-2 flex items-center">
-                <i className="fas fa-info-circle mr-2 text-blue-600" />
-                报告来源说明
-              </h3>
-              <div className="text-xs text-gray-600 space-y-1 text-left">
-                <p className="text-left">
-                  <strong>生成系统：</strong>TradingAgents 多智能体分析系统
-                </p>
-                <p className="text-left">
-                  <strong>分析方法：</strong>本报告由多个专业智能体协同分析生成，包括基本面分析师、市场分析师、新闻分析师、社交媒体分析师、多空研究员、风险管理团队等。
-                </p>
-                <p className="text-xs text-gray-500 mt-2 text-left">
-                  报告生成时间：{results?.analysis_date} | 股票代码：{results?.ticker}
-                  {results?.company_name && ` (${results.company_name})`}
-                  {results?.market && ` | 市场：${results?.market === 'US' ? '美股' : results?.market === 'HK' ? '港股' : results?.market === 'CN' ? 'A股' : results?.market}`}
-                </p>
-              </div>
-            </div>
-
-            {/* 免责声明 - 左对齐 */}
-            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
-              <h3 className="text-sm font-bold text-yellow-800 mb-2 flex items-center">
-                <i className="fas fa-exclamation-triangle mr-2 text-yellow-600" />
-                免责声明
-              </h3>
-              <div className="text-xs text-yellow-700 leading-relaxed text-left">
-                <p className="text-left">
-                  本报告由AI智能体系统生成，仅供参考，不构成任何投资建议。股市有风险，投资需谨慎。
-                  投资者应当根据自身风险承受能力、投资目标和财务状况，独立做出投资决策并自行承担投资风险。
-                  过往业绩不代表未来表现，市场波动可能导致本金损失。
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* PDF 导出页尾显示平台地址 */}
-          <div className="mt-2 text-right text-xs text-gray-500">
-            平台地址：{systemDomain}
-          </div>
-        </div>
-
         {/* 底部操作区域 */}
         <div className="p-6 bg-gray-50 border-t border-gray-200 no-print">
           {/* 操作按钮 - 排行榜模式下隐藏 */}
           {!fromLeaderboard && (
             <div className="flex flex-wrap gap-3 justify-center mb-6">
               <button
-                onClick={() => handleExport('pdf')}
-                className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center font-medium"
+                onClick={() => setShowExportPreview(true)}
+                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl flex items-center font-medium"
               >
-                <i className="fas fa-file-pdf mr-2" />
-                导出为PDF
-              </button>
-              <button
-                onClick={() => handleExport('image')}
-                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center font-medium"
-              >
-                <i className="fas fa-image mr-2" />
-                导出为图片
-              </button>
-              <button
-                onClick={() => handleExport('markdown')}
-                className="px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center font-medium"
-              >
-                <i className="fas fa-file-code mr-2" />
-                导出为Markdown
+                <i className="fas fa-download mr-2" />
+                导出报告
               </button>
               <button
                 onClick={onBackToConfig}
@@ -1711,6 +1680,382 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
           </div>
         </div>
       </div>
+
+      {/* 导出预览弹窗 */}
+      {showExportPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onClick={() => setShowExportPreview(false)}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            {/* 弹窗头部 */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+                  <i className="fas fa-file-export text-white text-lg" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">导出预览</h2>
+                  <p className="text-sm text-gray-500">预览报告内容并选择导出格式</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowExportPreview(false)}
+                className="w-10 h-10 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-center text-gray-500 hover:text-gray-700"
+              >
+                <i className="fas fa-times text-xl" />
+              </button>
+            </div>
+
+            {/* 预览内容区域 - 显示完整的分析报告 */}
+            <div className="flex-1 overflow-y-auto bg-gray-100">
+              <div id="export-preview-content" className="max-w-[794px] mx-auto bg-white shadow-lg" style={{ minHeight: '100%' }}>
+                {/* 封面页 - 蓝绿渐变背景 A4纸尺寸 */}
+                <div className="bg-gradient-to-r from-green-500 to-blue-500 text-white p-12 flex flex-col justify-between" style={{ minHeight: '1123px' }}>
+                  {/* 顶部标题 */}
+                  <div className="text-center">
+                    <h1 className="text-3xl font-bold mb-1 tracking-wide">股票投资分析报告</h1>
+                    <p className="text-sm opacity-75 tracking-widest mb-3">STOCK INVESTMENT ANALYSIS REPORT</p>
+                    <div className="w-32 h-1 bg-white opacity-50 mx-auto"></div>
+                  </div>
+
+                  {/* 中间主要内容 */}
+                  <div className="flex-1 flex flex-col justify-center items-center">
+                    {/* 市场标签 */}
+                    <div className="mb-8">
+                      <span className="bg-white bg-opacity-20 backdrop-blur-sm px-6 py-3 rounded-full text-base font-medium">
+                        {results?.market === 'US' ? '美国股票市场' : results?.market === 'HK' ? '香港股票市场' : results?.market === 'CN' ? 'A股市场' : '股票市场'}
+                      </span>
+                    </div>
+
+                    {/* 股票代码 */}
+                    <h2 className="text-7xl font-bold mb-6 tracking-wider">{results?.ticker}</h2>
+
+                    {/* 公司名称 */}
+                    {results?.company_name && (
+                      <p className="text-2xl mb-12 opacity-95 font-light">{results.company_name}</p>
+                    )}
+
+                    {/* 分隔线 */}
+                    <div className="w-80 h-px bg-white opacity-40 mb-12"></div>
+
+                    {/* 投资建议标签 */}
+                    <p className="text-base tracking-widest mb-6 opacity-90">投资建议</p>
+
+                    {/* 投资建议卡片 */}
+                    <div className="bg-white bg-opacity-25 backdrop-blur-md rounded-3xl px-16 py-8 shadow-2xl border border-white border-opacity-30">
+                      <p className="text-5xl font-bold tracking-wide">{results?.trading_decision}</p>
+                    </div>
+                  </div>
+
+                  {/* 底部信息 */}
+                  <div className="text-center space-y-2 opacity-90">
+                    <div className="w-full h-px bg-white opacity-30 mb-4"></div>
+                    <p className="text-sm">分析日期：{results?.analysis_date}</p>
+                    <p className="text-sm">生成系统：TradingAgents 多智能体分析系统</p>
+                    <p className="text-xs opacity-75 mt-2">Powered by Multi-Agent AI Analysis</p>
+                  </div>
+                </div>
+
+                {/* 报告内容 */}
+                <div className="p-8 space-y-8">
+                  {/* 渲染所有阶段 */}
+                  {results?.phases?.map((phase: PhaseResult, phaseIdx: number) => (
+                    <div key={phaseIdx} className="page-break-inside-avoid">
+                      <h2 className="text-2xl font-bold text-blue-600 mb-4 pb-2 border-b-2 border-blue-600 flex items-center">
+                        <i className={`fas ${phase.icon} mr-3`} />
+                        {phase.name}
+                      </h2>
+                      <div className="space-y-4">
+                        {phase.agents.map((agent: any, agentIdx: number) => (
+                          <div key={agentIdx} className="border border-gray-200 rounded-lg overflow-hidden">
+                            <div className={`bg-gradient-to-r ${getPhaseColor(phase.color)} p-3 text-white`}>
+                              <h3 className="font-bold text-base flex items-center">
+                                <i className="fas fa-user-tie mr-2" />
+                                {agent.name}
+                              </h3>
+                            </div>
+                            <div className="p-4 bg-white">
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm, remarkBreaks]}
+                                components={{
+                                  h1: ({ children }) => (
+                                    <h1 className="text-xl font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 rounded-lg mb-3 shadow-sm flex items-center">
+                                      <i className="fas fa-star mr-2 text-yellow-300 text-sm" />
+                                      {children}
+                                    </h1>
+                                  ),
+                                  h2: ({ children }) => (
+                                    <h2 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b-2 border-blue-500 flex items-center">
+                                      <i className="fas fa-bookmark mr-2 text-blue-500 text-sm" />
+                                      {children}
+                                    </h2>
+                                  ),
+                                  h3: ({ children }) => (
+                                    <h3 className="text-base font-semibold text-gray-800 mt-4 mb-2 pl-4 pr-3 py-2 border-l-4 border-blue-500 bg-blue-50 rounded-r flex items-center">
+                                      <i className="fas fa-chevron-right mr-2 text-blue-500 text-xs" />
+                                      {children}
+                                    </h3>
+                                  ),
+                                  h4: ({ children }) => (
+                                    <h4 className="text-sm font-semibold text-gray-700 mt-3 mb-2 flex items-center">
+                                      <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                                      {children}
+                                    </h4>
+                                  ),
+                                  p: ({ children }) => {
+                                    const text = typeof children === 'string' ? children : (Array.isArray(children) ? children.join('') : String(children));
+                                    const decoratedTitleMatch = text.match(/^[─_\-]{3,}(.+?)[─_\-]{3,}$/);
+                                    if (decoratedTitleMatch && decoratedTitleMatch[1]) {
+                                      const titleText = decoratedTitleMatch[1].trim();
+                                      return (
+                                        <div className="my-6 text-center">
+                                          <div className="flex items-center justify-center">
+                                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-500 to-blue-500"></div>
+                                            <h3 className="px-4 text-xl font-bold text-blue-700 whitespace-nowrap">{titleText}</h3>
+                                            <div className="flex-1 h-px bg-gradient-to-l from-transparent via-blue-500 to-blue-500"></div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return <p className="text-gray-700 leading-7 mb-4 text-justify">{children}</p>;
+                                  },
+                                  strong: ({ children }) => (
+                                    <strong className="font-bold text-gray-900 bg-yellow-50 px-1">{children}</strong>
+                                  ),
+                                  em: ({ children }) => (
+                                    <em className="italic text-gray-600">{children}</em>
+                                  ),
+                                  ul: ({ children }) => (
+                                    <ul className="mb-4 space-y-2 text-gray-700">{children}</ul>
+                                  ),
+                                  ol: ({ children }) => (
+                                    <ol className="mb-4 space-y-2 text-gray-700">{children}</ol>
+                                  ),
+                                  li: ({ children }) => (
+                                    <li className="ml-6 pl-2 relative before:content-['•'] before:absolute before:left-[-12px] before:text-blue-500 before:font-bold">{children}</li>
+                                  ),
+                                  blockquote: ({ children }) => (
+                                    <blockquote className="border-l-4 border-blue-500 bg-blue-50 pl-4 pr-4 py-3 my-4 italic text-gray-700">{children}</blockquote>
+                                  ),
+                                  table: ({ children }) => (
+                                    <div className="overflow-x-auto my-6 shadow-sm rounded-lg border border-gray-200">
+                                      <table className="min-w-full divide-y divide-gray-200">{children}</table>
+                                    </div>
+                                  ),
+                                  thead: ({ children }) => (
+                                    <thead className="bg-gray-50">{children}</thead>
+                                  ),
+                                  tbody: ({ children }) => (
+                                    <tbody className="bg-white divide-y divide-gray-200">{children}</tbody>
+                                  ),
+                                  tr: ({ children }) => (
+                                    <tr className="hover:bg-gray-50 transition-colors">{children}</tr>
+                                  ),
+                                  th: ({ children }) => (
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{children}</th>
+                                  ),
+                                  td: ({ children }) => (
+                                    <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{children}</td>
+                                  ),
+                                  hr: () => (
+                                    <hr className="my-6 border-t border-gray-300" />
+                                  ),
+                                  code: ({ inline, children }: any) =>
+                                    inline ? (
+                                      <code className="bg-gray-100 text-red-600 px-2 py-0.5 rounded text-sm font-mono">{children}</code>
+                                    ) : (
+                                      <code className="block bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm font-mono my-4">{children}</code>
+                                    ),
+                                  a: ({ href, children }) => (
+                                    <a href={href} className="text-blue-600 hover:text-blue-800 underline font-medium" target="_blank" rel="noopener noreferrer">{children}</a>
+                                  ),
+                                }}
+                              >{agent.result}</ReactMarkdown>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* 最终分析 */}
+                  {results?.final_summary && (
+                    <div className="page-break-inside-avoid">
+                      <h2 className="text-2xl font-bold text-orange-600 mb-4 pb-2 border-b-2 border-orange-600 flex items-center">
+                        <i className="fas fa-chart-bar mr-3" />
+                        交易决策分析
+                      </h2>
+                      {results.final_summary.split(/(?=##\s)/).filter((section: string) => section.trim()).map((section: string, index: number) => {
+                        const lines = section.trim().split('\n');
+                        const title = lines[0]?.replace(/^##\s*/, '') || '';
+                        const content = lines.slice(1).join('\n').trim();
+
+                        return (
+                          <div key={index} className="border border-gray-200 rounded-lg overflow-hidden mb-4">
+                            <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-3 text-white">
+                              <h3 className="font-bold text-base">{title}</h3>
+                            </div>
+                            <div className="p-4 bg-white">
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm, remarkBreaks]}
+                                components={{
+                                  h1: ({ children }) => (
+                                    <h1 className="text-xl font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 rounded-lg mb-3 shadow-sm flex items-center">
+                                      <i className="fas fa-star mr-2 text-yellow-300 text-sm" />
+                                      {children}
+                                    </h1>
+                                  ),
+                                  h2: ({ children }) => (
+                                    <h2 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b-2 border-blue-500 flex items-center">
+                                      <i className="fas fa-bookmark mr-2 text-blue-500 text-sm" />
+                                      {children}
+                                    </h2>
+                                  ),
+                                  h3: ({ children }) => (
+                                    <h3 className="text-base font-semibold text-gray-800 mt-4 mb-2 pl-4 pr-3 py-2 border-l-4 border-blue-500 bg-blue-50 rounded-r flex items-center">
+                                      <i className="fas fa-chevron-right mr-2 text-blue-500 text-xs" />
+                                      {children}
+                                    </h3>
+                                  ),
+                                  h4: ({ children }) => (
+                                    <h4 className="text-sm font-semibold text-gray-700 mt-3 mb-2 flex items-center">
+                                      <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                                      {children}
+                                    </h4>
+                                  ),
+                                  p: ({ children }) => {
+                                    const text = typeof children === 'string' ? children : (Array.isArray(children) ? children.join('') : String(children));
+                                    const decoratedTitleMatch = text.match(/^[─_\-]{3,}(.+?)[─_\-]{3,}$/);
+                                    if (decoratedTitleMatch && decoratedTitleMatch[1]) {
+                                      const titleText = decoratedTitleMatch[1].trim();
+                                      return (
+                                        <div className="my-6 text-center">
+                                          <div className="flex items-center justify-center">
+                                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-blue-500 to-blue-500"></div>
+                                            <h3 className="px-4 text-xl font-bold text-blue-700 whitespace-nowrap">{titleText}</h3>
+                                            <div className="flex-1 h-px bg-gradient-to-l from-transparent via-blue-500 to-blue-500"></div>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return <p className="text-gray-700 leading-7 mb-4 text-justify">{children}</p>;
+                                  },
+                                  strong: ({ children }) => (
+                                    <strong className="font-bold text-gray-900 bg-yellow-50 px-1">{children}</strong>
+                                  ),
+                                  ul: ({ children }) => (
+                                    <ul className="mb-4 space-y-2 text-gray-700">{children}</ul>
+                                  ),
+                                  ol: ({ children }) => (
+                                    <ol className="mb-4 space-y-2 text-gray-700">{children}</ol>
+                                  ),
+                                  li: ({ children }) => (
+                                    <li className="ml-6 pl-2 relative before:content-['•'] before:absolute before:left-[-12px] before:text-blue-500 before:font-bold">{children}</li>
+                                  ),
+                                  table: ({ children }) => (
+                                    <div className="overflow-x-auto my-6 shadow-sm rounded-lg border border-gray-200">
+                                      <table className="min-w-full divide-y divide-gray-200">{children}</table>
+                                    </div>
+                                  ),
+                                  thead: ({ children }) => (
+                                    <thead className="bg-gray-50">{children}</thead>
+                                  ),
+                                  tbody: ({ children }) => (
+                                    <tbody className="bg-white divide-y divide-gray-200">{children}</tbody>
+                                  ),
+                                  tr: ({ children }) => (
+                                    <tr className="hover:bg-gray-50 transition-colors">{children}</tr>
+                                  ),
+                                  th: ({ children }) => (
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">{children}</th>
+                                  ),
+                                  td: ({ children }) => (
+                                    <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{children}</td>
+                                  ),
+                                }}
+                              >{content}</ReactMarkdown>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* 报告来源说明 */}
+                  <div className="mt-8 pt-6 border-t border-gray-300">
+                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                      <h3 className="text-sm font-bold text-gray-800 mb-2 flex items-center">
+                        <i className="fas fa-info-circle mr-2 text-blue-600" />
+                        报告来源说明
+                      </h3>
+                      <div className="text-xs text-gray-600 space-y-1">
+                        <p><strong>生成系统：</strong>TradingAgents 多智能体分析系统</p>
+                        <p><strong>分析方法：</strong>本报告由多个专业智能体协同分析生成，包括基本面分析师、市场分析师、新闻分析师、社交媒体分析师、多空研究员、风险管理团队等。</p>
+                        <p><strong>平台地址：</strong>{systemDomain || window.location.origin}</p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          报告生成时间：{results?.analysis_date} | 股票代码：{results?.ticker}
+                          {results?.company_name && ` (${results.company_name})`}
+                          {results?.market && ` | 市场：${results?.market === 'US' ? '美股' : results?.market === 'HK' ? '港股' : results?.market === 'CN' ? 'A股' : results?.market}`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 免责声明 */}
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                      <h3 className="text-sm font-bold text-yellow-800 mb-2 flex items-center">
+                        <i className="fas fa-exclamation-triangle mr-2 text-yellow-600" />
+                        免责声明
+                      </h3>
+                      <p className="text-xs text-yellow-700 leading-relaxed">
+                        本报告由AI智能体系统生成，仅供参考，不构成任何投资建议。股市有风险，投资需谨慎。
+                        投资者应当根据自身风险承受能力、投资目标和财务状况，独立做出投资决策并自行承担投资风险。
+                        过往业绩不代表未来表现，市场波动可能导致本金损失。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 弹窗底部 - 导出按钮 */}
+            <div className="p-6 border-t border-gray-200 bg-white rounded-b-xl">
+              <div className="flex flex-wrap gap-3 justify-center">
+                <button
+                  onClick={async () => {
+                    await handleExport('pdf');
+                    setShowExportPreview(false);
+                  }}
+                  className="px-8 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center font-medium shadow-lg hover:shadow-xl"
+                >
+                  <i className="fas fa-file-pdf mr-2" />
+                  导出为 PDF
+                </button>
+                <button
+                  onClick={async () => {
+                    await handleExport('image');
+                    setShowExportPreview(false);
+                  }}
+                  className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center font-medium shadow-lg hover:shadow-xl"
+                >
+                  <i className="fas fa-image mr-2" />
+                  导出为图片
+                </button>
+                <button
+                  onClick={async () => {
+                    await handleExport('markdown');
+                    setShowExportPreview(false);
+                  }}
+                  className="px-8 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center font-medium shadow-lg hover:shadow-xl"
+                >
+                  <i className="fas fa-file-code mr-2" />
+                  导出为 Markdown
+                </button>
+              </div>
+              <p className="text-center text-sm text-gray-500 mt-4">
+                选择导出格式后将生成完整的分析报告
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
