@@ -163,14 +163,14 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
     switch (rec) {
       case '买入':
       case 'buy':
-        return 'text-white bg-gradient-to-br from-green-500 to-green-600 shadow-md';
+        return 'text-white bg-gradient-to-br from-[#f03a55] to-[#d91744] shadow-md';
       case '持有':
       case '观望':
       case 'hold':
         return 'text-white bg-gradient-to-br from-yellow-500 to-yellow-600 shadow-md';
       case '卖出':
       case 'sell':
-        return 'text-white bg-gradient-to-br from-red-500 to-red-600 shadow-md';
+        return 'text-white bg-gradient-to-br from-[#00a870] to-[#008c5e] shadow-md';
       default:
         return 'text-white bg-gradient-to-br from-yellow-500 to-yellow-600 shadow-md';
     }
@@ -260,9 +260,9 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                   {/* 第1列：股票代码 - 左对齐 */}
                   <div className="flex items-center justify-start space-x-2 flex-1 text-sm">
                     <div className={`text-white w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0 shadow-md ${analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
-                      ? 'bg-gradient-to-br from-green-500 to-green-600'
+                      ? 'bg-gradient-to-br from-[#f03a55] to-[#d91744]'
                       : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
-                        ? 'bg-gradient-to-br from-red-500 to-red-600'
+                        ? 'bg-gradient-to-br from-[#00a870] to-[#008c5e]'
                         : analysis.summary?.recommendation
                           ? 'bg-gradient-to-br from-yellow-500 to-yellow-600'
                           : 'bg-gradient-to-br from-gray-500 to-gray-600'
@@ -305,9 +305,9 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                   {/* 第3列：分析日期 - 上下排列 */}
                   <div className="flex items-center justify-center text-sm flex-1">
                     <i className={`far fa-calendar mr-1.5 text-xs ${analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
-                      ? 'text-green-500'
+                      ? 'text-[#f03a55]'
                       : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
-                        ? 'text-red-500'
+                        ? 'text-[#00a870]'
                         : analysis.summary?.recommendation
                           ? 'text-yellow-500'
                           : 'text-gray-500'
@@ -321,9 +321,9 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                   {/* 第4列：创建时间 - 上下排列 */}
                   <div className="flex items-center justify-center text-sm flex-1">
                     <i className={`far fa-clock mr-1.5 text-xs ${analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
-                      ? 'text-green-500'
+                      ? 'text-[#f03a55]'
                       : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
-                        ? 'text-red-500'
+                        ? 'text-[#00a870]'
                         : analysis.summary?.recommendation
                           ? 'text-yellow-500'
                           : 'text-gray-500'
@@ -339,9 +339,9 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                     {analysis.completed_at ? (
                       <>
                         <i className={`fas fa-check-circle mr-1.5 text-xs ${analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
-                          ? 'text-green-500'
+                          ? 'text-[#f03a55]'
                           : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
-                            ? 'text-red-500'
+                            ? 'text-[#00a870]'
                             : analysis.summary?.recommendation
                               ? 'text-yellow-500'
                               : 'text-gray-500'
@@ -362,9 +362,9 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                       <button
                         onClick={() => onViewResults(analysis.id)}
                         className={`px-3 py-1.5 text-white rounded-md text-sm font-medium transition-colors flex items-center shadow-md ${analysis.summary?.recommendation?.toLowerCase().includes('买入') || analysis.summary?.recommendation?.toLowerCase().includes('buy')
-                          ? 'bg-green-600 hover:bg-green-700'
+                          ? 'bg-[#f03a55] hover:bg-[#d91744]'
                           : analysis.summary?.recommendation?.toLowerCase().includes('卖出') || analysis.summary?.recommendation?.toLowerCase().includes('sell')
-                            ? 'bg-red-600 hover:bg-red-700'
+                            ? 'bg-[#00a870] hover:bg-[#008c5e]'
                             : analysis.summary?.recommendation
                               ? 'bg-yellow-600 hover:bg-yellow-700'
                               : 'bg-gray-600 hover:bg-gray-700'

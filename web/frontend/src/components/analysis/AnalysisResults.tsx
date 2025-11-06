@@ -293,8 +293,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
             </div>
             
             <div style={{ 
-              background: results?.trading_decision === '买入' ? 'linear-gradient(135deg, #10b981, #059669)' : 
-                          results?.trading_decision === '卖出' ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 
+              background: results?.trading_decision === '买入' ? 'linear-gradient(135deg, #f03a55, #d91744)' : 
+                          results?.trading_decision === '卖出' ? 'linear-gradient(135deg, #00a870, #008c5e)' : 
                           'linear-gradient(135deg, #f59e0b, #d97706)',
               color: 'white',
               padding: '0.75rem 2rem',
