@@ -532,9 +532,10 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       console.log('=== Analysis Started ===');
       console.log('Response:', response);
       console.log('Analysis ID:', response.analysis_id);
+      console.log('Status:', response.status);
 
       // 检查是否是重复任务
-      if (response.message && response.status !== 'queued') {
+      if (response.message) {
         // 重复任务，显示明确的警告提示
         console.log('Duplicate task detected, connecting to existing analysis:', response.analysis_id);
         onShowToast('⚠️ 该股票的分析任务已在进行中，已自动连接到现有任务。', 'warning');
@@ -542,8 +543,16 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
         setTimeout(() => {
           onAnalysisStart(response.analysis_id);
         }, 1500);
+      } else if (response.status === 'queued') {
+        // 任务排队中，跳转到历史记录页面
+        console.log('Task queued, redirecting to history page');
+        onShowToast('⏳ 分析任务已加入队列，请稍候...', 'info');
+        setTimeout(() => {
+          window.location.href = '/history';
+        }, 1500);
       } else {
-        // 新任务
+        // 新任务立即开始，跳转到进度页面
+        console.log('Task started immediately, redirecting to progress page');
         onShowToast('✅ 分析任务已启动！', 'success');
         onAnalysisStart(response.analysis_id);
       }

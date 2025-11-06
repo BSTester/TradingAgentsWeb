@@ -186,13 +186,18 @@ async def start_analysis(
         task_manager
     )
     
-    if not submitted:
+    if submitted:
+        # Task started immediately
+        analysis_record.status = "running"
+        analysis_record.current_step = "分析开始..."
+        await db.commit()
+        return AnalysisResponse(analysis_id=analysis_id, status="running")
+    else:
         # Task queued
         analysis_record.status = "queued"
         analysis_record.current_step = "等待队列中..."
         await db.commit()
-    
-    return AnalysisResponse(analysis_id=analysis_id, status="queued")
+        return AnalysisResponse(analysis_id=analysis_id, status="queued")
 
 
 @router.post("/analysis/{analysis_id}/stop")
