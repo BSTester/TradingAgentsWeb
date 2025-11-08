@@ -407,26 +407,24 @@ async def get_scheduler_config(
                 "is_using_analysis_config": False,
             }
         
-        # Check if intraday config exists
-        has_intraday_config = bool(user_config.intraday_futu_api_url)
+        # Priority: Use saved intraday config first, fallback to analysis config
+        # For each field, check if intraday config exists, if not use analysis config
+        futu_api_url = user_config.intraday_futu_api_url or user_config.futu_api_base_url
+        futu_api_key = user_config.intraday_futu_api_key or user_config.futu_api_key
+        llm_provider = user_config.intraday_llm_provider or user_config.last_llm_provider
+        api_key = user_config.intraday_api_key or user_config.last_api_key
+        llm_model = user_config.intraday_llm_model or user_config.last_deep_thinker
+        backend_url = user_config.intraday_backend_url or user_config.last_backend_url
         
-        # If no intraday config, fallback to analysis config (use deep_thinker as the model)
-        if not has_intraday_config:
-            futu_api_url = user_config.futu_api_base_url
-            futu_api_key = user_config.futu_api_key
-            llm_provider = user_config.last_llm_provider
-            api_key = user_config.last_api_key
-            llm_model = user_config.last_deep_thinker  # Use deep thinker from analysis config
-            backend_url = user_config.last_backend_url
-            is_using_analysis_config = True
-        else:
-            futu_api_url = user_config.intraday_futu_api_url
-            futu_api_key = user_config.intraday_futu_api_key
-            llm_provider = user_config.intraday_llm_provider or user_config.last_llm_provider
-            api_key = user_config.intraday_api_key or user_config.last_api_key
-            llm_model = user_config.intraday_llm_model or user_config.last_deep_thinker  # Fallback to deep thinker
-            backend_url = user_config.intraday_backend_url or user_config.last_backend_url
-            is_using_analysis_config = False
+        # Determine if using analysis config (all intraday fields are empty)
+        is_using_analysis_config = not any([
+            user_config.intraday_futu_api_url,
+            user_config.intraday_futu_api_key,
+            user_config.intraday_llm_provider,
+            user_config.intraday_api_key,
+            user_config.intraday_llm_model,
+            user_config.intraday_backend_url
+        ])
         
         return {
             "futu_api_url": futu_api_url,
@@ -680,17 +678,13 @@ async def get_positions(
         )
         user_config = result.scalar_one_or_none()
         
-        # Check if config exists, fallback to analysis config
+        # Priority: Use intraday config first, fallback to analysis config
         futu_api_url = None
         futu_api_key = None
         
         if user_config:
-            if user_config.intraday_futu_api_url:
-                futu_api_url = user_config.intraday_futu_api_url
-                futu_api_key = user_config.intraday_futu_api_key
-            else:
-                futu_api_url = user_config.futu_api_base_url
-                futu_api_key = user_config.futu_api_key
+            futu_api_url = user_config.intraday_futu_api_url or user_config.futu_api_base_url
+            futu_api_key = user_config.intraday_futu_api_key or user_config.futu_api_key
         
         if not futu_api_url:
             return []
@@ -926,17 +920,13 @@ async def get_account_info(
         )
         user_config = result.scalar_one_or_none()
         
-        # Check if config exists, fallback to analysis config
+        # Priority: Use intraday config first, fallback to analysis config
         futu_api_url = None
         futu_api_key = None
         
         if user_config:
-            if user_config.intraday_futu_api_url:
-                futu_api_url = user_config.intraday_futu_api_url
-                futu_api_key = user_config.intraday_futu_api_key
-            else:
-                futu_api_url = user_config.futu_api_base_url
-                futu_api_key = user_config.futu_api_key
+            futu_api_url = user_config.intraday_futu_api_url or user_config.futu_api_base_url
+            futu_api_key = user_config.intraday_futu_api_key or user_config.futu_api_key
         
         # Determine currency symbol based on market
         currency_map = {

@@ -110,17 +110,13 @@ async def execute_intraday_analysis(
                 )
                 user_config = result.scalar_one_or_none()
             
-            # Determine LLM configuration (intraday config -> analysis config -> env/default)
-            if user_config and user_config.intraday_llm_provider:
-                llm_provider = user_config.intraday_llm_provider
-                api_key = user_config.intraday_api_key
-                model_name = user_config.intraday_llm_model or user_config.last_deep_thinker
-                backend_url = user_config.intraday_backend_url
-            elif user_config and user_config.last_llm_provider:
-                llm_provider = user_config.last_llm_provider
-                api_key = user_config.last_api_key
-                model_name = user_config.last_deep_thinker
-                backend_url = user_config.last_backend_url
+            # Determine LLM configuration (priority: intraday config -> analysis config -> env/default)
+            # For each field, use intraday config first, fallback to analysis config
+            if user_config:
+                llm_provider = user_config.intraday_llm_provider or user_config.last_llm_provider or DEFAULT_CONFIG.get("llm_provider", "openai")
+                api_key = user_config.intraday_api_key or user_config.last_api_key
+                model_name = user_config.intraday_llm_model or user_config.last_deep_thinker or DEFAULT_CONFIG.get("deep_think_llm", "gpt-4o-mini")
+                backend_url = user_config.intraday_backend_url or user_config.last_backend_url or DEFAULT_CONFIG.get("backend_url")
             else:
                 llm_provider = DEFAULT_CONFIG.get("llm_provider", "openai")
                 api_key = None
