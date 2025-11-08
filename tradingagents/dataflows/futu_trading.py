@@ -887,6 +887,9 @@ def get_technical_analysis(
     if format.lower() not in valid_formats:
         raise ValueError(f"Invalid format: {format}. Must be one of {valid_formats}")
     
+    # Convert indicator to lowercase for consistent processing
+    indicator = indicator.lower()
+    
     logger.info(f"Fetching technical analysis for {symbol}: {indicator} with interval={interval}, start_date={start_date}, end_date={end_date}, format={format}")
     
     try:

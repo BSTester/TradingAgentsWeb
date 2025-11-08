@@ -16,6 +16,18 @@ from web.backend.models import User, IntradayDecisionRecord, PositionRecord, Tra
 from web.backend.auth_routes import get_current_active_user
 from pydantic import BaseModel
 
+# Admin role check dependency
+def require_admin(current_user: User = Depends(get_current_active_user)) -> User:
+    """
+    Dependency to require admin role for intraday trading access
+    """
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="需要管理员权限才能访问短线交易系统"
+        )
+    return current_user
+
 # Get logger for this module
 logger = logging.getLogger(__name__)
 
@@ -186,7 +198,7 @@ async def sync_positions_to_db(
 @router.post("/scheduler/control")
 async def control_scheduler(
     request: SchedulerControlRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_admin),
     app_request: Request = None,
     db: AsyncSession = Depends(get_db),
 ):
@@ -231,11 +243,11 @@ async def control_scheduler(
             
             # Create scheduler if doesn't exist
             if not manager.has_scheduler(user_id):
-                # Get market type, default to ALL if not set or if set to US (legacy)
+                # Get market type, default to all markets if not set
                 market_type = user_config.intraday_market_type
-                if not market_type or market_type == "US":
-                    market_type = "ALL"
-                    user_config.intraday_market_type = "ALL"
+                if not market_type:
+                    market_type = "US,HK,CN"
+                    user_config.intraday_market_type = "US,HK,CN"
                     await db.commit()
                 
                 await manager.create_scheduler(
@@ -297,7 +309,7 @@ async def control_scheduler(
                     status = {
                         "is_running": False,
                         "interval_minutes": user_config.intraday_interval_minutes if user_config else 5,
-                        "market_type": user_config.intraday_market_type if user_config else "ALL",
+                        "market_type": user_config.intraday_market_type if user_config else "US,HK,CN",
                         "market_status": "Scheduler stopped",
                         "market_is_open": False,
                         "markets_status": {},
@@ -362,7 +374,7 @@ class IntradayConfigRequest(BaseModel):
 
 @router.get("/scheduler/config")
 async def get_scheduler_config(
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -388,7 +400,7 @@ async def get_scheduler_config(
                 "futu_api_url": None,
                 "futu_api_key": None,
                 "interval_minutes": 5,
-                "market_type": "ALL",  # Default to ALL markets
+                "market_type": "US,HK,CN",  # Default to all markets (comma-separated)
                 "llm_provider": None,
                 "api_key": None,
                 "backend_url": None,
@@ -437,7 +449,7 @@ async def get_scheduler_config(
 @router.post("/scheduler/config")
 async def configure_scheduler(
     config: IntradayConfigRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -568,7 +580,7 @@ async def configure_scheduler(
 @router.get("/decisions/{decision_id}", response_model=DecisionRecordResponse)
 async def get_decision_record(
     decision_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -610,7 +622,7 @@ async def get_decision_record(
 async def get_decisions_by_date_range(
     start_date: str,  # YYYY-MM-DD format
     end_date: str,  # YYYY-MM-DD format
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -649,7 +661,7 @@ async def get_decisions_by_date_range(
 async def get_positions(
     market: str = "US",  # Market parameter for Futu API
     include_closed: bool = False,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -776,7 +788,7 @@ async def get_positions(
 @router.get("/positions/{stock_code}/history", response_model=List[TradingHistoryResponse])
 async def get_position_history(
     stock_code: str,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -818,7 +830,7 @@ async def get_all_trading_history(
     limit: int = 50,
     offset: int = 0,
     trade_type: Optional[str] = None,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -869,7 +881,7 @@ async def get_all_trading_history(
 @router.get("/account")
 async def get_account_info(
     market: str = "US",  # Default to US market
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -996,7 +1008,7 @@ async def get_account_info(
 @router.post("/scheduler/validate-config")
 async def validate_futu_config(
     config: IntradayConfigRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_admin),
 ):
     """
     Validate Futu API configuration by testing connection.

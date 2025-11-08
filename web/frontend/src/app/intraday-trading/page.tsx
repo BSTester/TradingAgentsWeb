@@ -147,22 +147,16 @@ export default function IntradayTradingPage() {
     }
   );
 
-  // 认证保护逻辑
+  // 认证和权限保护逻辑
   useEffect(() => {
-    if (!authLoading && !user) {
-      const timer = setTimeout(() => {
-        const token = localStorage.getItem('access_token');
-        if (!token && !user) {
-          router.push('/login');
-        }
-      }, 500);
-      return () => clearTimeout(timer);
+    if (!authLoading && (!user || user.role !== 'admin')) {
+      // 如果用户未登录或不是管理员，跳转到首页
+      router.push('/');
     }
-    return undefined;
   }, [user, authLoading, router]);
 
-  // 如果正在认证检查，显示加载状态
-  if (authLoading || !user) {
+  // 如果正在认证检查或不是管理员，显示加载状态
+  if (authLoading || !user || user.role !== 'admin') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
