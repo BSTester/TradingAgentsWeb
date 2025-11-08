@@ -43,6 +43,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
   const [llmKeyValidated, setLlmKeyValidated] = useState(false);
   const [validatingLlmKey, setValidatingLlmKey] = useState(false);
   const [llmModel, setLlmModel] = useState(''); // 只需要一个模型（深度思考模型）
+  const [backendUrl, setBackendUrl] = useState(''); // Backend URL for custom endpoints
   
   // API配置数据 - 使用 React Query 缓存
   const { data: apiConfig, isLoading: loadingApiConfig } = useQuery({
@@ -61,6 +62,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
       setLlmProvider(config.llm_provider || '');
       setLlmApiKey(config.api_key || ''); // 使用 api_key 字段（从 last_api_key 或 intraday_api_key 获取）
       setLlmModel(config.llm_model || ''); // 加载深度思考模型
+      setBackendUrl(config.backend_url || ''); // 加载 backend URL
       
       // Load market selection (always comma-separated or single)
       if (config.market_type) {
@@ -122,6 +124,15 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
   const handleLlmProviderChange = (value: string) => {
     setLlmProvider(value);
     setLlmKeyValidated(false);
+    
+    // Auto-set backend URL from provider config
+    const providers = getLlmProviders();
+    const selectedProvider = providers.find(p => p.value === value);
+    if (selectedProvider && 'url' in selectedProvider) {
+      setBackendUrl((selectedProvider as any).url);
+    } else {
+      setBackendUrl('');
+    }
   };
 
   const handleLlmApiKeyChange = (value: string) => {
@@ -367,10 +378,13 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
         configData.llm_provider = llmProvider;
       }
       if (llmApiKey) {
-        configData.llm_api_key = llmApiKey;
+        configData.api_key = llmApiKey;  // 使用 api_key 而不是 llm_api_key
       }
       if (llmModel) {
         configData.llm_model = llmModel;
+      }
+      if (backendUrl) {
+        configData.backend_url = backendUrl;
       }
       
       await updateConfig.mutateAsync(configData);
