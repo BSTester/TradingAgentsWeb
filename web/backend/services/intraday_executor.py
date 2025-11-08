@@ -220,6 +220,9 @@ async def execute_intraday_analysis(
             initial_message = "开始分析"
             if previous_decision_context:
                 initial_message = f"{previous_decision_context}\n\n请基于以上历史决策记录，开始新一轮的分析。"
+                logging.info(f"Providing historical context to agent (length: {len(previous_decision_context)} chars)")
+            else:
+                logging.info("No historical context available for this session")
             
             initial_state = {
                 "user_id": user_id,
