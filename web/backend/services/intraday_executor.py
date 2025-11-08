@@ -57,11 +57,7 @@ async def execute_intraday_analysis(
     """
     session_id = f"intraday_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
     
-    log_msg = f"🚀 Starting intraday analysis: session={session_id}, market={market_type}, user={user_id}"
-    logging.info(log_msg)
-    print(f"\n{'='*80}")
-    print(log_msg)
-    print(f"{'='*80}\n")
+    logging.info(f"Starting intraday analysis: session={session_id}, market={market_type}, user={user_id}")
 
     # WebSocket: announce session start
     try:
@@ -155,14 +151,10 @@ async def execute_intraday_analysis(
                 raise ValueError(f"Unsupported LLM provider: {llm_provider}")
             
             # Create intraday trader agent
-            print(f"🤖 Creating LangGraph agent...")
-            print(f"   Provider: {llm_provider}")
-            print(f"   Model: {model_name}")
+            logging.info(f"Creating LangGraph agent with provider={llm_provider}, model={model_name}")
             
             memory = None  # Can add memory if needed
             trader_agent = create_intraday_trader(llm, memory)
-            
-            print(f"✅ Agent created successfully\n")
             
             # Prepare initial state
             # Note: Agent has comprehensive system prompt with detailed instructions
@@ -179,24 +171,17 @@ async def execute_intraday_analysis(
             }
             
             # Execute agent - it will autonomously call tools and make decisions
-            print(f"🚀 Invoking intraday trader agent...")
-            print(f"   Session: {session_id}")
-            print(f"   Market: {market_type}")
-            print(f"   Mode: Autonomous (following system prompt instructions)\n")
-            
-            logging.info(f"Invoking intraday trader agent for session {session_id}")
-            result = trader_agent.invoke(initial_state)
-            
-            print(f"\n✅ Agent execution completed")
+            logging.info(f"Invoking intraday trader agent for session {session_id}, market={market_type}")
+            # Set recursion limit to 100 to allow more tool calls
+            # Default is 25, but intraday trading may need more iterations
+            result = trader_agent.invoke(
+                initial_state,
+                config={"recursion_limit": 100}
+            )
             
             # Extract results from agent execution
             decision_report = result.get("decision_report", "")
             trades_executed = result.get("trades_executed", [])
-            
-            # Log the extraction results
-            print(f"\n📊 Extracting results...")
-            print(f"   Report length: {len(decision_report)} chars")
-            print(f"   Trades executed: {len(trades_executed) if trades_executed else 0}")
             
             logging.info(f"Agent execution completed. Report length: {len(decision_report)} chars")
             logging.info(f"Trades executed: {len(trades_executed) if trades_executed else 0}")

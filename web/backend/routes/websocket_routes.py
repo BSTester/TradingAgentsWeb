@@ -108,7 +108,7 @@ async def intraday_websocket_endpoint(websocket: WebSocket, user_id: int):
                         status = {
                             "is_running": False,
                             "interval_minutes": user_config.intraday_interval_minutes if user_config else 5,
-                            "market_type": user_config.intraday_market_type if user_config else "ALL",
+                            "market_type": user_config.intraday_market_type if user_config else "US,HK,CN",
                             "market_status": "Scheduler not running",
                             "market_is_open": False,
                             "markets_status": {},
@@ -124,7 +124,7 @@ async def intraday_websocket_endpoint(websocket: WebSocket, user_id: int):
                     status = {
                         "is_running": False,
                         "interval_minutes": 5,
-                        "market_type": "ALL",
+                        "market_type": "US,HK,CN",
                         "market_status": "Scheduler not running",
                         "market_is_open": False,
                         "markets_status": {},

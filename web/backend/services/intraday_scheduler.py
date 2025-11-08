@@ -183,7 +183,7 @@ class IntradayScheduler:
                     
                     # Check if market is open
                     is_open, status_msg = is_market_open(market, market_local_time)
-                    
+                    # is_open = True
                     if is_open:
                         # Check if there's already a running task for this market
                         existing_task = self._analysis_tasks.get(market)
@@ -191,9 +191,11 @@ class IntradayScheduler:
                             logger.info(f"⏳ {market} analysis is still running, skipping this cycle")
                         else:
                             logger.info(f"✅ {market} market is open, triggering analysis: {status_msg}")
-                            # Start analysis in background (non-blocking)
-                            task = asyncio.create_task(self._trigger_analysis(market))
+                            # Start analysis in background using ensure_future (more robust)
+                            # This ensures the task runs independently without blocking the scheduler loop
+                            task = asyncio.ensure_future(self._trigger_analysis(market))
                             self._analysis_tasks[market] = task
+                            # Don't await - let it run in background
                     else:
                         logger.info(f"⏸️  {market} market is closed, skipping: {status_msg}")
                 
@@ -220,6 +222,9 @@ class IntradayScheduler:
         Trigger intraday trading analysis for a specific market.
         This runs in the background and can be cancelled.
         
+        Uses asyncio.to_thread() to run the potentially blocking analysis
+        in a separate thread, preventing it from blocking the event loop.
+        
         Args:
             market: Market to analyze (US/HK/CN)
         """
@@ -229,10 +234,16 @@ class IntradayScheduler:
             # Import here to avoid circular dependencies
             from web.backend.services.intraday_executor import execute_intraday_analysis
             
-            # Execute analysis asynchronously
-            result = await execute_intraday_analysis(
-                market_type=market,
-                user_id=self.user_id,
+            # Run the analysis in a separate thread to avoid blocking the event loop
+            # This is important because execute_intraday_analysis contains:
+            # 1. Synchronous database operations (SessionLocal)
+            # 2. Synchronous LLM calls (trader_agent.invoke)
+            # 3. Potentially long-running operations
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,  # Use default ThreadPoolExecutor
+                self._run_analysis_sync,
+                market
             )
             
             logger.info(f"✅ {market} analysis completed: {result.get('status', 'unknown')}")
@@ -246,6 +257,36 @@ class IntradayScheduler:
             # Clean up task reference
             if market in self._analysis_tasks:
                 del self._analysis_tasks[market]
+    
+    def _run_analysis_sync(self, market: str) -> dict:
+        """
+        Synchronous wrapper for execute_intraday_analysis.
+        This runs in a thread pool to avoid blocking the event loop.
+        
+        Args:
+            market: Market to analyze (US/HK/CN)
+            
+        Returns:
+            dict: Analysis result
+        """
+        import asyncio
+        from web.backend.services.intraday_executor import execute_intraday_analysis
+        
+        # Create a new event loop for this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # Run the async function in this thread's event loop
+            result = loop.run_until_complete(
+                execute_intraday_analysis(
+                    market_type=market,
+                    user_id=self.user_id,
+                )
+            )
+            return result
+        finally:
+            loop.close()
     
     async def _broadcast_status(self):
         """Broadcast current status via WebSocket"""
