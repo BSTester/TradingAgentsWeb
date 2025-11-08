@@ -183,7 +183,6 @@ class IntradayScheduler:
                     
                     # Check if market is open
                     is_open, status_msg = is_market_open(market, market_local_time)
-                    # is_open = True
                     if is_open:
                         # Check if there's already a running task for this market
                         existing_task = self._analysis_tasks.get(market)
