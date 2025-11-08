@@ -174,9 +174,15 @@ async def execute_intraday_analysis(
             logging.info(f"Invoking intraday trader agent for session {session_id}, market={market_type}")
             # Set recursion limit to 100 to allow more tool calls
             # Default is 25, but intraday trading may need more iterations
+            # Pass user_id in configurable field for tools to access
             result = trader_agent.invoke(
                 initial_state,
-                config={"recursion_limit": 100}
+                config={
+                    "recursion_limit": 100,
+                    "configurable": {
+                        "user_id": user_id
+                    }
+                }
             )
             
             # Extract results from agent execution
@@ -212,7 +218,36 @@ async def execute_intraday_analysis(
             account_info = {}
             positions = []
             
-            # Try to extract from messages/tool results in the state
+            # Extract stock codes from trades_executed
+            if trades_executed and isinstance(trades_executed, list):
+                found_stocks = set()
+                for trade in trades_executed:
+                    if isinstance(trade, dict):
+                        # Try different field names for stock code
+                        stock_code = trade.get('stock') or trade.get('stock_code') or trade.get('symbol')
+                        if stock_code:
+                            found_stocks.add(str(stock_code).upper())
+                
+                positions = sorted(list(found_stocks))
+                logging.info(f"Extracted {len(positions)} stock codes from trades: {positions}")
+            
+            # If no trades, try to extract from decision report as fallback
+            if not positions and decision_report:
+                import re
+                # Pattern 1: Extract from section headers like "### AAPL - Apple Inc."
+                stock_pattern1 = r'###\s+([A-Z0-9]{1,6})\s*[-–—]'
+                # Pattern 2: Extract from Chinese format like "### 600519 - 贵州茅台"
+                stock_pattern2 = r'###\s+(\d{5,6})\s*[-–—]'
+                
+                found_stocks = set()
+                for pattern in [stock_pattern1, stock_pattern2]:
+                    matches = re.findall(pattern, decision_report)
+                    found_stocks.update(matches)
+                
+                positions = sorted(list(found_stocks))
+                logging.info(f"Extracted {len(positions)} stock codes from report (fallback): {positions}")
+            
+            # Try to extract account info from messages/tool results
             messages = result.get("messages", [])
             for msg in messages:
                 if hasattr(msg, 'content'):
@@ -230,10 +265,6 @@ async def execute_intraday_analysis(
                                         account_info['total_assets'] = float(match.group(1).replace(',', ''))
                             except:
                                 pass
-                        if "positions" in content.lower() or "stock" in content.lower():
-                            # This might contain position info
-                            # For now, just note that positions were analyzed
-                            pass
 
             # Update decision record
             decision_record.end_time = datetime.now()

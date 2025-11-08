@@ -3,7 +3,8 @@ Futu Trading Tools
 LangChain tool wrappers for Futu mock trading API functions.
 """
 
-from langchain_core.tools import tool
+from langchain_core.tools import tool, InjectedToolArg
+from langchain_core.runnables import RunnableConfig
 from typing import Annotated, Optional
 from tradingagents.dataflows.futu_trading import (
     get_account_info as _get_account_info,
@@ -49,7 +50,8 @@ def get_futu_account_info(
 
 @tool
 def get_futu_positions(
-    market_type: Annotated[str, "Market type: US, HK, or CN"]
+    market_type: Annotated[str, "Market type: US, HK, or CN"],
+    config: Annotated[RunnableConfig, InjectedToolArg] = None
 ) -> str:
     """
     Get all current positions for a specific market from Futu mock trading account.
@@ -62,13 +64,18 @@ def get_futu_positions(
         
     Returns:
         str: JSON formatted list of positions with stock code, quantity, 
-             cost price, current price, and profit/loss
+             cost price, current price, profit/loss, holding days, and first open time
     
     Example:
         >>> positions = get_futu_positions("US")
     """
     try:
-        result = _get_positions(market_type)
+        # Extract user_id from config if available
+        user_id = None
+        if config and "configurable" in config:
+            user_id = config["configurable"].get("user_id")
+        
+        result = _get_positions(market_type, user_id=user_id)
         return json.dumps(result, ensure_ascii=False, indent=2)
     except Exception as e:
         return f"Error getting positions: {str(e)}"
