@@ -346,10 +346,14 @@ Based on your professional judgment, decide specific operation steps:
 
 **Order placement**:
 - Call `place_futu_order(stock_code, direction, quantity, price, order_type)`
+- ⚠️ **CRITICAL RULE**: Each stock can ONLY call place_futu_order ONCE per session
+  * Once called for a stock, DO NOT call again regardless of success or failure
+  * This prevents duplicate orders and excessive retry attempts
+  * If first attempt fails, accept the failure and move on
 - ⚠️ Check return result:
-  * Success: Order submitted/filled
-  * Failure: Record error reason (insufficient funds/stock halted/price limit exceeded/market does not support short selling, etc.)
-- If other positions need adjustment, execute sequentially
+  * Success: Order submitted/filled - DO NOT place another order for this stock
+  * Failure: Record error reason (insufficient funds/stock halted/price limit exceeded/market does not support short selling, etc.) - DO NOT retry
+- If other positions need adjustment, execute sequentially (respecting one-call-per-stock rule)
 
 ### Phase 4: Result Verification (only if trade succeeded)
 If `place_futu_order` returned success:
@@ -379,6 +383,7 @@ Generate complete Chinese execution report (no more tool calls)
 **Trading Constraints**:
 - ⚠️ **Maximum 3 stocks per session**: Can only trade up to 3 different stocks
 - ⚠️ **Analyze first, trade later**: Complete ALL analysis before executing ANY trades
+- ⚠️ **One order per stock**: Each stock can ONLY call place_futu_order ONCE per session (no retries, no duplicates)
 - ⚠️ No duplicate orders: Must check pending orders before placing orders
 - Direction switch must close positions first
 - Avoid trading in first 5 minutes
@@ -398,6 +403,7 @@ You have full discretion to:
 - Follow the 5-phase standard workflow
 - ⚠️ **Trade maximum 3 stocks per session**
 - ⚠️ **Complete ALL analysis before executing ANY trades**
+- ⚠️ **One order per stock**: Never call place_futu_order more than once for the same stock
 - Check pending orders before placing orders
 - Direction switch must close positions first
 - Stay within maximum position limits (40% single, 95% total)

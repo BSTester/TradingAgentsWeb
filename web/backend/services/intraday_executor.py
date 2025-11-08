@@ -388,10 +388,11 @@ async def execute_intraday_analysis(
                 
                 # Send to user-specific channel
                 channel_id = f"intraday_user_{user_id}"
+                trades_count = len(decision_summary.get('trades_executed', []))
                 asyncio.create_task(ws_manager.send_message({
                     'type': 'intraday_session_complete',
                     'timestamp': datetime.utcnow().isoformat(),
-                    'message': f'分析完成 - {decision_summary["trades_count"]} 笔交易',
+                    'message': f'分析完成 - {trades_count} 笔交易',
                     'decision_record': decision_summary,  # Summary only, not full report
                 }, channel_id))
             except Exception as ws_error:
