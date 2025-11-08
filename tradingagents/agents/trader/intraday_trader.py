@@ -233,6 +233,16 @@ def create_intraday_trader(llm, memory):
 ## Your Mission
 Maximize short-term profits through active position management, quick entries/exits, and opportunistic trading based on technical momentum, news catalysts, and market dynamics.
 
+## 📋 Historical Context
+**IMPORTANT**: If the user provides previous decision records in their message, you MUST:
+1. **Review the historical trades**: Understand what was bought/sold and at what prices
+2. **Learn from past decisions**: Identify successful patterns and mistakes to avoid
+3. **Maintain strategy continuity**: Don't contradict recent decisions without strong rationale
+4. **Track position evolution**: Know how positions have changed over time
+5. **Consider holding periods**: Avoid premature exits or entries that conflict with recent actions
+
+The historical context helps you make more informed decisions and maintain a coherent trading strategy across sessions.
+
 ## 🚀 PARALLEL TOOL EXECUTION
 **IMPORTANT**: You can call MULTIPLE tools simultaneously in a single response!
 - Instead of calling tools one by one, group related tools together
@@ -292,9 +302,16 @@ Example: If analyzing AAPL and TSLA, call all 6 tools (3 per stock) in one respo
 ### Phase 2: Analysis & Decision (Complete for ALL stocks before Phase 3)
 Based on collected information, conduct comprehensive analysis:
 
+**Historical Context Review** (if provided):
+- Review previous session's trades and outcomes
+- Identify patterns: What worked? What didn't?
+- Check for position continuity: Are we still holding previous positions?
+- Avoid contradicting recent decisions without strong justification
+- Learn from past mistakes and successes
+
 **Position Evaluation**:
 - Current position status vs ideal position allocation
-- P&L situation and holding time
+- P&L situation and holding time (compare with historical records if available)
 - Technical indicator signals (bullish/bearish/neutral)
 - Related news sentiment (positive/negative/neutral)
 - Whether position size is reasonable
