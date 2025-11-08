@@ -45,6 +45,21 @@ except Exception:
 # Load environment variables
 load_dotenv()
 
+# Configure logging
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+# Disable verbose logging from third-party libraries
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('httpcore').setLevel(logging.WARNING)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+
 # Import TradingAgents components
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
@@ -125,6 +140,11 @@ async def lifespan(app: FastAPI):
             email_service = init_email_service()
             app.state.email_service = email_service
             
+            # Initialize intraday trading scheduler manager (multi-user)
+            # Note: Individual user schedulers are created on-demand via API
+            # No global scheduler needed - each user has their own scheduler instance
+            print("✅ Intraday trading scheduler manager ready (user schedulers created on-demand)")
+            
             app.state.monitor_task = asyncio.create_task(task_monitor())
             print("✅ Task monitor started (leader)")
         except OSError:
@@ -144,6 +164,12 @@ async def lifespan(app: FastAPI):
     # Shutdown (cleanup if needed)
     print("🔌 Shutting down...")
     if getattr(app.state, "is_leader", False):
+        # Stop intraday scheduler
+        intraday_scheduler = getattr(app.state, "intraday_scheduler", None)
+        if intraday_scheduler and intraday_scheduler.is_running:
+            await intraday_scheduler.stop()
+            print("✅ Intraday trading scheduler stopped")
+        
         # Stop scheduler
         scheduler = getattr(app.state, "scheduler", None)
         if scheduler:
@@ -673,6 +699,10 @@ app.include_router(export_routes.router)
 app.include_router(leaderboard_routes.router)
 app.include_router(user_management_routes.router)
 app.include_router(scheduled_task_routes.router)
+
+# Include intraday trading routes
+from web.backend.routes import intraday_trading_routes
+app.include_router(intraday_trading_routes.router)
 
 # Include user config routes
 from web.backend.routes import user_config_routes

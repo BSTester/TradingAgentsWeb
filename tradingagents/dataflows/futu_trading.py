@@ -260,7 +260,7 @@ def get_account_info(
         >>> print(f"Cash: {account['cash']}")
     """
     # Validate market type
-    if market_type not in ["US", "HK", "CN"]:
+    if market_type.upper() not in ["US", "HK", "CN"]:
         raise ValueError(f"Invalid market_type: {market_type}. Must be US, HK, or CN")
     
     logger.info(f"Fetching account info for market: {market_type}")
@@ -318,7 +318,7 @@ def get_positions(
         ...     print(f"{pos['stock_code']}: {pos['quantity']} shares")
     """
     # Validate market type
-    if market_type not in ["US", "HK", "CN"]:
+    if market_type.upper() not in ["US", "HK", "CN"]:
         raise ValueError(f"Invalid market_type: {market_type}. Must be US, HK, or CN")
     
     logger.info(f"Fetching positions for market: {market_type}")
@@ -473,11 +473,11 @@ def get_kline_data(
         raise ValueError("symbol cannot be empty")
     
     valid_intervals = ["1min", "5min", "15min", "30min", "60min", "daily", "weekly", "monthly", "quarterly", "yearly"]
-    if interval not in valid_intervals:
+    if interval.lower() not in valid_intervals:
         raise ValueError(f"Invalid interval: {interval}. Must be one of {valid_intervals}")
     
     valid_formats = ["json", "csv"]
-    if format not in valid_formats:
+    if format.lower() not in valid_formats:
         raise ValueError(f"Invalid format: {format}. Must be one of {valid_formats}")
     
     logger.info(f"Fetching K-line data for {symbol} with interval={interval}, start_date={start_date}, end_date={end_date}, format={format}")
@@ -554,7 +554,7 @@ def get_hot_stocks(
         ...     print(f"{stock['stock_code']}: {stock['change_pct']}%")
     """
     # Validate inputs
-    if market_type not in ["US", "HK", "CN"]:
+    if market_type.upper() not in ["US", "HK", "CN"]:
         raise ValueError(f"Invalid market_type: {market_type}. Must be US, HK, or CN")
     if count <= 0:
         raise ValueError(f"count must be positive, got {count}")
@@ -635,15 +635,15 @@ def place_order(
     # Validate inputs
     if not stock_code:
         raise ValueError("stock_code cannot be empty")
-    if side not in ["BUY", "SELL"]:
+    if side.upper() not in ["BUY", "SELL"]:
         raise ValueError(f"Invalid side: {side}. Must be BUY or SELL")
     if quantity <= 0:
         raise ValueError(f"quantity must be positive, got {quantity}")
-    if order_type not in ["LIMIT", "MARKET"]:
+    if order_type.upper() not in ["LIMIT", "MARKET"]:
         raise ValueError(f"Invalid order_type: {order_type}. Must be LIMIT or MARKET")
     
     # For LIMIT orders, price is required
-    if order_type == "LIMIT" and price is None:
+    if order_type.upper() == "LIMIT" and price is None:
         raise ValueError("price is required for LIMIT orders")
     
     logger.info(f"Placing {order_type} {side} order: {quantity} shares of {stock_code} at {price}")
@@ -778,7 +778,7 @@ def get_orders(
         ...     print(f"{order['order_id']}: {order['stock_code']}")
     """
     # Validate inputs
-    if market_type not in ["US", "HK", "CN"]:
+    if market_type.upper() not in ["US", "HK", "CN"]:
         raise ValueError(f"Invalid market_type: {market_type}. Must be US, HK, or CN")
     if filter_status not in [0, 1, 2, 3]:
         raise ValueError(f"Invalid filter_status: {filter_status}. Must be 0, 1, 2, or 3")
@@ -876,15 +876,15 @@ def get_technical_analysis(
         raise ValueError("symbol cannot be empty")
     
     valid_intervals = ["1min", "5min", "15min", "30min", "60min", "daily", "weekly", "monthly", "quarterly", "yearly"]
-    if interval not in valid_intervals:
+    if interval.lower() not in valid_intervals:
         raise ValueError(f"Invalid interval: {interval}. Must be one of {valid_intervals}")
     
     valid_indicators = ["close_50_sma", "close_200_sma", "close_10_ema", "macd", "rsi", "boll", "atr", "vwma"]
-    if indicator not in valid_indicators:
+    if indicator.lower() not in valid_indicators:
         raise ValueError(f"Invalid indicator: {indicator}. Must be one of {valid_indicators}")
     
     valid_formats = ["json", "csv"]
-    if format not in valid_formats:
+    if format.lower() not in valid_formats:
         raise ValueError(f"Invalid format: {format}. Must be one of {valid_formats}")
     
     logger.info(f"Fetching technical analysis for {symbol}: {indicator} with interval={interval}, start_date={start_date}, end_date={end_date}, format={format}")
@@ -949,7 +949,7 @@ def get_hot_news(
         >>> news_en = get_hot_news("en-us")
     """
     # Validate language code
-    if lang not in ["zh-cn", "zh-hk", "en-us"]:
+    if lang.lower() not in ["zh-cn", "zh-hk", "en-us"]:
         raise ValueError(f"Invalid lang: {lang}. Must be zh-cn, zh-hk, or en-us")
     
     logger.info(f"Fetching hot news in {lang}")

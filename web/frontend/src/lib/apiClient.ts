@@ -50,9 +50,16 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // Clear auth data
       localStorage.removeItem('access_token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      
+      // Don't redirect to login for /api/auth/me endpoint
+      // This allows the app to show logged-out state without redirecting
+      const requestUrl = error.config?.url || '';
+      if (!requestUrl.includes('/api/auth/me')) {
+        window.location.href = '/login';
+      }
     } else if (!error.response) {
       // 网络错误（无响应）
       error.message = '网络连接失败，请检查网络连接后重试';
@@ -236,6 +243,11 @@ export const analysisAPI = {
       throw new Error(errorMessage);
     }
   },
+
+  // Reuse configAPI's validateAPIKey
+  validateKey: async (data: { provider: string; api_key: string }) => {
+    return configAPI.validateAPIKey(data.provider, data.api_key);
+  },
 };
 
 // User Config API (需要认证)
@@ -317,6 +329,140 @@ export const scheduledTasksAPI = {
                           error.response?.data?.message || 
                           error.message || 
                           '删除定时任务失败';
+      throw new Error(errorMessage);
+    }
+  },
+};
+
+// Intraday Trading API (需要认证)
+export const intradayTradingAPI = {
+  // DEPRECATED: Scheduler status is now pushed via WebSocket 'scheduler_status_sync' message
+  // This method is kept for backward compatibility but should not be used
+  // getSchedulerStatus: async () => {
+  //   throw new Error('DEPRECATED: Use WebSocket scheduler_status_sync message instead');
+  // },
+
+  getConfig: async () => {
+    try {
+      const response = await apiClient.get('/api/intraday/scheduler/config');
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取配置失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  startScheduler: async () => {
+    try {
+      const response = await apiClient.post('/api/intraday/scheduler/control', {
+        action: 'start'
+      });
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '启动调度器失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  stopScheduler: async () => {
+    try {
+      const response = await apiClient.post('/api/intraday/scheduler/control', {
+        action: 'stop'
+      });
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '停止调度器失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  updateConfig: async (config: {
+    futu_api_url?: string;
+    futu_api_key?: string;
+    interval_minutes?: number;
+    market_type?: string;
+    llm_provider?: string;
+    llm_api_key?: string;
+  }) => {
+    try {
+      const response = await apiClient.post('/api/intraday/scheduler/config', config);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '更新配置失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  validateConfig: async (config: {
+    futu_api_url: string;
+    futu_api_key?: string;
+  }) => {
+    try {
+      const response = await apiClient.post('/api/intraday/scheduler/validate-config', config);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '验证配置失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  // Account and positions
+  getAccountInfo: async (market: string = 'US') => {
+    try {
+      const response = await apiClient.get(`/api/intraday/account?market=${market}`);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取账户信息失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  getPositions: async (market: string = 'US') => {
+    try {
+      const response = await apiClient.get(`/api/intraday/positions?market=${market}`);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取持仓信息失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  // DEPRECATED: Decisions list is now pushed via WebSocket 'decisions_initial' message
+  // This method is kept for backward compatibility but should not be used
+  // getDecisions: async (params?: { page?: number; limit?: number }) => {
+  //   throw new Error('DEPRECATED: Use WebSocket decisions_initial message instead');
+  // },
+
+  getDecision: async (id: number) => {
+    try {
+      const response = await apiClient.get(`/api/intraday/decisions/${id}`);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取决策详情失败';
       throw new Error(errorMessage);
     }
   },

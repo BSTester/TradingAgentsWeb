@@ -915,69 +915,61 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
               
               <div>
                 <label htmlFor="futu_api_key" className="block text-sm font-medium text-gray-700 mb-2">
+                  <i className="fas fa-key mr-1" />
                   富途 API Key
                   <span className="text-red-500 ml-1">*</span>
                 </label>
-                <div className="relative">
-                  <input
-                    type={showApiKey ? 'text' : 'password'}
-                    id="futu_api_key"
-                    value={futuApiKey}
-                    onChange={(e) => handleFutuApiKeyChange(e.target.value)}
-                    placeholder="输入富途 API Key"
-                    className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required={enableTradingExecutor}
-                  />
+                <div className="flex space-x-2">
+                  <div className="relative flex-1">
+                    <input
+                      type={showApiKey ? 'text' : 'password'}
+                      id="futu_api_key"
+                      value={futuApiKey}
+                      onChange={(e) => handleFutuApiKeyChange(e.target.value)}
+                      placeholder="输入富途 API Key"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required={enableTradingExecutor}
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                    >
+                      <i className={`fas ${showApiKey ? 'fa-eye-slash' : 'fa-eye'} text-gray-400 hover:text-gray-600`} />
+                    </button>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    onClick={validateFutuApi}
+                    disabled={!futuApiBaseUrl || !futuApiKey || validatingFutuApi}
+                    className={`px-4 py-2 rounded-md border font-medium transition-colors ${
+                      futuApiValidated
+                        ? 'bg-green-50 border-green-200 text-green-700'
+                        : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
-                    <i className={`fas fa-eye${showApiKey ? '-slash' : ''}`}></i>
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  <i className="fas fa-lock mr-1"></i>
-                  API Key 将安全地保存在服务器上
-                </p>
-              </div>
-
-              {/* 验证按钮和状态 */}
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={validateFutuApi}
-                  disabled={!futuApiBaseUrl || !futuApiKey || validatingFutuApi}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    futuApiValidated
-                      ? 'bg-green-600 text-white hover:bg-green-700'
-                      : 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed'
-                  }`}
-                >
-                  {validatingFutuApi ? (
-                    <>
-                      <i className="fas fa-spinner fa-spin mr-2"></i>
-                      验证中...
-                    </>
-                  ) : futuApiValidated ? (
-                    <>
-                      <i className="fas fa-check-circle mr-2"></i>
-                      已验证
+                    {validatingFutuApi ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin mr-1" />
+                        验证中
+                      </>
+                    ) : futuApiValidated ? (
+                      <>
+                        <i className="fas fa-check mr-1" />
+                        已验证
                     </>
                   ) : (
                     <>
-                      <i className="fas fa-shield-alt mr-2"></i>
-                      验证配置
+                      <i className="fas fa-check mr-1" />
+                      验证
                     </>
                   )}
-                </button>
-                
-                {futuApiValidated && (
-                  <span className="text-sm text-green-600 flex items-center">
-                    <i className="fas fa-check-circle mr-1"></i>
-                    富途 API 配置有效
-                  </span>
-                )}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  <i className="fas fa-lock mr-1" />
+                  API Key 将安全地保存在服务器上
+                </p>
               </div>
               
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
