@@ -150,6 +150,62 @@ async def execute_intraday_analysis(
             else:
                 raise ValueError(f"Unsupported LLM provider: {llm_provider}")
             
+            # Get previous decision for context (last completed decision for this user and market)
+            previous_decision_context = ""
+            try:
+                from sqlalchemy import desc
+                prev_result = db.execute(
+                    select(IntradayDecisionRecord).where(
+                        IntradayDecisionRecord.user_id == user_id,
+                        IntradayDecisionRecord.market_type == market_type,
+                        IntradayDecisionRecord.status == "completed"
+                    ).order_by(desc(IntradayDecisionRecord.end_time)).limit(1)
+                )
+                prev_decision = prev_result.scalar_one_or_none()
+                
+                if prev_decision:
+                    # Build context from previous decision
+                    prev_time = prev_decision.end_time.strftime('%Y-%m-%d %H:%M:%S') if prev_decision.end_time else "未知"
+                    prev_positions = prev_decision.positions_analyzed or []
+                    prev_trades = prev_decision.trades_executed or []
+                    
+                    previous_decision_context = f"""
+## 上次决策记录 (参考)
+
+**时间**: {prev_time}
+**市场**: {prev_decision.market_type}
+**分析股票**: {', '.join(prev_positions) if prev_positions else '无'}
+**执行交易**: {len(prev_trades)} 笔
+
+"""
+                    # Add trade details if available
+                    if prev_trades:
+                        previous_decision_context += "**交易详情**:\n"
+                        for i, trade in enumerate(prev_trades[:5], 1):  # Limit to 5 most recent
+                            action = trade.get('action', '未知')
+                            stock = trade.get('stock', '未知')
+                            quantity = trade.get('quantity', 0)
+                            price = trade.get('price', 0)
+                            previous_decision_context += f"{i}. {action} {stock} - {quantity}股 @ ${price}\n"
+                        
+                        if len(prev_trades) > 5:
+                            previous_decision_context += f"... 还有 {len(prev_trades) - 5} 笔交易\n"
+                    
+                    # Add brief summary from report if available
+                    if prev_decision.decision_report:
+                        # Extract first few lines as summary
+                        report_lines = prev_decision.decision_report.split('\n')[:10]
+                        summary = '\n'.join(report_lines)
+                        if len(prev_decision.decision_report) > 500:
+                            summary = summary[:500] + "..."
+                        previous_decision_context += f"\n**决策摘要**:\n{summary}\n"
+                    
+                    logging.info(f"Found previous decision (ID: {prev_decision.id}) for context")
+                else:
+                    logging.info("No previous decision found for this user/market")
+            except Exception as e:
+                logging.warning(f"Failed to fetch previous decision: {e}")
+            
             # Create intraday trader agent
             logging.info(f"Creating LangGraph agent with provider={llm_provider}, model={model_name}")
             
@@ -158,15 +214,19 @@ async def execute_intraday_analysis(
             
             # Prepare initial state
             # Note: Agent has comprehensive system prompt with detailed instructions
-            # We only need a simple trigger message to start the conversation
+            # We provide context from previous decision to help agent make informed decisions
             from langchain_core.messages import HumanMessage
+            
+            initial_message = "开始分析"
+            if previous_decision_context:
+                initial_message = f"{previous_decision_context}\n\n请基于以上历史决策记录，开始新一轮的分析。"
             
             initial_state = {
                 "user_id": user_id,
                 "market_type": market_type,
                 "session_id": session_id,
                 "messages": [
-                    HumanMessage(content="开始分析")  # Simple trigger - agent knows what to do from system prompt
+                    HumanMessage(content=initial_message)
                 ],
             }
             
@@ -320,8 +380,8 @@ async def execute_intraday_analysis(
                     'end_time': decision_record.end_time.isoformat() if decision_record.end_time else None,
                     'status': decision_record.status,
                     'market_type': decision_record.market_type,
-                    'positions_count': len(decision_record.positions_analyzed) if decision_record.positions_analyzed else 0,
-                    'trades_count': len(decision_record.trades_executed) if decision_record.trades_executed else 0,
+                    'positions_analyzed': decision_record.positions_analyzed if decision_record.positions_analyzed else [],
+                    'trades_executed': decision_record.trades_executed if decision_record.trades_executed else [],
                     'report_summary': report_summary,  # Brief summary only
                     'created_at': decision_record.created_at.isoformat(),
                 }

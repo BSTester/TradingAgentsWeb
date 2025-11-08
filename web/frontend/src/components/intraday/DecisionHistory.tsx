@@ -115,9 +115,9 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
           </div>
         ) : (
           <div className="space-y-4">
-            {decisions.map((decision) => (
+            {decisions.map((decision, index) => (
               <div
-                key={decision.id}
+                key={`${decision.id}-${index}`}
                 className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
               >
                 {/* Decision Card - Click to open detail modal */}
@@ -139,15 +139,9 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
                           {new Date(decision.start_time).toLocaleString('zh-CN')}
                         </span>
                         <span>
-                          <i className="fas fa-chart-line mr-1" />
-                          分析 {Array.isArray(decision.positions_analyzed) ? decision.positions_analyzed.length : 0} 只股票
+                          <i className="fas fa-exchange-alt mr-1" />
+                          执行 {decision.trades_executed?.length || 0} 笔交易
                         </span>
-                        {decision.trades_executed && decision.trades_executed.length > 0 && (
-                          <span>
-                            <i className="fas fa-exchange-alt mr-1" />
-                            执行 {decision.trades_executed.length} 笔交易
-                          </span>
-                        )}
                       </div>
                       {decision.end_time && (
                         <div className="text-xs text-gray-500 mt-1">
@@ -229,27 +223,39 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
               ) : detailData ? (
                 <div className="space-y-6">
                   {/* Session Info */}
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-gray-600">会话ID:</span>
-                        <span className="ml-2 font-mono text-gray-900">{detailData.session_id}</span>
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-5 border border-blue-200">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex items-start">
+                        <i className="fas fa-fingerprint text-blue-500 mt-1 mr-3" />
+                        <div>
+                          <div className="text-xs text-gray-600 font-medium mb-1">会话ID</div>
+                          <div className="font-mono text-sm text-gray-900 break-all">{detailData.session_id}</div>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-gray-600">市场:</span>
-                        <span className="ml-2 font-medium text-gray-900">{detailData.market_type}</span>
+                      <div className="flex items-start">
+                        <i className="fas fa-globe text-green-500 mt-1 mr-3" />
+                        <div>
+                          <div className="text-xs text-gray-600 font-medium mb-1">市场</div>
+                          <div className="font-semibold text-sm text-gray-900">{detailData.market_type}</div>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-gray-600">开始时间:</span>
-                        <span className="ml-2 text-gray-900">
-                          {new Date(detailData.start_time).toLocaleString('zh-CN')}
-                        </span>
+                      <div className="flex items-start">
+                        <i className="fas fa-play-circle text-purple-500 mt-1 mr-3" />
+                        <div>
+                          <div className="text-xs text-gray-600 font-medium mb-1">开始时间</div>
+                          <div className="text-sm text-gray-900">
+                            {new Date(detailData.start_time).toLocaleString('zh-CN')}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-gray-600">结束时间:</span>
-                        <span className="ml-2 text-gray-900">
-                          {detailData.end_time ? new Date(detailData.end_time).toLocaleString('zh-CN') : '-'}
-                        </span>
+                      <div className="flex items-start">
+                        <i className="fas fa-stop-circle text-orange-500 mt-1 mr-3" />
+                        <div>
+                          <div className="text-xs text-gray-600 font-medium mb-1">结束时间</div>
+                          <div className="text-sm text-gray-900">
+                            {detailData.end_time ? new Date(detailData.end_time).toLocaleString('zh-CN') : '-'}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -261,12 +267,38 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
                         <i className="fas fa-file-alt mr-2 text-blue-600" />
                         完整决策报告
                       </h4>
-                      <div className="bg-white border border-gray-200 rounded-lg p-6 prose prose-sm max-w-none">
-                        <ReactMarkdown
-                          rehypePlugins={[rehypeRaw, rehypeSanitize]}
-                        >
-                          {detailData.decision_report}
-                        </ReactMarkdown>
+                      <div className="bg-white border border-gray-200 rounded-lg p-6">
+                        <div className="markdown-content">
+                          <ReactMarkdown
+                            rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                            components={{
+                              h1: ({node, ...props}) => <h1 className="text-2xl font-bold text-gray-900 mb-4 mt-6" {...props} />,
+                              h2: ({node, ...props}) => <h2 className="text-xl font-bold text-gray-900 mb-3 mt-5" {...props} />,
+                              h3: ({node, ...props}) => <h3 className="text-lg font-semibold text-gray-900 mb-2 mt-4" {...props} />,
+                              h4: ({node, ...props}) => <h4 className="text-base font-semibold text-gray-900 mb-2 mt-3" {...props} />,
+                              p: ({node, ...props}) => <p className="text-gray-700 mb-3 leading-relaxed" {...props} />,
+                              ul: ({node, ...props}) => <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700" {...props} />,
+                              ol: ({node, ...props}) => <ol className="list-decimal list-inside mb-3 space-y-1 text-gray-700" {...props} />,
+                              li: ({node, ...props}) => <li className="text-gray-700 ml-4" {...props} />,
+                              strong: ({node, ...props}) => <strong className="font-semibold text-gray-900" {...props} />,
+                              em: ({node, ...props}) => <em className="italic text-gray-700" {...props} />,
+                              code: ({node, inline, ...props}: any) => 
+                                inline 
+                                  ? <code className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded text-sm font-mono" {...props} />
+                                  : <code className="block bg-gray-50 text-gray-800 p-3 rounded border border-gray-200 text-sm font-mono overflow-x-auto mb-3" {...props} />,
+                              pre: ({node, ...props}) => <pre className="bg-gray-50 p-4 rounded border border-gray-200 overflow-x-auto mb-3" {...props} />,
+                              blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-700 my-3" {...props} />,
+                              table: ({node, ...props}) => <table className="min-w-full border-collapse border border-gray-300 mb-3" {...props} />,
+                              thead: ({node, ...props}) => <thead className="bg-gray-50" {...props} />,
+                              th: ({node, ...props}) => <th className="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-900" {...props} />,
+                              td: ({node, ...props}) => <td className="border border-gray-300 px-4 py-2 text-gray-700" {...props} />,
+                              a: ({node, ...props}) => <a className="text-blue-600 hover:text-blue-800 underline" {...props} />,
+                              hr: ({node, ...props}) => <hr className="my-4 border-gray-300" {...props} />,
+                            }}
+                          >
+                            {detailData.decision_report}
+                          </ReactMarkdown>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -278,8 +310,8 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
                         <i className="fas fa-wallet mr-2 text-green-600" />
                         账户快照
                       </h4>
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <pre className="text-sm text-gray-700 whitespace-pre-wrap">
+                      <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-lg p-4 border border-green-200">
+                        <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono overflow-x-auto">
                           {JSON.stringify(detailData.account_snapshot, null, 2)}
                         </pre>
                       </div>
@@ -293,38 +325,44 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
                         <i className="fas fa-exchange-alt mr-2 text-orange-600" />
                         执行交易 ({detailData.trades_executed.length})
                       </h4>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {detailData.trades_executed.map((trade: any, idx: number) => (
                           <div
                             key={idx}
-                            className="bg-gray-50 rounded-lg p-4 border border-gray-200"
+                            className={`rounded-lg p-4 border-l-4 shadow-sm ${
+                              trade.action === 'BUY'
+                                ? 'bg-green-50 border-green-500'
+                                : 'bg-red-50 border-red-500'
+                            }`}
                           >
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-3">
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                                   trade.action === 'BUY' 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : 'bg-red-100 text-red-800'
+                                    ? 'bg-green-500 text-white' 
+                                    : 'bg-red-500 text-white'
                                 }`}>
-                                  {trade.action || '未知'}
+                                  {trade.action === 'BUY' ? '买入' : trade.action === 'SELL' ? '卖出' : trade.action || '未知'}
                                 </span>
-                                <span className="font-semibold text-gray-900">
+                                <span className="font-bold text-lg text-gray-900">
                                   {trade.stock || '未知股票'}
                                 </span>
                               </div>
                               {trade.price && (
-                                <span className="text-sm text-gray-600">
-                                  @ ${trade.price}
+                                <span className="text-base font-semibold text-gray-700">
+                                  ${trade.price}
                                 </span>
                               )}
                             </div>
                             {trade.quantity && (
-                              <div className="text-sm text-gray-600 mb-1">
-                                数量: {trade.quantity} 股
+                              <div className="text-sm text-gray-700 font-medium mb-2">
+                                <i className="fas fa-layer-group mr-2 text-gray-500" />
+                                数量: <span className="font-bold">{trade.quantity}</span> 股
                               </div>
                             )}
                             {trade.description && (
-                              <div className="text-sm text-gray-700 mt-2 pt-2 border-t border-gray-200">
+                              <div className="text-sm text-gray-700 mt-3 pt-3 border-t border-gray-300 leading-relaxed">
+                                <i className="fas fa-info-circle mr-2 text-blue-500" />
                                 {trade.description}
                               </div>
                             )}
