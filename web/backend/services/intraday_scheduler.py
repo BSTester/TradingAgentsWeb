@@ -188,7 +188,10 @@ class IntradayScheduler:
                         # Check if there's already a running task for this market
                         existing_task = self._analysis_tasks.get(market)
                         if existing_task and not existing_task.done():
-                            logger.info(f"⏳ {market} analysis is still running, skipping this cycle")
+                            logger.warning(f"⏳ {market} analysis is still running from previous cycle")
+                            logger.warning(f"   Skipping this cycle and will retry in next interval")
+                            # Don't start a new task - let the existing one finish
+                            # The next cycle will check again
                         else:
                             logger.info(f"✅ {market} market is open, triggering analysis: {status_msg}")
                             # Start analysis in background using ensure_future (more robust)
@@ -324,10 +327,17 @@ class IntradayScheduler:
             market_local_time = utc_now.astimezone(market_tz)
             is_open, status_msg = is_market_open(market, market_local_time)
             
+            # Check if there's a running task for this market
+            task_running = False
+            existing_task = self._analysis_tasks.get(market)
+            if existing_task and not existing_task.done():
+                task_running = True
+            
             markets_status[market] = {
                 "is_open": is_open,
                 "status": status_msg,
-                "local_time": market_local_time.strftime("%Y-%m-%d %H:%M:%S %Z")
+                "local_time": market_local_time.strftime("%Y-%m-%d %H:%M:%S %Z"),
+                "task_running": task_running
             }
         
         # Use tracked next run time
