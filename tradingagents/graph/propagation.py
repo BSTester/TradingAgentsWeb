@@ -1,6 +1,6 @@
 # TradingAgents/graph/propagation.py
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from tradingagents.agents.utils.agent_states import (
     AgentState,
     InvestDebateState,
@@ -42,9 +42,25 @@ class Propagator:
             "news_report": "",
         }
 
-    def get_graph_args(self) -> Dict[str, Any]:
-        """Get arguments for the graph invocation."""
+    def get_graph_args(self, user_id: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Get arguments for the graph invocation.
+        
+        Args:
+            user_id: Optional user ID to pass to tools for database queries
+            
+        Returns:
+            dict: Configuration for graph execution
+        """
+        config = {
+            "recursion_limit": self.max_recur_limit
+        }
+        
+        # Add user_id to configurable if provided
+        if user_id is not None:
+            config["configurable"] = {"user_id": user_id}
+        
         return {
             "stream_mode": "values",
-            "config": {"recursion_limit": self.max_recur_limit},
+            "config": config,
         }

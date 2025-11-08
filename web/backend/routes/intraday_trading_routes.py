@@ -744,6 +744,20 @@ async def get_positions(
                 }
                 currency = currency_map.get(market, "$")
                 
+                # Query database for position records to get open time
+                from datetime import datetime, date
+                position_records_query = await db.execute(
+                    select(PositionRecord).where(
+                        PositionRecord.user_id == current_user.id,
+                        PositionRecord.market_type == market,
+                        PositionRecord.is_closed == False
+                    )
+                )
+                position_records = {rec.stock_code: rec for rec in position_records_query.scalars().all()}
+                
+                # Get today's date for calculating holding days
+                today = date.today()
+                
                 # Build result
                 result_positions = []
                 for pos in positions:
@@ -759,6 +773,17 @@ async def get_positions(
                     # Calculate position ratio
                     position_ratio = (market_value / total_assets * 100) if total_assets > 0 else 0
                     
+                    # Get holding days from database (only calculate date difference, not time)
+                    holding_days = 0
+                    first_open_time = None
+                    if stock_code in position_records:
+                        record = position_records[stock_code]
+                        first_open_time = record.first_open_time
+                        if first_open_time:
+                            # Convert to date only (ignore time component)
+                            open_date = first_open_time.date() if hasattr(first_open_time, 'date') else first_open_time
+                            holding_days = (today - open_date).days
+                    
                     result_positions.append({
                         "stock_code": stock_code,
                         "stock_name": stock_name,
@@ -770,7 +795,8 @@ async def get_positions(
                         "pnl_percent": profit_loss_ratio * 100,
                         "position_value": market_value,
                         "position_ratio": round(position_ratio, 2),
-                        "holding_days": 0,
+                        "holding_days": holding_days,
+                        "first_open_time": first_open_time.isoformat() if first_open_time else None,
                         "currency": currency,
                     })
                 

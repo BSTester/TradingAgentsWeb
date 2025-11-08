@@ -288,10 +288,14 @@ def get_account_info(
 
 
 def get_positions(
-    market_type: Annotated[str, "Market type: US, HK, or CN"]
+    market_type: Annotated[str, "Market type: US, HK, or CN"],
+    user_id: Optional[int] = None
 ) -> List[Dict[str, Any]]:
     """
     Get all positions for a specific market.
+    
+    Queries Futu API for current positions and enriches with database information
+    including first open time and holding days.
     
     Args:
         market_type: Market type (US/HK/CN)
@@ -307,6 +311,8 @@ def get_positions(
             - market_value: Total position value
             - profit_loss: Unrealized P&L
             - profit_loss_pct: P&L percentage
+            - first_open_time: First open time from database (if available)
+            - holding_days: Days since first open (if available)
             
     Raises:
         FutuAPIError: If API call fails
@@ -315,7 +321,7 @@ def get_positions(
     Example:
         >>> positions = get_positions("US")
         >>> for pos in positions:
-        ...     print(f"{pos['stock_code']}: {pos['quantity']} shares")
+        ...     print(f"{pos['stock_code']}: {pos['quantity']} shares, held {pos.get('holding_days', 0)} days")
     """
     # Validate market type
     if market_type.upper() not in ["US", "HK", "CN"]:
@@ -339,6 +345,60 @@ def get_positions(
             positions = response["data"]
         else:
             positions = []
+        
+        # Try to enrich with database information (first open time)
+        # user_id should be passed as parameter from the tool
+        if user_id:
+            try:
+                from web.backend.database import SessionLocal
+                from web.backend.models import PositionRecord
+                from datetime import datetime, date
+                
+                db = SessionLocal()
+                try:
+                    # Query position records for this user and market
+                    records = db.query(PositionRecord).filter(
+                        PositionRecord.user_id == user_id,
+                        PositionRecord.market_type == market_type,
+                        PositionRecord.is_closed == False
+                    ).all()
+                    
+                    # Create lookup dict
+                    records_dict = {rec.stock_code: rec for rec in records}
+                    
+                    # Get today's date for calculating holding days
+                    today = date.today()
+                    
+                    # Enrich positions with database info
+                    for pos in positions:
+                        stock_code = pos.get('stock_code', '')
+                        if stock_code in records_dict:
+                            record = records_dict[stock_code]
+                            pos['first_open_time'] = record.first_open_time.isoformat() if record.first_open_time else None
+                            if record.first_open_time:
+                                # Convert to date only (ignore time component)
+                                open_date = record.first_open_time.date() if hasattr(record.first_open_time, 'date') else record.first_open_time
+                                pos['holding_days'] = (today - open_date).days
+                            else:
+                                pos['holding_days'] = 0
+                        else:
+                            pos['first_open_time'] = None
+                            pos['holding_days'] = 0
+                    
+                    logger.info(f"Enriched {len(positions)} positions with database info for user {user_id}")
+                finally:
+                    db.close()
+            except Exception as e:
+                # If enrichment fails, just log and continue with basic position data
+                logger.warning(f"Failed to enrich positions with database info: {e}")
+                for pos in positions:
+                    pos['first_open_time'] = None
+                    pos['holding_days'] = 0
+        else:
+            # No user_id provided, add empty fields
+            for pos in positions:
+                pos['first_open_time'] = None
+                pos['holding_days'] = 0
         
         logger.info(f"Successfully retrieved {len(positions)} positions for {market_type}")
         return positions

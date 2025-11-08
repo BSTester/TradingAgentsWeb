@@ -15,17 +15,12 @@ interface DecisionHistoryProps {
 
 export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
   const [page, setPage] = useState(1);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [detailModalId, setDetailModalId] = useState<number | null>(null);
   const [detailData, setDetailData] = useState<any>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const limit = 20; // Show 20 records per page
 
   const { data, isLoading, error } = useDecisions(page, limit);
-
-  const handleToggleExpand = (id: number) => {
-    setExpandedId(expandedId === id ? null : id);
-  };
 
   const handleViewDetail = async (id: number) => {
     setDetailModalId(id);
@@ -125,10 +120,10 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
                 key={decision.id}
                 className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
               >
-                {/* Decision Card Header */}
+                {/* Decision Card - Click to open detail modal */}
                 <div
-                  className="p-4 bg-gray-50 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleToggleExpand(decision.id)}
+                  className="p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => handleViewDetail(decision.id)}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -145,7 +140,7 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
                         </span>
                         <span>
                           <i className="fas fa-chart-line mr-1" />
-                          分析 {decision.positions_analyzed?.length || 0} 只股票
+                          分析 {Array.isArray(decision.positions_analyzed) ? decision.positions_analyzed.length : 0} 只股票
                         </span>
                         {decision.trades_executed && decision.trades_executed.length > 0 && (
                           <span>
@@ -164,145 +159,10 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
                       )}
                     </div>
                     <div>
-                      <i
-                        className={`fas fa-chevron-${
-                          expandedId === decision.id ? 'up' : 'down'
-                        } text-gray-400`}
-                      />
+                      <i className="fas fa-chevron-right text-gray-400" />
                     </div>
                   </div>
                 </div>
-
-                {/* Decision Card Body (Expanded) */}
-                {expandedId === decision.id && (
-                  <div className="p-4 border-t border-gray-200">
-                    {/* Account Snapshot */}
-                    {decision.account_snapshot && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">
-                          <i className="fas fa-wallet mr-1" />
-                          账户快照
-                        </h4>
-                        <div className="grid grid-cols-3 gap-4 bg-gray-50 rounded-lg p-3">
-                          <div>
-                            <p className="text-xs text-gray-600">总资产</p>
-                            <p className="text-sm font-medium text-gray-900">
-                              ¥{decision.account_snapshot.total_assets?.toLocaleString() || 0}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-600">可用资金</p>
-                            <p className="text-sm font-medium text-gray-900">
-                              ¥{decision.account_snapshot.cash?.toLocaleString() || 0}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-600">持仓市值</p>
-                            <p className="text-sm font-medium text-gray-900">
-                              ¥{decision.account_snapshot.position_value?.toLocaleString() || 0}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Analyzed Positions */}
-                    {decision.positions_analyzed && decision.positions_analyzed.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">
-                          <i className="fas fa-list mr-1" />
-                          分析股票
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                          {decision.positions_analyzed.map((code: string, idx: number) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                            >
-                              {code}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Trades Executed */}
-                    {decision.trades_executed && decision.trades_executed.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">
-                          <i className="fas fa-exchange-alt mr-1" />
-                          执行交易 ({decision.trades_executed.length})
-                        </h4>
-                        <div className="space-y-2">
-                          {decision.trades_executed.map((trade: any, idx: number) => (
-                            <div
-                              key={idx}
-                              className="bg-gray-50 rounded-lg p-3 text-sm"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <span className="font-medium text-gray-900">
-                                    {trade.stock || trade.stock_code || '未知'}
-                                  </span>
-                                  <span
-                                    className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
-                                      (trade.action || trade.trade_type) === 'BUY'
-                                        ? 'bg-green-100 text-green-800'
-                                        : 'bg-red-100 text-red-800'
-                                    }`}
-                                  >
-                                    {(trade.action || trade.trade_type) === 'BUY' ? '买入' : '卖出'}
-                                  </span>
-                                </div>
-                                {trade.quantity && trade.price && (
-                                  <div className="text-right">
-                                    <p className="text-gray-900">
-                                      {trade.quantity} 股 @ ${trade.price}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                              {trade.description && (
-                                <p className="text-xs text-gray-600 mt-2">
-                                  {trade.description}
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Decision Report Summary */}
-                    {decision.report_summary && (
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">
-                          <i className="fas fa-file-alt mr-1" />
-                          决策摘要
-                        </h4>
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                            {decision.report_summary}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* View Full Report Button */}
-                    <div className="mt-4 flex justify-end">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewDetail(decision.id);
-                        }}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center"
-                      >
-                        <i className="fas fa-eye mr-2" />
-                        查看完整报告
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
           </div>

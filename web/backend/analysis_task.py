@@ -361,7 +361,8 @@ def run_analysis_task(
             request_data.get('ticker'),
             request_data.get('analysis_date')
         )
-        args = graph.propagator.get_graph_args()
+        # Pass user_id to graph args for tools to access
+        args = graph.propagator.get_graph_args(user_id=analysis_record.user_id)
         # 修改 stream_mode 为 "updates" 以获取节点信息
         args["stream_mode"] = "updates"
         
