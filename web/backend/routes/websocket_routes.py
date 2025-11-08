@@ -187,8 +187,8 @@ async def intraday_websocket_endpoint(websocket: WebSocket, user_id: int):
                         'end_time': decision.end_time.isoformat() if decision.end_time else None,
                         'status': decision.status,
                         'market_type': decision.market_type,
-                        'positions_count': len(decision.positions_analyzed) if decision.positions_analyzed else 0,
-                        'trades_count': len(decision.trades_executed) if decision.trades_executed else 0,
+                        'positions_analyzed': decision.positions_analyzed if decision.positions_analyzed else [],
+                        'trades_executed': decision.trades_executed if decision.trades_executed else [],
                         'report_summary': report_summary,  # Brief summary only
                         'created_at': decision.created_at.isoformat(),
                     })

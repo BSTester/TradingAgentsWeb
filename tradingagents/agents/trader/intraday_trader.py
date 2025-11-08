@@ -52,15 +52,19 @@ IMPORTANT RULES:
    - action: Trade action - "BUY" (买入/买入开仓), "SELL" (卖出/平多), or "SHORT" (卖空/开仓做空)
    - quantity: Number of shares (integer)
    - price: Trade price (float, if available)
-   - description: Brief description of the trade
+   - description: Brief description of the trade **IN CHINESE** (必须用中文描述)
 
 Return a JSON array of trade objects. If no trades were executed, return an empty array [].
 
-Example output:
+Example output (note that description MUST be in Chinese):
 [
-  {{"stock": "AAPL", "action": "BUY", "quantity": 100, "price": 150.50, "description": "Bought 100 shares at $150.50"}},
-  {{"stock": "TSLA", "action": "SELL", "quantity": 50, "price": 200.00, "description": "Sold 50 shares at $200.00"}}
+  {{"stock": "AAPL", "action": "BUY", "quantity": 100, "price": 150.50, "description": "以$150.50买入100股"}},
+  {{"stock": "TSLA", "action": "SELL", "quantity": 50, "price": 200.00, "description": "以$200.00卖出50股"}},
+  {{"stock": "00700", "action": "BUY", "quantity": 200, "price": 320.50, "description": "以HK$320.50买入200股腾讯"}},
+  {{"stock": "600519", "action": "SELL", "quantity": 100, "price": 1680.00, "description": "以¥1680.00卖出100股贵州茅台"}}
 ]
+
+CRITICAL: The "description" field MUST be in Chinese, including the action type, quantity, and price.
 """),
             ("user", "Extract executed trades from this report:\n\n{report}")
         ])
@@ -129,13 +133,14 @@ def _extract_trades_simple(report: str) -> List[Dict[str, Any]]:
     for match in re.finditer(tool_pattern, report, re.IGNORECASE):
         direction = match.group(2).upper()
         action = 'BUY' if direction in ['BUY', '0'] else 'SELL' if direction in ['SELL', '1'] else 'SHORT'
+        action_cn = '买入' if action == 'BUY' else '卖出' if action == 'SELL' else '卖空'
         
         trades.append({
             'stock': match.group(1).upper(),
             'action': action,
             'quantity': int(match.group(3)),
             'price': None,
-            'description': f"{action} {match.group(1)} {match.group(3)} shares"
+            'description': f"{action_cn}{match.group(1)} {match.group(3)}股"
         })
     
     # Pattern 2: Look for Chinese execution results that indicate success
@@ -153,7 +158,7 @@ def _extract_trades_simple(report: str) -> List[Dict[str, Any]]:
             'action': action,
             'quantity': quantity,
             'price': None,
-            'description': f"{action} {stock} {quantity} shares"
+            'description': f"{action_cn}{stock} {quantity}股"
         })
     
     # Remove duplicates
@@ -228,6 +233,13 @@ def create_intraday_trader(llm, memory):
 ## Your Mission
 Maximize short-term profits through active position management, quick entries/exits, and opportunistic trading based on technical momentum, news catalysts, and market dynamics.
 
+## 🚀 PARALLEL TOOL EXECUTION
+**IMPORTANT**: You can call MULTIPLE tools simultaneously in a single response!
+- Instead of calling tools one by one, group related tools together
+- Example: Call get_futu_account_info, get_futu_positions, and get_futu_orders all at once
+- This dramatically speeds up analysis by reducing round trips
+- The system will execute all tools in parallel and return results together
+
 ## Trading Philosophy
 - **Act decisively**: When signals align, execute with conviction
 - **Cut losses fast**: Don't let small losses become big ones
@@ -254,20 +266,28 @@ Maximize short-term profits through active position management, quick entries/ex
 ## Standard Execution Workflow
 
 ### Phase 1: Information Collection
-**Required tool calls** (in order):
+
+⚠️ **PARALLEL TOOL CALLS**: You can call multiple tools simultaneously in one response to speed up data collection!
+
+**Step 1: Account & Position Overview** (call these 3 tools in parallel):
 1. `get_futu_account_info(market_type="{market_type}")` - Check account funds and total assets
 2. `get_futu_positions(market_type="{market_type}")` - Get all current positions
 3. `get_futu_orders(market_type="{market_type}", filter_status=0)` - Check pending orders (⚠️ CRITICAL: avoid duplicate orders)
 
-**For each position and candidate stock**:
-4. `get_futu_quote(stock_code)` - Get real-time quote
-5. `get_futu_kline(stock_code, period="5min", count=50)` - Get K-line data for short-term trend analysis
-6. `get_futu_technical_analysis(stock_code, indicators=["MACD", "RSI", "BOLL"])` - Get technical indicators
+**Step 2: Stock Analysis** (call multiple tools in parallel for each stock):
+For each position and candidate stock, call these tools together:
+- `get_futu_quote(stock_code)` - Get real-time quote
+- `get_futu_kline(stock_code, period="5min", count=50)` - Get K-line data for short-term trend analysis
+- `get_futu_technical_analysis(stock_code, indicators=["MACD", "RSI", "BOLL"])` - Get technical indicators
 
-**Market scanning** (optional but recommended):
-7. `get_akshare_news(limit=20)` - Get latest financial news
-8. `get_akshare_hot_stocks(symbol="A股", time_range="今日", limit=10)` - Get Baidu hot search stocks (for CN market)
-9. `get_futu_hot_stocks(market_type="{market_type}")` - Discover market hot stocks and trading opportunities
+Example: If analyzing AAPL and TSLA, call all 6 tools (3 per stock) in one response!
+
+**Step 3: Market Scanning** (optional, call these in parallel):
+- `get_akshare_news(limit=20)` - Get latest financial news
+- `get_akshare_hot_stocks(symbol="A股", time_range="今日", limit=10)` - Get Baidu hot search stocks (for CN market)
+- `get_futu_hot_stocks(market_type="{market_type}")` - Discover market hot stocks and trading opportunities
+
+💡 **Efficiency Tip**: Group related tool calls together to minimize round trips and speed up analysis!
 
 ### Phase 2: Analysis & Decision (Complete for ALL stocks before Phase 3)
 Based on collected information, conduct comprehensive analysis:
@@ -452,14 +472,7 @@ You have full discretion to:
 - 待处理订单: X个
 - 净敞口变化: [增加/减少/不变] XX%
 
-## V. 工具调用记录
-1. get_futu_account_info() → [结果摘要]
-2. get_futu_positions() → [X个持仓]
-3. get_futu_orders() → [X个待处理订单]
-4. get_futu_hot_stocks() → [X只热门股票]
-5. [列出所有工具调用及简要结果]
-
-## VI. 下一步行动
+## V. 下一步行动
 - 监控重点: [具体股票和条件]
 - 关注事件: [即将到来的催化剂]
 - 调整计划: [下一周期的策略调整]
@@ -651,14 +664,21 @@ Current market: {market_type} - Please formulate trading strategy according to m
         last_message = messages[-1] if messages else None
         
         if last_message and hasattr(last_message, 'tool_calls'):
-            logging.info(f"Executing {len(last_message.tool_calls)} tool(s)")
+            num_tools = len(last_message.tool_calls)
+            tool_names = [tc.get('name', 'unknown') for tc in last_message.tool_calls]
+            
+            if num_tools > 1:
+                logging.info(f"🚀 Executing {num_tools} tools IN PARALLEL: {', '.join(tool_names)}")
+            else:
+                logging.info(f"Executing {num_tools} tool(s): {', '.join(tool_names)}")
         
-        # Execute tools - ToolNode needs to be invoked, not called directly
+        # Execute tools - ToolNode executes them in parallel automatically
         result = base_tool_node.invoke(state)
         
         # Log results
         if 'messages' in result:
             new_messages = result['messages']
+            completed_tools = []
             for msg in new_messages:
                 if hasattr(msg, 'name'):  # Tool message
                     tool_name = msg.name
@@ -669,7 +689,11 @@ Current market: {market_type} - Please formulate trading strategy according to m
                     else:
                         content_preview = content
                     
-                    logging.info(f"Tool {tool_name} completed: {content_preview}")
+                    completed_tools.append(tool_name)
+                    logging.info(f"✓ Tool {tool_name} completed: {content_preview}")
+            
+            if len(completed_tools) > 1:
+                logging.info(f"✅ All {len(completed_tools)} tools completed in parallel")
         
         return result
     
