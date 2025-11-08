@@ -14,11 +14,11 @@ export function Providers({ children }: ProvidersProps) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 0, // 禁用缓存，始终获取最新数据
-        cacheTime: 0, // 不缓存数据
-        refetchOnMount: true, // 组件挂载时重新获取
-        refetchOnWindowFocus: true, // 窗口聚焦时重新获取
-        refetchOnReconnect: true, // 重新连接时重新获取
+        staleTime: 30000, // 30秒后过期（WebSocket会主动更新）
+        gcTime: 5 * 60 * 1000, // 5分钟后清理缓存
+        refetchOnMount: false, // 不在挂载时自动获取（依赖 WebSocket）
+        refetchOnWindowFocus: false, // 不在窗口聚焦时获取（依赖 WebSocket）
+        refetchOnReconnect: true, // 重新连接时获取（网络恢复）
         retry: (failureCount, error: any) => {
           if (error?.response?.status === 401) {
             return false

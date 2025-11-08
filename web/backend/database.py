@@ -120,7 +120,10 @@ def init_db_sync():
     Initialize database tables (sync operation for scripts)
     """
     # Import all models to ensure they are registered with Base
-    from web.backend.models import User, UserConfig, AnalysisRecord, AnalysisLog, ExportRecord, ScheduledTask
+    from web.backend.models import (
+        User, UserConfig, AnalysisRecord, AnalysisLog, ExportRecord, ScheduledTask,
+        PositionRecord, TradingHistory, IntradayDecisionRecord
+    )
     
     # Create all tables using sync engine
     Base.metadata.create_all(bind=sync_engine)
@@ -133,7 +136,10 @@ async def init_db():
     Initialize database tables (async operation for app startup)
     """
     # Import all models to ensure they are registered with Base
-    from web.backend.models import User, UserConfig, AnalysisRecord, AnalysisLog, ExportRecord, ScheduledTask
+    from web.backend.models import (
+        User, UserConfig, AnalysisRecord, AnalysisLog, ExportRecord, ScheduledTask,
+        PositionRecord, TradingHistory, IntradayDecisionRecord
+    )
     
     # Create all tables using async engine
     async with async_engine.begin() as conn:

@@ -102,9 +102,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const response = await apiClient.get<User>('/api/auth/me')
       setUser(response.data)
       localStorage.setItem('user', JSON.stringify(response.data))
-    } catch (error) {
-      console.error('Error refreshing user:', error)
-      clearAuth()
+    } catch (error: any) {
+      // For 401 errors on /api/auth/me, just clear auth silently
+      // Don't log error to avoid console noise on initial page load
+      if (error.response?.status === 401) {
+        clearAuth()
+      } else {
+        console.error('Error refreshing user:', error)
+        clearAuth()
+      }
     }
   }
 

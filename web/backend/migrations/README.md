@@ -1,184 +1,118 @@
 # Database Migrations
 
-## Overview
+This directory contains SQL migration scripts for the TradingAgents database.
 
-This directory contains database migration scripts for TradingAgents Web Interface. Migrations are automatically applied on application startup.
+## Migration History
 
-## Migration Files
+### 001_add_intraday_trading_tables.sql (2025-11-06)
 
-### Core Files
+Adds three new tables for the Intraday Trading Agent System:
 
-- **`auto_migrate.py`** - Auto migration manager (runs on startup)
-- **`init_schema.py`** - Initial schema migration (creates all tables)
-- **`AUTO_MIGRATION.md`** - Detailed documentation
+#### 1. position_records
+Tracks stock positions with first opening time and current status.
 
-### Migration History Table
+**Key Fields:**
+- `stock_code`, `market_type` - Stock identifier and market
+- `first_open_time`, `first_open_price` - Initial position details
+- `current_quantity` - Current position size
+- `is_closed` - Whether position is closed
 
-The system uses a `migration_history` table to track applied migrations:
+**Indexes:**
+- `idx_position_records_user_id` - Query by user
+- `idx_position_records_stock_code` - Query by stock
+- `idx_position_records_user_stock` - Composite index for user+stock queries
 
-```sql
-CREATE TABLE migration_history (
-    migration_name VARCHAR(255) PRIMARY KEY,
-    applied_at DATETIME NOT NULL,
-    description VARCHAR(500)
-);
-```
+#### 2. trading_history
+Records all trades for each position with decision context.
 
-## Current Schema
+**Key Fields:**
+- `trade_type` - BUY or SELL
+- `quantity`, `price` - Trade details
+- `decision_reason` - Why the trade was made
+- `technical_signals` - Technical indicators (JSON)
+- `news_sentiment` - News sentiment at trade time
 
-The current database schema includes:
+**Indexes:**
+- `idx_trading_history_position_id` - Query by position
+- `idx_trading_history_trade_time` - Query by time
 
-### Tables
+#### 3. intraday_decision_records
+Stores complete analysis sessions with full decision-making process.
 
-1. **users** - User accounts and authentication
-   - id, username, email, hashed_password, role, is_active
-   - created_at, updated_at
+**Key Fields:**
+- `session_id` - Unique session identifier
+- `positions_analyzed` - List of stocks analyzed (JSON)
+- `account_snapshot` - Account state at analysis time (JSON)
+- `decision_report` - Full decision report text
+- `trades_executed` - List of executed trades (JSON)
+- `tool_calls` - Complete tool call sequence (JSON)
 
-2. **user_configs** - User-specific configuration
-   - id, user_id
-   - last_ticker, last_analysts, last_research_depth
-   - last_llm_provider, last_shallow_thinker, last_deep_thinker, last_backend_url
-   - enable_trading_executor, futu_api_base_url, futu_api_key
-   - last_api_key
-   - created_at, updated_at
+**Indexes:**
+- `idx_intraday_decisions_user_id` - Query by user
+- `idx_intraday_decisions_session_id` - Query by session
+- `idx_intraday_decisions_start_time` - Query by time
+- `idx_intraday_decisions_status` - Query by status
 
-3. **scheduled_tasks** - Recurring analysis tasks
-   - id, user_id, task_name
-   - ticker, market, analysts, research_depth
-   - llm_provider, shallow_thinker, deep_thinker, backend_url
-   - is_public, enable_trading_executor, futu_api_base_url, futu_api_key
-   - execution_cycle, execution_time, interval_days, day_of_week, end_date
-   - is_enabled, status, next_run_time, last_run_time, total_executions
-   - scheduler_job_id
-   - created_at, updated_at
-
-4. **analysis_records** - Analysis requests and results
-   - id, analysis_id, user_id
-   - ticker, company_name, market, analysis_date
-   - analysts, research_depth, llm_provider, shallow_thinker, deep_thinker, backend_url
-   - is_public, enable_trading_executor, futu_api_base_url, futu_api_key
-   - status, current_step, progress_percentage
-   - final_state, trading_decision, final_summary, phases
-   - market_analysis, sentiment_analysis, news_analysis, fundamentals_analysis, risk_assessment
-   - error_message, error_traceback
-   - created_at, updated_at, started_at, completed_at
-
-5. **analysis_logs** - Real-time analysis logs
-   - id, analysis_record_id
-   - timestamp, level, message, agent, step, progress
-   - log_metadata
-
-6. **export_records** - Export tracking (PDF, Markdown, JSON)
-   - id, user_id, analysis_record_id
-   - export_format, file_path, file_size, download_url
-   - export_options, status, expires_at, downloaded_at
-   - error_message
-   - created_at, updated_at
-
-## Usage
+## How to Apply Migrations
 
 ### Automatic (Recommended)
+The migrations are automatically applied when the application starts via SQLAlchemy's `create_all()` method in `database.py`.
 
-Migrations run automatically on application startup:
+```python
+from web.backend.database import init_db_sync
+init_db_sync()
+```
+
+### Manual (SQLite)
+If you need to manually apply migrations to an existing database:
 
 ```bash
-python web/backend/app.py
-# or
-uvicorn web.backend.app:app --reload
+sqlite3 db/tradingagents.db < web/backend/migrations/001_add_intraday_trading_tables.sql
 ```
 
-### Manual
-
-Run migrations manually:
+### Manual (PostgreSQL)
+For PostgreSQL deployments, use the PostgreSQL-specific version in the migration file:
 
 ```bash
-python web/backend/migrations/auto_migrate.py
+psql -U username -d tradingagents < web/backend/migrations/001_add_intraday_trading_tables.sql
 ```
 
-### Initialize Fresh Database
+## Testing Migrations
 
-For a completely new database:
+Run the test script to verify models are correctly configured:
 
 ```bash
-python web/backend/migrations/init_schema.py
+python web/backend/test_intraday_models.py
 ```
 
-## Adding New Migrations
+## Database Schema
 
-1. **Create migration script**:
-   ```python
-   # web/backend/migrations/my_migration.py
-   def run_migration():
-       # Your migration logic here
-       pass
-   
-   if __name__ == "__main__":
-       run_migration()
-   ```
+The complete schema includes:
 
-2. **Register in auto_migrate.py**:
-   ```python
-   MIGRATIONS = [
-       # ... existing migrations ...
-       {
-           "name": "my_migration",
-           "file": "my_migration.py",
-           "description": "What this migration does"
-       },
-   ]
-   ```
+**Existing Tables:**
+- users
+- user_configs
+- analysis_records
+- analysis_logs
+- export_records
+- scheduled_tasks
 
-3. **Test**:
-   ```bash
-   python web/backend/migrations/my_migration.py
-   ```
+**New Tables (Intraday Trading):**
+- position_records
+- trading_history
+- intraday_decision_records
 
-4. **Deploy**: Migration runs automatically on next startup
+## Relationships
 
-## Migration Best Practices
-
-1. **Idempotent**: Migrations should be safe to run multiple times
-2. **Backward Compatible**: Don't delete existing columns
-3. **Test First**: Test in development before production
-4. **Backup**: Always backup production database before migrations
-5. **Atomic**: Each migration should be a single logical change
-
-## Troubleshooting
-
-### Reset Migration History
-
-**Warning**: This will cause all migrations to re-run!
-
-```sql
-DROP TABLE migration_history;
+```
+User (1) ----< (N) PositionRecord
+PositionRecord (1) ----< (N) TradingHistory
+User (1) ----< (N) IntradayDecisionRecord
 ```
 
-### Skip Failed Migration
+## Notes
 
-```sql
-DELETE FROM migration_history WHERE migration_name = 'failed_migration';
-```
-
-### Mark Migration as Applied
-
-```sql
-INSERT INTO migration_history (migration_name, applied_at, description)
-VALUES ('migration_name', datetime('now'), 'Description');
-```
-
-## Version History
-
-- **v2.0** (Current) - Consolidated schema with all features
-  - User authentication and roles
-  - User configuration caching
-  - Scheduled tasks
-  - Trading executor support
-  - Analysis tracking and results
-  - Export functionality
-
-## Support
-
-For issues or questions:
-- Check `AUTO_MIGRATION.md` for detailed documentation
-- Review migration logs in application startup output
-- Check `migration_history` table for applied migrations
+- All tables use `ON DELETE CASCADE` for foreign keys to maintain referential integrity
+- JSON fields are stored as TEXT in SQLite and JSONB in PostgreSQL
+- Timestamps use timezone-aware types for consistency across deployments
+- Indexes are optimized for common query patterns (user lookups, time-based queries)

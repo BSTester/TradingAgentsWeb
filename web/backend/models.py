@@ -29,6 +29,8 @@ class User(Base):
     export_records = relationship("ExportRecord", back_populates="user", cascade="all, delete-orphan")
     scheduled_tasks = relationship("ScheduledTask", back_populates="user", cascade="all, delete-orphan")
     user_config = relationship("UserConfig", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    position_records = relationship("PositionRecord", back_populates="user", cascade="all, delete-orphan")
+    intraday_decisions = relationship("IntradayDecisionRecord", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"
@@ -56,6 +58,19 @@ class UserConfig(Base):
     enable_trading_executor = Column(Boolean, default=False, nullable=False)  # Whether to enable trading executor
     futu_api_base_url = Column(String(255), nullable=True)  # Futu API base URL
     futu_api_key = Column(String(255), nullable=True)  # Futu API key (should be encrypted in production)
+    
+    # Intraday trading configuration
+    intraday_futu_api_url = Column(String(255), nullable=True)  # Intraday trading Futu API URL
+    intraday_futu_api_key = Column(String(255), nullable=True)  # Intraday trading Futu API key
+    intraday_scheduler_enabled = Column(Boolean, default=False, nullable=False)  # Whether intraday scheduler is running
+    intraday_interval_minutes = Column(Integer, default=5, nullable=False)  # Analysis interval in minutes
+    intraday_market_type = Column(String(10), default='US', nullable=False)  # Market type: US/HK/CN
+    
+    # Intraday trading LLM configuration
+    intraday_llm_provider = Column(String(50), nullable=True)  # LLM provider for intraday trading
+    intraday_api_key = Column(String(255), nullable=True)  # API key for intraday trading LLM
+    intraday_llm_model = Column(String(100), nullable=True)  # LLM model for intraday trading (uses deep thinker options)
+    intraday_backend_url = Column(String(255), nullable=True)  # Backend URL for intraday trading LLM
     
     # API Key cache (single field for all LLM providers, should be encrypted in production)
     last_api_key = Column(String(255), nullable=True)  # Last used API key (matches last_llm_provider)
@@ -265,3 +280,106 @@ class ExportRecord(Base):
     
     def __repr__(self):
         return f"<ExportRecord(id={self.id}, format='{self.export_format}', status='{self.status}')>"
+
+
+class PositionRecord(Base):
+    """
+    Position record model to track stock positions for intraday trading
+    Records the first opening time and tracks position changes over time
+    """
+    __tablename__ = "position_records"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    stock_code = Column(String(20), nullable=False, index=True)
+    market_type = Column(String(10), nullable=False)  # US/HK/CN
+    
+    # Position info
+    first_open_time = Column(DateTime(timezone=True), nullable=False)
+    first_open_price = Column(Float, nullable=False)
+    initial_quantity = Column(Integer, nullable=False)
+    
+    # Current status
+    current_quantity = Column(Integer, nullable=False)
+    last_update_time = Column(DateTime(timezone=True), nullable=False)
+    is_closed = Column(Boolean, default=False, nullable=False)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationships
+    user = relationship("User", back_populates="position_records")
+    trading_history = relationship("TradingHistory", back_populates="position_record", cascade="all, delete-orphan")
+    
+    def __repr__(self):
+        return f"<PositionRecord(id={self.id}, user_id={self.user_id}, stock_code='{self.stock_code}', market='{self.market_type}')>"
+
+
+class TradingHistory(Base):
+    """
+    Trading history model to track all trades for each position
+    Records buy/sell actions with decision context
+    """
+    __tablename__ = "trading_history"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    position_record_id = Column(Integer, ForeignKey("position_records.id"), nullable=False)
+    
+    # Trade info
+    trade_time = Column(DateTime(timezone=True), nullable=False)
+    trade_type = Column(String(10), nullable=False)  # BUY/SELL
+    quantity = Column(Integer, nullable=False)
+    price = Column(Float, nullable=False)
+    order_id = Column(String(50), nullable=True)
+    
+    # Decision context
+    decision_reason = Column(Text, nullable=True)
+    technical_signals = Column(JSON, nullable=True)
+    news_sentiment = Column(String(20), nullable=True)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    
+    # Relationships
+    position_record = relationship("PositionRecord", back_populates="trading_history")
+    
+    def __repr__(self):
+        return f"<TradingHistory(id={self.id}, position_id={self.position_record_id}, type='{self.trade_type}', quantity={self.quantity})>"
+
+
+class IntradayDecisionRecord(Base):
+    """
+    Intraday decision record model to store complete analysis sessions
+    Records the full decision-making process including tool calls and reasoning
+    """
+    __tablename__ = "intraday_decision_records"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    
+    # Session info
+    session_id = Column(String(255), unique=True, nullable=False, index=True)
+    start_time = Column(DateTime(timezone=True), nullable=False)
+    end_time = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String(20), nullable=False)  # running/completed/failed
+    
+    # Analysis context
+    market_type = Column(String(10), nullable=False)
+    positions_analyzed = Column(JSON, nullable=False)  # List of stock codes
+    account_snapshot = Column(JSON, nullable=False)  # Account info at start
+    
+    # Decision output
+    decision_report = Column(Text, nullable=True)
+    trades_executed = Column(JSON, nullable=True)  # List of trade details
+    tool_calls = Column(JSON, nullable=True)  # Complete tool call sequence
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationships
+    user = relationship("User", back_populates="intraday_decisions")
+    
+    def __repr__(self):
+        return f"<IntradayDecisionRecord(id={self.id}, session_id='{self.session_id}', status='{self.status}')>"

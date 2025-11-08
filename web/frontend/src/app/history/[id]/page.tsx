@@ -27,6 +27,11 @@ export default function HistoryDetailPage() {
     router.push('/history');
   };
 
+  const handleNewAnalysis = () => {
+    // 跳转到分析配置页面（dashboard）
+    router.push('/dashboard');
+  };
+
   // 鉴权逻辑
   React.useEffect(() => {
     if (!authLoading && !user) {
@@ -100,7 +105,7 @@ export default function HistoryDetailPage() {
       <div className="flex-1 max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 w-full">
         <AnalysisResults
           analysisId={analysisId}
-          onBackToConfig={handleBackToHome}
+          onBackToConfig={handleNewAnalysis}
           onBackToHistory={handleBackToHistory}
           onShowToast={showToast}
           fromLeaderboard={false}

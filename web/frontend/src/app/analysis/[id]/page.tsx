@@ -39,6 +39,16 @@ export default function AnalysisDetailPage() {
     }
   };
 
+  const handleNewAnalysis = () => {
+    // 跳转到分析配置页面
+    if (user) {
+      router.push('/dashboard');
+    } else {
+      // 未登录用户跳转到登录页
+      router.push('/login');
+    }
+  };
+
   // 鉴权逻辑：只有从历史记录进入时才需要登录
   React.useEffect(() => {
     // 如果从排行榜进入，不需要鉴权
@@ -127,7 +137,7 @@ export default function AnalysisDetailPage() {
       <div className="flex-1 max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 w-full">
         <AnalysisResults
           analysisId={analysisId}
-          onBackToConfig={handleBackToHome}
+          onBackToConfig={handleNewAnalysis}
           onBackToHistory={handleBackToHistory}
           onShowToast={showToast}
           fromLeaderboard={fromLeaderboard}

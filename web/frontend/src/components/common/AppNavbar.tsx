@@ -73,6 +73,19 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
               <i className="fas fa-clock mr-1" />
               定期报告
             </button>
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => router.push('/intraday-trading')}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActive('/intraday-trading')
+                    ? 'bg-green-600 text-white'
+                    : 'text-gray-300 hover:text-white hover:bg-gray-800'
+                }`}
+              >
+                <i className="fas fa-chart-line mr-1" />
+                短线交易
+              </button>
+            )}
             {showUserManagement && user?.role === 'admin' && (
               <button
                 onClick={() => router.push('/admin/users')}
