@@ -270,16 +270,35 @@ async def set_password(
     """
     Set or update user password
     Requires authentication
+    If user has already set password, old_password is required
     """
-    from web.backend.auth import get_password_hash
+    from web.backend.auth import get_password_hash, verify_password
     
     try:
+        # If user has already set a password, require old password for verification
+        if current_user.has_set_password:
+            if not request_data.old_password:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="修改密码需要输入旧密码"
+                )
+            
+            # Verify old password
+            if not verify_password(request_data.old_password, current_user.hashed_password):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="旧密码错误"
+                )
+        
         # Update user password
         current_user.hashed_password = get_password_hash(request_data.password)
+        current_user.has_set_password = True
         await db.commit()
         
         return {"message": "密码设置成功"}
         
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         raise HTTPException(

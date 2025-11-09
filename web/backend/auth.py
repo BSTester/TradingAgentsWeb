@@ -128,6 +128,9 @@ async def create_user(db: AsyncSession, username: str, email: str, password: Opt
     user_count = len(result.scalars().all())
     role = "admin" if user_count == 0 else "user"
     
+    # Track if user explicitly provided a password
+    user_provided_password = password is not None and len(password) >= 6
+    
     # Generate random password if not provided
     if not password:
         import secrets
@@ -138,10 +141,12 @@ async def create_user(db: AsyncSession, username: str, email: str, password: Opt
     
     # Create new user
     hashed_password = get_password_hash(password)
+    # Mark has_set_password as True only if user explicitly provided a password during registration
     db_user = User(
         username=username,
         email=email,
         hashed_password=hashed_password,
+        has_set_password=user_provided_password,
         role=role,
         is_active=True
     )
