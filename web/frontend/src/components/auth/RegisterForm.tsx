@@ -8,7 +8,6 @@ import { useToast, Toast } from '@/components/ui/Toast';
 import CaptchaImage from './CaptchaImage';
 
 interface RegisterFormProps {
-  // 移除了 onSwitchToLogin，现在由 AuthLayout 统一处理
   onSubmit?: (data: { username: string; email: string; password: string }) => void;
   externalLoading?: boolean;
   externalError?: string;
@@ -24,7 +23,6 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
   const [captchaInput, setCaptchaInput] = useState('');
   const [captchaKey, setCaptchaKey] = useState(0);
   
-  // Email verification code state
   const [emailVerificationCode, setEmailVerificationCode] = useState('');
   const [countdown, setCountdown] = useState(0);
   const [isSendingCode, setIsSendingCode] = useState(false);
@@ -33,7 +31,6 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
   const { toast, showToast, hideToast } = useToast();
   const router = useRouter();
 
-  // Countdown timer effect
   useEffect(() => {
     if (countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
@@ -42,14 +39,12 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
   }, [countdown]);
 
   const handleSendEmailCode = async () => {
-    // Validate email first
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!formData.email || !emailRegex.test(formData.email)) {
       showToast('请先输入有效的邮箱地址', 'warning');
       return;
     }
     
-    // Validate CAPTCHA
     if (!captchaId || !captchaInput.trim()) {
       showToast('请输入图形验证码', 'warning');
       return;
@@ -58,10 +53,8 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
     setIsSendingCode(true);
     
     try {
-      // Import authAPI from apiClient
       const { authAPI } = await import('@/lib/apiClient');
       
-      // Use the register-specific endpoint
       await authAPI.sendEmailCodeForRegister(formData.email, {
         id: captchaId,
         answer: captchaInput.trim(),
@@ -69,10 +62,8 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
       
       showToast('验证码已发送到您的邮箱，请查收', 'success');
       setCountdown(60);
-      // Keep captcha for reuse in registration submission (within TTL period)
     } catch (error: any) {
       showToast(error.message || '发送验证码失败，请稍后重试', 'error');
-      // Only refresh captcha on error
       setCaptchaKey((k) => k + 1);
       setCaptchaInput('');
     } finally {
@@ -87,13 +78,11 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
       return false;
     }
 
-    // Validate email verification code
     if (!emailVerificationCode || emailVerificationCode.length !== 6) {
       showToast('请输入6位邮箱验证码', 'warning');
       return false;
     }
 
-    // 服务端验证码：前端仅做必填校验，正确性由后端校验
     if (!captchaId || !captchaInput.trim()) {
       showToast('请输入图形验证码', 'warning');
       return false;
@@ -112,29 +101,25 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
     setIsLoading(true);
 
     try {
-      // Register without password (backend will generate a random one)
       await register(
         formData.username, 
         formData.email, 
-        undefined, // No password provided
+        undefined,
         { id: captchaId, answer: captchaInput.trim() },
         emailVerificationCode
       );
       
       showToast('注册成功！正在跳转...', 'success');
       
-      // Redirect to dashboard with setup_password parameter
       await new Promise(resolve => setTimeout(resolve, 500));
       router.replace('/dashboard?setup_password=true');
     } catch (error: any) {
-      // 显示详细的错误信息
       const errorMessage = error.message || '注册失败，请稍后重试';
       showToast(errorMessage, 'error');
       setIsLoading(false);
-      // 注册失败时刷新验证码（通过重新挂载触发内部刷新）
       setCaptchaKey((k) => k + 1);
       setCaptchaInput('');
-      setEmailVerificationCode(''); // Clear email code on error
+      setEmailVerificationCode('');
     }
   };
 
@@ -149,12 +134,12 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
     <>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="username" className="block text-sm font-medium text-text-secondary mb-2">
             用户名
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <i className="fas fa-user text-gray-400" />
+              <i className="fas fa-user text-text-tertiary" />
             </div>
             <input
               type="text"
@@ -162,7 +147,7 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
               name="username"
               value={formData.username}
               onChange={handleChange}
-              className="block w-full h-12 pl-10 pr-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="block w-full h-12 pl-10 pr-3 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
               placeholder="请输入用户名"
               required
             />
@@ -170,12 +155,12 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
         </div>
 
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-2">
             邮箱地址
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <i className="fas fa-envelope text-gray-400" />
+              <i className="fas fa-envelope text-text-tertiary" />
             </div>
             <input
               type="email"
@@ -183,19 +168,19 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
               name="email"
               value={formData.email}
               onChange={handleChange}
-              className="block w-full h-12 pl-10 pr-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="block w-full h-12 pl-10 pr-3 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
               placeholder="请输入邮箱地址"
               required
             />
           </div>
-          <p className="mt-2 text-xs text-blue-600 flex items-start">
+          <p className="mt-2 text-xs text-accent-primary flex items-start">
             <i className="fas fa-info-circle mr-1 mt-0.5 flex-shrink-0" />
             <span>请提供真实邮箱，用于接收分析报告、验证码登录等重要通知</span>
           </p>
         </div>
 
         <div>
-          <label htmlFor="emailCode" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="emailCode" className="block text-sm font-medium text-text-secondary mb-2">
             邮箱验证码
           </label>
           <div className="flex items-center gap-3">
@@ -204,7 +189,7 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
               id="emailCode"
               value={emailVerificationCode}
               onChange={(e) => setEmailVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="flex-1 h-12 px-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-center text-lg tracking-widest font-mono"
+              className="flex-1 h-12 px-3 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all text-center text-lg tracking-widest font-mono"
               placeholder="请输入6位验证码"
               maxLength={6}
               required
@@ -213,7 +198,7 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
               type="button"
               onClick={handleSendEmailCode}
               disabled={countdown > 0 || isSendingCode}
-              className="px-4 h-12 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap text-sm"
+              className="px-4 h-12 bg-gradient-to-r from-accent-secondary to-accent-primary text-white rounded-lg hover:shadow-glow-cyan focus:outline-none focus:ring-2 focus:ring-accent-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap text-sm"
             >
               {isSendingCode ? (
                 <>
@@ -227,15 +212,14 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
               )}
             </button>
           </div>
-          <p className="mt-2 text-xs text-gray-500">
+          <p className="mt-2 text-xs text-text-tertiary">
             <i className="fas fa-shield-alt mr-1" />
             验证码将发送到您的邮箱，有效期5分钟
           </p>
         </div>
 
-        {/* 图形验证码 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-text-secondary mb-2">
             图形验证码
           </label>
           <div className="flex items-center gap-3">
@@ -244,7 +228,7 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
               value={captchaInput}
               onChange={(e) => setCaptchaInput(e.target.value)}
               placeholder="请输入右侧验证码"
-              className="flex-1 h-12 px-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="flex-1 h-12 px-3 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary transition-all"
               required
             />
             <div className="flex items-center gap-2">
@@ -256,7 +240,7 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="w-full bg-gradient-to-r from-success-500 to-success-600 text-white py-3 px-4 rounded-lg hover:shadow-glow-cyan hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-success-500 focus:ring-offset-2 focus:ring-offset-dark-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           {isLoading ? (
             <>

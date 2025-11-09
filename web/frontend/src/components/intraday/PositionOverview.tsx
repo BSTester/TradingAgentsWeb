@@ -27,10 +27,10 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
         <div className="flex items-center justify-center">
-          <i className="fas fa-spinner fa-spin text-2xl text-blue-600 mr-3" />
-          <span className="text-gray-600">加载持仓信息...</span>
+          <i className="fas fa-spinner fa-spin text-2xl text-accent-primary mr-3" />
+          <span className="text-text-secondary">加载持仓信息...</span>
         </div>
       </div>
     );
@@ -38,8 +38,8 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
 
   if (error) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-center text-red-600">
+      <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
+        <div className="flex items-center justify-center text-danger-500">
           <i className="fas fa-exclamation-triangle mr-2" />
           <span>加载持仓信息失败</span>
         </div>
@@ -82,19 +82,19 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
 
   const getSortIcon = (field: SortField) => {
     if (sortField !== field) {
-      return <i className="fas fa-sort text-gray-400 ml-1" />;
+      return <i className="fas fa-sort text-text-muted ml-1" />;
     }
     return sortOrder === 'asc' ? (
-      <i className="fas fa-sort-up text-blue-600 ml-1" />
+      <i className="fas fa-sort-up text-accent-primary ml-1" />
     ) : (
-      <i className="fas fa-sort-down text-blue-600 ml-1" />
+      <i className="fas fa-sort-down text-accent-primary ml-1" />
     );
   };
 
   return (
-    <div className="bg-white rounded-lg shadow">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h2 className="text-xl font-bold text-gray-900">
+    <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border">
+      <div className="px-6 py-4 border-b border-dark-border">
+        <h2 className="text-xl font-bold text-text-primary">
           <i className="fas fa-list mr-2 text-green-600" />
           持仓概览
         </h2>
@@ -102,50 +102,50 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
       <div className="p-6">
         {filteredPositions.length === 0 ? (
           <div className="text-center py-12">
-            <i className="fas fa-inbox text-6xl text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">暂无持仓</h3>
-            <p className="text-gray-600">
+            <i className="fas fa-inbox text-6xl text-text-muted mb-4" />
+            <h3 className="text-lg font-medium text-text-primary mb-2">暂无持仓</h3>
+            <p className="text-text-secondary">
               当前没有持仓股票
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-dark-border">
+              <thead className="bg-dark-tertiary">
                 <tr>
                   <th
                     onClick={() => handleSort('stock_code')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer hover:bg-dark-primary"
                   >
                     <div className="flex items-center">
                       股票代码
                       {getSortIcon('stock_code')}
                     </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                     市场
                   </th>
                   <th
                     onClick={() => handleSort('holding_days')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer hover:bg-dark-primary"
                   >
                     <div className="flex items-center">
                       持仓天数
                       {getSortIcon('holding_days')}
                     </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                     数量
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                     成本价
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-w">
                     当前价
                   </th>
                   <th
                     onClick={() => handleSort('pnl_percent')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer hover:bg-darry"
                   >
                     <div className="flex items-center">
                       盈亏
@@ -154,7 +154,7 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
                   </th>
                   <th
                     onClick={() => handleSort('position_ratio')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer hover:bg-darry"
                   >
                     <div className="flex items-center">
                       仓位占比
@@ -163,15 +163,15 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-dark-secondary divide-y divide-dark-border">
                 {filteredPositions.map((position, index) => (
-                      <tr key={`${position.stock_code}-${index}`} className="hover:bg-gray-50">
+                      <tr key={`${position.stock_code}-${index}`} className="hover:bg-dark-tertiary transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-text-primary">
                             {position.stock_code}
                           </div>
                           {position.stock_name && (
-                            <div className="text-xs text-gray-500">
+                            <div className="text-xs text-text-tertiary">
                               {position.stock_name}
                             </div>
                           )}
@@ -181,16 +181,16 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
                             {marketLabels[position.market_type] || position.market_type}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
                           {position.holding_days || 0} 天
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
                           {position.quantity?.toLocaleString() || 0}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
                           {position.currency || '$'}{position.cost_price?.toFixed(2) || '0.00'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
                           {position.currency || '$'}{position.current_price?.toFixed(2) || '0.00'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -206,17 +206,17 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="flex-1">
-                              <div className="text-sm font-medium text-gray-900">
+                              <div className="text-sm font-medium text-text-primary">
                                 {(position.position_ratio || 0).toFixed(2)}%
                               </div>
-                              <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                              <div className="w-full bg-dark-tertiary rounded-full h-2 mt-1">
                                 <div
                                   className={`h-2 rounded-full ${
                                     (position.position_ratio || 0) > 30
-                                      ? 'bg-red-600'
+                                      ? 'bg-danger-500'
                                       : (position.position_ratio || 0) > 20
-                                      ? 'bg-yellow-600'
-                                      : 'bg-green-600'
+                                      ? 'bg-warning-500'
+                                      : 'bg-success-500'
                                   }`}
                                   style={{ width: `${Math.min(position.position_ratio || 0, 100)}%` }}
                                 />

@@ -158,33 +158,33 @@ export default function IntradayTradingPage() {
   // 如果正在认证检查或不是管理员，显示加载状态
   if (authLoading || !user || user.role !== 'admin') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
         <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4" />
-          <p className="text-gray-600">加载中...</p>
+          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
+          <p className="text-text-secondary">加载中...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-dark-primary flex flex-col">
       {/* 顶部导航栏 */}
       <AppNavbar user={user} onLogout={logout} />
 
       {/* 面包屑导航 */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <nav className="bg-dark-secondary/80 backdrop-blur-lg border-b border-dark-border shadow-lg pt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-10">
           <div className="flex items-center space-x-2 text-sm">
             <button
               onClick={() => router.push('/')}
-              className="text-blue-600 hover:text-blue-800"
+              className="text-accent-primary hover:text-accent-secondary transition-colors"
             >
               <i className="fas fa-home mr-1" />
               首页
             </button>
-            <i className="fas fa-chevron-right text-gray-400 text-xs" />
-            <span className="text-gray-900 font-medium">短线交易系统</span>
+            <i className="fas fa-chevron-right text-text-tertiary text-xs" />
+            <span className="text-text-primary font-medium">短线交易系统</span>
           </div>
         </div>
       </nav>
@@ -196,11 +196,11 @@ export default function IntradayTradingPage() {
           <div className="mb-8">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                  <i className="fas fa-chart-line mr-3 text-green-600" />
+                <h1 className="text-3xl font-bold text-text-primary mb-2">
+                  <i className="fas fa-chart-line mr-3 text-success-500" />
                   短线交易系统
                 </h1>
-                <p className="text-gray-600">
+                <p className="text-text-secondary">
                   自动化短线交易分析，智能决策，实时监控
                 </p>
               </div>
@@ -209,21 +209,21 @@ export default function IntradayTradingPage() {
               <div className="flex items-center space-x-2">
                 <div className={`flex items-center px-3 py-1 rounded-full text-sm ${
                   isConnected 
-                    ? 'bg-green-100 text-green-800' 
+                    ? 'bg-success-500/20 text-success-500' 
                     : wsStatus === 'connecting'
-                    ? 'bg-yellow-100 text-yellow-800'
+                    ? 'bg-warning-500/20 text-warning-500'
                     : wsStatus === 'error'
-                    ? 'bg-orange-100 text-orange-800'
-                    : 'bg-gray-100 text-gray-800'
+                    ? 'bg-warning-500/20 text-warning-500'
+                    : 'bg-dark-tertiary text-text-tertiary'
                 }`}>
                   <span className={`w-2 h-2 rounded-full mr-2 ${
                     isConnected 
-                      ? 'bg-green-600 animate-pulse' 
+                      ? 'bg-success-500 animate-pulse' 
                       : wsStatus === 'connecting'
-                      ? 'bg-yellow-600 animate-pulse'
+                      ? 'bg-warning-500 animate-pulse'
                       : wsStatus === 'error'
-                      ? 'bg-orange-600'
-                      : 'bg-gray-600'
+                      ? 'bg-warning-500'
+                      : 'bg-text-tertiary'
                   }`} />
                   {isConnected 
                     ? '实时连接' 

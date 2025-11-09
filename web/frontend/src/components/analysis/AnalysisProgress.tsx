@@ -681,20 +681,20 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
       case 'error':
         return 'fa-times-circle text-red-500';
       default:
-        return 'fa-circle text-gray-300';
+        return 'fa-circle text-text-muted';
     }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
+    <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">
+        <h3 className="text-lg font-semibold text-text-primary">
           <i className="fas fa-chart-line mr-2 text-blue-600" />
           分析进度
         </h3>
         <button
           onClick={onBackToConfig}
-          className="text-gray-500 hover:text-gray-700"
+          className="text-text-muted hover:text-text-secondary"
         >
           <i className="fas fa-times" />
         </button>
@@ -703,7 +703,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
       <div className="space-y-6">
         {/* 总体进度条 */}
         <div>
-          <div className="flex justify-between text-sm text-gray-600 mb-2">
+          <div className="flex justify-between text-sm text-text-secondary mb-2">
             <span>总体进度</span>
             <span>{Math.round(progress)}%</span>
           </div>
@@ -727,23 +727,23 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                 }`}
             >
               {/* 阶段头部 */}
-              <div className={`p-4 ${phase.status === 'running' ? 'bg-blue-50' :
-                  phase.status === 'completed' ? 'bg-green-50' :
-                    phase.status === 'error' ? 'bg-red-50' :
-                      'bg-gray-50'
+              <div className={`p-4 border-b border-dark-border ${phase.status === 'running' ? 'bg-gradient-to-r from-accent-primary/20 to-accent-primary/10' :
+                  phase.status === 'completed' ? 'bg-gradient-to-r from-success-500/20 to-success-500/10' :
+                    phase.status === 'error' ? 'bg-gradient-to-r from-danger-500/20 to-danger-500/10' :
+                      'bg-dark-tertiary/50'
                 }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${phase.status === 'running' ? 'bg-blue-500' :
-                        phase.status === 'completed' ? 'bg-green-500' :
-                          phase.status === 'error' ? 'bg-red-500' :
-                            'bg-gray-300'
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${phase.status === 'running' ? 'bg-accent-primary' :
+                        phase.status === 'completed' ? 'bg-success-500' :
+                          phase.status === 'error' ? 'bg-danger-500' :
+                            'bg-text-muted'
                       }`}>
                       <i className={`fas ${phase.icon} text-white`} />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">{phase.name}</h4>
-                      <p className="text-sm text-gray-600">{phase.description}</p>
+                      <h4 className="font-semibold text-text-primary">{phase.name}</h4>
+                      <p className="text-sm text-text-secondary">{phase.description}</p>
                     </div>
                   </div>
                   <i className={`fas ${getStatusIcon(phase.status)} text-xl`} />
@@ -752,7 +752,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
 
               {/* 智能体列表 */}
               {(phase.status === 'running' || phase.status === 'completed' || phaseIdx === currentPhaseIndex) && (
-                <div className="p-4 bg-white space-y-3">
+                <div className="p-4 bg-dark-primary space-y-3">
                   {phase.agents.map((agent, agentIdx) => (
                     <div key={agentIdx} className="border-l-4 pl-4 py-2" style={{
                       borderColor: agent.status === 'completed' ? '#10b981' :
@@ -763,10 +763,10 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center space-x-2">
                           <i className={`fas ${getStatusIcon(agent.status)}`} />
-                          <span className="font-medium text-gray-900">{agent.name}</span>
+                          <span className="font-medium text-text-primary">{agent.name}</span>
                         </div>
                         {agent.status === 'running' && (
-                          <span className="text-xs text-blue-600 font-medium">执行中...</span>
+                          <span className="text-xs text-accent-primary font-medium">执行中...</span>
                         )}
                         {agent.status === 'completed' && (
                           <span className="text-xs text-green-600 font-medium">已完成</span>
@@ -778,9 +778,9 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
 
                       {/* 智能体日志 */}
                       {agent.logs.length > 0 && (
-                        <div className="mt-2 max-h-32 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                        <div className="mt-2 max-h-32 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-dark-border scrollbar-track-dark-tertiary">
                           {agent.logs.slice(-10).map((log, logIdx) => (
-                            <div key={logIdx} className="text-xs text-gray-600 pl-6 break-words">
+                            <div key={logIdx} className="text-xs text-text-secondary pl-6 break-words">
                               {log}
                             </div>
                           ))}
@@ -817,7 +817,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
           )}
           <button
             onClick={onBackToConfig}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+            className="px-4 py-2 text-text-primary bg-dark-tertiary rounded-md hover:bg-dark-primary border border-dark-border transition-colors"
           >
             <i className="fas fa-arrow-left mr-2" />
             返回

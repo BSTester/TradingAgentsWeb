@@ -151,7 +151,7 @@ export function CaptchaImage({
           ref={canvasRef}
           width={width}
           height={height}
-          className="rounded border border-gray-300 cursor-pointer bg-white"
+          className="rounded border border-dark-border cursor-pointer bg-dark-tertiary hover:border-accent-primary transition-colors"
           onClick={() => { void regenerate(); }}
           aria-label="点击刷新验证码"
           title="点击刷新验证码"

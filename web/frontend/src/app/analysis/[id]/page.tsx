@@ -81,10 +81,10 @@ export default function AnalysisDetailPage() {
   // 只有从历史记录进入时才显示加载状态
   if (!fromLeaderboard && (authLoading || !user)) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
         <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4" />
-          <p className="text-gray-600">加载中...</p>
+          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
+          <p className="text-text-secondary">加载中...</p>
         </div>
       </div>
     );
@@ -104,31 +104,31 @@ export default function AnalysisDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-dark-primary flex flex-col">
       {/* 顶部导航栏 */}
       <Header user={user} onLogout={logout} />
 
       {/* 面包屑导航 */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <nav className="bg-dark-secondary/80 backdrop-blur-lg border-b border-dark-border shadow-lg pt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-10">
           <div className="flex items-center space-x-2 text-sm">
             <button
               onClick={handleBackToHome}
-              className="text-blue-600 hover:text-blue-800"
+              className="text-accent-primary hover:text-accent-secondary transition-colors"
             >
               <i className="fas fa-home mr-1" />
               首页
             </button>
-            <i className="fas fa-chevron-right text-gray-400 text-xs" />
+            <i className="fas fa-chevron-right text-text-tertiary text-xs" />
             {fromLeaderboard && (
               <>
-                <span className="text-gray-600">{getMarketName(marketTab)}</span>
-                <i className="fas fa-chevron-right text-gray-400 text-xs" />
+                <span className="text-text-secondary">{getMarketName(marketTab)}</span>
+                <i className="fas fa-chevron-right text-text-tertiary text-xs" />
               </>
             )}
-            <span className="text-gray-600">分析详情</span>
-            <i className="fas fa-chevron-right text-gray-400 text-xs" />
-            <span className="text-gray-900 font-medium">{analysisId}</span>
+            <span className="text-text-secondary">分析详情</span>
+            <i className="fas fa-chevron-right text-text-tertiary text-xs" />
+            <span className="text-text-primary font-medium">{analysisId}</span>
           </div>
         </div>
       </nav>
@@ -151,7 +151,7 @@ export default function AnalysisDetailPage() {
       {showBackToTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-8 right-8 bg-blue-600 text-white w-12 h-12 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-300 flex items-center justify-center z-50 hover:scale-110"
+          className="fixed bottom-8 right-8 bg-gradient-to-r from-accent-primary to-accent-secondary text-white w-12 h-12 rounded-full shadow-glow-cyan hover:scale-110 transition-all duration-300 flex items-center justify-center z-50"
           aria-label="返回顶部"
         >
           <i className="fas fa-arrow-up text-xl" />

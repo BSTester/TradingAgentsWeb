@@ -16,19 +16,18 @@ interface AnalysisCardData {
 interface AnalysisCardProps {
   analysis: AnalysisCardData;
   onClick: () => void;
-  market?: string; // 添加市场参数，用于返回时定位
+  market?: string;
 }
 
 export function AnalysisCard({ analysis, onClick, market }: AnalysisCardProps) {
-  // 安全获取交易决策，处理 null/undefined 情况
   const tradingDecision = analysis.trading_decision || '';
   
   const getDecisionColor = (decision: string) => {
     const d = (decision || '').toLowerCase();
-    if (d.includes('买入') || d.includes('buy')) return 'text-white bg-gradient-to-br from-[#f03a55] to-[#d91744] border border-[#f03a55] shadow-red-200';
-    if (d.includes('卖出') || d.includes('sell')) return 'text-white bg-gradient-to-br from-[#00a870] to-[#008c5e] border border-[#00a870] shadow-green-200';
-    if (d.includes('持有') || d.includes('观望') || d.includes('hold')) return 'text-white bg-gradient-to-br from-yellow-500 to-yellow-600 border border-yellow-600 shadow-yellow-200';
-    return 'text-white bg-gradient-to-br from-yellow-500 to-yellow-600 border border-yellow-600 shadow-yellow-200';
+    if (d.includes('买入') || d.includes('buy')) return 'from-success-500 to-success-600';
+    if (d.includes('卖出') || d.includes('sell')) return 'from-danger-500 to-danger-600';
+    if (d.includes('持有') || d.includes('观望') || d.includes('hold')) return 'from-warning-500 to-warning-600';
+    return 'from-warning-500 to-warning-600';
   };
 
   const getDecisionIcon = (decision: string) => {
@@ -57,88 +56,58 @@ export function AnalysisCard({ analysis, onClick, market }: AnalysisCardProps) {
   return (
     <div 
       onClick={onClick}
-      className="bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-200 overflow-hidden group"
+      className="group bg-dark-secondary rounded-xl border border-dark-border hover:border-accent-primary hover:shadow-glow-cyan transition-all duration-300 cursor-pointer overflow-hidden"
     >
-      {/* 顶部渐变条 - 根据交易决策显示不同颜色 */}
-      <div className={`h-2 transition-all ${
-        tradingDecision.toLowerCase().includes('买入') || tradingDecision.toLowerCase().includes('buy')
-          ? 'bg-gradient-to-r from-[#f03a55] to-[#d91744] group-hover:from-[#d91744] group-hover:to-[#c01535]'
-          : tradingDecision.toLowerCase().includes('卖出') || tradingDecision.toLowerCase().includes('sell')
-          ? 'bg-gradient-to-r from-[#00a870] to-[#008c5e] group-hover:from-[#008c5e] group-hover:to-[#00704c]'
-          : 'bg-gradient-to-r from-yellow-500 to-yellow-600 group-hover:from-yellow-600 group-hover:to-yellow-700'
-      }`} />
+      {/* Top gradient bar */}
+      <div className={`h-1 bg-gradient-to-r ${getDecisionColor(tradingDecision)}`} />
       
       <div className="p-6">
-        {/* 顶部：股票代码和交易决策 */}
+        {/* Header: Ticker and Decision */}
         <div className="flex items-start justify-between mb-4">
-          {/* 左侧：股票代码 */}
+          {/* Left: Ticker */}
           <div className="flex items-center space-x-3">
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-md flex-shrink-0 ${
-              tradingDecision.toLowerCase().includes('买入') || tradingDecision.toLowerCase().includes('buy')
-                ? 'bg-gradient-to-br from-[#f03a55] to-[#d91744]'
-                : tradingDecision.toLowerCase().includes('卖出') || tradingDecision.toLowerCase().includes('sell')
-                ? 'bg-gradient-to-br from-[#00a870] to-[#008c5e]'
-                : 'bg-gradient-to-br from-yellow-500 to-yellow-600'
-            }`}>
+            <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-md flex-shrink-0 bg-gradient-to-br ${getDecisionColor(tradingDecision)}`}>
               {analysis.ticker.substring(0, 2).toUpperCase()}
             </div>
             <div>
-              <h3 className="text-xl font-bold text-gray-900">{analysis.ticker}</h3>
-              <p className="text-sm text-gray-500">
+              <h3 className="text-xl font-bold text-text-primary">{analysis.ticker}</h3>
+              <p className="text-sm text-text-tertiary">
                 {analysis.market === 'US' ? '美股' : analysis.market === 'HK' ? '港股' : analysis.market === 'CN' ? 'A股' : analysis.market}
                 {analysis.company_name && ` | ${analysis.company_name}`}
               </p>
             </div>
           </div>
 
-          {/* 右侧：交易决策 */}
-          <div className={`flex items-center px-4 py-2 rounded-lg font-bold text-sm shadow-sm ${getDecisionColor(tradingDecision)} flex-shrink-0`}>
+          {/* Right: Decision Badge */}
+          <div className={`flex items-center px-4 py-2 rounded-lg font-bold text-sm shadow-sm text-white bg-gradient-to-br ${getDecisionColor(tradingDecision)} flex-shrink-0`}>
             <i className={`fas ${getDecisionIcon(tradingDecision)} mr-2`} />
             {tradingDecision || '未知'}
           </div>
         </div>
 
-        {/* 分析信息：左右分布 */}
+        {/* Analysis Info */}
         <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
-          {/* 左侧：分析日期 */}
-          <div className="flex items-center text-gray-600">
-            <i className={`far fa-calendar mr-2 flex-shrink-0 ${
-              tradingDecision.toLowerCase().includes('买入') || tradingDecision.toLowerCase().includes('buy')
-                ? 'text-[#f03a55]'
-                : tradingDecision.toLowerCase().includes('卖出') || tradingDecision.toLowerCase().includes('sell')
-                ? 'text-[#00a870]'
-                : 'text-yellow-500'
-            }`} />
+          {/* Left: Analysis Date */}
+          <div className="flex items-center text-text-tertiary">
+            <i className="far fa-calendar mr-2 flex-shrink-0 text-accent-primary" />
             <div>
-              <div className="text-xs text-gray-500">分析日期</div>
-              <div className="font-medium text-gray-900">{analysis.analysis_date}</div>
+              <div className="text-xs text-text-muted">分析日期</div>
+              <div className="font-medium text-text-secondary">{analysis.analysis_date}</div>
             </div>
           </div>
 
-          {/* 右侧：完成时间 */}
-          <div className="flex items-center justify-end text-gray-600">
-            <i className={`far fa-clock mr-2 flex-shrink-0 ${
-              tradingDecision.toLowerCase().includes('买入') || tradingDecision.toLowerCase().includes('buy')
-                ? 'text-[#f03a55]'
-                : tradingDecision.toLowerCase().includes('卖出') || tradingDecision.toLowerCase().includes('sell')
-                ? 'text-[#00a870]'
-                : 'text-yellow-500'
-            }`} />
+          {/* Right: Completed Time */}
+          <div className="flex items-center justify-end text-text-tertiary">
+            <i className="far fa-clock mr-2 flex-shrink-0 text-accent-primary" />
             <div>
-              <div className="text-xs text-gray-500">完成时间</div>
-              <div className="font-medium text-gray-900">{formatDate(analysis.completed_at)}</div>
+              <div className="text-xs text-text-muted">完成时间</div>
+              <div className="font-medium text-text-secondary">{formatDate(analysis.completed_at)}</div>
             </div>
           </div>
         </div>
 
-        {/* 查看详情按钮 - 根据交易决策显示不同颜色 */}
-        <button className={`w-full text-white py-2 rounded-lg transition-colors font-medium ${
-          tradingDecision.toLowerCase().includes('买入') || tradingDecision.toLowerCase().includes('buy')
-            ? 'bg-[#f03a55] hover:bg-[#d91744] group-hover:bg-[#d91744]'
-            : tradingDecision.toLowerCase().includes('卖出') || tradingDecision.toLowerCase().includes('sell')
-            ? 'bg-[#00a870] hover:bg-[#008c5e] group-hover:bg-[#008c5e]'
-            : 'bg-yellow-600 hover:bg-yellow-700 group-hover:bg-yellow-700'
-        }`}>
+        {/* View Details Button */}
+        <button className={`w-full text-white py-2 rounded-lg transition-all font-medium bg-gradient-to-r ${getDecisionColor(tradingDecision)} hover:shadow-glow-cyan group-hover:scale-105`}>
           <i className="fas fa-chart-line mr-2" />
           查看详情
         </button>

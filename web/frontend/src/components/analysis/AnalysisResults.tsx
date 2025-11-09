@@ -239,7 +239,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                 分析日期：{results?.analysis_date}
               </p>
               <p style={{ opacity: '0.9', textAlign: 'center', margin: '0 auto' }}>
-                生成系统：TradingAgents 多智能体分析系统
+                生成系统：TradingAgentsWeb 多智能体分析系统
               </p>
             </div>
           </div>
@@ -926,7 +926,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-lg p-12">
+      <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-12">
         <div className="text-center">
           <div className="relative inline-block mb-4">
             {/* 外圈旋转 */}
@@ -934,8 +934,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
             {/* 内圈反向旋转 */}
             <div className="absolute top-2 left-2 w-16 h-16 border-4 border-purple-200 border-b-purple-600 rounded-full animate-spin-reverse"></div>
           </div>
-          <p className="text-gray-700 font-medium text-lg">正在加载分析结果...</p>
-          <p className="text-sm text-gray-500 mt-2">正在获取详细报告，请稍候</p>
+          <p className="text-text-primary font-medium text-lg">正在加载分析结果...</p>
+          <p className="text-sm text-text-tertiary mt-2">正在获取详细报告，请稍候</p>
         </div>
       </div>
     );
@@ -1357,23 +1357,23 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
         }
       `}</style>
 
-      <div className="bg-white rounded-lg shadow-lg">
+      <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border">
         {/* 头部 */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-dark-border">
           <div className="flex justify-between items-center">
             <div>
-              <h3 className="text-2xl font-bold text-gray-900">
-                <i className="fas fa-file-alt mr-2 text-blue-600" />
+              <h3 className="text-2xl font-bold text-text-primary">
+                <i className="fas fa-file-alt mr-2 text-accent-primary" />
                 分析结果报告
               </h3>
-              <div className="flex items-center mt-2 text-sm text-gray-600">
+              <div className="flex items-center mt-2 text-sm text-text-secondary">
                 <i className="far fa-calendar mr-1" />
                 分析日期: {results?.analysis_date}
               </div>
             </div>
             <button
               onClick={onBackToHistory}
-              className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors no-print"
+              className="flex items-center space-x-2 px-4 py-2 text-text-secondary hover:text-text-primary hover:bg-dark-tertiary rounded-lg transition-colors no-print"
               title="返回"
             >
               <i className="fas fa-arrow-left text-lg" />
@@ -1420,8 +1420,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
               <button
                 onClick={() => setActivePhase(-1)}
                 className={`px-4 py-3 font-medium text-sm whitespace-nowrap transition-all ${activePhase === -1
-                  ? 'border-b-2 border-blue-600 text-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'border-b-2 border-accent-primary text-accent-primary'
+                  : 'text-text-secondary hover:text-text-primary'
                   }`}
               >
                 <i className="fas fa-file-alt mr-2" />
@@ -1434,8 +1434,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                   key={phase.id}
                   onClick={() => setActivePhase(index)}
                   className={`px-4 py-3 font-medium text-sm whitespace-nowrap transition-all ${activePhase === index
-                    ? 'border-b-2 border-blue-600 text-blue-600'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'border-b-2 border-accent-primary text-accent-primary'
+                    : 'text-text-secondary hover:text-text-primary'
                     }`}
                 >
                   <i className={`fas ${phase.icon} mr-2`} />
@@ -1462,7 +1462,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                         {title}
                       </h2>
                     </div>
-                    <div className="p-6 bg-white">
+                    <div className="p-6 bg-dark-tertiary">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm, remarkBreaks]}
                         components={{
@@ -1475,15 +1475,15 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                           ),
                           // 三级标题 - 小标题，带左侧装饰条和背景
                           h3: ({ children }) => (
-                            <h3 className="text-lg font-semibold text-gray-800 mt-5 mb-3 pl-4 pr-3 py-2 border-l-4 border-blue-500 bg-blue-50 rounded-r flex items-center">
-                              <i className="fas fa-chevron-right mr-2 text-blue-500 text-sm" />
+                            <h3 className="text-lg font-semibold text-text-primary mt-5 mb-3 pl-4 pr-3 py-2 border-l-4 border-accent-primary bg-dark-secondary rounded-r flex items-center">
+                              <i className="fas fa-chevron-right mr-2 text-accent-primary text-sm" />
                               {children}
                             </h3>
                           ),
                           // 四级标题 - 带圆点装饰
                           h4: ({ children }) => (
-                            <h4 className="text-base font-semibold text-gray-700 mt-4 mb-2 flex items-center">
-                              <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                            <h4 className="text-base font-semibold text-text-primary mt-4 mb-2 flex items-center">
+                              <span className="w-2 h-2 bg-accent-primary rounded-full mr-2"></span>
                               {children}
                             </h4>
                           ),
@@ -1513,32 +1513,32 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
 
                             // 普通段落
                             return (
-                              <p className="text-gray-700 leading-7 mb-4 text-justify">
+                              <p className="text-text-secondary leading-7 mb-4 text-justify">
                                 {children}
                               </p>
                             );
                           },
                           // 加粗文字 - 使用深色和更粗的字体
                           strong: ({ children }) => (
-                            <strong className="font-bold text-gray-900 bg-yellow-50 px-1">
+                            <strong className="font-bold text-text-primary bg-accent-primary/10 px-1">
                               {children}
                             </strong>
                           ),
                           // 斜体
                           em: ({ children }) => (
-                            <em className="italic text-gray-600">
+                            <em className="italic text-text-tertiary">
                               {children}
                             </em>
                           ),
                           // 无序列表 - 使用自定义样式
                           ul: ({ children }) => (
-                            <ul className="mb-4 space-y-2 text-gray-700">
+                            <ul className="mb-4 space-y-2 text-text-secondary">
                               {children}
                             </ul>
                           ),
                           // 有序列表 - 使用自定义样式
                           ol: ({ children }) => (
-                            <ol className="mb-4 space-y-2 text-gray-700">
+                            <ol className="mb-4 space-y-2 text-text-secondary">
                               {children}
                             </ol>
                           ),
@@ -1550,7 +1550,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                           ),
                           // 引用块 - 金融报告风格
                           blockquote: ({ children }) => (
-                            <blockquote className="border-l-4 border-blue-500 bg-blue-50 pl-4 pr-4 py-3 my-4 italic text-gray-700">
+                            <blockquote className="border-l-4 border-accent-primary bg-dark-secondary pl-4 pr-4 py-3 my-4 italic text-text-secondary">
                               {children}
                             </blockquote>
                           ),
@@ -1564,31 +1564,31 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                           ),
                           // 表头 - 深色背景
                           thead: ({ children }) => (
-                            <thead className="bg-gray-50">
+                            <thead className="bg-dark-secondary">
                               {children}
                             </thead>
                           ),
                           // 表体
                           tbody: ({ children }) => (
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody className="bg-dark-tertiary divide-y divide-dark-border">
                               {children}
                             </tbody>
                           ),
                           // 表格行 - 悬停效果
                           tr: ({ children }) => (
-                            <tr className="hover:bg-gray-50 transition-colors">
+                            <tr className="hover:bg-dark-secondary transition-colors">
                               {children}
                             </tr>
                           ),
                           // 表头单元格 - 加粗和居中
                           th: ({ children }) => (
-                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
                               {children}
                             </th>
                           ),
                           // 表格单元格 - 适当的内边距
                           td: ({ children }) => (
-                            <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">
+                            <td className="px-6 py-4 text-sm text-text-secondary whitespace-nowrap">
                               {children}
                             </td>
                           ),
@@ -1599,17 +1599,17 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                           // 行内代码
                           code: ({ inline, children }: any) =>
                             inline ? (
-                              <code className="bg-gray-100 text-red-600 px-2 py-0.5 rounded text-sm font-mono">
+                              <code className="bg-dark-secondary text-accent-primary px-2 py-0.5 rounded text-sm font-mono">
                                 {children}
                               </code>
                             ) : (
-                              <code className="block bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm font-mono my-4">
+                              <code className="block bg-[#0a0e1a] text-text-primary p-4 rounded-lg overflow-x-auto text-sm font-mono my-4 border border-dark-border">
                                 {children}
                               </code>
                             ),
                           // 代码块
                           pre: ({ children }) => (
-                            <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4">
+                            <pre className="bg-[#0a0e1a] text-text-primary p-4 rounded-lg overflow-x-auto my-4 border border-dark-border">
                               {children}
                             </pre>
                           ),
@@ -1643,7 +1643,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                         {agent.name}
                       </h4>
                     </div>
-                    <div className="p-6 bg-white">
+                    <div className="p-6 bg-dark-tertiary">
                       <div className="markdown-content">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm, remarkBreaks]}
@@ -1656,20 +1656,20 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                               </h1>
                             ),
                             h2: ({ children }) => (
-                              <h2 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b-2 border-blue-500 flex items-center">
-                                <i className="fas fa-bookmark mr-2 text-blue-500 text-sm" />
+                              <h2 className="text-lg font-bold text-text-primary mb-3 pb-2 border-b-2 border-accent-primary flex items-center">
+                                <i className="fas fa-bookmark mr-2 text-accent-primary text-sm" />
                                 {children}
                               </h2>
                             ),
                             h3: ({ children }) => (
-                              <h3 className="text-base font-semibold text-gray-800 mt-4 mb-2 pl-4 pr-3 py-2 border-l-4 border-blue-500 bg-blue-50 rounded-r flex items-center">
-                                <i className="fas fa-chevron-right mr-2 text-blue-500 text-xs" />
+                              <h3 className="text-base font-semibold text-text-primary mt-4 mb-2 pl-4 pr-3 py-2 border-l-4 border-accent-primary bg-dark-secondary rounded-r flex items-center">
+                                <i className="fas fa-chevron-right mr-2 text-accent-primary text-xs" />
                                 {children}
                               </h3>
                             ),
                             h4: ({ children }) => (
-                              <h4 className="text-sm font-semibold text-gray-700 mt-3 mb-2 flex items-center">
-                                <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                              <h4 className="text-sm font-semibold text-text-primary mt-3 mb-2 flex items-center">
+                                <span className="w-2 h-2 bg-accent-primary rounded-full mr-2"></span>
                                 {children}
                               </h4>
                             ),
@@ -1699,92 +1699,92 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
 
                               // 普通段落
                               return (
-                                <p className="text-gray-700 leading-7 mb-4 text-justify">
+                                <p className="text-text-secondary leading-7 mb-4 text-justify">
                                   {children}
                                 </p>
                               );
                             },
                             // 加粗
                             strong: ({ children }) => (
-                              <strong className="font-bold text-gray-900 bg-yellow-50 px-1">
+                              <strong className="font-bold text-text-primary bg-accent-primary/10 px-1">
                                 {children}
                               </strong>
                             ),
                             // 斜体
                             em: ({ children }) => (
-                              <em className="italic text-gray-600">
+                              <em className="italic text-text-tertiary">
                                 {children}
                               </em>
                             ),
                             // 无序列表
                             ul: ({ children }) => (
-                              <ul className="mb-4 space-y-2 text-gray-700">
+                              <ul className="mb-4 space-y-2 text-text-secondary">
                                 {children}
                               </ul>
                             ),
                             // 有序列表
                             ol: ({ children }) => (
-                              <ol className="mb-4 space-y-2 text-gray-700">
+                              <ol className="mb-4 space-y-2 text-text-secondary">
                                 {children}
                               </ol>
                             ),
                             // 列表项
                             li: ({ children }) => (
-                              <li className="ml-6 pl-2 relative before:content-['•'] before:absolute before:left-[-12px] before:text-blue-500 before:font-bold">
+                              <li className="ml-6 pl-2 relative before:content-['•'] before:absolute before:left-[-12px] before:text-accent-primary before:font-bold">
                                 {children}
                               </li>
                             ),
                             // 引用块
                             blockquote: ({ children }) => (
-                              <blockquote className="border-l-4 border-blue-500 bg-blue-50 pl-4 pr-4 py-3 my-4 italic text-gray-700">
+                              <blockquote className="border-l-4 border-accent-primary bg-dark-secondary pl-4 pr-4 py-3 my-4 italic text-text-secondary">
                                 {children}
                               </blockquote>
                             ),
                             // 表格
                             table: ({ children }) => (
-                              <div className="overflow-x-auto my-6 shadow-sm rounded-lg border border-gray-200">
-                                <table className="min-w-full divide-y divide-gray-200">
+                              <div className="overflow-x-auto my-6 shadow-sm rounded-lg border border-dark-border">
+                                <table className="min-w-full divide-y divide-dark-border">
                                   {children}
                                 </table>
                               </div>
                             ),
                             thead: ({ children }) => (
-                              <thead className="bg-gray-50">
+                              <thead className="bg-dark-secondary">
                                 {children}
                               </thead>
                             ),
                             tbody: ({ children }) => (
-                              <tbody className="bg-white divide-y divide-gray-200">
+                              <tbody className="bg-dark-tertiary divide-y divide-dark-border">
                                 {children}
                               </tbody>
                             ),
                             tr: ({ children }) => (
-                              <tr className="hover:bg-gray-50 transition-colors">
+                              <tr className="hover:bg-dark-secondary transition-colors">
                                 {children}
                               </tr>
                             ),
                             th: ({ children }) => (
-                              <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                              <th className="px-6 py-3 text-left text-xs font-bold text-text-primary uppercase tracking-wider">
                                 {children}
                               </th>
                             ),
                             td: ({ children }) => (
-                              <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">
+                              <td className="px-6 py-4 text-sm text-text-secondary whitespace-nowrap">
                                 {children}
                               </td>
                             ),
                             // 水平线
                             hr: () => (
-                              <hr className="my-6 border-t border-gray-300" />
+                              <hr className="my-6 border-t border-dark-border" />
                             ),
                             // 代码
                             code: ({ inline, children }: any) =>
                               inline ? (
-                                <code className="bg-gray-100 text-red-600 px-2 py-0.5 rounded text-sm font-mono">
+                                <code className="bg-dark-secondary text-accent-primary px-2 py-0.5 rounded text-sm font-mono">
                                   {children}
                                 </code>
                               ) : (
-                                <code className="block bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm font-mono my-4">
+                                <code className="block bg-[#0a0e1a] text-text-primary p-4 rounded-lg overflow-x-auto text-sm font-mono my-4 border border-dark-border">
                                   {children}
                                 </code>
                               ),
@@ -1792,7 +1792,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                             a: ({ href, children }) => (
                               <a
                                 href={href}
-                                className="text-blue-600 hover:text-blue-800 underline font-medium"
+                                className="text-accent-primary hover:text-accent-secondary underline font-medium"
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
@@ -1811,7 +1811,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
         </div>
 
         {/* 底部操作区域 */}
-        <div className="p-6 bg-gray-50 border-t border-gray-200 no-print">
+        <div className="p-6 bg-dark-tertiary border-t border-dark-border no-print">
           {/* 操作按钮 - 排行榜模式下隐藏 */}
           {!fromLeaderboard && (
             <div className="flex flex-wrap gap-3 justify-center mb-6">
@@ -1917,7 +1917,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                   <div className="text-center space-y-2 opacity-90">
                     <div className="w-full h-px bg-white opacity-30 mb-4"></div>
                     <p className="text-sm">分析日期：{results?.analysis_date}</p>
-                    <p className="text-sm">生成系统：TradingAgents 多智能体分析系统</p>
+                    <p className="text-sm">生成系统：TradingAgentsWeb 多智能体分析系统</p>
                     <p className="text-xs opacity-75 mt-2">Powered by Multi-Agent AI Analysis</p>
                   </div>
                 </div>
@@ -2155,7 +2155,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                         报告来源说明
                       </h3>
                       <div className="text-xs text-gray-600 space-y-1">
-                        <p><strong>生成系统：</strong>TradingAgents 多智能体分析系统</p>
+                        <p><strong>生成系统：</strong>TradingAgentsWeb 多智能体分析系统</p>
                         <p><strong>分析方法：</strong>本报告由多个专业智能体协同分析生成，包括基本面分析师、市场分析师、新闻分析师、社交媒体分析师、多空研究员、风险管理团队等。</p>
                         <p><strong>平台地址：</strong>{systemDomain || window.location.origin}</p>
                         <p className="text-xs text-gray-500 mt-2">

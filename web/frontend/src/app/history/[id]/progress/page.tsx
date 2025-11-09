@@ -44,42 +44,42 @@ export default function HistoryProgressPage() {
 
   if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
         <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4" />
-          <p className="text-gray-600">加载中...</p>
+          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
+          <p className="text-text-secondary">加载中...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-dark-primary flex flex-col">
       {/* 顶部导航栏 */}
       <AppNavbar user={user} onLogout={logout} />
 
       {/* 面包屑导航 */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <nav className="bg-dark-secondary/80 backdrop-blur-lg border-b border-dark-border shadow-lg pt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-10">
           <div className="flex items-center space-x-2 text-sm">
             <button
               onClick={handleBackToHome}
-              className="text-blue-600 hover:text-blue-800"
+              className="text-accent-primary hover:text-accent-secondary transition-colors"
             >
               <i className="fas fa-home mr-1" />
               首页
             </button>
-            <i className="fas fa-chevron-right text-gray-400 text-xs" />
+            <i className="fas fa-chevron-right text-text-tertiary text-xs" />
             <button
               onClick={handleBackToHistory}
-              className="text-blue-600 hover:text-blue-800"
+              className="text-accent-primary hover:text-accent-secondary transition-colors"
             >
               分析历史
             </button>
-            <i className="fas fa-chevron-right text-gray-400 text-xs" />
-            <span className="text-gray-900 font-medium">分析进度</span>
-            <i className="fas fa-chevron-right text-gray-400 text-xs" />
-            <span className="text-gray-600">{analysisId}</span>
+            <i className="fas fa-chevron-right text-text-tertiary text-xs" />
+            <span className="text-text-primary font-medium">分析进度</span>
+            <i className="fas fa-chevron-right text-text-tertiary text-xs" />
+            <span className="text-text-secondary">{analysisId}</span>
           </div>
         </div>
       </nav>
