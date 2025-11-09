@@ -249,6 +249,85 @@ class UserIntradaySchedulerManager:
     def get_all_users(self) -> list:
         """Get list of all user IDs with schedulers"""
         return list(self._schedulers.keys())
+    
+    async def restore_schedulers_from_db(self):
+        """
+        Restore schedulers from database on service restart.
+        Only restores schedulers that were running when service stopped unexpectedly.
+        """
+        try:
+            from web.backend.database import SessionLocal
+            from web.backend.models import UserConfig
+            from sqlalchemy import select
+            
+            # Use sync session for startup
+            db = SessionLocal()
+            try:
+                # Find all users with auto_start enabled
+                result = db.execute(
+                    select(UserConfig).where(
+                        UserConfig.intraday_scheduler_auto_start == True
+                    )
+                )
+                configs = result.scalars().all()
+                
+                if not configs:
+                    logger.info("No schedulers to restore")
+                    return
+                
+                logger.info(f"Found {len(configs)} scheduler(s) to restore")
+                
+                for config in configs:
+                    try:
+                        user_id = config.user_id
+                        logger.info(f"Restoring scheduler for user {user_id}...")
+                        
+                        # Get configuration
+                        interval_minutes = config.intraday_interval_minutes or 5
+                        market_type = config.intraday_market_type or "US,HK,CN"
+                        futu_api_url = config.intraday_futu_api_url or config.futu_api_base_url
+                        
+                        if not futu_api_url:
+                            logger.warning(f"No Futu API URL for user {user_id}, skipping restore")
+                            # Clear auto_start flag since we can't restore
+                            config.intraday_scheduler_auto_start = False
+                            db.commit()
+                            continue
+                        
+                        # Create and start scheduler
+                        await self.create_scheduler(
+                            user_id=user_id,
+                            interval_minutes=interval_minutes,
+                            market_type=market_type,
+                            futu_api_url=futu_api_url,
+                        )
+                        
+                        success = await self.start_scheduler(user_id)
+                        if success:
+                            logger.info(f"✅ Restored scheduler for user {user_id}")
+                            # Keep auto_start flag enabled for next restart
+                        else:
+                            logger.error(f"❌ Failed to restore scheduler for user {user_id}")
+                            # Clear auto_start flag on failure
+                            config.intraday_scheduler_auto_start = False
+                            db.commit()
+                    
+                    except Exception as e:
+                        logger.error(f"Error restoring scheduler for user {config.user_id}: {e}", exc_info=True)
+                        # Clear auto_start flag on error
+                        try:
+                            config.intraday_scheduler_auto_start = False
+                            db.commit()
+                        except:
+                            pass
+                
+                logger.info(f"Scheduler restoration complete. Active: {len(self.get_active_users())}")
+            
+            finally:
+                db.close()
+        
+        except Exception as e:
+            logger.error(f"Error restoring schedulers from database: {e}", exc_info=True)
 
 
 # Global manager instance

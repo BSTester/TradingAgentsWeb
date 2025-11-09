@@ -65,6 +65,7 @@ class UserConfig(Base):
     intraday_futu_api_url = Column(String(255), nullable=True)  # Intraday trading Futu API URL
     intraday_futu_api_key = Column(String(255), nullable=True)  # Intraday trading Futu API key
     intraday_scheduler_enabled = Column(Boolean, default=False, nullable=False)  # Whether intraday scheduler is running
+    intraday_scheduler_auto_start = Column(Boolean, default=False, nullable=False)  # Whether to auto-start scheduler on service restart
     intraday_interval_minutes = Column(Integer, default=5, nullable=False)  # Analysis interval in minutes
     intraday_market_type = Column(String(10), default='US', nullable=False)  # Market type: US/HK/CN
     

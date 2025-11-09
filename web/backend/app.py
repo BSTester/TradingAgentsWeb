@@ -145,6 +145,12 @@ async def lifespan(app: FastAPI):
             # No global scheduler needed - each user has their own scheduler instance
             print("✅ Intraday trading scheduler manager ready (user schedulers created on-demand)")
             
+            # Restore schedulers that were running before service restart
+            from web.backend.services.user_intraday_scheduler import get_manager as get_intraday_manager
+            intraday_manager = get_intraday_manager()
+            await intraday_manager.restore_schedulers_from_db()
+            print("✅ Intraday trading schedulers restored from database")
+            
             app.state.monitor_task = asyncio.create_task(task_monitor())
             print("✅ Task monitor started (leader)")
         except OSError:
@@ -164,11 +170,14 @@ async def lifespan(app: FastAPI):
     # Shutdown (cleanup if needed)
     print("🔌 Shutting down...")
     if getattr(app.state, "is_leader", False):
-        # Stop intraday scheduler
-        intraday_scheduler = getattr(app.state, "intraday_scheduler", None)
-        if intraday_scheduler and intraday_scheduler.is_running:
-            await intraday_scheduler.stop()
-            print("✅ Intraday trading scheduler stopped")
+        # Stop all user intraday schedulers (but keep auto_start flags for restart)
+        try:
+            from web.backend.services.user_intraday_scheduler import get_manager as get_intraday_manager
+            intraday_manager = get_intraday_manager()
+            await intraday_manager.stop_all_schedulers()
+            print("✅ All intraday trading schedulers stopped")
+        except Exception as e:
+            print(f"⚠️  Error stopping intraday schedulers: {e}")
         
         # Stop scheduler
         scheduler = getattr(app.state, "scheduler", None)
