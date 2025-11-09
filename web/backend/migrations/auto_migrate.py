@@ -41,6 +41,11 @@ MIGRATIONS = [
         "file": "init_schema.py",
         "description": "Initialize database schema (all tables)"
     },
+    {
+        "name": "add_has_set_password",
+        "file": "add_has_set_password.py",
+        "description": "Add has_set_password field to users table and update existing users"
+    },
     # Future migrations will be added here
     # Example:
     # {

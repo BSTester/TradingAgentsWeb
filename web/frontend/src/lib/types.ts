@@ -4,6 +4,7 @@ export interface User {
   username: string;
   email: string;
   role: string;  // 'admin' or 'user'
+  has_set_password: boolean;  // Whether user has explicitly set a password
   created_at: string;
 }
 

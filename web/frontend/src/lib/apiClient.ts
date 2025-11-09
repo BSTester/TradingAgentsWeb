@@ -132,9 +132,13 @@ export const authAPI = {
     }
   },
 
-  setPassword: async (password: string) => {
+  setPassword: async (password: string, oldPassword?: string) => {
     try {
-      const response = await apiClient.post('/api/auth/set-password', { password });
+      const payload: any = { password };
+      if (oldPassword) {
+        payload.old_password = oldPassword;
+      }
+      const response = await apiClient.post('/api/auth/set-password', payload);
       return response.data;
     } catch (error: any) {
       let errorMessage = error.response?.data?.detail || 

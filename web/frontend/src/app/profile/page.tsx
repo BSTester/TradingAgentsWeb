@@ -12,8 +12,10 @@ export default function ProfilePage() {
   const { toast, showToast, hideToast } = useToast();
   
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showOldPassword, setShowOldPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSettingPassword, setIsSettingPassword] = useState(false);
@@ -35,17 +37,27 @@ export default function ProfilePage() {
       showToast('密码长度至少6位', 'error');
       return;
     }
+
+    // If user has set password, old password is required
+    if (user?.has_set_password && !oldPassword) {
+      showToast('请输入旧密码', 'error');
+      return;
+    }
     
     setIsSettingPassword(true);
     
     try {
       const { authAPI } = await import('@/lib/apiClient');
-      await authAPI.setPassword(password);
+      await authAPI.setPassword(password, user?.has_set_password ? oldPassword : undefined);
       
       showToast('密码设置成功！', 'success');
       setShowPasswordModal(false);
+      setOldPassword('');
       setPassword('');
       setConfirmPassword('');
+      
+      // Refresh user data to update has_set_password flag
+      window.location.reload();
     } catch (error: any) {
       showToast(error.message || '设置密码失败，请稍后重试', 'error');
     } finally {
@@ -131,20 +143,26 @@ export default function ProfilePage() {
 
           {/* Password Settings Card */}
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              <i className="fas fa-lock mr-2" />
-              密码设置
-            </h2>
-            <p className="text-gray-600 mb-4">
-              为了账户安全，建议定期更新您的登录密码
-            </p>
-            <button
-              onClick={() => setShowPasswordModal(true)}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-            >
-              <i className="fas fa-key mr-2" />
-              设置/修改密码
-            </button>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                  <i className="fas fa-lock mr-2" />
+                  密码设置
+                </h2>
+                <p className="text-gray-600">
+                  {user.has_set_password 
+                    ? '为了账户安全，建议定期更新您的登录密码' 
+                    : '您还未设置密码，建议设置密码以保护账户安全'}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowPasswordModal(true)}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors whitespace-nowrap ml-6"
+              >
+                <i className="fas fa-key mr-2" />
+                {user.has_set_password ? '修改密码' : '设置密码'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -156,11 +174,12 @@ export default function ProfilePage() {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-semibold text-gray-900">
                 <i className="fas fa-lock mr-2" />
-                设置密码
+                {user.has_set_password ? '修改密码' : '设置密码'}
               </h3>
               <button
                 onClick={() => {
                   setShowPasswordModal(false);
+                  setOldPassword('');
                   setPassword('');
                   setConfirmPassword('');
                 }}
@@ -171,6 +190,35 @@ export default function ProfilePage() {
             </div>
 
             <div className="space-y-4">
+              {/* Old Password Field - only shown if user has set password */}
+              {user.has_set_password && (
+                <div>
+                  <label htmlFor="old-password" className="block text-sm font-medium text-gray-700 mb-2">
+                    旧密码
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <i className="fas fa-lock text-gray-400" />
+                    </div>
+                    <input
+                      type={showOldPassword ? 'text' : 'password'}
+                      id="old-password"
+                      value={oldPassword}
+                      onChange={(e) => setOldPassword(e.target.value)}
+                      className="block w-full h-12 pl-10 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="请输入旧密码"
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      onClick={() => setShowOldPassword(!showOldPassword)}
+                    >
+                      <i className={`fas ${showOldPassword ? 'fa-eye-slash' : 'fa-eye'} text-gray-400 hover:text-gray-600`} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                   新密码
@@ -228,6 +276,7 @@ export default function ProfilePage() {
                   type="button"
                   onClick={() => {
                     setShowPasswordModal(false);
+                    setOldPassword('');
                     setPassword('');
                     setConfirmPassword('');
                   }}
@@ -238,7 +287,7 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={handleSetPassword}
-                  disabled={isSettingPassword || !password || !confirmPassword}
+                  disabled={isSettingPassword || !password || !confirmPassword || (user.has_set_password && !oldPassword)}
                   className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSettingPassword ? (

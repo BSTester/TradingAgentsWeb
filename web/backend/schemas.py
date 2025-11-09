@@ -43,6 +43,7 @@ class UserCreate(UserBase):
 class PasswordSetRequest(BaseModel):
     """Request schema for setting password"""
     password: str
+    old_password: Optional[str] = None  # Required when updating existing password
     
     @validator('password')
     def validate_password(cls, v):
@@ -61,6 +62,7 @@ class User(UserBase):
     id: int
     role: str
     is_active: bool
+    has_set_password: bool
     created_at: datetime
     
     class Config:
