@@ -152,7 +152,7 @@ class VerificationCodeService:
         
         try:
             # Compose email content
-            subject = "TradingAgents 登录验证码"
+            subject = "TradingAgentsWeb 登录验证码"
             
             # HTML body
             html_body = f"""
@@ -164,12 +164,12 @@ class VerificationCodeService:
             <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
                 <div style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden;">
                     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center;">
-                        <h1 style="margin: 0; font-size: 24px; font-weight: 600;">🔐 TradingAgents</h1>
+                        <h1 style="margin: 0; font-size: 24px; font-weight: 600;">🔐 TradingAgentsWeb</h1>
                         <p style="margin: 10px 0 0 0; opacity: 0.9; font-size: 14px;">登录验证码</p>
                     </div>
                     <div style="padding: 40px 30px;">
                         <p style="font-size: 16px; color: #495057; margin-bottom: 20px;">您好，</p>
-                        <p style="font-size: 14px; color: #495057; margin-bottom: 30px;">您正在使用邮箱验证码登录 TradingAgents。您的验证码是：</p>
+                        <p style="font-size: 14px; color: #495057; margin-bottom: 30px;">您正在使用邮箱验证码登录 TradingAgentsWeb。您的验证码是：</p>
                         <div style="background-color: #f8f9fa; border: 2px dashed #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0;">
                             <div style="font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #667eea; font-family: 'Courier New', monospace;">{code}</div>
                         </div>
@@ -177,7 +177,7 @@ class VerificationCodeService:
                             <strong>⏰ 有效期：</strong>5分钟
                         </p>
                         <p style="font-size: 14px; color: #6c757d; margin-bottom: 30px;">
-                            <strong>⚠️ 安全提示：</strong>请勿将此验证码分享给任何人，包括 TradingAgents 工作人员。
+                            <strong>⚠️ 安全提示：</strong>请勿将此验证码分享给任何人，包括 TradingAgentsWeb 工作人员。
                         </p>
                         <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-top: 20px; font-size: 13px; color: #856404;">
                             <strong>注意：</strong>如果您没有请求此验证码，请忽略此邮件。您的账户仍然是安全的。
@@ -190,21 +190,21 @@ class VerificationCodeService:
             
             # Plain text body
             text_body = f"""
-TradingAgents 登录验证码
+TradingAgentsWeb 登录验证码
 
 您好，
 
-您正在使用邮箱验证码登录 TradingAgents。您的验证码是：
+您正在使用邮箱验证码登录 TradingAgentsWeb。您的验证码是：
 
 {code}
 
 有效期：5分钟
 
-安全提示：请勿将此验证码分享给任何人，包括 TradingAgents 工作人员。
+安全提示：请勿将此验证码分享给任何人，包括 TradingAgentsWeb 工作人员。
 
 注意：如果您没有请求此验证码，请忽略此邮件。您的账户仍然是安全的。
 
-© 2024 TradingAgents. All rights reserved.
+© 2024 TradingAgentsWeb. All rights reserved.
             """
             
             # Send email in thread pool to avoid blocking

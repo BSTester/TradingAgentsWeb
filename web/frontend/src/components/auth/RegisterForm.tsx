@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { useToast, Toast } from '@/components/ui/Toast';
 
 import CaptchaImage from './CaptchaImage';
 
@@ -11,9 +10,10 @@ interface RegisterFormProps {
   onSubmit?: (data: { username: string; email: string; password: string }) => void;
   externalLoading?: boolean;
   externalError?: string;
+  onShowToast: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
 }
 
-export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLoading, externalError: _externalError }: RegisterFormProps) {
+export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLoading, externalError: _externalError, onShowToast }: RegisterFormProps) {
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -28,7 +28,6 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
   const [isSendingCode, setIsSendingCode] = useState(false);
 
   const { register } = useAuth();
-  const { toast, showToast, hideToast } = useToast();
   const router = useRouter();
 
   useEffect(() => {
@@ -41,12 +40,12 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
   const handleSendEmailCode = async () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!formData.email || !emailRegex.test(formData.email)) {
-      showToast('请先输入有效的邮箱地址', 'warning');
+      onShowToast('请先输入有效的邮箱地址', 'warning');
       return;
     }
     
     if (!captchaId || !captchaInput.trim()) {
-      showToast('请输入图形验证码', 'warning');
+      onShowToast('请输入图形验证码', 'warning');
       return;
     }
     
@@ -60,10 +59,10 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
         answer: captchaInput.trim(),
       });
       
-      showToast('验证码已发送到您的邮箱，请查收', 'success');
+      onShowToast('验证码已发送到您的邮箱，请查收', 'success');
       setCountdown(60);
     } catch (error: any) {
-      showToast(error.message || '发送验证码失败，请稍后重试', 'error');
+      onShowToast(error.message || '发送验证码失败，请稍后重试', 'error');
       setCaptchaKey((k) => k + 1);
       setCaptchaInput('');
     } finally {
@@ -74,17 +73,17 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
   const validateForm = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      showToast('请输入有效的邮箱地址', 'error');
+      onShowToast('请输入有效的邮箱地址', 'error');
       return false;
     }
 
     if (!emailVerificationCode || emailVerificationCode.length !== 6) {
-      showToast('请输入6位邮箱验证码', 'warning');
+      onShowToast('请输入6位邮箱验证码', 'warning');
       return false;
     }
 
     if (!captchaId || !captchaInput.trim()) {
-      showToast('请输入图形验证码', 'warning');
+      onShowToast('请输入图形验证码', 'warning');
       return false;
     }
 
@@ -109,13 +108,13 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
         emailVerificationCode
       );
       
-      showToast('注册成功！正在跳转...', 'success');
+      onShowToast('注册成功！正在跳转...', 'success');
       
       await new Promise(resolve => setTimeout(resolve, 500));
       router.replace('/dashboard?setup_password=true');
     } catch (error: any) {
       const errorMessage = error.message || '注册失败，请稍后重试';
-      showToast(errorMessage, 'error');
+      onShowToast(errorMessage, 'error');
       setIsLoading(false);
       setCaptchaKey((k) => k + 1);
       setCaptchaInput('');
@@ -255,13 +254,6 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
           )}
         </button>
       </form>
-
-      <Toast
-        message={toast.message}
-        type={toast.type}
-        isVisible={toast.isVisible}
-        onClose={hideToast}
-      />
     </>
   );
 }

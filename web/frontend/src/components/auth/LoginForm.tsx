@@ -3,11 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { useToast, Toast } from '@/components/ui/Toast';
 
 import CaptchaImage from './CaptchaImage';
 
-export function LoginForm() {
+interface LoginFormProps {
+  onShowToast: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
+}
+
+export function LoginForm({ onShowToast }: LoginFormProps) {
   const [loginMode, setLoginMode] = useState<'password' | 'email'>('password');
   
   const [formData, setFormData] = useState({
@@ -27,7 +30,6 @@ export function LoginForm() {
   const [captchaKey, setCaptchaKey] = useState(0);
 
   const { login, loginWithEmailCode } = useAuth();
-  const { toast, showToast, hideToast } = useToast();
   const router = useRouter();
   
   useEffect(() => {
@@ -39,12 +41,12 @@ export function LoginForm() {
 
   const handleSendCode = async () => {
     if (!emailForCode || !emailForCode.includes('@')) {
-      showToast('请输入有效的邮箱地址', 'warning');
+      onShowToast('请输入有效的邮箱地址', 'warning');
       return;
     }
     
     if (!captchaId || !captchaInput.trim()) {
-      showToast('请输入图形验证码', 'warning');
+      onShowToast('请输入图形验证码', 'warning');
       return;
     }
     
@@ -58,10 +60,10 @@ export function LoginForm() {
         answer: captchaInput.trim(),
       });
       
-      showToast('验证码已发送到您的邮箱', 'success');
+      onShowToast('验证码已发送到您的邮箱', 'success');
       setCountdown(60);
     } catch (error: any) {
-      showToast(error.message || '发送验证码失败，请稍后重试', 'error');
+      onShowToast(error.message || '发送验证码失败，请稍后重试', 'error');
       setCaptchaKey((k) => k + 1);
       setCaptchaInput('');
     } finally {
@@ -73,7 +75,7 @@ export function LoginForm() {
     e.preventDefault();
 
     if (!captchaId || !captchaInput.trim()) {
-      showToast('请输入图形验证码', 'warning');
+      onShowToast('请输入图形验证码', 'warning');
       return;
     }
 
@@ -81,13 +83,13 @@ export function LoginForm() {
 
     try {
       await login(formData.username, formData.password, { id: captchaId, answer: captchaInput.trim() });
-      showToast('登录成功！正在跳转...', 'success');
+      onShowToast('登录成功！正在跳转...', 'success');
       
       await new Promise(resolve => setTimeout(resolve, 500));
       router.replace('/dashboard');
     } catch (error: any) {
       const errorMessage = error.message || '登录失败，请检查用户名和密码';
-      showToast(errorMessage, 'error');
+      onShowToast(errorMessage, 'error');
       setIsLoading(false);
       setCaptchaKey((k) => k + 1);
       setCaptchaInput('');
@@ -98,17 +100,17 @@ export function LoginForm() {
     e.preventDefault();
     
     if (!emailForCode || !emailForCode.includes('@')) {
-      showToast('请输入有效的邮箱地址', 'warning');
+      onShowToast('请输入有效的邮箱地址', 'warning');
       return;
     }
     
     if (!verificationCode || verificationCode.length !== 6) {
-      showToast('请输入6位验证码', 'warning');
+      onShowToast('请输入6位验证码', 'warning');
       return;
     }
     
     if (!captchaId || !captchaInput.trim()) {
-      showToast('请输入图形验证码', 'warning');
+      onShowToast('请输入图形验证码', 'warning');
       return;
     }
     
@@ -116,13 +118,13 @@ export function LoginForm() {
     
     try {
       await loginWithEmailCode(emailForCode, verificationCode, { id: captchaId, answer: captchaInput.trim() });
-      showToast('登录成功！正在跳转...', 'success');
+      onShowToast('登录成功！正在跳转...', 'success');
       
       await new Promise(resolve => setTimeout(resolve, 500));
       router.replace('/dashboard');
     } catch (error: any) {
       const errorMessage = error.message || '登录失败，请检查验证码';
-      showToast(errorMessage, 'error');
+      onShowToast(errorMessage, 'error');
       setIsLoading(false);
       setCaptchaKey((k) => k + 1);
       setCaptchaInput('');
@@ -354,13 +356,6 @@ export function LoginForm() {
           </button>
         </form>
       )}
-
-      <Toast
-        message={toast.message}
-        type={toast.type}
-        isVisible={toast.isVisible}
-        onClose={hideToast}
-      />
     </>
   );
 }
