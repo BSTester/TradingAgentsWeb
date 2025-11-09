@@ -73,13 +73,33 @@ export function AuthLayout({
         </div>
       </div>
       
-      <div className="relative z-10 mt-8 text-center space-y-2">
+      <div className="relative z-10 mt-8 text-center space-y-3">
         <p className="text-xs text-text-tertiary">
           © {new Date().getFullYear()} SmartAIGC. 保留所有权利
         </p>
         <p className="text-xs text-text-muted">
-          基于 <a href="https://github.com/TauricResearch/TradingAgents" target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:text-accent-secondary transition-colors">TradingAgents</a> 构建
+          基于{' '}
+          <a 
+            href="https://github.com/TauricResearch/TradingAgents" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-accent-primary hover:text-accent-secondary transition-colors"
+          >
+            TradingAgents
+          </a>{' '}
+          构建
         </p>
+        <div className="flex items-center justify-center space-x-4 pt-2">
+          <a 
+            href="https://github.com/BSTester/TradingAgentsWeb" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-text-muted hover:text-accent-primary transition-colors"
+            aria-label="GitHub"
+          >
+            <i className="fab fa-github text-xl" />
+          </a>
+        </div>
       </div>
     </div>
   );

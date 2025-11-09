@@ -233,7 +233,7 @@ class EmailService:
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
         # Set sender with display name
-        msg['From'] = f"TradingAgents <{self.smtp_from_email}>"
+        msg['From'] = f"TradingAgentsWeb <{self.smtp_from_email}>"
         msg['To'] = to_email
         
         # Attach text and HTML parts
@@ -450,7 +450,7 @@ class EmailService:
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
             <div style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden;">
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center;">
-                    <h1 style="margin: 0; font-size: 28px; font-weight: 600;">📊 TradingAgents 分析报告</h1>
+                    <h1 style="margin: 0; font-size: 28px; font-weight: 600;">📊 TradingAgentsWeb 分析报告</h1>
                     <p style="margin: 10px 0 0 0; opacity: 0.9; font-size: 14px;">AI 驱动的多智能体股票分析系统</p>
                 </div>
                 <div style="background-color: #f8f9fa; padding: 25px 30px; border-bottom: 1px solid #e9ecef;">
@@ -491,7 +491,7 @@ class EmailService:
                 sections_text += f"\n\n{title}:\n{section_content[:500]}..."
         
         return f"""
-TradingAgents 分析报告
+TradingAgentsWeb 分析报告
 
 股票代码: {ticker}
 公司名称: {company_name}

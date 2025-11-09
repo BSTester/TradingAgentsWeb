@@ -1851,29 +1851,29 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
 
       {/* 导出预览弹窗 */}
       {showExportPreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onClick={() => setShowExportPreview(false)}>
-          <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={() => setShowExportPreview(false)}>
+          <div className="bg-dark-secondary rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col border border-dark-border" onClick={(e) => e.stopPropagation()}>
             {/* 弹窗头部 */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between p-6 border-b border-dark-border">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-gradient-to-r from-accent-primary to-accent-secondary rounded-lg flex items-center justify-center shadow-glow-cyan">
                   <i className="fas fa-file-export text-white text-lg" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-800">导出预览</h2>
-                  <p className="text-sm text-gray-500">预览报告内容并选择导出格式</p>
+                  <h2 className="text-2xl font-bold text-text-primary">导出预览</h2>
+                  <p className="text-sm text-text-secondary">预览报告内容并选择导出格式</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowExportPreview(false)}
-                className="w-10 h-10 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-center text-gray-500 hover:text-gray-700"
+                className="w-10 h-10 rounded-lg hover:bg-dark-tertiary transition-colors flex items-center justify-center text-text-secondary hover:text-text-primary"
               >
                 <i className="fas fa-times text-xl" />
               </button>
             </div>
 
             {/* 预览内容区域 - 显示完整的分析报告 */}
-            <div className="flex-1 overflow-y-auto bg-gray-100">
+            <div className="flex-1 overflow-y-auto bg-dark-tertiary p-4">
               <div id="export-preview-content" className="max-w-[794px] mx-auto bg-white shadow-lg" style={{ minHeight: '100%' }}>
                 {/* 封面页 - 蓝绿渐变背景 A4纸尺寸 */}
                 <div className="bg-gradient-to-r from-green-500 to-blue-500 text-white p-12 flex flex-col justify-between" style={{ minHeight: '1123px' }}>
@@ -2184,14 +2184,14 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
             </div>
 
             {/* 弹窗底部 - 导出按钮 */}
-            <div className="p-6 border-t border-gray-200 bg-white rounded-b-xl">
+            <div className="p-6 border-t border-dark-border bg-dark-secondary rounded-b-xl">
               <div className="flex flex-wrap gap-3 justify-center">
                 <button
                   onClick={async () => {
                     await handleExport('pdf');
                     setShowExportPreview(false);
                   }}
-                  className="px-8 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center font-medium shadow-lg hover:shadow-xl"
+                  className="px-8 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:shadow-glow-cyan transition-all flex items-center font-medium shadow-lg hover:scale-105"
                 >
                   <i className="fas fa-file-pdf mr-2" />
                   导出为 PDF
@@ -2201,7 +2201,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                     await handleExport('image');
                     setShowExportPreview(false);
                   }}
-                  className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center font-medium shadow-lg hover:shadow-xl"
+                  className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:shadow-glow-cyan transition-all flex items-center font-medium shadow-lg hover:scale-105"
                 >
                   <i className="fas fa-image mr-2" />
                   导出为图片
@@ -2211,13 +2211,14 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                     await handleExport('markdown');
                     setShowExportPreview(false);
                   }}
-                  className="px-8 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center font-medium shadow-lg hover:shadow-xl"
+                  className="px-8 py-3 bg-gradient-to-r from-accent-primary to-accent-secondary text-white rounded-lg hover:shadow-glow-cyan transition-all flex items-center font-medium shadow-lg hover:scale-105"
                 >
                   <i className="fas fa-file-code mr-2" />
                   导出为 Markdown
                 </button>
               </div>
-              <p className="text-center text-sm text-gray-500 mt-4">
+              <p className="text-center text-sm text-text-secondary mt-4">
+                <i className="fas fa-info-circle mr-1" />
                 选择导出格式后将生成完整的分析报告
               </p>
             </div>
