@@ -101,7 +101,14 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
             )}
             {user && (
               <>
-                <div className="text-gray-300 flex items-center">
+                <button
+                  onClick={() => router.push('/profile')}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center ${
+                    isActive('/profile')
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-300 hover:text-white hover:bg-gray-800'
+                  }`}
+                >
                   <i className={`fas ${user?.role === 'admin' ? 'fa-crown' : 'fa-user-circle'} mr-2`} />
                   {user?.username}
                   {user?.role === 'admin' && (
@@ -109,7 +116,7 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
                       管理员
                     </span>
                   )}
-                </div>
+                </button>
                 <button
                   onClick={() => {
                     onLogout();

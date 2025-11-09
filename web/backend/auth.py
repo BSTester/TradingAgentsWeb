@@ -102,10 +102,11 @@ async def authenticate_user(db: AsyncSession, username: str, password: str) -> U
         return False
     return user
 
-async def create_user(db: AsyncSession, username: str, email: str, password: str) -> User:
+async def create_user(db: AsyncSession, username: str, email: str, password: Optional[str] = None) -> User:
     """
     Create a new user
     First registered user automatically becomes admin
+    If password is not provided, generates a random one
     """
     # Check if username already exists
     if await get_user_by_username(db, username):
@@ -126,6 +127,14 @@ async def create_user(db: AsyncSession, username: str, email: str, password: str
     result = await db.execute(stmt)
     user_count = len(result.scalars().all())
     role = "admin" if user_count == 0 else "user"
+    
+    # Generate random password if not provided
+    if not password:
+        import secrets
+        import string
+        alphabet = string.ascii_letters + string.digits
+        password = ''.join(secrets.choice(alphabet) for _ in range(16))
+        print(f"🔐 Generated random password for user {username}")
     
     # Create new user
     hashed_password = get_password_hash(password)
