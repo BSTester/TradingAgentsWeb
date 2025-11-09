@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { configAPI } from '@/lib/apiClient';
@@ -11,7 +11,7 @@ import { AnalysisResults } from '@/components/analysis/AnalysisResults';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { AppNavbar } from '@/components/common/AppNavbar';
 
-export default function DashboardPage() {
+function DashboardContent() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -345,5 +345,20 @@ export default function DashboardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <i className="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4" />
+          <p className="text-gray-600">加载中...</p>
+        </div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }
