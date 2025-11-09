@@ -2,23 +2,30 @@
 """
 Verification Code Service for TradingAgents Web Interface
 Handles generation, storage, and verification of email verification codes
+Uses in-memory storage instead of database for better performance
 """
 
 import os
 import random
 import asyncio
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, Dict, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from passlib.context import CryptContext
+import threading
 
-from web.backend.models import EmailVerificationCode, User
+from web.backend.models import User
 from web.backend.services.email_service import get_email_service
 
 
 # Password context for hashing verification codes
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# In-memory storage for verification codes
+# Structure: {email: (code_hash, expires_at, used)}
+_verification_codes: Dict[str, Tuple[str, datetime, bool]] = {}
+_codes_lock = threading.Lock()
 
 
 class VerificationCodeService:
@@ -76,7 +83,7 @@ class VerificationCodeService:
         ip_address: str
     ) -> bool:
         """
-        Generate verification code, store in database, and send via email
+        Generate verification code, store in memory, and send via email
         
         Args:
             email: User's email address
@@ -96,35 +103,16 @@ class VerificationCodeService:
                 print(f"❌ [VerificationCodeService] Email not registered: {email}")
                 return False
             
-            # Delete any existing unused codes for this email
-            await self.db.execute(
-                delete(EmailVerificationCode).where(
-                    EmailVerificationCode.email == email,
-                    EmailVerificationCode.used == False
-                )
-            )
-            await self.db.commit()
-            
             # Generate new code
             code = self._generate_code()
             code_hash = self._hash_code(code)
             
             # Calculate expiration time (5 minutes from now)
-            created_at = datetime.now(timezone.utc)
-            expires_at = created_at + timedelta(minutes=5)
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
             
-            # Store in database
-            verification_code = EmailVerificationCode(
-                email=email,
-                code_hash=code_hash,
-                created_at=created_at,
-                expires_at=expires_at,
-                used=False,
-                ip_address=ip_address
-            )
-            
-            self.db.add(verification_code)
-            await self.db.commit()
+            # Store in memory (thread-safe)
+            with _codes_lock:
+                _verification_codes[email] = (code_hash, expires_at, False)
             
             print(f"📧 [VerificationCodeService] Generated code for {email}, expires at {expires_at}")
             
@@ -133,6 +121,9 @@ class VerificationCodeService:
             
             if not success:
                 print(f"❌ [VerificationCodeService] Failed to send email to {email}")
+                # Clean up the code if email fails
+                with _codes_lock:
+                    _verification_codes.pop(email, None)
                 return False
             
             print(f"✅ [VerificationCodeService] Verification code sent successfully to {email}")
@@ -142,7 +133,6 @@ class VerificationCodeService:
             print(f"❌ [VerificationCodeService] Error generating code: {e}")
             import traceback
             traceback.print_exc()
-            await self.db.rollback()
             return False
     
     async def _send_verification_email(self, email: str, code: str) -> bool:
@@ -253,35 +243,38 @@ TradingAgents 登录验证码
             bool: True if code is valid, False otherwise
         """
         try:
-            # Find the most recent unused code for this email
-            result = await self.db.execute(
-                select(EmailVerificationCode)
-                .where(
-                    EmailVerificationCode.email == email,
-                    EmailVerificationCode.used == False
-                )
-                .order_by(EmailVerificationCode.created_at.desc())
-            )
-            verification_code = result.scalar_one_or_none()
+            # Get code from memory (thread-safe)
+            with _codes_lock:
+                code_data = _verification_codes.get(email)
             
-            if not verification_code:
-                print(f"❌ [VerificationCodeService] No unused code found for {email}")
+            if not code_data:
+                print(f"❌ [VerificationCodeService] No code found for {email}")
+                return False
+            
+            code_hash, expires_at, used = code_data
+            
+            # Check if code has been used
+            if used:
+                print(f"❌ [VerificationCodeService] Code already used for {email}")
                 return False
             
             # Check if code has expired
-            if verification_code.is_expired():
+            now = datetime.now(timezone.utc)
+            if now > expires_at:
                 print(f"❌ [VerificationCodeService] Code expired for {email}")
+                # Clean up expired code
+                with _codes_lock:
+                    _verification_codes.pop(email, None)
                 return False
             
             # Verify code hash
-            if not self._verify_hash(code, verification_code.code_hash):
+            if not self._verify_hash(code, code_hash):
                 print(f"❌ [VerificationCodeService] Invalid code for {email}")
                 return False
             
-            # Mark code as used
-            verification_code.used = True
-            verification_code.used_at = datetime.now(timezone.utc)
-            await self.db.commit()
+            # Mark code as used (thread-safe)
+            with _codes_lock:
+                _verification_codes[email] = (code_hash, expires_at, True)
             
             print(f"✅ [VerificationCodeService] Code verified successfully for {email}")
             return True
@@ -292,35 +285,6 @@ TradingAgents 登录验证码
             traceback.print_exc()
             return False
     
-    async def cleanup_expired_codes(self) -> int:
-        """
-        Delete verification codes older than 1 hour
-        
-        Returns:
-            int: Number of codes deleted
-        """
-        try:
-            # Calculate cutoff time (1 hour ago)
-            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=1)
-            
-            # Delete old codes
-            result = await self.db.execute(
-                delete(EmailVerificationCode).where(
-                    EmailVerificationCode.created_at < cutoff_time
-                )
-            )
-            await self.db.commit()
-            
-            deleted_count = result.rowcount
-            print(f"🧹 [VerificationCodeService] Cleaned up {deleted_count} expired codes")
-            return deleted_count
-            
-        except Exception as e:
-            print(f"❌ [VerificationCodeService] Error cleaning up codes: {e}")
-            await self.db.rollback()
-            return 0
-
-
 def get_verification_code_service(db: AsyncSession) -> VerificationCodeService:
     """
     Get verification code service instance

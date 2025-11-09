@@ -9,35 +9,6 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from web.backend.database import Base
 
-class EmailVerificationCode(Base):
-    """
-    Email verification code model for email-based login
-    Stores hashed verification codes with expiration and usage tracking
-    """
-    __tablename__ = "email_verification_codes"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), nullable=False, index=True)
-    code_hash = Column(String(255), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
-    used = Column(Boolean, default=False, nullable=False, index=True)
-    used_at = Column(DateTime(timezone=True), nullable=True)
-    ip_address = Column(String(45), nullable=True)
-    
-    def is_expired(self) -> bool:
-        """Check if code has expired"""
-        from datetime import datetime, timezone
-        now = datetime.now(timezone.utc)
-        # Handle both timezone-aware and timezone-naive datetimes
-        if self.expires_at.tzinfo is None:
-            # If expires_at is naive, make now naive too for comparison
-            now = datetime.utcnow()
-        return now > self.expires_at
-    
-    def __repr__(self):
-        return f"<EmailVerificationCode(email='{self.email}', used={self.used}, expires_at='{self.expires_at}')>"
-
 
 class User(Base):
     """
