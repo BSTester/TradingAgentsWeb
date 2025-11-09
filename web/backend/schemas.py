@@ -13,10 +13,12 @@ class UserBase(BaseModel):
     email: EmailStr
 
 class UserCreate(UserBase):
-    password: str
+    password: Optional[str] = None  # Password is now optional
     # 服务端验证码（防绕过前端）
     captcha_id: Optional[str] = None
     captcha_answer: Optional[str] = None
+    # 邮箱验证码
+    email_code: Optional[str] = None
     
     @validator('username')
     def validate_username(cls, v):
@@ -25,6 +27,22 @@ class UserCreate(UserBase):
         if not v.replace('_', '').replace('-', '').isalnum():
             raise ValueError('Username can only contain letters, numbers, underscores, and hyphens')
         return v
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if v and len(v) < 6:
+            raise ValueError('Password must be at least 6 characters long')
+        return v
+    
+    @validator('email_code')
+    def validate_email_code(cls, v):
+        if v and (not v.isdigit() or len(v) != 6):
+            raise ValueError('Email verification code must be exactly 6 digits')
+        return v
+
+class PasswordSetRequest(BaseModel):
+    """Request schema for setting password"""
+    password: str
     
     @validator('password')
     def validate_password(cls, v):
@@ -55,6 +73,31 @@ class UserInDB(User):
 class CaptchaResponse(BaseModel):
     captcha_id: str
     seed: str
+
+# Email verification code schemas
+class EmailCodeSendRequest(BaseModel):
+    """Request schema for sending verification code"""
+    email: EmailStr
+    captcha_id: str
+    captcha_answer: str
+
+class EmailCodeSendResponse(BaseModel):
+    """Response schema for send verification code"""
+    message: str
+    expires_in: int  # seconds
+
+class EmailCodeLoginRequest(BaseModel):
+    """Request schema for email code login"""
+    email: EmailStr
+    code: str
+    captcha_id: str
+    captcha_answer: str
+    
+    @validator('code')
+    def validate_code(cls, v):
+        if not v.isdigit() or len(v) != 6:
+            raise ValueError('Verification code must be exactly 6 digits')
+        return v
 
 # Token schemas
 class Token(BaseModel):

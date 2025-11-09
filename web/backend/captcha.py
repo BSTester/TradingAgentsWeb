@@ -3,8 +3,8 @@ import time
 import uuid
 from typing import Dict, Tuple
 
-# In-memory captcha store: { id: { "seed": str, "expires": float } }
-_CAPTCHAS: Dict[str, Dict[str, float | str]] = {}
+# In-memory captcha store: { id: { "seed": str, "expires": float, "use_count": int } }
+_CAPTCHAS: Dict[str, Dict[str, float | str | int]] = {}
 
 # Expiry in seconds
 CAPTCHA_TTL_SECONDS = 120
@@ -59,7 +59,7 @@ def create_captcha() -> Tuple[str, str]:
     # 生成 seed 并保存，前端据此派生并绘制验证码
     seed = uuid.uuid4().hex  # 16字节hex即可
     captcha_id = uuid.uuid4().hex
-    _CAPTCHAS[captcha_id] = {"seed": seed, "expires": time.time() + CAPTCHA_TTL_SECONDS}
+    _CAPTCHAS[captcha_id] = {"seed": seed, "expires": time.time() + CAPTCHA_TTL_SECONDS, "use_count": 0}
     return captcha_id, seed
 
 def verify_captcha(captcha_id: str, answer: str) -> bool:
@@ -70,9 +70,26 @@ def verify_captcha(captcha_id: str, answer: str) -> bool:
         # expired; delete and fail
         _CAPTCHAS.pop(captcha_id, None)
         return False
+    
+    # Check use count - allow maximum 2 successful verifications
+    use_count = int(entry.get("use_count", 0))
+    if use_count >= 2:
+        # Already used twice, delete and fail
+        _CAPTCHAS.pop(captcha_id, None)
+        return False
+    
     seed = str(entry.get("seed", ""))
     expected = derive_code_from_seed(seed).upper() if seed else ""
     ok = str(answer or "").strip().upper() == expected
-    # one-time use: remove after attempt regardless of pass/fail to prevent brute-force
-    _CAPTCHAS.pop(captcha_id, None)
+    
+    if ok:
+        # Increment use count on successful verification
+        entry["use_count"] = use_count + 1
+        # If this is the second use, delete it
+        if entry["use_count"] >= 2:
+            _CAPTCHAS.pop(captcha_id, None)
+    else:
+        # Delete on failed verification to prevent brute-force
+        _CAPTCHAS.pop(captcha_id, None)
+    
     return ok

@@ -105,12 +105,18 @@ export const authAPI = {
     }
   },
 
-  register: async (username: string, email: string, password: string, captcha?: { id: string; answer: string }) => {
+  register: async (username: string, email: string, password?: string, captcha?: { id: string; answer: string }, emailCode?: string) => {
     try {
-      const payload: any = { username, email, password };
+      const payload: any = { username, email };
+      if (password) {
+        payload.password = password;
+      }
       if (captcha?.id && captcha?.answer) {
         payload.captcha_id = captcha.id;
         payload.captcha_answer = captcha.answer;
+      }
+      if (emailCode) {
+        payload.email_code = emailCode;
       }
       const response = await publicApiClient.post('/api/auth/register', payload);
       return response.data;
@@ -126,9 +132,83 @@ export const authAPI = {
     }
   },
 
+  setPassword: async (password: string) => {
+    try {
+      const response = await apiClient.post('/api/auth/set-password', { password });
+      return response.data;
+    } catch (error: any) {
+      let errorMessage = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         error.message || 
+                         '设置密码失败，请稍后重试';
+      throw new Error(errorMessage);
+    }
+  },
+
   getCurrentUser: async () => {
     const response = await apiClient.get('/api/auth/me');
     return response.data;
+  },
+
+  sendEmailCode: async (email: string, captcha: { id: string; answer: string }) => {
+    try {
+      const response = await publicApiClient.post('/api/auth/email-code/send', {
+        email,
+        captcha_id: captcha.id,
+        captcha_answer: captcha.answer,
+      });
+      return response.data;
+    } catch (error: any) {
+      let errorMessage = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         error.message || 
+                         '发送验证码失败，请稍后重试';
+      if (typeof errorMessage === 'string' && /Invalid or expired captcha/i.test(errorMessage)) {
+        errorMessage = '验证码无效或已过期';
+      }
+      throw new Error(errorMessage);
+    }
+  },
+
+  sendEmailCodeForRegister: async (email: string, captcha: { id: string; answer: string }) => {
+    try {
+      const response = await publicApiClient.post('/api/auth/email-code/send-for-register', {
+        email,
+        captcha_id: captcha.id,
+        captcha_answer: captcha.answer,
+      });
+      return response.data;
+    } catch (error: any) {
+      let errorMessage = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         error.message || 
+                         '发送验证码失败，请稍后重试';
+      if (typeof errorMessage === 'string' && /Invalid or expired captcha/i.test(errorMessage)) {
+        errorMessage = '验证码无效或已过期';
+      }
+      throw new Error(errorMessage);
+    }
+  },
+
+  loginWithEmailCode: async (email: string, code: string, captcha: { id: string; answer: string }) => {
+    try {
+      const response = await publicApiClient.post('/api/auth/email-code/login', {
+        email,
+        code,
+        captcha_id: captcha.id,
+        captcha_answer: captcha.answer,
+      });
+      return response.data;
+    } catch (error: any) {
+      let errorMessage = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         error.message || 
+                         '登录失败，请稍后重试';
+      if (typeof errorMessage === 'string' && /Invalid or expired captcha/i.test(errorMessage)) {
+        errorMessage = '验证码无效或已过期';
+      }
+      throw new Error(errorMessage);
+    }
   },
 };
 
