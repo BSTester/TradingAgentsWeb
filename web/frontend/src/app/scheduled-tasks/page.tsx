@@ -105,10 +105,10 @@ export default function ScheduledTasksPage() {
   // 如果正在认证检查，显示加载状态
   if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
         <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4" />
-          <p className="text-gray-600">加载中...</p>
+          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
+          <p className="text-text-secondary">加载中...</p>
         </div>
       </div>
     );
@@ -116,12 +116,12 @@ export default function ScheduledTasksPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
+      <div className="min-h-screen bg-dark-primary flex flex-col">
         <AppNavbar user={user} onLogout={logout} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <i className="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4" />
-            <p className="text-gray-600">加载定期报告...</p>
+            <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
+            <p className="text-text-secondary">加载定期报告...</p>
           </div>
         </div>
         <Footer />
@@ -131,12 +131,12 @@ export default function ScheduledTasksPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
+      <div className="min-h-screen bg-dark-primary flex flex-col">
         <AppNavbar user={user} onLogout={logout} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <i className="fas fa-exclamation-triangle text-4xl text-red-600 mb-4" />
-            <p className="text-gray-600">加载失败：{error.message}</p>
+            <i className="fas fa-exclamation-triangle text-4xl text-danger-500 mb-4" />
+            <p className="text-text-secondary">加载失败：{error.message}</p>
           </div>
         </div>
         <Footer />
@@ -145,23 +145,23 @@ export default function ScheduledTasksPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-dark-primary flex flex-col">
       {/* 顶部导航栏 */}
       <AppNavbar user={user} onLogout={logout} />
 
       {/* 面包屑导航 */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <nav className="bg-dark-secondary/80 backdrop-blur-lg border-b border-dark-border shadow-lg pt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-10">
           <div className="flex items-center space-x-2 text-sm">
             <button
               onClick={() => router.push('/')}
-              className="text-blue-600 hover:text-blue-800"
+              className="text-accent-primary hover:text-accent-secondary transition-colors"
             >
               <i className="fas fa-home mr-1" />
               首页
             </button>
-            <i className="fas fa-chevron-right text-gray-400 text-xs" />
-            <span className="text-gray-900 font-medium">定期报告</span>
+            <i className="fas fa-chevron-right text-text-tertiary text-xs" />
+            <span className="text-text-primary font-medium">定期报告</span>
           </div>
         </div>
       </nav>
@@ -171,65 +171,65 @@ export default function ScheduledTasksPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            <i className="fas fa-clock mr-3 text-purple-600" />
+          <h1 className="text-3xl font-bold text-text-primary mb-2">
+            <i className="fas fa-clock mr-3 text-accent-secondary" />
             定期报告
           </h1>
-          <p className="text-gray-600">
+          <p className="text-text-secondary">
             管理您的定期分析报告，查看执行计划和历史记录
           </p>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <i className="fas fa-tasks text-3xl text-blue-600" />
+                <i className="fas fa-tasks text-3xl text-accent-primary" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">总任务数</p>
-                <p className="text-2xl font-bold text-gray-900">{data?.total || 0}</p>
+                <p className="text-sm font-medium text-text-secondary">总任务数</p>
+                <p className="text-2xl font-bold text-text-primary">{data?.total || 0}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <i className="fas fa-play-circle text-3xl text-green-600" />
+                <i className="fas fa-play-circle text-3xl text-success-500" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">启用中</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm font-medium text-text-secondary">启用中</p>
+                <p className="text-2xl font-bold text-text-primary">
                   {data?.stats?.enabled || 0}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <i className="fas fa-pause-circle text-3xl text-gray-600" />
+                <i className="fas fa-pause-circle text-3xl text-text-tertiary" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">已暂停</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm font-medium text-text-secondary">已暂停</p>
+                <p className="text-2xl font-bold text-text-primary">
                   {data?.stats?.paused || 0}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <i className="fas fa-check-circle text-3xl text-blue-600" />
+                <i className="fas fa-check-circle text-3xl text-accent-primary" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">已完成</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm font-medium text-text-secondary">已完成</p>
+                <p className="text-2xl font-bold text-text-primary">
                   {data?.stats?.completed || 0}
                 </p>
               </div>
@@ -238,17 +238,17 @@ export default function ScheduledTasksPage() {
         </div>
 
         {/* Task List */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border overflow-hidden">
           {!data?.items || data.items.length === 0 ? (
             <div className="text-center py-12">
-              <i className="fas fa-calendar-times text-6xl text-gray-300 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">暂无定期报告</h3>
-              <p className="text-gray-600 mb-6">
+              <i className="fas fa-calendar-times text-6xl text-text-tertiary mb-4" />
+              <h3 className="text-lg font-medium text-text-primary mb-2">暂无定期报告</h3>
+              <p className="text-text-secondary mb-6">
                 您还没有创建任何定期报告
               </p>
               <a
                 href="/dashboard"
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-accent-primary to-accent-secondary hover:shadow-glow-cyan hover:scale-105 transition-all"
               >
                 <i className="fas fa-plus mr-2" />
                 创建定期报告
@@ -256,67 +256,67 @@ export default function ScheduledTasksPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-dark-border">
+                <thead className="bg-dark-tertiary">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       任务名称
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       股票代码
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       执行周期
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       下次执行
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       执行次数
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                       状态
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-text-secondary uppercase tracking-wider">
                       操作
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-dark-secondary divide-y divide-dark-border">
                   {data.items.map((task) => (
-                    <tr key={task.id} className="hover:bg-gray-50">
+                    <tr key={task.id} className="hover:bg-dark-tertiary transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <i className="fas fa-calendar-alt text-purple-600 mr-2" />
+                          <i className="fas fa-calendar-alt text-accent-secondary mr-2" />
                           <div>
-                            <div className="text-sm font-medium text-gray-900">
+                            <div className="text-sm font-medium text-text-primary">
                               {task.task_name}
                             </div>
-                            <div className="text-sm text-gray-500">
+                            <div className="text-sm text-text-secondary">
                               创建于 {new Date(task.created_at).toLocaleDateString('zh-CN')}
                             </div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{task.ticker}</div>
+                        <div className="text-sm font-medium text-text-primary">{task.ticker}</div>
                         {task.market && (
-                          <div className="text-sm text-gray-500">{task.market}</div>
+                          <div className="text-sm text-text-secondary">{task.market}</div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-text-primary">
                           {getExecutionCycleLabel(task.execution_cycle, task.interval_days, task.day_of_week)}
                         </div>
-                        <div className="text-sm text-gray-500">{task.execution_time} 北京时间</div>
+                        <div className="text-sm text-text-secondary">{task.execution_time} 北京时间</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {task.next_run_time ? (
                           <div>
-                            <div className="text-sm text-gray-900">
+                            <div className="text-sm text-text-primary">
                               {new Date(task.next_run_time).toLocaleString('zh-CN')}
                             </div>
-                            <div className="text-sm text-gray-500">
+                            <div className="text-sm text-text-secondary">
                               {formatDistanceToNow(new Date(task.next_run_time), {
                                 addSuffix: true,
                                 locale: zhCN
@@ -324,25 +324,25 @@ export default function ScheduledTasksPage() {
                             </div>
                           </div>
                         ) : (
-                          <span className="text-sm text-gray-500">-</span>
+                          <span className="text-sm text-text-secondary">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
                         {task.total_executions} 次
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {task.status === 'completed' ? (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-accent-primary/20 text-accent-primary">
                             <i className="fas fa-check-circle mr-1" />
                             已完成
                           </span>
                         ) : (
                           <button
                             onClick={() => handleToggleEnabled(task.id, task.is_enabled)}
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                               task.is_enabled
-                                ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                ? 'bg-success-500/20 text-success-500 hover:bg-success-500/30'
+                                : 'bg-dark-tertiary text-text-tertiary hover:bg-dark-primary'
                             }`}
                           >
                             <i className={`fas ${task.is_enabled ? 'fa-check-circle' : 'fa-pause-circle'} mr-1`} />
@@ -353,7 +353,7 @@ export default function ScheduledTasksPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
                           onClick={() => setShowDeleteDialog(task.id)}
-                          className="text-red-600 hover:text-red-900 ml-4"
+                          className="text-danger-500 hover:text-danger-400 ml-4 transition-colors"
                           title="删除任务"
                         >
                           <i className="fas fa-trash" />
@@ -368,10 +368,10 @@ export default function ScheduledTasksPage() {
 
           {/* Pagination */}
           {data && data.items.length > 0 && data.total > limit && (
-            <div className="mt-6 p-4 border-t border-gray-200">
+            <div className="mt-6 p-4 border-t border-dark-border">
               <div className="flex items-center justify-between">
                 {/* 左侧：显示信息 */}
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-text-secondary">
                   显示第 {(page - 1) * limit + 1} - {Math.min(page * limit, data.total)} 条，共 {data.total} 条记录
                 </div>
 
@@ -381,7 +381,7 @@ export default function ScheduledTasksPage() {
                   <button
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 py-2 text-sm font-medium text-text-primary bg-dark-tertiary border border-dark-border rounded-md hover:bg-dark-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <i className="fas fa-chevron-left mr-1" />
                     上一页
@@ -398,11 +398,11 @@ export default function ScheduledTasksPage() {
                           <>
                             <button
                               onClick={() => setPage(1)}
-                              className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                              className="px-3 py-2 text-sm font-medium text-text-primary bg-dark-tertiary border border-dark-border rounded-md hover:bg-dark-primary transition-colors"
                             >
                               1
                             </button>
-                            {page > 4 && <span className="px-2 text-gray-500">...</span>}
+                            {page > 4 && <span className="px-2 text-text-tertiary">...</span>}
                           </>
                         );
                       }
@@ -420,8 +420,8 @@ export default function ScheduledTasksPage() {
                             onClick={() => setPage(p)}
                             className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                               p === page
-                                ? 'bg-blue-600 text-white'
-                                : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                                ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white'
+                                : 'text-text-primary bg-dark-tertiary border border-dark-border hover:bg-dark-primary'
                             }`}
                           >
                             {p}
@@ -436,10 +436,10 @@ export default function ScheduledTasksPage() {
                       if (page < totalPages - 2) {
                         return (
                           <>
-                            {page < totalPages - 3 && <span className="px-2 text-gray-500">...</span>}
+                            {page < totalPages - 3 && <span className="px-2 text-text-tertiary">...</span>}
                             <button
                               onClick={() => setPage(totalPages)}
-                              className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                              className="px-3 py-2 text-sm font-medium text-text-primary bg-dark-tertiary border border-dark-border rounded-md hover:bg-dark-primary transition-colors"
                             >
                               {totalPages}
                             </button>
@@ -457,7 +457,7 @@ export default function ScheduledTasksPage() {
                       setPage(p => Math.min(totalPages, p + 1));
                     }}
                     disabled={page === Math.max(1, Math.ceil(data.total / limit))}
-                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-3 py-2 text-sm font-medium text-text-primary bg-dark-tertiary border border-dark-border rounded-md hover:bg-dark-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     下一页
                     <i className="fas fa-chevron-right ml-1" />
@@ -483,17 +483,17 @@ export default function ScheduledTasksPage() {
 
       {/* Delete Confirmation Dialog */}
       {showDeleteDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-md w-full p-6">
             <div className="flex items-start mb-4">
               <div className="flex-shrink-0">
-                <i className="fas fa-exclamation-triangle text-red-600 text-3xl" />
+                <i className="fas fa-exclamation-triangle text-danger-500 text-3xl" />
               </div>
               <div className="ml-4">
-                <h3 className="text-lg font-bold text-gray-900 mb-2">
+                <h3 className="text-lg font-bold text-text-primary mb-2">
                   确认删除
                 </h3>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-text-secondary">
                   您确定要删除这个定期报告吗？此操作无法撤销。
                 </p>
               </div>
@@ -501,13 +501,13 @@ export default function ScheduledTasksPage() {
             <div className="flex justify-end space-x-3">
               <button
                 onClick={() => setShowDeleteDialog(null)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 border border-dark-border rounded-md text-sm font-medium text-text-secondary hover:bg-dark-tertiary transition-colors"
               >
                 取消
               </button>
               <button
                 onClick={() => handleDelete(showDeleteDialog)}
-                className="px-4 py-2 bg-red-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-red-700"
+                className="px-4 py-2 bg-danger-500 border border-transparent rounded-md text-sm font-medium text-white hover:bg-danger-400 transition-colors"
               >
                 <i className="fas fa-trash mr-2" />
                 删除

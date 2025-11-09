@@ -454,10 +454,10 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
 
   if (isLoading || configLoading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
         <div className="flex items-center justify-center">
-          <i className="fas fa-spinner fa-spin text-2xl text-blue-600 mr-3" />
-          <span className="text-gray-600">加载系统状态...</span>
+          <i className="fas fa-spinner fa-spin text-2xl text-accent-primary mr-3" />
+          <span className="text-text-secondary">加载系统状态...</span>
         </div>
       </div>
     );
@@ -470,20 +470,20 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
   return (
     <>
       {/* Compact Control Bar */}
-      <div className="bg-white rounded-lg shadow px-6 py-4">
+      <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border px-6 py-4">
         <div className="flex items-center justify-between">
           {/* Left: Status */}
           <div className="flex items-center space-x-4">
             <div className="flex items-center">
               <span className={`w-3 h-3 rounded-full mr-2 ${
-                isRunning ? 'bg-green-600 animate-pulse' : 'bg-gray-400'
+                isRunning ? 'bg-green-600 animate-pulse' : 'bg-text-muted'
               }`} />
-              <span className="text-sm font-medium text-gray-700">
+              <span className="text-sm font-medium text-text-primary">
                 {isRunning ? '运行中' : '已停止'}
               </span>
             </div>
             {isRunning && nextRunTime && (
-              <div className="text-sm font-medium text-gray-700">
+              <div className="text-sm font-medium text-text-primary">
                 <i className="fas fa-clock mr-1" />
                 下次分析时间: {new Date(nextRunTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </div>
@@ -526,7 +526,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
             {/* Config Button */}
             <button
               onClick={() => setShowConfigModal(true)}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+              className="px-4 py-2 bg-dark-tertiary text-text-primary rounded-md hover:bg-dark-primary border border-dark-border transition-colors"
               title="系统配置"
             >
               <i className="fas fa-cog" />
@@ -537,16 +537,16 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
 
       {/* Configuration Modal */}
       {showConfigModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-gray-900">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+          <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-dark-border flex items-center justify-between">
+              <h3 className="text-xl font-bold text-text-primary">
                 <i className="fas fa-cog mr-2 text-blue-600" />
                 系统配置
               </h3>
               <button
                 onClick={() => setShowConfigModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-text-muted hover:text-text-secondary"
               >
                 <i className="fas fa-times text-xl" />
               </button>
@@ -568,7 +568,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
 
               {/* Futu API URL */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   富途API地址 <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -576,16 +576,16 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                   value={futuApiUrl}
                   onChange={(e) => handleFutuApiUrlChange(e.target.value)}
                   placeholder="http://localhost:8080"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-dark-tertiary border border-dark-border text-text-primary rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-text-tertiary mt-1">
                   富途OpenAPI服务地址
                 </p>
               </div>
 
               {/* Futu API Key with Validate Button */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   <i className="fas fa-key mr-1" />
                   富途API密钥 <span className="text-red-500">*</span>
                 </label>
@@ -596,7 +596,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                       value={futuApiKey}
                       onChange={(e) => handleFutuApiKeyChange(e.target.value)}
                       placeholder="请输入富途API密钥"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 bg-dark-tertiary border border-dark-border text-text-primary rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-transparent"
                       required
                     />
                     <button
@@ -604,7 +604,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                       className="absolute inset-y-0 right-0 pr-3 flex items-center"
                       onClick={() => setShowApiKey(!showApiKey)}
                     >
-                      <i className={`fas ${showApiKey ? 'fa-eye-slash' : 'fa-eye'} text-gray-400 hover:text-gray-600`} />
+                      <i className={`fas ${showApiKey ? 'fa-eye-slash' : 'fa-eye'} text-text-muted hover:text-text-secondary`} />
                     </button>
                   </div>
                   <button
@@ -613,8 +613,8 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                     disabled={validatingConfig || !futuApiUrl || !futuApiKey}
                     className={`px-4 py-2 rounded-md border font-medium transition-colors ${
                       configValidated
-                        ? 'bg-green-50 border-green-200 text-green-700'
-                        : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'
+                        ? 'bg-success-500/20 border-success-500 text-success-500'
+                        : 'bg-dark-tertiary border-dark-border text-text-primary hover:bg-dark-primary'
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {validatingConfig ? (
@@ -635,7 +635,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                     )}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-text-tertiary mt-1">
                   <i className="fas fa-lock mr-1" />
                   富途OpenAPI密钥，用于身份验证
                 </p>
@@ -643,7 +643,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
 
               {/* Interval */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   分析间隔（分钟） <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -652,16 +652,16 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                   onChange={(e) => setInterval(Number(e.target.value))}
                   min={5}
                   max={60}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 bg-dark-tertiary border border-dark-border text-text-primary rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-text-tertiary mt-1">
                   系统每隔多少分钟执行一次分析（最低5分钟，最高60分钟）
                 </p>
               </div>
 
               {/* Market Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-text-primary mb-2">
                   分析市场 <span className="text-red-500">*</span>
                 </label>
                 <div className="flex items-center space-x-6">
@@ -681,51 +681,51 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                             setSelectedMarkets(selectedMarkets.filter(m => m !== market.value));
                           }
                         }}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        className="w-4 h-4 text-accent-primary border-dark-border rounded focus:ring-accent-primary bg-dark-tertiary"
                       />
-                      <span className="text-sm text-gray-700">
+                      <span className="text-sm text-text-primary">
                         {market.icon} {market.label}
                       </span>
                     </label>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-text-tertiary mt-1">
                   选择要分析的市场，可多选。系统会按顺序检查每个市场的开盘状态
                 </p>
               </div>
 
               {/* LLM Configuration Section */}
-              <div className="border-t border-gray-200 pt-4 mt-4">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">
-                  <i className="fas fa-brain mr-2 text-purple-600" />
+              <div className="border-t border-dark-border pt-4 mt-4">
+                <h4 className="text-sm font-semibold text-text-primary mb-3">
+                  <i className="fas fa-brain mr-2 text-accent-secondary" />
                   LLM 配置
                 </h4>
-                <p className="text-xs text-gray-500 mb-3">
+                <p className="text-xs text-text-tertiary mb-3">
                   配置用于短线交易分析的 LLM 服务商和模型，如不配置将使用分析页面的缓存配置
                 </p>
 
                 {/* LLM Provider */}
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-text-primary mb-2">
                     LLM 提供商 <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={llmProvider}
                     onChange={(e) => handleLlmProviderChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-dark-tertiary border border-dark-border text-text-primary rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary"
                     required
                     disabled={loadingApiConfig}
                   >
-                    <option value="">
+                    <option value="" className="bg-dark-tertiary text-text-primary">
                       {loadingApiConfig ? '加载中...' : '请选择 LLM 服务商...'}
                     </option>
                     {getLlmProviders().map((provider) => (
-                      <option key={provider.value} value={provider.value}>
+                      <option key={provider.value} value={provider.value} className="bg-dark-tertiary text-text-primary">
                         {provider.label} - {provider.description}
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-text-tertiary mt-1">
                     选择用于短线交易分析的 LLM 提供商
                   </p>
                 </div>
@@ -733,7 +733,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                 {/* LLM API Key */}
                 {llmProvider && llmProvider !== 'ollama' && (
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-text-primary mb-2">
                       <i className="fas fa-key mr-1" />
                       LLM API 密钥 <span className="text-red-500">*</span>
                     </label>
@@ -744,7 +744,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                           value={llmApiKey}
                           onChange={(e) => handleLlmApiKeyChange(e.target.value)}
                           placeholder={`请输入 ${llmProvider.toUpperCase()} API 密钥`}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-3 py-2 bg-dark-tertiary border border-dark-border text-text-primary rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-transparent"
                           required
                         />
                         <button
@@ -752,7 +752,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                           className="absolute inset-y-0 right-0 pr-3 flex items-center"
                           onClick={() => setShowLlmApiKey(!showLlmApiKey)}
                         >
-                          <i className={`fas ${showLlmApiKey ? 'fa-eye-slash' : 'fa-eye'} text-gray-400 hover:text-gray-600`} />
+                          <i className={`fas ${showLlmApiKey ? 'fa-eye-slash' : 'fa-eye'} text-text-muted hover:text-text-secondary`} />
                         </button>
                       </div>
                       <button
@@ -761,8 +761,8 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                         disabled={validatingLlmKey || !llmApiKey}
                         className={`px-4 py-2 rounded-md border font-medium transition-colors ${
                           llmKeyValidated
-                            ? 'bg-green-50 border-green-200 text-green-700'
-                            : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'
+                            ? 'bg-success-500/20 border-success-500 text-success-500'
+                            : 'bg-dark-tertiary border-dark-border text-text-primary hover:bg-dark-primary'
                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                       >
                         {validatingLlmKey ? (
@@ -783,7 +783,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                         )}
                       </button>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-text-tertiary mt-1">
                       <i className="fas fa-lock mr-1" />
                       用于访问 {llmProvider.toUpperCase()} 服务的 API 密钥
                     </p>
@@ -792,30 +792,30 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
 
                 {/* Model Selection - Show when API key is validated or using Ollama */}
                 {llmProvider && (llmKeyValidated || llmProvider === 'ollama') && (
-                  <div className="border-t border-gray-200 pt-4 mt-4">
+                  <div className="border-t border-dark-border pt-4 mt-4">
                     <div className="flex items-center space-x-2 mb-4">
                       <i className="fas fa-brain text-purple-600" />
                       <span className="font-medium text-purple-700">选择 LLM 模型</span>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-text-primary mb-2">
                         <i className="fas fa-robot mr-1" />
                         LLM 模型 <span className="text-red-500">*</span>
                       </label>
                       <select
                         value={llmModel}
                         onChange={(e) => handleLlmModelChange(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-dark-tertiary border border-dark-border text-text-primary rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary"
                         required
                       >
-                        <option value="">选择模型...</option>
+                        <option value="" className="bg-dark-tertiary text-text-primary">选择模型...</option>
                         {getModelsForProvider(llmProvider, 'deep').map((model) => (
-                          <option key={model.value} value={model.value}>
+                          <option key={model.value} value={model.value} className="bg-dark-tertiary text-text-primary">
                             {model.label}
                           </option>
                         ))}
                       </select>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-xs text-text-tertiary mt-1">
                         用于短线交易分析和决策（使用深度思考模型选项）
                       </p>
                     </div>
@@ -824,10 +824,10 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-2">
+            <div className="px-6 py-4 border-t border-dark-border flex justify-end space-x-2">
               <button
                 onClick={() => setShowConfigModal(false)}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                className="px-4 py-2 text-text-primary bg-dark-tertiary rounded-md hover:bg-dark-primary border border-dark-border"
               >
                 取消
               </button>

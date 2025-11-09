@@ -152,29 +152,29 @@ function DashboardContent() {
   // 如果正在认证检查或加载配置，显示加载状态
   if (authLoading || isLoading || !user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
         <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4" />
-          <p className="text-gray-600">加载中...</p>
+          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
+          <p className="text-text-secondary">加载中...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-dark-primary flex flex-col">
       {/* 顶部导航栏 */}
       <AppNavbar user={user} onLogout={logout} showNewAnalysis={false} />
 
       {/* 主要内容区域 */}
-      <div className="flex-1 max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 w-full">
+      <div className="flex-1 max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 w-full pt-20">
         {/* 欢迎横幅 */}
         {currentView === 'config' && (
-          <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-6 mb-6 text-white">
+          <div className="bg-gradient-to-r from-accent-primary to-accent-secondary rounded-lg p-6 mb-6 text-white shadow-glow-cyan">
             <div className="text-center">
               <h1 className="text-2xl md:text-3xl font-bold mb-2">
                 <i className="fas fa-robot mr-3" />
-                TradingAgents
+                TradingAgentsWeb
               </h1>
               <p className="text-lg md:text-xl mb-2">多智能体大语言模型金融交易框架</p>
               <p className="text-base md:text-lg">
@@ -217,7 +217,7 @@ function DashboardContent() {
       {currentView === 'results' && showBackToTop && (
         <button
           onClick={handleBackToTop}
-          className="fixed bottom-8 right-8 bg-blue-600 text-white w-12 h-12 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-300 flex items-center justify-center z-50 hover:scale-110"
+          className="fixed bottom-8 right-8 bg-gradient-to-r from-accent-primary to-accent-secondary text-white w-12 h-12 rounded-full shadow-glow-cyan hover:scale-110 transition-all duration-300 flex items-center justify-center z-50"
           aria-label="返回顶部"
         >
           <i className="fas fa-arrow-up text-xl" />
@@ -225,12 +225,12 @@ function DashboardContent() {
       )}
 
       {/* 页面底部版权信息 */}
-      <footer className="bg-white border-t border-gray-200 mt-auto">
+      <footer className="bg-dark-secondary border-t border-dark-border mt-auto">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
-          <div className="text-center text-sm text-gray-500">
-            <p>© {new Date().getFullYear()} SmartAIGC. 保留所有权利</p>
+          <div className="text-center text-sm text-text-tertiary">
+            <p className="text-text-secondary">© {new Date().getFullYear()} SmartAIGC. 保留所有权利</p>
             <p className="mt-1">
-              基于 <a href="https://github.com/TauricResearch/TradingAgents" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700">TradingAgents</a> 构建
+              基于 <a href="https://github.com/TauricResearch/TradingAgents" target="_blank" rel="noopener noreferrer" className="text-accent-primary hover:text-accent-secondary transition-colors">TradingAgents</a> 构建
             </p>
           </div>
         </div>
@@ -247,32 +247,32 @@ function DashboardContent() {
       {/* Password Setup Modal */}
       {showPasswordModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-md w-full p-6">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i className="fas fa-check text-green-600 text-2xl" />
+              <div className="w-16 h-16 bg-success-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i className="fas fa-check text-success-500 text-2xl" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">注册成功！</h3>
-              <p className="text-sm text-gray-600">
+              <h3 className="text-xl font-semibold text-text-primary mb-2">注册成功！</h3>
+              <p className="text-sm text-text-secondary">
                 为了账户安全，建议您设置登录密码
               </p>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label htmlFor="modal-password" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="modal-password" className="block text-sm font-medium text-text-secondary mb-2">
                   设置密码
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <i className="fas fa-lock text-gray-400" />
+                    <i className="fas fa-lock text-text-tertiary" />
                   </div>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     id="modal-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full h-12 pl-10 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="block w-full h-12 pl-10 pr-12 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
                     placeholder="请输入密码（至少6位）"
                   />
                   <button
@@ -280,25 +280,25 @@ function DashboardContent() {
                     className="absolute inset-y-0 right-0 pr-3 flex items-center"
                     onClick={() => setShowPassword(!showPassword)}
                   >
-                    <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-gray-400 hover:text-gray-600`} />
+                    <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'} text-text-tertiary hover:text-accent-primary transition-colors`} />
                   </button>
                 </div>
               </div>
 
               <div>
-                <label htmlFor="modal-confirm-password" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="modal-confirm-password" className="block text-sm font-medium text-text-secondary mb-2">
                   确认密码
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <i className="fas fa-lock text-gray-400" />
+                    <i className="fas fa-lock text-text-tertiary" />
                   </div>
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
                     id="modal-confirm-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="block w-full h-12 pl-10 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="block w-full h-12 pl-10 pr-12 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
                     placeholder="请再次输入密码"
                   />
                   <button
@@ -306,7 +306,7 @@ function DashboardContent() {
                     className="absolute inset-y-0 right-0 pr-3 flex items-center"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
-                    <i className={`fas ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'} text-gray-400 hover:text-gray-600`} />
+                    <i className={`fas ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'} text-text-tertiary hover:text-accent-primary transition-colors`} />
                   </button>
                 </div>
               </div>
@@ -315,7 +315,7 @@ function DashboardContent() {
                 <button
                   type="button"
                   onClick={handleSkipPassword}
-                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+                  className="flex-1 px-4 py-3 border border-dark-border text-text-secondary rounded-lg hover:bg-dark-tertiary focus:outline-none focus:ring-2 focus:ring-accent-primary transition-colors"
                 >
                   稍后设置
                 </button>
@@ -323,7 +323,7 @@ function DashboardContent() {
                   type="button"
                   onClick={handleSetPassword}
                   disabled={isSettingPassword || !password || !confirmPassword}
-                  className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-success-500 to-success-600 text-white rounded-lg hover:shadow-glow-cyan focus:outline-none focus:ring-2 focus:ring-success-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   {isSettingPassword ? (
                     <>
@@ -336,7 +336,7 @@ function DashboardContent() {
                 </button>
               </div>
 
-              <p className="text-xs text-gray-500 text-center mt-4">
+              <p className="text-xs text-text-tertiary text-center mt-4">
                 <i className="fas fa-info-circle mr-1" />
                 您也可以稍后在个人中心设置或修改密码
               </p>
@@ -351,10 +351,10 @@ function DashboardContent() {
 export default function DashboardPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
         <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4" />
-          <p className="text-gray-600">加载中...</p>
+          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
+          <p className="text-text-secondary">加载中...</p>
         </div>
       </div>
     }>

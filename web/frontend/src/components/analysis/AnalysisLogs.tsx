@@ -112,13 +112,13 @@ export function AnalysisLogs({ analysisId, onComplete }: AnalysisLogsProps) {
       case 'error':
         return 'text-red-600 bg-red-50';
       case 'warning':
-        return 'text-yellow-600 bg-yellow-50';
+        return 'text-warning-500 bg-warning-500/20';
       case 'info':
-        return 'text-blue-600 bg-blue-50';
+        return 'text-accent-primary bg-accent-primary/20';
       case 'debug':
-        return 'text-gray-600 bg-gray-50';
+        return 'text-text-secondary bg-dark-tertiary';
       default:
-        return 'text-gray-600 bg-gray-50';
+        return 'text-text-secondary bg-dark-tertiary';
     }
   };
 
@@ -138,28 +138,28 @@ export function AnalysisLogs({ analysisId, onComplete }: AnalysisLogsProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg">
+    <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border">
       {/* 头部 - 进度条和状态 */}
-      <div className="p-6 border-b border-gray-200">
+      <div className="p-6 border-b border-dark-border">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
             <div className={`w-3 h-3 rounded-full ${
-              hasError ? 'bg-red-500' : 
-              isCompleted ? 'bg-green-500' : 
-              isConnected ? 'bg-blue-500 animate-pulse' : 
-              'bg-gray-400'
+              hasError ? 'bg-danger-500' : 
+              isCompleted ? 'bg-success-500' : 
+              isConnected ? 'bg-accent-primary animate-pulse' : 
+              'bg-text-muted'
             }`} />
-            <h3 className="text-lg font-semibold text-gray-900">
-              <i className="fas fa-terminal mr-2 text-blue-600" />
+            <h3 className="text-lg font-semibold text-text-primary">
+              <i className="fas fa-terminal mr-2 text-accent-primary" />
               实时分析日志
             </h3>
           </div>
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-text-secondary">
               <i className="fas fa-layer-group mr-1" />
               {currentPhase}
             </span>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-text-secondary">
               <i className="fas fa-tasks mr-1" />
               {currentStep}
             </span>
@@ -168,26 +168,26 @@ export function AnalysisLogs({ analysisId, onComplete }: AnalysisLogsProps) {
 
         {/* 进度条 */}
         <div className="relative">
-          <div className="overflow-hidden h-4 text-xs flex rounded-full bg-gray-200">
+          <div className="overflow-hidden h-4 text-xs flex rounded-full bg-dark-tertiary">
             <div
               style={{ width: `${progress}%` }}
               className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center transition-all duration-500 ${
-                hasError ? 'bg-gradient-to-r from-red-500 to-red-600' :
-                isCompleted ? 'bg-gradient-to-r from-green-500 to-green-600' :
-                'bg-gradient-to-r from-blue-500 to-purple-500'
+                hasError ? 'bg-gradient-to-r from-danger-500 to-danger-600' :
+                isCompleted ? 'bg-gradient-to-r from-success-500 to-success-600' :
+                'bg-gradient-to-r from-accent-primary to-accent-secondary'
               }`}
             />
           </div>
           <div className="flex justify-between items-center mt-2">
-            <span className="text-sm font-medium text-gray-700">{progress.toFixed(1)}%</span>
+            <span className="text-sm font-medium text-text-primary">{progress.toFixed(1)}%</span>
             {isCompleted && (
-              <span className="text-sm text-green-600 font-medium">
+              <span className="text-sm text-success-500 font-medium">
                 <i className="fas fa-check-circle mr-1" />
                 分析完成
               </span>
             )}
             {hasError && (
-              <span className="text-sm text-red-600 font-medium">
+              <span className="text-sm text-danger-500 font-medium">
                 <i className="fas fa-exclamation-circle mr-1" />
                 分析失败
               </span>
@@ -198,17 +198,17 @@ export function AnalysisLogs({ analysisId, onComplete }: AnalysisLogsProps) {
 
       {/* 日志内容 */}
       <div className="p-6">
-        <div className="bg-gray-900 rounded-lg p-4 h-96 overflow-y-auto font-mono text-sm">
+        <div className="bg-dark-primary rounded-lg p-4 h-96 overflow-y-auto font-mono text-sm">
           {logs.length === 0 ? (
-            <div className="text-gray-500 text-center py-8">
+            <div className="text-text-tertiary text-center py-8">
               <i className="fas fa-spinner fa-spin text-2xl mb-2" />
               <p>等待日志...</p>
             </div>
           ) : (
             <div className="space-y-2">
               {logs.map((log, index) => (
-                <div key={index} className="flex items-start space-x-2 text-gray-300 hover:bg-gray-800 px-2 py-1 rounded transition-colors">
-                  <span className="text-gray-500 text-xs whitespace-nowrap">
+                <div key={index} className="flex items-start space-x-2 text-text-secondary hover:bg-dark-secondary px-2 py-1 rounded transition-colors">
+                  <span className="text-text-tertiary text-xs whitespace-nowrap">
                     {new Date(log.timestamp).toLocaleTimeString('zh-CN')}
                   </span>
                   <span className={`px-2 py-0.5 rounded text-xs font-medium ${getLevelColor(log.level)}`}>
@@ -234,7 +234,7 @@ export function AnalysisLogs({ analysisId, onComplete }: AnalysisLogsProps) {
         </div>
 
         {/* 日志统计 */}
-        <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+        <div className="mt-4 flex items-center justify-between text-sm text-text-secondary">
           <div className="flex items-center space-x-4">
             <span>
               <i className="fas fa-list mr-1" />
@@ -251,7 +251,7 @@ export function AnalysisLogs({ analysisId, onComplete }: AnalysisLogsProps) {
           </div>
           <button
             onClick={() => setLogs([])}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-text-muted hover:text-text-secondary"
           >
             <i className="fas fa-trash-alt mr-1" />
             清空日志
