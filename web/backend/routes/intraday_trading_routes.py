@@ -264,6 +264,7 @@ async def control_scheduler(
             
             # Update user config
             user_config.intraday_scheduler_enabled = True
+            user_config.intraday_scheduler_auto_start = True  # Mark for auto-restart on service restart
             await db.commit()
             
             # Broadcast status update via WebSocket
@@ -297,6 +298,7 @@ async def control_scheduler(
             # Update user config
             if user_config:
                 user_config.intraday_scheduler_enabled = False
+                user_config.intraday_scheduler_auto_start = False  # Clear auto-restart flag (manual stop)
                 await db.commit()
             
             # Broadcast stopped status via WebSocket
