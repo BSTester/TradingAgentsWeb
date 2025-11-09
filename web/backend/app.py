@@ -131,45 +131,6 @@ async def lifespan(app: FastAPI):
             app.state.scheduler = scheduler
             print("✅ Scheduler service started")
             
-            # Add email verification code cleanup job (runs every hour)
-            from web.backend.services.verification_code_service import VerificationCodeService
-            from web.backend.database import SessionLocal
-            
-            def cleanup_verification_codes():
-                """Background job to cleanup expired verification codes"""
-                db = SessionLocal()
-                try:
-                    # Use sync session for background job
-                    from sqlalchemy import delete
-                    from web.backend.models import EmailVerificationCode
-                    from datetime import datetime, timedelta, timezone
-                    
-                    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=1)
-                    result = db.execute(
-                        delete(EmailVerificationCode).where(
-                            EmailVerificationCode.created_at < cutoff_time
-                        )
-                    )
-                    db.commit()
-                    deleted_count = result.rowcount
-                    if deleted_count > 0:
-                        print(f"🧹 [Cleanup] Deleted {deleted_count} expired verification codes")
-                except Exception as e:
-                    print(f"❌ [Cleanup] Error cleaning up verification codes: {e}")
-                    db.rollback()
-                finally:
-                    db.close()
-            
-            # Schedule cleanup job to run every hour
-            scheduler.scheduler.add_job(
-                cleanup_verification_codes,
-                'interval',
-                hours=1,
-                id='cleanup_verification_codes',
-                replace_existing=True
-            )
-            print("✅ Email verification code cleanup job scheduled (runs every hour)")
-            
             # Load existing enabled scheduled tasks
             await load_scheduled_tasks(scheduler)
             print("✅ Scheduled tasks loaded")
