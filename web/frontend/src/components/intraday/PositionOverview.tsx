@@ -195,10 +195,10 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm">
-                            <div className={`font-medium ${(position.pnl || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            <div className={`font-medium ${(position.pnl || 0) >= 0 ? 'text-[#f03a55]' : 'text-[#00a870]'}`}>
                               {(position.pnl || 0) >= 0 ? '+' : ''}{position.currency || '$'}{(position.pnl || 0).toFixed(2)}
                             </div>
-                            <div className={`text-xs ${(position.pnl_percent || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            <div className={`text-xs ${(position.pnl_percent || 0) >= 0 ? 'text-[#f03a55]' : 'text-[#00a870]'}`}>
                               {(position.pnl_percent || 0) >= 0 ? '+' : ''}{(position.pnl_percent || 0).toFixed(2)}%
                             </div>
                           </div>
@@ -212,11 +212,9 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
                               <div className="w-full bg-dark-tertiary rounded-full h-2 mt-1">
                                 <div
                                   className={`h-2 rounded-full ${
-                                    (position.position_ratio || 0) > 30
-                                      ? 'bg-danger-500'
-                                      : (position.position_ratio || 0) > 20
-                                      ? 'bg-warning-500'
-                                      : 'bg-success-500'
+                                    (position.pnl || 0) >= 0
+                                      ? 'bg-[#f03a55]'
+                                      : 'bg-[#00a870]'
                                   }`}
                                   style={{ width: `${Math.min(position.position_ratio || 0, 100)}%` }}
                                 />

@@ -2,12 +2,16 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  // 移除 output: 'export' 以支持动态路由和API功能
+  // 启用静态导出 - 构建为纯静态HTML/CSS/JS文件
+  output: 'export',
+  
+  // 静态导出时图片优化必须禁用
   images: {
     unoptimized: true,
   },
   
-  // 生产环境通过 Nginx 反代 /api，无需 Next 内部重写
+  // 静态导出时禁用trailing slash（可选，根据需求调整）
+  trailingSlash: true,
   
   // 生产构建时自动移除 console 语句
   compiler: {
