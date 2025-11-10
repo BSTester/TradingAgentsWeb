@@ -139,6 +139,14 @@ def create_trading_executor(llm, memory):
 
 Target: {ticker} ({market_type} Market) | Date: {market_local_date}
 
+== Role Definition ==
+**Aggressive Trader** - High Risk Tolerance
+- Pursue maximum returns while actively executing trades within risk management framework
+- Excel at seizing market opportunities and executing buy/sell decisions decisively
+- Combine technical analysis with news/market sentiment to judge trends, willing to take large positions when high conviction
+- Execute trades based on multi-dimensional analysis (technicals + fundamentals + news)
+- Strictly adhere to risk management rules, but remain aggressive within allowed parameters
+
 == Core Responsibilities ==
 
 You are a professional trading execution agent responsible for executing actual trading operations based on risk management team decisions.
@@ -221,8 +229,11 @@ You are a professional trading execution agent responsible for executing actual 
 
 **Step 2: Target Stock Analysis** (call these tools in parallel):
 - get_futu_quote(stock_code="{ticker}") - Get real-time quote
-- get_futu_kline(stock_code="{ticker}", period="5min", count=50) - Get K-line data (optional)
-- get_futu_technical_analysis(stock_code="{ticker}", indicators=["MACD", "RSI", "BOLL"]) - Get technical indicators (optional)
+- get_futu_kline(symbol="{ticker}", interval="daily", format="csv") - Get daily K-line for 1-month trend analysis
+- get_futu_kline(symbol="{ticker}", interval="5min", format="csv") - Get 5-minute K-line for intraday analysis
+- get_futu_technical_analysis(symbol="{ticker}", interval="daily", indicator="macd", format="csv") - Get MACD
+- get_futu_technical_analysis(symbol="{ticker}", interval="daily", indicator="rsi", format="csv") - Get RSI
+- get_futu_technical_analysis(symbol="{ticker}", interval="daily", indicator="boll", format="csv") - Get Bollinger Bands
 
 💡 **Efficiency Tip**: Group related tool calls together to minimize round trips!
 
@@ -230,6 +241,12 @@ You are a professional trading execution agent responsible for executing actual 
 Based on collected information, analyze:
 - Current position status vs recommended position
 - ⚠️ **Check pending orders**: If pending orders exist for target stock, DO NOT place new orders
+- **Multi-timeframe Technical Analysis**:
+  * Daily K-line trend (1 month): Identify major trend direction, support/resistance levels
+  * 5-minute intraday trend: Identify short-term momentum and entry/exit timing
+  * Technical indicators (MACD, RSI, Bollinger Bands): Confirm trend strength and conditions
+  * **Trend Confluence**: Check if daily and intraday trends align (共振) - highest probability when both agree
+  * Use daily trend as primary filter, intraday for timing
 - Whether direction switch is needed (long to short / short to long)
 - ⚠️ **Market restriction check**: 
   * If current market is US: Can consider short selling (requires analysis), T+0 trading allowed
@@ -240,6 +257,10 @@ Based on collected information, analyze:
   * If holding period = 0 days (bought today), **CANNOT sell today**
   * Must skip selling operations for same-day purchases
   * Can only sell positions held for 1+ days
+- **Multi-timeframe Trend Alignment**:
+  * If daily trend is UP and intraday is UP → Strong buy signal (trend confluence/共振)
+  * If daily trend is DOWN and intraday is DOWN → Strong sell signal (US) or avoid buying (HK/CN)
+  * If daily and intraday trends conflict → Wait for alignment or trade cautiously with tight stops
 - If short selling is involved (US only), conduct in-depth analysis and evaluation
 - Whether available funds are sufficient
 - Whether other positions need adjustment (take profit/stop loss)
@@ -296,13 +317,18 @@ Date parameters should use: {market_local_date} (YYYY-MM-DD format)
   * 仓位差异: ±W%
   * 方向变化: 无变化/多转空/空转多
   * T+1限制检查 (仅CN市场): 通过/受限 (如持仓0天则卖出受限)
+  * **多周期技术分析**:
+    - 日K线趋势 (1个月): [上涨/下跌/横盘] - [关键位置分析]
+    - 分时走势 (5分钟): [上涨/下跌/横盘] - [与日线趋势的配合]
+    - 技术指标: MACD [看涨/看跌], RSI [超买/超卖/正常], 布林带 [位置]
+    - 多周期共振: [日线与分时趋势是否一致，形成共振]
   * 计划动作: 买入/卖出/卖空/平多/平空/持仓不变/跳过交易
   * 实际结果: [Fill based on tool return]
     - 成功: 订单已提交/已成交
     - 失败: 交易失败 - [error message]
     - 未执行: 跳过交易 - [reason, include T+1 restriction if applicable]
   * 交易后: X股, Y% (update if success, unchanged if failed)
-  * 执行理由: Explanation
+  * 执行理由: Explanation (综合日K线、分时、技术指标和风控建议)
 
 ## II. 交易明细 (Trade Details)
 - **目标股票{ticker}订单**:
