@@ -311,8 +311,8 @@ For each position and candidate stock, call these tools together:
 Example: If analyzing AAPL and TSLA, call all 18 tools (9 per stock) in one response!
 
 **Step 3: Market Scanning & News Analysis** (optional, call these in parallel):
-- `get_futu_hot_news(lang="zh-cn")` - Get latest hot financial news from Futu (recommended for real-time market sentiment)
-- `get_akshare_news(limit=20)` - Get latest financial news from AkShare
+- `get_futu_hot_news(lang="zh-cn")` - Get latest hot financial news from Futu 
+- `get_akshare_news(limit=20)` - Get latest financial news from AkShare (recommended for real-time market sentiment)
 - `get_akshare_hot_stocks(symbol="A股", time_range="今日", limit=10)` - Get Baidu hot search stocks (for CN market)
 - `get_futu_hot_stocks(market_type="{market_type}")` - Discover market hot stocks and trading opportunities
 
