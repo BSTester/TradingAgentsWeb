@@ -258,9 +258,13 @@ The historical context helps you make more informed decisions and maintain a coh
 - **Trade the trend**: Momentum is your friend in short-term trading
 
 ## Market Rules
-- **US Market**: Supports both long and short positions
-- **HK Market**: Only supports long positions, short selling NOT supported
-- **CN Market**: Only supports long positions, short selling NOT supported
+- **US Market**: Supports both long and short positions, T+0 trading (can buy and sell same day)
+- **HK Market**: Only supports long positions, short selling NOT supported, T+0 trading allowed
+- **CN Market (A-shares)**: Only supports long positions, short selling NOT supported, **T+1 trading mechanism**
+  * **T+1 Restriction**: Stocks bought today (holding period = 0 days) CANNOT be sold on the same day
+  * Must wait until next trading day to sell newly purchased stocks
+  * This applies to ALL A-share stocks (Shanghai/Shenzhen exchanges)
+  * When analyzing positions, ALWAYS check holding period before planning sell operations
 
 ⚠️ **IMPORTANT**: Current market is {market_type}. Please formulate trading strategy according to market rules.
 
@@ -312,15 +316,25 @@ Based on collected information, conduct comprehensive analysis:
 **Position Evaluation**:
 - Current position status vs ideal position allocation
 - P&L situation and holding time (compare with historical records if available)
+- ⚠️ **Holding Period Check (CN Market CRITICAL)**:
+  * Check holding period for each position (from get_futu_positions result)
+  * If holding period = 0 days (bought today), **CANNOT sell today due to T+1 restriction**
+  * Mark positions with 0-day holding as "sell-restricted" in analysis
+  * Only positions held for 1+ days can be sold
 - Technical indicator signals (bullish/bearish/neutral)
 - Related news sentiment (positive/negative/neutral)
 - Whether position size is reasonable
 
 **Direction Judgment**:
 - Whether direction switch is needed (long to short / short to long)
-- ⚠️ **Short Selling Restriction Check**:
-  * If current market is **US**: Can consider short selling
-  * If current market is **HK** or **CN**: Short selling NOT supported, can only close long or hold
+- ⚠️ **Market Restriction Check**:
+  * If current market is **US**: Can consider short selling, T+0 trading allowed
+  * If current market is **HK**: Short selling NOT supported, can only close long or hold, T+0 trading allowed
+  * If current market is **CN**: Short selling NOT supported, can only close long or hold, **T+1 trading restriction applies**
+- ⚠️ **T+1 Selling Restriction (CN Market ONLY)**:
+  * Before planning any sell operation, verify holding period ≥ 1 day
+  * If holding period = 0 days, **MUST skip selling** and note "T+1限制，无法当日卖出"
+  * Can only plan sells for positions held 1+ days
 - If short selling is involved (US only), conduct in-depth analysis:
   * Technical support (trend, momentum, indicators)
   * Fundamental support (valuation, financials, industry)
@@ -352,7 +366,9 @@ Based on your professional judgment, decide specific operation steps:
 - Confirm no duplicate orders (check Phase 1 pending orders results)
 - Confirm sufficient funds
 - Calculate appropriate position size
-- ⚠️ **Reconfirm market rules**: HK/CN do not support short selling
+- ⚠️ **Reconfirm market rules**: 
+  * HK/CN do not support short selling
+  * **CN Market T+1 Check**: If selling, confirm holding period ≥ 1 day (cannot sell same-day purchases)
 
 **Execute according to trading rules**:
 - **Direction switch**: Must close positions first, then open opposite direction positions
@@ -446,6 +462,7 @@ You have full discretion to:
 - 持仓: XXX股 @ $XX.XX成本 | 现价: $XX.XX
 - 盈亏: ±X.XX% ($XXX) | 持仓规模: 占总资产XX%
 - 持仓时间: X天/小时
+- T+1限制 (仅CN市场): [不受限 (持仓≥1天) / 受限 (持仓0天，当日买入不可卖出)]
 
 **技术分析**:
 - 5分钟趋势: [上涨/下跌/横盘]
@@ -459,12 +476,13 @@ You have full discretion to:
 
 **决策**: [加仓/减仓/平仓/持有]
 **推理**: [基于技术面、新闻面、持仓管理的详细解释]
+**T+1限制影响 (仅CN市场)**: [不适用 / 无影响 / 受限制无法卖出（持仓0天）]
 
 **执行操作**:
 - 是否调用交易工具: 是/否
 - 订单类型: 买入/卖出/卖空（仅美股）/平多/平空/无
 - 数量和价格: [如执行则填写]
-- 工具返回结果: 成功/失败/未调用 - [详情]
+- 工具返回结果: 成功/失败/未调用 - [详情，如因T+1限制跳过则说明]
 - 最终状态: [交易后持仓情况]
 
 [对每个持仓重复]
