@@ -1,20 +1,21 @@
 'use client';
 
-import React from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import React, { Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { AnalysisProgress } from '@/components/analysis/AnalysisProgress';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { Footer } from '@/components/leaderboard/Footer';
 import { AppNavbar } from '@/components/common/AppNavbar';
 
-export default function HistoryProgressPage() {
+function HistoryProgressContent() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  const params = useParams();
+  const searchParams = useSearchParams();
   const { toast, showToast, hideToast } = useToast();
   
-  const analysisId = params.id as string;
+  // 从 URL 参数获取 ID
+  const analysisId = searchParams.get('id') || '';
 
   const handleBackToHome = () => {
     router.push('/');
@@ -25,10 +26,9 @@ export default function HistoryProgressPage() {
   };
 
   const handleComplete = () => {
-    router.push(`/history/${analysisId}`);
+    router.push(`/history/detail?id=${analysisId}`);
   };
 
-  // 鉴权逻辑
   React.useEffect(() => {
     if (!authLoading && !user) {
       const timer = setTimeout(() => {
@@ -41,6 +41,17 @@ export default function HistoryProgressPage() {
     }
     return undefined;
   }, [user, authLoading, router]);
+
+  if (!analysisId) {
+    return (
+      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
+        <div className="text-center">
+          <i className="fas fa-exclamation-triangle text-4xl text-danger-500 mb-4" />
+          <p className="text-text-secondary">缺少分析 ID</p>
+        </div>
+      </div>
+    );
+  }
 
   if (authLoading || !user) {
     return (
@@ -55,10 +66,8 @@ export default function HistoryProgressPage() {
 
   return (
     <div className="min-h-screen bg-dark-primary flex flex-col">
-      {/* 顶部导航栏 */}
       <AppNavbar user={user} onLogout={logout} />
 
-      {/* 面包屑导航 */}
       <nav className="bg-dark-secondary/80 backdrop-blur-lg border-b border-dark-border shadow-lg pt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-10">
           <div className="flex items-center space-x-2 text-sm">
@@ -84,7 +93,6 @@ export default function HistoryProgressPage() {
         </div>
       </nav>
 
-      {/* 主要内容 */}
       <div className="flex-1 max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 w-full">
         <AnalysisProgress
           analysisId={analysisId}
@@ -94,10 +102,8 @@ export default function HistoryProgressPage() {
         />
       </div>
 
-      {/* Footer */}
       <Footer />
 
-      {/* Toast组件 */}
       <Toast
         message={toast.message}
         type={toast.type}
@@ -105,5 +111,20 @@ export default function HistoryProgressPage() {
         onClose={hideToast}
       />
     </div>
+  );
+}
+
+export default function HistoryProgressPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
+        <div className="text-center">
+          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
+          <p className="text-text-secondary">加载中...</p>
+        </div>
+      </div>
+    }>
+      <HistoryProgressContent />
+    </Suspense>
   );
 }

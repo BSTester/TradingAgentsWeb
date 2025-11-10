@@ -10,8 +10,11 @@ const nextConfig: NextConfig = {
     unoptimized: true,
   },
   
-  // 静态导出时禁用trailing slash（可选，根据需求调整）
+  // 静态导出时添加 trailing slash
   trailingSlash: true,
+  
+  // 跳过 trailing slash 重定向，允许客户端路由
+  skipTrailingSlashRedirect: true,
   
   // 生产构建时自动移除 console 语句
   compiler: {

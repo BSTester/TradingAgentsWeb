@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Intraday Trading API Routes
-短线交易系统相关的 API 路由
+短线交易系统相关�?API 路由
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -13,20 +13,8 @@ import logging
 
 from web.backend.database import get_db
 from web.backend.models import User, IntradayDecisionRecord, PositionRecord, TradingHistory
-from web.backend.auth_routes import get_current_active_user
+from web.backend.auth_routes import get_current_active_user, require_intraday_access
 from pydantic import BaseModel
-
-# Admin role check dependency
-def require_admin(current_user: User = Depends(get_current_active_user)) -> User:
-    """
-    Dependency to require admin role for intraday trading access
-    """
-    if current_user.role != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="需要管理员权限才能访问短线交易系统"
-        )
-    return current_user
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -198,7 +186,7 @@ async def sync_positions_to_db(
 @router.post("/scheduler/control")
 async def control_scheduler(
     request: SchedulerControlRequest,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_intraday_access),
     app_request: Request = None,
     db: AsyncSession = Depends(get_db),
 ):
@@ -376,7 +364,7 @@ class IntradayConfigRequest(BaseModel):
 
 @router.get("/scheduler/config")
 async def get_scheduler_config(
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_intraday_access),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -449,7 +437,7 @@ async def get_scheduler_config(
 @router.post("/scheduler/config")
 async def configure_scheduler(
     config: IntradayConfigRequest,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_intraday_access),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -480,7 +468,7 @@ async def configure_scheduler(
             if config.interval_minutes < 5 or config.interval_minutes > 60:
                 raise HTTPException(
                     status_code=400,
-                    detail="分析间隔必须在5到60分钟之间"
+                    detail="分析间隔必须�?�?0分钟之间"
                 )
             user_config.intraday_interval_minutes = config.interval_minutes
         
@@ -580,7 +568,7 @@ async def configure_scheduler(
 @router.get("/decisions/{decision_id}", response_model=DecisionRecordResponse)
 async def get_decision_record(
     decision_id: int,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_intraday_access),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -622,7 +610,7 @@ async def get_decision_record(
 async def get_decisions_by_date_range(
     start_date: str,  # YYYY-MM-DD format
     end_date: str,  # YYYY-MM-DD format
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_intraday_access),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -661,7 +649,7 @@ async def get_decisions_by_date_range(
 async def get_positions(
     market: str = "US",  # Market parameter for Futu API
     include_closed: bool = False,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_intraday_access),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -810,7 +798,7 @@ async def get_positions(
 @router.get("/positions/{stock_code}/history", response_model=List[TradingHistoryResponse])
 async def get_position_history(
     stock_code: str,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_intraday_access),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -852,7 +840,7 @@ async def get_all_trading_history(
     limit: int = 50,
     offset: int = 0,
     trade_type: Optional[str] = None,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_intraday_access),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -903,7 +891,7 @@ async def get_all_trading_history(
 @router.get("/account")
 async def get_account_info(
     market: str = "US",  # Default to US market
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_intraday_access),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -1026,7 +1014,7 @@ async def get_account_info(
 @router.post("/scheduler/validate-config")
 async def validate_futu_config(
     config: IntradayConfigRequest,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_intraday_access),
 ):
     """
     Validate Futu API configuration by testing connection.

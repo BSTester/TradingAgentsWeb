@@ -73,7 +73,7 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
               <i className="fas fa-clock mr-1" />
               定期报告
             </button>
-            {user?.role === 'admin' && (
+            {(user?.role === 'admin' || user?.can_access_intraday_trading) && (
               <button
                 onClick={() => router.push('/intraday-trading')}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${

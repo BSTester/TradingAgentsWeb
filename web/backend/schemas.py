@@ -62,6 +62,7 @@ class User(UserBase):
     id: int
     role: str
     is_active: bool
+    can_access_intraday_trading: bool
     has_set_password: bool
     created_at: datetime
     
@@ -426,6 +427,15 @@ class ScheduledTaskListResponse(BaseModel):
     has_prev: bool
     # Statistics for all tasks (not just current page)
     stats: Optional[dict] = None  # {"enabled": int, "paused": int, "completed": int}
+
+# User Status Update schemas
+class UserStatusUpdate(BaseModel):
+    """Schema for updating user status"""
+    is_active: bool
+
+class UserIntradayAccessUpdate(BaseModel):
+    """Schema for updating user intraday trading access"""
+    can_access_intraday_trading: bool
 
 # User Configuration schemas
 class UserConfigUpdate(BaseModel):

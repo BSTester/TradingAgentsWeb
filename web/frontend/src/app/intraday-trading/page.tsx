@@ -149,14 +149,20 @@ export default function IntradayTradingPage() {
 
   // 认证和权限保护逻辑
   useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'admin')) {
-      // 如果用户未登录或不是管理员，跳转到首页
+    if (!authLoading && user) {
+      // 检查用户是否有访问权限（管理员或有短线交易权限）
+      if (user.role !== 'admin' && !user.can_access_intraday_trading) {
+        showToast('您没有访问短线交易功能的权限', 'error');
+        router.push('/');
+      }
+    } else if (!authLoading && !user) {
+      // 用户未登录，跳转到首页
       router.push('/');
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, showToast]);
 
-  // 如果正在认证检查或不是管理员，显示加载状态
-  if (authLoading || !user || user.role !== 'admin') {
+  // 如果正在认证检查或没有权限，显示加载状态
+  if (authLoading || !user || (user.role !== 'admin' && !user.can_access_intraday_trading)) {
     return (
       <div className="min-h-screen bg-dark-primary flex items-center justify-center">
         <div className="text-center">

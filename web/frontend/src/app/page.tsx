@@ -68,7 +68,7 @@ export default function HomePage() {
 
   const handleCardClick = (analysisId: string) => {
     setIsNavigating(true);
-    router.push(`/analysis/${analysisId}?from=leaderboard&market=${activeMarket}`);
+    router.push(`/analysis?id=${analysisId}&from=leaderboard&market=${activeMarket}`);
   };
 
   const handleNewAnalysis = () => {
