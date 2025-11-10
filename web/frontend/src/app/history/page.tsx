@@ -66,10 +66,10 @@ export default function HistoryPage() {
         <AnalysisHistory
           onBackToConfig={() => router.push('/dashboard')}
           onViewResults={(analysisId: string) => {
-            router.push(`/history/${analysisId}`);
+            router.push(`/history/detail?id=${analysisId}`);
           }}
           onViewProgress={(analysisId: string) => {
-            router.push(`/history/${analysisId}/progress`);
+            router.push(`/history/progress?id=${analysisId}`);
           }}
           onShowToast={showToast}
         />

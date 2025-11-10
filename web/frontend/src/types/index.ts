@@ -3,8 +3,10 @@ export interface User {
   id: number
   username: string
   email: string
-  created_at: string
+  role: string
   is_active: boolean
+  can_access_intraday_trading: boolean
+  created_at: string
 }
 
 export interface LoginRequest {

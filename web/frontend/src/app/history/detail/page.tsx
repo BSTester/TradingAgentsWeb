@@ -1,23 +1,23 @@
 'use client';
 
-import React from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import React, { Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { AnalysisResults } from '@/components/analysis/AnalysisResults';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { Footer } from '@/components/leaderboard/Footer';
 import { AppNavbar } from '@/components/common/AppNavbar';
 
-export default function HistoryDetailPage() {
+function HistoryDetailContent() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  const params = useParams();
+  const searchParams = useSearchParams();
   const { toast, showToast, hideToast } = useToast();
   
-  // 返回顶部功能
   const [showBackToTop, setShowBackToTop] = React.useState(false);
   
-  const analysisId = params.id as string;
+  // 从 URL 参数获取 ID
+  const analysisId = searchParams.get('id') || '';
 
   const handleBackToHome = () => {
     router.push('/');
@@ -28,11 +28,9 @@ export default function HistoryDetailPage() {
   };
 
   const handleNewAnalysis = () => {
-    // 跳转到分析配置页面（dashboard）
     router.push('/dashboard');
   };
 
-  // 鉴权逻辑
   React.useEffect(() => {
     if (!authLoading && !user) {
       const timer = setTimeout(() => {
@@ -55,6 +53,17 @@ export default function HistoryDetailPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  if (!analysisId) {
+    return (
+      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
+        <div className="text-center">
+          <i className="fas fa-exclamation-triangle text-4xl text-danger-500 mb-4" />
+          <p className="text-text-secondary">缺少分析 ID</p>
+        </div>
+      </div>
+    );
+  }
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-dark-primary flex items-center justify-center">
@@ -72,10 +81,8 @@ export default function HistoryDetailPage() {
 
   return (
     <div className="min-h-screen bg-dark-primary flex flex-col">
-      {/* 顶部导航栏 */}
       <AppNavbar user={user} onLogout={logout} />
 
-      {/* 面包屑导航 */}
       <nav className="bg-dark-secondary/80 backdrop-blur-lg border-b border-dark-border shadow-lg pt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-10">
           <div className="flex items-center space-x-2 text-sm">
@@ -101,7 +108,6 @@ export default function HistoryDetailPage() {
         </div>
       </nav>
 
-      {/* 主要内容 */}
       <div className="flex-1 max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 w-full">
         <AnalysisResults
           analysisId={analysisId}
@@ -112,10 +118,8 @@ export default function HistoryDetailPage() {
         />
       </div>
 
-      {/* Footer */}
       <Footer />
 
-      {/* 返回顶部按钮 */}
       {showBackToTop && (
         <button
           onClick={scrollToTop}
@@ -126,7 +130,6 @@ export default function HistoryDetailPage() {
         </button>
       )}
 
-      {/* Toast组件 */}
       <Toast
         message={toast.message}
         type={toast.type}
@@ -134,5 +137,20 @@ export default function HistoryDetailPage() {
         onClose={hideToast}
       />
     </div>
+  );
+}
+
+export default function HistoryDetailPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
+        <div className="text-center">
+          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
+          <p className="text-text-secondary">加载中...</p>
+        </div>
+      </div>
+    }>
+      <HistoryDetailContent />
+    </Suspense>
   );
 }

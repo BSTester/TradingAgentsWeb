@@ -12,6 +12,7 @@ from datetime import datetime
 
 from web.backend.database import get_db
 from web.backend.models import User
+from web.backend.schemas import UserStatusUpdate, UserIntradayAccessUpdate
 from web.backend.auth_routes import get_current_active_user
 
 router = APIRouter(prefix="/api/admin", tags=["user-management"])
@@ -70,6 +71,7 @@ async def get_all_users(
             "email": user.email,
             "role": user.role,
             "is_active": user.is_active,
+            "can_access_intraday_trading": user.can_access_intraday_trading,
             "created_at": user.created_at.isoformat() if user.created_at else None,
             "updated_at": user.updated_at.isoformat() if user.updated_at else None,
         })
@@ -144,6 +146,7 @@ async def get_user_detail(
         "email": user.email,
         "role": user.role,
         "is_active": user.is_active,
+        "can_access_intraday_trading": user.can_access_intraday_trading,
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "updated_at": user.updated_at.isoformat() if user.updated_at else None,
         "statistics": {
@@ -246,4 +249,105 @@ async def get_system_stats(
             "HK": hk_analyses,
             "CN": cn_analyses
         }
+    }
+
+
+@router.patch("/users/{user_id}/status")
+async def update_user_status(
+    user_id: int,
+    status_update: UserStatusUpdate,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    更新用户状态（启用/禁用）（仅管理员）
+    
+    Args:
+        user_id: 用户ID
+        status_update: 状态更新数据
+        current_user: 当前用户（必须是管理员）
+        db: 数据库会话
+        
+    Returns:
+        更新后的用户信息
+    """
+    
+    # 防止管理员禁用自己的账户
+    if user_id == current_user.id and not status_update.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="不能禁用当前登录的管理员账户"
+        )
+    
+    # 查询用户
+    stmt = select(User).filter(User.id == user_id)
+    result = await db.execute(stmt)
+    user = result.scalars().first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="用户不存在"
+        )
+    
+    # 更新用户状态
+    user.is_active = status_update.is_active
+    await db.commit()
+    await db.refresh(user)
+    
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "role": user.role,
+        "is_active": user.is_active,
+        "can_access_intraday_trading": user.can_access_intraday_trading,
+        "updated_at": user.updated_at.isoformat() if user.updated_at else None
+    }
+
+
+@router.patch("/users/{user_id}/intraday-access")
+async def update_user_intraday_access(
+    user_id: int,
+    access_update: UserIntradayAccessUpdate,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    更新用户短线交易访问权限（仅管理员）
+    
+    Args:
+        user_id: 用户ID
+        access_update: 权限更新数据
+        current_user: 当前用户（必须是管理员）
+        db: 数据库会话
+        
+    Returns:
+        更新后的用户信息
+    """
+    
+    # 查询用户
+    stmt = select(User).filter(User.id == user_id)
+    result = await db.execute(stmt)
+    user = result.scalars().first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="用户不存在"
+        )
+    
+    # 更新用户短线交易权限
+    user.can_access_intraday_trading = access_update.can_access_intraday_trading
+    await db.commit()
+    await db.refresh(user)
+    
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "role": user.role,
+        "is_active": user.is_active,
+        "can_access_intraday_trading": user.can_access_intraday_trading,
+        "updated_at": user.updated_at.isoformat() if user.updated_at else None
     }

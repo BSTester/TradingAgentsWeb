@@ -4,6 +4,8 @@ export interface User {
   username: string;
   email: string;
   role: string;  // 'admin' or 'user'
+  is_active: boolean;  // Whether user account is active
+  can_access_intraday_trading: boolean;  // Whether user can access intraday trading features
   has_set_password: boolean;  // Whether user has explicitly set a password
   created_at: string;
 }
