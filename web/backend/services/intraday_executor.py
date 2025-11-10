@@ -247,21 +247,24 @@ async def execute_intraday_analysis(
             # Extract results from agent execution
             decision_report = result.get("decision_report", "")
             trades_executed = result.get("trades_executed", [])
+            messages = result.get("messages", [])
             
-            logging.info(f"Agent execution completed. Report length: {len(decision_report)} chars")
-            logging.info(f"Trades executed: {len(trades_executed) if trades_executed else 0}")
+            logging.info(f"Agent execution completed:")
+            logging.info(f"  - Messages: {len(messages)}")
+            logging.info(f"  - Report length: {len(decision_report)} chars")
+            logging.info(f"  - Trades executed: {len(trades_executed) if trades_executed else 0}")
             
             # If decision_report is empty, try to extract from messages
             if not decision_report:
-                messages = result.get("messages", [])
                 logging.warning(f"Decision report is empty. Checking {len(messages)} messages...")
                 
                 # Find the last AI message (should be the final report)
                 for msg in reversed(messages):
                     if hasattr(msg, 'content') and isinstance(msg.content, str):
+                        content = msg.content
                         # Check if this looks like a report (has markdown headers or substantial content)
-                        if any(marker in msg.content for marker in ["#", "##", "Analysis", "Summary", "Decision"]):
-                            decision_report = msg.content
+                        if any(marker in content for marker in ["#", "##", "日内交易报告", "账户状态", "持仓分析", "交易摘要"]):
+                            decision_report = content
                             logging.info(f"Extracted decision report from message (length: {len(decision_report)} chars)")
                             break
                 
@@ -271,6 +274,29 @@ async def execute_intraday_analysis(
                     if hasattr(last_msg, 'content'):
                         decision_report = last_msg.content
                         logging.info(f"Using last message as decision report (length: {len(decision_report)} chars)")
+            
+            # Verify we have a valid report
+            if not decision_report or len(decision_report) < 50:
+                logging.error(f"Decision report is too short or empty: '{decision_report[:200] if decision_report else 'EMPTY'}'")
+                # Try to construct a minimal report from available data
+                decision_report = f"""# 日内交易报告
+
+**会话**: {session_id}
+**时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+**市场**: {market_type}
+
+## 执行结果
+- 执行交易: {len(trades_executed) if trades_executed else 0} 笔
+
+## 交易详情
+"""
+                if trades_executed:
+                    for i, trade in enumerate(trades_executed, 1):
+                        decision_report += f"{i}. {trade.get('action', '未知')} {trade.get('stock', '未知')} - {trade.get('quantity', 0)}股\n"
+                else:
+                    decision_report += "无交易执行\n"
+                
+                logging.warning(f"Constructed minimal report (length: {len(decision_report)} chars)")
             
             # Extract account and position info from agent's tool calls if available
             # The agent will have called these tools during execution
@@ -325,29 +351,36 @@ async def execute_intraday_analysis(
                             except:
                                 pass
 
-            # Update decision record
+            # Update decision record with all collected information
             decision_record.end_time = datetime.now()
             decision_record.status = "completed"
             decision_record.decision_report = decision_report
             decision_record.trades_executed = trades_executed if trades_executed else []
-
-            # Persist snapshots if available from agent execution
             decision_record.positions_analyzed = positions if isinstance(positions, list) else []
             decision_record.account_snapshot = account_info if account_info else {}
 
             # Log what we're saving
-            logging.info(f"Saving decision record:")
+            logging.info(f"Saving decision record to database:")
+            logging.info(f"  - Decision ID: {decision_record.id}")
+            logging.info(f"  - Session ID: {session_id}")
+            logging.info(f"  - Status: {decision_record.status}")
+            logging.info(f"  - Market: {market_type}")
             logging.info(f"  - Report length: {len(decision_report)} chars")
-            logging.info(f"  - Trades: {len(trades_executed) if trades_executed else 0}")
-            logging.info(f"  - Positions analyzed: {len(positions) if positions else 0}")
-            logging.info(f"  - Account snapshot keys: {list(account_info.keys()) if account_info else []}")
+            logging.info(f"  - Trades executed: {len(trades_executed) if trades_executed else 0}")
+            logging.info(f"  - Positions analyzed: {len(positions) if positions else 0} - {positions}")
+            logging.info(f"  - Account snapshot: {account_info}")
             
-            # Verify report is not empty
+            # Verify critical data is present
             if not decision_report or len(decision_report) < 100:
-                logging.warning(f"Decision report seems too short or empty: '{decision_report[:200]}'")
+                logging.warning(f"⚠️ Decision report seems too short: {len(decision_report)} chars")
+            if trades_executed:
+                logging.info(f"✓ Trades data collected: {[f\"{t.get('action')} {t.get('stock')}\" for t in trades_executed]}")
+            else:
+                logging.info("ℹ️ No trades executed in this session")
 
             db.commit()
-            logging.info(f"Decision record saved to database (ID: {decision_record.id})")
+            db.refresh(decision_record)  # Refresh to get updated data
+            logging.info(f"✓ Decision record saved successfully (ID: {decision_record.id})")
 
             # WebSocket: announce session complete with summary only (not full report)
             try:
@@ -375,15 +408,23 @@ async def execute_intraday_analysis(
                 decision_summary = {
                     'id': decision_record.id,
                     'session_id': decision_record.session_id,
+                    'user_id': decision_record.user_id,
                     'start_time': decision_record.start_time.isoformat(),
                     'end_time': decision_record.end_time.isoformat() if decision_record.end_time else None,
                     'status': decision_record.status,
                     'market_type': decision_record.market_type,
                     'positions_analyzed': decision_record.positions_analyzed if decision_record.positions_analyzed else [],
                     'trades_executed': decision_record.trades_executed if decision_record.trades_executed else [],
+                    'trades_count': len(decision_record.trades_executed) if decision_record.trades_executed else 0,
                     'report_summary': report_summary,  # Brief summary only
+                    'report_length': len(decision_report),  # Full report length for reference
                     'created_at': decision_record.created_at.isoformat(),
                 }
+                
+                logging.info(f"Prepared WebSocket message with decision summary:")
+                logging.info(f"  - Trades count: {decision_summary['trades_count']}")
+                logging.info(f"  - Positions: {decision_summary['positions_analyzed']}")
+                logging.info(f"  - Report length: {decision_summary['report_length']} chars")
                 
                 # Send to user-specific channel
                 channel_id = f"intraday_user_{user_id}"
@@ -403,7 +444,13 @@ async def execute_intraday_analysis(
                 "status": "success",
                 "session_id": session_id,
                 "decision_record_id": decision_record.id,
+                "market_type": market_type,
+                "user_id": user_id,
                 "trades_count": len(trades_executed) if trades_executed else 0,
+                "positions_analyzed": positions if positions else [],
+                "report_length": len(decision_report),
+                "start_time": decision_record.start_time.isoformat(),
+                "end_time": decision_record.end_time.isoformat() if decision_record.end_time else None,
             }
         
         finally:
