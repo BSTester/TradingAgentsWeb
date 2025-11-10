@@ -86,6 +86,15 @@ export default function IntradayTradingPage() {
             );
           }
         }
+        
+        // Refresh account info and positions after decision is complete
+        // This ensures the UI shows the latest data after trades are executed
+        queryClient.invalidateQueries({ 
+          queryKey: [...intradayTradingKeys.account(), selectedMarket] 
+        });
+        queryClient.invalidateQueries({ 
+          queryKey: [...intradayTradingKeys.positions(), selectedMarket] 
+        });
         break;
         
       case 'intraday_session_error':
