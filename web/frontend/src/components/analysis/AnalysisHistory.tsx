@@ -64,11 +64,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
         },
-        cache: 'no-store' // 禁用浏览器缓存
       });
 
       if (!response.ok) {
@@ -82,9 +78,9 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
       logger.log('📋 Fetched analyses:', result);
       return result;
     },
-    staleTime: 0, // 历史记录列表不缓存，确保删除后立即刷新
-    gcTime: 0, // 不保留缓存
-    retry: 10, // 最多重试10次
+    staleTime: 30 * 1000, // 30秒缓存，减少不必要的请求
+    gcTime: 5 * 60 * 1000, // 5分钟保留缓存
+    retry: 3, // 最多重试3次
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // 指数退避，最多10秒
   });
 
