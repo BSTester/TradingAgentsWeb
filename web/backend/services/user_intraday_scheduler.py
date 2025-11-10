@@ -254,8 +254,10 @@ class UserIntradaySchedulerManager:
         """
         Restore schedulers from database on service restart.
         Only restores schedulers that were running when service stopped unexpectedly.
+        Adds random delay (0-5 minutes) to avoid concurrent startup.
         """
         try:
+            import random
             from web.backend.database import SessionLocal
             from web.backend.models import UserConfig
             from sqlalchemy import select
@@ -294,7 +296,7 @@ class UserIntradaySchedulerManager:
                             db.commit()
                             continue
                         
-                        # Create and start scheduler
+                        # Create scheduler
                         await self.create_scheduler(
                             user_id=user_id,
                             interval_minutes=interval_minutes,
@@ -302,15 +304,12 @@ class UserIntradaySchedulerManager:
                             futu_api_url=futu_api_url,
                         )
                         
-                        success = await self.start_scheduler(user_id)
-                        if success:
-                            logger.info(f"✅ Restored scheduler for user {user_id}")
-                            # Keep auto_start flag enabled for next restart
-                        else:
-                            logger.error(f"❌ Failed to restore scheduler for user {user_id}")
-                            # Clear auto_start flag on failure
-                            config.intraday_scheduler_auto_start = False
-                            db.commit()
+                        # Add random delay (0-5 minutes) to avoid concurrent startup
+                        delay_seconds = random.uniform(0, 300)  # 0-300 seconds (0-5 minutes)
+                        logger.info(f"Scheduler for user {user_id} will start in {delay_seconds:.1f} seconds")
+                        
+                        # Schedule delayed start (don't pass db session - it will be closed)
+                        asyncio.create_task(self._delayed_start_scheduler(user_id, delay_seconds))
                     
                     except Exception as e:
                         logger.error(f"Error restoring scheduler for user {config.user_id}: {e}", exc_info=True)
@@ -321,13 +320,67 @@ class UserIntradaySchedulerManager:
                         except:
                             pass
                 
-                logger.info(f"Scheduler restoration complete. Active: {len(self.get_active_users())}")
+                logger.info(f"Scheduler restoration initiated. Schedulers will start with random delays.")
             
             finally:
                 db.close()
         
         except Exception as e:
             logger.error(f"Error restoring schedulers from database: {e}", exc_info=True)
+    
+    async def _delayed_start_scheduler(self, user_id: int, delay_seconds: float):
+        """
+        Start scheduler after a delay.
+        
+        Args:
+            user_id: User ID
+            delay_seconds: Delay in seconds before starting
+        """
+        try:
+            # Wait for the delay
+            await asyncio.sleep(delay_seconds)
+            
+            # Start scheduler
+            success = await self.start_scheduler(user_id)
+            if success:
+                logger.info(f"✅ Restored scheduler for user {user_id} after {delay_seconds:.1f}s delay")
+                # Keep auto_start flag enabled for next restart (already set in DB)
+            else:
+                logger.error(f"❌ Failed to restore scheduler for user {user_id}")
+                # Clear auto_start flag on failure using a new session
+                await self._clear_auto_start_flag(user_id)
+        
+        except Exception as e:
+            logger.error(f"Error in delayed start for user {user_id}: {e}", exc_info=True)
+            # Clear auto_start flag on error
+            await self._clear_auto_start_flag(user_id)
+    
+    async def _clear_auto_start_flag(self, user_id: int):
+        """
+        Clear auto_start flag for a user (helper method for error handling).
+        Uses a new database session to avoid session lifecycle issues.
+        
+        Args:
+            user_id: User ID
+        """
+        try:
+            from web.backend.database import AsyncSessionLocal
+            from web.backend.models import UserConfig
+            from sqlalchemy import select
+            
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(
+                    select(UserConfig).where(UserConfig.user_id == user_id)
+                )
+                user_config = result.scalar_one_or_none()
+                
+                if user_config:
+                    user_config.intraday_scheduler_auto_start = False
+                    await db.commit()
+                    logger.info(f"Cleared auto_start flag for user {user_id}")
+        
+        except Exception as e:
+            logger.error(f"Failed to clear auto_start flag for user {user_id}: {e}")
 
 
 # Global manager instance
