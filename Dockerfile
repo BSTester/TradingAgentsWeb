@@ -40,7 +40,7 @@ COPY main.py ./
 COPY .env.example ./.env
 
 # 安装项目
-RUN pip install -e .
+RUN pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 创建必要的目录
 RUN mkdir -p eval_results assets web/static web/templates
