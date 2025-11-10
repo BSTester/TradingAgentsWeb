@@ -19,7 +19,7 @@ export function useScheduledTasks(page: number = 1, limit: number = 20) {
   return useQuery({
     queryKey: scheduledTasksKeys.list(page, limit),
     queryFn: () => scheduledTasksAPI.list({ page, limit }),
-    staleTime: 0, // Always fetch fresh data
+    staleTime: 30 * 1000, // 30秒缓存，减少不必要的请求
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   });
 }
