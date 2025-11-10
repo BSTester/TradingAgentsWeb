@@ -374,7 +374,8 @@ async def execute_intraday_analysis(
             if not decision_report or len(decision_report) < 100:
                 logging.warning(f"⚠️ Decision report seems too short: {len(decision_report)} chars")
             if trades_executed:
-                logging.info(f"✓ Trades data collected: {[f\"{t.get('action')} {t.get('stock')}\" for t in trades_executed]}")
+                trades_summary = [f"{t.get('action')} {t.get('stock')}" for t in trades_executed]
+                logging.info(f"✓ Trades data collected: {trades_summary}")
             else:
                 logging.info("ℹ️ No trades executed in this session")
 
