@@ -140,7 +140,7 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
                         </span>
                         <span>
                           <i className="fas fa-exchange-alt mr-1" />
-                          执行 {decision.trades_executed?.length || 0} 笔交易
+                          执行 {decision.trades_count ?? decision.trades_executed?.length ?? 0} 笔交易
                         </span>
                       </div>
                       {decision.end_time && (
