@@ -1852,7 +1852,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
       {/* 导出预览弹窗 */}
       {showExportPreview && (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={() => setShowExportPreview(false)}>
-          <div className="bg-dark-secondary rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col border border-dark-border" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-dark-secondary rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col border border-dark-border" onClick={(e) => e.stopPropagation()}>
             {/* 弹窗头部 */}
             <div className="flex items-center justify-between p-6 border-b border-dark-border">
               <div className="flex items-center gap-3">
