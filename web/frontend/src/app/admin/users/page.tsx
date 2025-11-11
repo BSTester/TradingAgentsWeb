@@ -129,7 +129,7 @@ export default function UserManagementPage() {
     },
   });
 
-  // 更新短线交易权限的 mutation
+  // 更新智能盯盘权限的 mutation
   const updateIntradayAccessMutation = useMutation({
     mutationFn: async ({ userId, canAccess }: { userId: number; canAccess: boolean }) => {
       const token = localStorage.getItem('access_token');
@@ -143,13 +143,13 @@ export default function UserManagementPage() {
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.detail || '更新短线交易权限失败');
+        throw new Error(error.detail || '更新智能盯盘权限失败');
       }
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
-      showToast('短线交易权限已更新', 'success');
+      showToast('智能盯盘权限已更新', 'success');
     },
     onError: (error: Error) => {
       showToast(error.message, 'error');
@@ -173,7 +173,7 @@ export default function UserManagementPage() {
     }
   };
 
-  // 处理短线交易权限切换
+  // 处理智能盯盘权限切换
   const handleIntradayAccessToggle = async (userId: number, currentAccess: boolean) => {
     setUpdatingUsers(prev => new Set(prev).add(userId));
     try {
@@ -341,7 +341,7 @@ export default function UserManagementPage() {
                         账户状态
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                        短线交易
+                        智能盯盘
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
                         注册时间

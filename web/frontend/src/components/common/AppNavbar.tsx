@@ -83,7 +83,7 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
                 }`}
               >
                 <i className="fas fa-chart-line mr-1" />
-                短线交易
+                智能盯盘
               </button>
             )}
             {showUserManagement && user?.role === 'admin' && (

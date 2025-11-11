@@ -560,7 +560,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                     <i className="fas fa-info-circle text-blue-600 mt-0.5 mr-2" />
                     <div className="text-sm text-blue-800">
                       <p className="font-medium">当前使用启动分析页面的配置</p>
-                      <p className="text-xs mt-1">如需单独配置短线交易系统，请修改下方设置并保存</p>
+                      <p className="text-xs mt-1">如需单独配置智能盯盘，请修改下方设置并保存</p>
                     </div>
                   </div>
                 </div>
@@ -701,7 +701,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                   LLM 配置
                 </h4>
                 <p className="text-xs text-text-tertiary mb-3">
-                  配置用于短线交易分析的 LLM 服务商和模型，如不配置将使用分析页面的缓存配置
+                  配置用于智能盯盘分析的 LLM 服务商和模型，如不配置将使用分析页面的缓存配置
                 </p>
 
                 {/* LLM Provider */}
@@ -726,7 +726,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                     ))}
                   </select>
                   <p className="text-xs text-text-tertiary mt-1">
-                    选择用于短线交易分析的 LLM 提供商
+                    选择用于智能盯盘分析的 LLM 提供商
                   </p>
                 </div>
 
@@ -816,7 +816,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                         ))}
                       </select>
                       <p className="text-xs text-text-tertiary mt-1">
-                        用于短线交易分析和决策（使用深度思考模型选项）
+                        用于智能盯盘分析和决策（使用深度思考模型选项）
                       </p>
                     </div>
                   </div>
