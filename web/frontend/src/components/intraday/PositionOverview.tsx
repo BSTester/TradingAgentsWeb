@@ -99,7 +99,7 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
           持仓概览
         </h2>
       </div>
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         {filteredPositions.length === 0 ? (
           <div className="text-center py-12">
             <i className="fas fa-inbox text-6xl text-text-muted mb-4" />

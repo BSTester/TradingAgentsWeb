@@ -93,7 +93,7 @@ export default function HomePage() {
           <FeaturesShowcase />
           
           {/* Stock Listings Section */}
-          <section className="relative py-20 bg-dark-primary">
+          <section className="relative py-10 md:py-20 bg-dark-primary">
             {/* Background decoration */}
             <div className="absolute inset-0 overflow-hidden">
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-accent-primary/50 to-transparent" />
@@ -101,11 +101,11 @@ export default function HomePage() {
 
             <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               {/* Section Header */}
-              <div className="text-center mb-12 space-y-4">
-                <h2 className="text-4xl md:text-5xl font-bold text-text-primary">
+              <div className="text-center mb-8 md:mb-12 space-y-2 md:space-y-4">
+                <h2 className="text-responsive-h1">
                   最新分析
                 </h2>
-                <p className="text-lg text-text-secondary max-w-2xl mx-auto">
+                <p className="text-responsive-body text-text-secondary max-w-2xl mx-auto">
                   查看各市场最新的 AI 分析报告和投资建议
                 </p>
               </div>
@@ -141,8 +141,8 @@ export default function HomePage() {
               {/* Inner ring */}
               <div className="absolute top-2 left-2 w-16 h-16 border-4 border-accent-secondary/20 border-b-accent-secondary rounded-full animate-spin-reverse"></div>
             </div>
-            <p className="text-text-primary font-medium text-lg">正在加载分析详情...</p>
-            <p className="text-sm text-text-tertiary mt-2">请稍候</p>
+            <p className="text-text-primary font-medium text-responsive-body">正在加载分析详情...</p>
+            <p className="text-responsive-small text-text-tertiary mt-2">请稍候</p>
           </div>
         </div>
       )}

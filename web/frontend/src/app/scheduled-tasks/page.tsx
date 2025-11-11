@@ -9,6 +9,8 @@ import { zhCN } from 'date-fns/locale';
 import { AppNavbar } from '@/components/common/AppNavbar';
 import { Footer } from '@/components/leaderboard/Footer';
 import { useToast, Toast } from '@/components/ui/Toast';
+import { ResponsiveTaskCard } from '@/components/scheduled-tasks/ResponsiveTaskCard';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 
 export default function ScheduledTasksPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -17,6 +19,7 @@ export default function ScheduledTasksPage() {
   const [page, setPage] = useState(1);
   const [showDeleteDialog, setShowDeleteDialog] = useState<number | null>(null);
   const limit = 10; // 每页显示10条
+  const isMobile = useIsMobile();
   
   const { data, isLoading, error } = useScheduledTasks(page, limit);
   const deleteTask = useDeleteScheduledTask();
@@ -151,16 +154,16 @@ export default function ScheduledTasksPage() {
 
       {/* 面包屑导航 */}
       <nav className="bg-dark-secondary/80 backdrop-blur-lg border-b border-dark-border shadow-lg pt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-10">
-          <div className="flex items-center space-x-2 text-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-10 overflow-hidden">
+          <div className="flex items-center space-x-2 text-sm whitespace-nowrap">
             <button
               onClick={() => router.push('/')}
-              className="text-accent-primary hover:text-accent-secondary transition-colors"
+              className="text-accent-primary hover:text-accent-secondary transition-colors flex-shrink-0"
             >
               <i className="fas fa-home mr-1" />
               首页
             </button>
-            <i className="fas fa-chevron-right text-text-tertiary text-xs" />
+            <i className="fas fa-chevron-right text-text-tertiary text-xs flex-shrink-0" />
             <span className="text-text-primary font-medium">定期报告</span>
           </div>
         </div>
@@ -171,65 +174,65 @@ export default function ScheduledTasksPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-text-primary mb-2">
+          <h1 className="text-responsive-h2 text-text-primary mb-2">
             <i className="fas fa-clock mr-3 text-accent-secondary" />
             定期报告
           </h1>
-          <p className="text-text-secondary">
+          <p className="text-responsive-body text-text-secondary">
             管理您的定期分析报告，查看执行计划和历史记录
           </p>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
+          <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-4 md:p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <i className="fas fa-tasks text-3xl text-accent-primary" />
+                <i className="fas fa-tasks text-2xl md:text-3xl text-accent-primary" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary">总任务数</p>
-                <p className="text-2xl font-bold text-text-primary">{data?.total || 0}</p>
+              <div className="ml-3 md:ml-4">
+                <p className="text-xs md:text-sm font-medium text-text-secondary">总任务数</p>
+                <p className="text-xl md:text-2xl font-bold text-text-primary">{data?.total || 0}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
+          <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-4 md:p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <i className="fas fa-play-circle text-3xl text-success-500" />
+                <i className="fas fa-play-circle text-2xl md:text-3xl text-success-500" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary">启用中</p>
-                <p className="text-2xl font-bold text-text-primary">
+              <div className="ml-3 md:ml-4">
+                <p className="text-xs md:text-sm font-medium text-text-secondary">启用中</p>
+                <p className="text-xl md:text-2xl font-bold text-text-primary">
                   {data?.stats?.enabled || 0}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
+          <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-4 md:p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <i className="fas fa-pause-circle text-3xl text-text-tertiary" />
+                <i className="fas fa-pause-circle text-2xl md:text-3xl text-text-tertiary" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary">已暂停</p>
-                <p className="text-2xl font-bold text-text-primary">
+              <div className="ml-3 md:ml-4">
+                <p className="text-xs md:text-sm font-medium text-text-secondary">已暂停</p>
+                <p className="text-xl md:text-2xl font-bold text-text-primary">
                   {data?.stats?.paused || 0}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
+          <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-4 md:p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <i className="fas fa-check-circle text-3xl text-accent-primary" />
+                <i className="fas fa-check-circle text-2xl md:text-3xl text-accent-primary" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-text-secondary">已完成</p>
-                <p className="text-2xl font-bold text-text-primary">
+              <div className="ml-3 md:ml-4">
+                <p className="text-xs md:text-sm font-medium text-text-secondary">已完成</p>
+                <p className="text-xl md:text-2xl font-bold text-text-primary">
                   {data?.stats?.completed || 0}
                 </p>
               </div>
@@ -240,10 +243,10 @@ export default function ScheduledTasksPage() {
         {/* Task List */}
         <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border overflow-hidden">
           {!data?.items || data.items.length === 0 ? (
-            <div className="text-center py-12">
-              <i className="fas fa-calendar-times text-6xl text-text-tertiary mb-4" />
-              <h3 className="text-lg font-medium text-text-primary mb-2">暂无定期报告</h3>
-              <p className="text-text-secondary mb-6">
+            <div className="text-center py-12 px-4">
+              <i className="fas fa-calendar-times text-4xl md:text-6xl text-text-tertiary mb-4" />
+              <h3 className="text-responsive-h4 text-text-primary mb-2">暂无定期报告</h3>
+              <p className="text-responsive-body text-text-secondary mb-6">
                 您还没有创建任何定期报告
               </p>
               <a
@@ -254,7 +257,20 @@ export default function ScheduledTasksPage() {
                 创建定期报告
               </a>
             </div>
+          ) : isMobile ? (
+            // Mobile: Card layout
+            <div className="p-4 space-y-3">
+              {data.items.map((task) => (
+                <ResponsiveTaskCard
+                  key={task.id}
+                  task={task}
+                  onToggleEnabled={handleToggleEnabled}
+                  onDelete={(id) => setShowDeleteDialog(id)}
+                />
+              ))}
+            </div>
           ) : (
+            // Desktop: Table layout
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-dark-border">
                 <thead className="bg-dark-tertiary">
@@ -484,30 +500,30 @@ export default function ScheduledTasksPage() {
       {/* Delete Confirmation Dialog */}
       {showDeleteDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-md w-full p-6">
+          <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-md w-full p-4 md:p-6">
             <div className="flex items-start mb-4">
               <div className="flex-shrink-0">
-                <i className="fas fa-exclamation-triangle text-danger-500 text-3xl" />
+                <i className="fas fa-exclamation-triangle text-danger-500 text-2xl md:text-3xl" />
               </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-bold text-text-primary mb-2">
+              <div className="ml-3 md:ml-4">
+                <h3 className="text-responsive-h4 text-text-primary mb-2">
                   确认删除
                 </h3>
-                <p className="text-sm text-text-secondary">
+                <p className="text-responsive-small text-text-secondary">
                   您确定要删除这个定期报告吗？此操作无法撤销。
                 </p>
               </div>
             </div>
-            <div className="flex justify-end space-x-3">
+            <div className="flex flex-col md:flex-row justify-end gap-3 md:space-x-3">
               <button
                 onClick={() => setShowDeleteDialog(null)}
-                className="px-4 py-2 border border-dark-border rounded-md text-sm font-medium text-text-secondary hover:bg-dark-tertiary transition-colors"
+                className="w-full md:w-auto px-4 py-3 md:py-2 border border-dark-border rounded-md text-sm font-medium text-text-secondary hover:bg-dark-tertiary transition-colors min-h-touch"
               >
                 取消
               </button>
               <button
                 onClick={() => handleDelete(showDeleteDialog)}
-                className="px-4 py-2 bg-danger-500 border border-transparent rounded-md text-sm font-medium text-white hover:bg-danger-400 transition-colors"
+                className="w-full md:w-auto px-4 py-3 md:py-2 bg-danger-500 border border-transparent rounded-md text-sm font-medium text-white hover:bg-danger-400 transition-colors min-h-touch"
               >
                 <i className="fas fa-trash mr-2" />
                 删除

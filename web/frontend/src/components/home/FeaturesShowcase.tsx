@@ -11,7 +11,7 @@ interface FeatureCardProps {
 
 function FeatureCard({ icon, title, description, details }: FeatureCardProps) {
   return (
-    <div className="group bg-dark-secondary border border-dark-border rounded-xl p-8 hover:border-accent-primary hover:shadow-glow-cyan transition-all duration-300 h-full">
+    <div className="group bg-dark-secondary border border-dark-border rounded-xl p-4 md:p-6 lg:p-8 hover:border-accent-primary hover:shadow-glow-cyan transition-all duration-300 h-full">
       <div className="flex flex-col space-y-4 h-full">
         {/* Icon */}
         <div className="w-16 h-16 bg-gradient-to-br from-accent-primary/20 to-accent-secondary/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
@@ -19,10 +19,10 @@ function FeatureCard({ icon, title, description, details }: FeatureCardProps) {
         </div>
 
         {/* Title */}
-        <h3 className="text-2xl font-bold text-text-primary">{title}</h3>
+        <h3 className="text-responsive-h3 text-text-primary">{title}</h3>
 
         {/* Description */}
-        <p className="text-text-secondary leading-relaxed">{description}</p>
+        <p className="text-responsive-body text-text-secondary leading-relaxed">{description}</p>
 
         {/* Details */}
         <ul className="space-y-2 flex-grow">
@@ -85,16 +85,16 @@ export function FeaturesShowcase() {
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center mb-16 space-y-4">
-          <h2 className="text-4xl md:text-5xl font-bold text-text-primary">
+          <h2 className="text-responsive-h1 text-text-primary">
             核心功能
           </h2>
-          <p className="text-lg text-text-secondary max-w-2xl mx-auto">
+          <p className="text-responsive-body text-text-secondary max-w-2xl mx-auto">
             强大的 AI 驱动分析能力，为您的投资决策提供全方位支持
           </p>
         </div>
 
         {/* Features Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
           {features.map((feature, index) => (
             <div
               key={index}
@@ -107,8 +107,8 @@ export function FeaturesShowcase() {
         </div>
 
         {/* Workflow Diagram */}
-        <div className="mt-20 bg-dark-secondary border border-dark-border rounded-xl p-8">
-          <h3 className="text-2xl font-bold text-text-primary mb-8 text-center">
+        <div className="mt-20 bg-dark-secondary border border-dark-border rounded-xl p-4 md:p-6 lg:p-8">
+          <h3 className="text-responsive-h3 text-text-primary mb-8 text-center">
             智能体协作流程
           </h3>
           <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0 md:space-x-4">
@@ -129,7 +129,10 @@ export function FeaturesShowcase() {
                   </span>
                 </div>
                 {index < 4 && (
-                  <i className="fas fa-arrow-right text-2xl text-accent-primary hidden md:block" />
+                  <>
+                    <i className="fas fa-arrow-down text-2xl text-accent-primary md:!hidden" />
+                    <i className="fas fa-arrow-right text-2xl text-accent-primary !hidden md:!block" />
+                  </>
                 )}
               </React.Fragment>
             ))}

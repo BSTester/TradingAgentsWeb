@@ -89,16 +89,16 @@ export default function ProfilePage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Page Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-text-primary">
+            <h1 className="text-responsive-h2 text-text-primary">
               <i className="fas fa-user-circle mr-3" />
               个人中心
             </h1>
-            <p className="mt-2 text-text-secondary">管理您的账户信息和设置</p>
+            <p className="mt-2 text-responsive-body text-text-secondary">管理您的账户信息和设置</p>
           </div>
 
           {/* User Info Card */}
           <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6 mb-6">
-            <h2 className="text-xl font-semibold text-text-primary mb-4">
+            <h2 className="text-responsive-h3 text-text-primary mb-4">
               <i className="fas fa-id-card mr-2" />
               账户信息
             </h2>
@@ -146,7 +146,7 @@ export default function ProfilePage() {
           <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-text-primary mb-2">
+                <h2 className="text-responsive-h3 text-text-primary mb-2">
                   <i className="fas fa-lock mr-2" />
                   密码设置
                 </h2>
@@ -173,7 +173,7 @@ export default function ProfilePage() {
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
           <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-text-primary">
+              <h3 className="text-responsive-h3 text-text-primary">
                 <i className="fas fa-lock mr-2" />
                 {user.has_set_password ? '修改密码' : '设置密码'}
               </h3>

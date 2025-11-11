@@ -6,6 +6,7 @@ import { normalizeTicker, validateTicker, getTickerErrorMessage } from '@/utils/
 import { ScheduleConfig, ScheduleData } from './ScheduleConfig';
 import { useUserConfig } from '@/hooks/useUserConfig';
 import { useAuth } from '@/lib/auth';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 
 interface AnalysisConfigFormProps {
   config: any;
@@ -59,6 +60,7 @@ interface AnalysisResponse {
 export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: AnalysisConfigFormProps) {
   const { token } = useAuth();
   const { config: userConfig, loading: configLoading } = useUserConfig(token);
+  const isMobile = useIsMobile();
   
   const [formData, setFormData] = useState<FormData>({
     ticker: '',
@@ -566,14 +568,14 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
 
   return (
     <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border">
-      <div className="p-6 border-b border-dark-border">
-        <h3 className="text-lg font-semibold text-text-primary">
+      <div className="p-4 md:p-6 border-b border-dark-border">
+        <h3 className="text-base md:text-lg font-semibold text-text-primary">
           <i className="fas fa-cog mr-2 text-accent-primary" />
           配置分析
         </h3>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 space-y-8">
+      <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-6 md:space-y-8 pb-20 md:pb-6">
         {/* 步骤1: 股票代码 */}
         <div className="space-y-4">
           <div className="flex items-center space-x-3">
@@ -592,7 +594,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
               name="ticker"
               value={formData.ticker}
               onChange={handleInputChange}
-              className={`w-full px-3 py-2 bg-dark-tertiary text-white border rounded-md focus:outline-none focus:ring-2 focus:border-transparent transition-all ${tickerError
+              className={`w-full px-3 py-2 md:py-2 h-12 md:h-auto text-base md:text-sm bg-dark-tertiary text-white border rounded-md focus:outline-none focus:ring-2 focus:border-transparent transition-all ${tickerError
                 ? 'border-danger-500 focus:ring-danger-500'
                 : 'border-dark-border focus:ring-accent-primary'
                 }`}
@@ -630,7 +632,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
               name="analysis_date"
               value={formData.analysis_date}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 bg-dark-tertiary border border-dark-border text-white rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
+              className="w-full px-3 py-2 h-12 md:h-auto text-base md:text-sm bg-dark-tertiary border border-dark-border text-white rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
               required
             />
           </div>
@@ -646,7 +648,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
           </div>
           <div className="ml-11">
             <p className="text-sm text-text-secondary mb-4">选择您的LLM分析师智能体进行分析</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
               {availableAnalysts.map((analyst: Analyst) => (
                 <div
                   key={analyst.value}
@@ -661,10 +663,10 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
                       type="checkbox"
                       checked={formData.analysts.includes(analyst.value)}
                       onChange={() => handleAnalystToggle(analyst.value)}
-                      className="mt-1 h-5 w-5 text-accent-primary focus:ring-accent-primary border-dark-border rounded cursor-pointer bg-dark-secondary"
+                      className="mt-1 h-6 w-6 md:h-5 md:w-5 text-accent-primary focus:ring-accent-primary border-dark-border rounded cursor-pointer bg-dark-secondary min-w-touch min-h-touch md:min-w-0 md:min-h-0"
                     />
-                    <div>
-                      <h5 className="font-medium text-text-primary">{analyst.label}</h5>
+                    <div className="flex-1">
+                      <h5 className="font-medium text-text-primary text-base md:text-sm">{analyst.label}</h5>
                       <p className="text-sm text-text-secondary">{analyst.description}</p>
                     </div>
                   </div>
@@ -684,7 +686,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
           </div>
           <div className="ml-11">
             <p className="text-sm text-text-secondary mb-4">选择您的研究深度级别</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-3 md:grid md:grid-cols-3 md:gap-4 md:space-y-0">
               {researchDepths.map((depth: ResearchDepth) => (
                 <div
                   key={depth.value}
@@ -1073,13 +1075,13 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       {/* 隐私确认对话框 */}
       {showPrivacyDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-md w-full p-6 animate-fade-in">
+          <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-md w-full p-4 md:p-6 animate-fade-in">
             <div className="flex items-start mb-4">
               <div className="flex-shrink-0">
-                <i className="fas fa-shield-alt text-accent-primary text-3xl" />
+                <i className="fas fa-shield-alt text-accent-primary text-2xl md:text-3xl" />
               </div>
-              <div className="ml-4">
-                <h3 className="text-lg font-bold text-text-primary mb-2">
+              <div className="ml-3 md:ml-4">
+                <h3 className="text-responsive-h4 text-text-primary mb-2">
                   隐私设置确认
                 </h3>
                 <div className="text-sm text-text-secondary space-y-2">
@@ -1108,16 +1110,16 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
               </div>
             </div>
 
-            <div className="flex space-x-3 mt-6">
+            <div className="flex flex-col md:flex-row gap-3 md:space-x-3 mt-6">
               <button
                 onClick={() => setShowPrivacyDialog(false)}
-                className="flex-1 px-4 py-2 border border-dark-border rounded-lg text-text-primary bg-dark-tertiary hover:bg-dark-primary transition-colors"
+                className="w-full md:flex-1 px-4 py-3 md:py-2 border border-dark-border rounded-lg text-text-primary bg-dark-tertiary hover:bg-dark-primary transition-colors min-h-touch"
               >
                 取消
               </button>
               <button
                 onClick={confirmStartAnalysis}
-                className="flex-1 px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-secondary transition-colors font-medium"
+                className="w-full md:flex-1 px-4 py-3 md:py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-secondary transition-colors font-medium min-h-touch"
               >
                 确认并开始分析
               </button>

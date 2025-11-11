@@ -29,59 +29,59 @@ export function HeroSection({ onNewAnalysis }: HeroSectionProps) {
           </div>
 
           {/* Main Title */}
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight">
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight">
             <span className="bg-gradient-to-r from-accent-primary via-accent-secondary to-accent-primary bg-clip-text text-transparent animate-shimmer bg-[length:200%_100%]">
               TradingAgentsWeb
             </span>
           </h1>
 
           {/* Subtitle */}
-          <p className="text-xl md:text-2xl lg:text-3xl font-light text-text-secondary max-w-3xl mx-auto">
+          <p className="text-responsive-h3 font-light text-text-secondary max-w-3xl mx-auto">
             多智能体大语言模型金融交易框架
           </p>
 
           {/* Description */}
-          <p className="text-base md:text-lg text-text-tertiary max-w-2xl mx-auto leading-relaxed">
+          <p className="text-responsive-body text-text-tertiary max-w-2xl mx-auto leading-relaxed">
             基于 LangGraph 的多智能体协作系统，整合分析师团队、研究团队、交易员和风险管理团队，
             为您提供全方位的智能投资决策支持
           </p>
 
           {/* Features Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto mt-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 max-w-5xl mx-auto mt-12">
             {/* Feature 1 */}
-            <div className="group bg-dark-secondary/50 backdrop-blur-sm border border-dark-border rounded-xl p-6 hover:border-accent-primary hover:shadow-glow-cyan transition-all duration-300">
+            <div className="group bg-dark-secondary/50 backdrop-blur-sm border border-dark-border rounded-xl p-4 md:p-6 hover:border-accent-primary hover:shadow-glow-cyan transition-all duration-300">
               <div className="flex flex-col items-center text-center space-y-3">
                 <div className="w-14 h-14 bg-gradient-to-br from-accent-primary/20 to-accent-secondary/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                   <i className="fas fa-users-cog text-2xl text-accent-primary" />
                 </div>
-                <h3 className="text-lg font-semibold text-text-primary">多智能体协作</h3>
-                <p className="text-sm text-text-tertiary">
+                <h3 className="text-responsive-h4 text-text-primary">多智能体协作</h3>
+                <p className="text-responsive-small text-text-tertiary">
                   分析师、研究员、交易员、风险管理团队协同工作
                 </p>
               </div>
             </div>
 
             {/* Feature 2 */}
-            <div className="group bg-dark-secondary/50 backdrop-blur-sm border border-dark-border rounded-xl p-6 hover:border-accent-primary hover:shadow-glow-cyan transition-all duration-300">
+            <div className="group bg-dark-secondary/50 backdrop-blur-sm border border-dark-border rounded-xl p-4 md:p-6 hover:border-accent-primary hover:shadow-glow-cyan transition-all duration-300">
               <div className="flex flex-col items-center text-center space-y-3">
                 <div className="w-14 h-14 bg-gradient-to-br from-accent-primary/20 to-accent-secondary/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                   <i className="fas fa-globe-americas text-2xl text-accent-primary" />
                 </div>
-                <h3 className="text-lg font-semibold text-text-primary">多市场支持</h3>
-                <p className="text-sm text-text-tertiary">
+                <h3 className="text-responsive-h4 text-text-primary">多市场支持</h3>
+                <p className="text-responsive-small text-text-tertiary">
                   支持美股、港股、A股三大市场的全面分析
                 </p>
               </div>
             </div>
 
             {/* Feature 3 */}
-            <div className="group bg-dark-secondary/50 backdrop-blur-sm border border-dark-border rounded-xl p-6 hover:border-accent-primary hover:shadow-glow-cyan transition-all duration-300">
+            <div className="group bg-dark-secondary/50 backdrop-blur-sm border border-dark-border rounded-xl p-4 md:p-6 hover:border-accent-primary hover:shadow-glow-cyan transition-all duration-300">
               <div className="flex flex-col items-center text-center space-y-3">
                 <div className="w-14 h-14 bg-gradient-to-br from-accent-primary/20 to-accent-secondary/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                   <i className="fas fa-chart-line text-2xl text-accent-primary" />
                 </div>
-                <h3 className="text-lg font-semibold text-text-primary">实时分析追踪</h3>
-                <p className="text-sm text-text-tertiary">
+                <h3 className="text-responsive-h4 text-text-primary">实时分析追踪</h3>
+                <p className="text-responsive-small text-text-tertiary">
                   WebSocket 实时追踪分析进度和结果
                 </p>
               </div>

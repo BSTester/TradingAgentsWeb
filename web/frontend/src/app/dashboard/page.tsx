@@ -172,12 +172,12 @@ function DashboardContent() {
         {currentView === 'config' && (
           <div className="bg-gradient-to-r from-accent-primary to-accent-secondary rounded-lg p-6 mb-6 text-white shadow-glow-cyan">
             <div className="text-center">
-              <h1 className="text-2xl md:text-3xl font-bold mb-2">
+              <h1 className="text-responsive-h2 mb-2">
                 <i className="fas fa-robot mr-3" />
                 TradingAgentsWeb
               </h1>
-              <p className="text-lg md:text-xl mb-2">多智能体大语言模型金融交易框架</p>
-              <p className="text-base md:text-lg">
+              <p className="text-responsive-body mb-2">多智能体大语言模型金融交易框架</p>
+              <p className="text-responsive-body">
                 <strong>工作流程：</strong>
                 分析师团队 → 研究团队 → 交易员 → 风险管理 → 投资组合分析
               </p>
@@ -252,8 +252,8 @@ function DashboardContent() {
               <div className="w-16 h-16 bg-success-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <i className="fas fa-check text-success-500 text-2xl" />
               </div>
-              <h3 className="text-xl font-semibold text-text-primary mb-2">注册成功！</h3>
-              <p className="text-sm text-text-secondary">
+              <h3 className="text-responsive-h3 text-text-primary mb-2">注册成功！</h3>
+              <p className="text-responsive-small text-text-secondary">
                 为了账户安全，建议您设置登录密码
               </p>
             </div>

@@ -104,7 +104,7 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
           决策历史
         </h2>
       </div>
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         {decisions.length === 0 ? (
           <div className="text-center py-12">
             <i className="fas fa-file-alt text-6xl text-text-muted mb-4" />
@@ -197,24 +197,24 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
 
       {/* Detail Modal */}
       {detailModalId && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-dark-border flex items-center justify-between">
-              <h3 className="text-xl font-bold text-text-primary">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-0 md:p-4">
+          <div className="bg-dark-secondary md:rounded-lg shadow-xl border-0 md:border border-dark-border max-w-4xl w-full h-full md:h-auto md:max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Modal Header - Sticky */}
+            <div className="sticky top-0 z-10 px-4 md:px-6 py-3 md:py-4 border-b border-dark-border flex items-center justify-between bg-dark-secondary">
+              <h3 className="text-responsive-h4 text-text-primary">
                 <i className="fas fa-file-alt mr-2 text-accent-primary" />
                 决策详情 #{detailModalId}
               </h3>
               <button
                 onClick={handleCloseDetail}
-                className="text-text-muted hover:text-text-secondary"
+                className="text-text-muted hover:text-text-secondary min-w-touch min-h-touch flex items-center justify-center"
               >
                 <i className="fas fa-times text-xl" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6">
               {loadingDetail ? (
                 <div className="flex items-center justify-center py-12">
                   <i className="fas fa-spinner fa-spin text-2xl text-accent-primary mr-3" />
@@ -267,33 +267,86 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
                         <i className="fas fa-file-alt mr-2 text-accent-primary" />
                         完整决策报告
                       </h4>
-                      <div className="bg-dark-tertiary border border-dark-border rounded-lg p-6">
-                        <div className="markdown-content">
+                      <div className="bg-dark-tertiary border border-dark-border rounded-lg p-4 md:p-6 shadow-inner">
+                        <div className="prose prose-invert prose-sm md:prose-base max-w-none">
                           <ReactMarkdown
                             rehypePlugins={[rehypeRaw, rehypeSanitize]}
                             components={{
-                              h1: ({node, ...props}) => <h1 className="text-2xl font-bold text-text-primary mb-4 mt-6" {...props} />,
-                              h2: ({node, ...props}) => <h2 className="text-xl font-bold text-text-primary mb-3 mt-5" {...props} />,
-                              h3: ({node, ...props}) => <h3 className="text-lg font-semibold text-text-primary mb-2 mt-4" {...props} />,
-                              h4: ({node, ...props}) => <h4 className="text-base font-semibold text-text-primary mb-2 mt-3" {...props} />,
-                              p: ({node, ...props}) => <p className="text-text-secondary mb-3 leading-relaxed" {...props} />,
-                              ul: ({node, ...props}) => <ul className="list-disc list-inside mb-3 space-y-1 text-text-secondary" {...props} />,
-                              ol: ({node, ...props}) => <ol className="list-decimal list-inside mb-3 space-y-1 text-text-secondary" {...props} />,
-                              li: ({node, ...props}) => <li className="text-text-secondary ml-4" {...props} />,
-                              strong: ({node, ...props}) => <strong className="font-semibold text-text-primary" {...props} />,
-                              em: ({node, ...props}) => <em className="italic text-text-secondary" {...props} />,
+                              h1: ({node, ...props}) => (
+                                <h1 className="text-2xl md:text-3xl font-bold text-text-primary mb-4 mt-6 pb-2 border-b-2 border-accent-primary/30" {...props} />
+                              ),
+                              h2: ({node, ...props}) => (
+                                <h2 className="text-xl md:text-2xl font-bold text-text-primary mb-3 mt-6 pb-2 border-b border-accent-primary/20" {...props} />
+                              ),
+                              h3: ({node, ...props}) => (
+                                <h3 className="text-lg md:text-xl font-semibold text-text-primary mb-2 mt-5" {...props} />
+                              ),
+                              h4: ({node, ...props}) => (
+                                <h4 className="text-base md:text-lg font-semibold text-text-primary mb-2 mt-4" {...props} />
+                              ),
+                              h5: ({node, ...props}) => (
+                                <h5 className="text-sm md:text-base font-semibold text-text-primary mb-2 mt-3" {...props} />
+                              ),
+                              h6: ({node, ...props}) => (
+                                <h6 className="text-sm font-semibold text-text-secondary mb-2 mt-3" {...props} />
+                              ),
+                              p: ({node, ...props}) => (
+                                <p className="text-text-secondary mb-4 leading-relaxed text-sm md:text-base" {...props} />
+                              ),
+                              ul: ({node, ...props}) => (
+                                <ul className="list-disc list-outside ml-5 mb-4 space-y-2 text-text-secondary" {...props} />
+                              ),
+                              ol: ({node, ...props}) => (
+                                <ol className="list-decimal list-outside ml-5 mb-4 space-y-2 text-text-secondary" {...props} />
+                              ),
+                              li: ({node, ...props}) => (
+                                <li className="text-text-secondary leading-relaxed text-sm md:text-base pl-1" {...props} />
+                              ),
+                              strong: ({node, ...props}) => (
+                                <strong className="font-bold text-text-primary" {...props} />
+                              ),
+                              em: ({node, ...props}) => (
+                                <em className="italic text-accent-secondary" {...props} />
+                              ),
                               code: ({node, inline, ...props}: any) => 
                                 inline 
-                                  ? <code className="bg-accent-primary/20 text-accent-primary px-1.5 py-0.5 rounded text-sm font-mono" {...props} />
-                                  : <code className="block bg-dark-primary text-text-primary p-3 rounded border border-dark-border text-sm font-mono overflow-x-auto mb-3" {...props} />,
-                              pre: ({node, ...props}) => <pre className="bg-dark-primary p-4 rounded border border-dark-border overflow-x-auto mb-3" {...props} />,
-                              blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-accent-primary pl-4 italic text-text-secondary my-3" {...props} />,
-                              table: ({node, ...props}) => <table className="min-w-full border-collapse border border-dark-border mb-3" {...props} />,
-                              thead: ({node, ...props}) => <thead className="bg-dark-primary" {...props} />,
-                              th: ({node, ...props}) => <th className="border border-dark-border px-4 py-2 text-left font-semibold text-text-primary" {...props} />,
-                              td: ({node, ...props}) => <td className="border border-dark-border px-4 py-2 text-text-secondary" {...props} />,
-                              a: ({node, ...props}) => <a className="text-accent-primary hover:text-accent-secondary underline" {...props} />,
-                              hr: ({node, ...props}) => <hr className="my-4 border-dark-border" {...props} />,
+                                  ? <code className="bg-accent-primary/20 text-accent-primary px-2 py-0.5 rounded text-xs md:text-sm font-mono border border-accent-primary/30" {...props} />
+                                  : <code className="block bg-dark-primary text-text-primary p-3 md:p-4 rounded-lg border border-dark-border text-xs md:text-sm font-mono overflow-x-auto mb-4 leading-relaxed" {...props} />,
+                              pre: ({node, ...props}) => (
+                                <pre className="bg-dark-primary p-3 md:p-4 rounded-lg border border-dark-border overflow-x-auto mb-4 shadow-inner" {...props} />
+                              ),
+                              blockquote: ({node, ...props}) => (
+                                <blockquote className="border-l-4 border-accent-primary bg-accent-primary/5 pl-4 pr-4 py-2 italic text-text-secondary my-4 rounded-r" {...props} />
+                              ),
+                              table: ({node, ...props}) => (
+                                <div className="overflow-x-auto mb-4 rounded-lg border border-dark-border">
+                                  <table className="min-w-full border-collapse" {...props} />
+                                </div>
+                              ),
+                              thead: ({node, ...props}) => (
+                                <thead className="bg-dark-primary" {...props} />
+                              ),
+                              tbody: ({node, ...props}) => (
+                                <tbody className="divide-y divide-dark-border" {...props} />
+                              ),
+                              tr: ({node, ...props}) => (
+                                <tr className="hover:bg-dark-primary/50 transition-colors" {...props} />
+                              ),
+                              th: ({node, ...props}) => (
+                                <th className="border-b-2 border-dark-border px-4 py-3 text-left font-bold text-text-primary text-sm md:text-base bg-dark-primary/80" {...props} />
+                              ),
+                              td: ({node, ...props}) => (
+                                <td className="border-b border-dark-border px-4 py-3 text-text-secondary text-sm md:text-base" {...props} />
+                              ),
+                              a: ({node, ...props}) => (
+                                <a className="text-accent-primary hover:text-accent-secondary underline decoration-accent-primary/50 hover:decoration-accent-secondary transition-colors" target="_blank" rel="noopener noreferrer" {...props} />
+                              ),
+                              hr: ({node, ...props}) => (
+                                <hr className="my-6 border-t-2 border-dark-border" {...props} />
+                              ),
+                              img: ({node, ...props}) => (
+                                <img className="rounded-lg border border-dark-border my-4 max-w-full h-auto" {...props} />
+                              ),
                             }}
                           >
                             {detailData.decision_report}
@@ -331,16 +384,16 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
                             key={idx}
                             className={`rounded-lg p-4 border-l-4 shadow-sm ${
                               trade.action === 'BUY'
-                                ? 'bg-success-900/20 border-success-500'
-                                : 'bg-danger-900/20 border-danger-500'
+                                ? 'bg-red-900/20 border-red-500'
+                                : 'bg-green-900/20 border-green-500'
                             }`}
                           >
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-3">
                                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                                   trade.action === 'BUY' 
-                                    ? 'bg-success-500 text-white' 
-                                    : 'bg-danger-500 text-white'
+                                    ? 'bg-red-500 text-white' 
+                                    : 'bg-green-500 text-white'
                                 }`}>
                                   {trade.action === 'BUY' ? '买入' : trade.action === 'SELL' ? '卖出' : trade.action || '未知'}
                                 </span>

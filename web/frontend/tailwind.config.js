@@ -124,6 +124,12 @@ module.exports = {
         '10': '2.5rem',    // 40px
         '11': '2.75rem',   // 44px
         '12': '3rem',      // 48px
+        // Mobile-specific spacing
+        'safe-top': 'env(safe-area-inset-top)',
+        'safe-bottom': 'env(safe-area-inset-bottom)',
+        'safe-left': 'env(safe-area-inset-left)',
+        'safe-right': 'env(safe-area-inset-right)',
+        'touch': '2.75rem', // 44px - minimum touch target
       },
       // Bootstrap-compatible font sizes
       fontSize: {
@@ -208,6 +214,18 @@ module.exports = {
       // Custom backdrop blur
       backdropBlur: {
         'xs': '2px',
+      },
+      // Mobile-specific utilities
+      minHeight: {
+        'touch': '44px',
+        'screen-safe': 'calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom))',
+      },
+      minWidth: {
+        'touch': '44px',
+      },
+      maxWidth: {
+        'mobile': '640px',
+        'tablet': '1024px',
       },
     },
   },

@@ -6,6 +6,8 @@ import { buildApiUrl, API_ENDPOINTS } from '../../utils/api';
 import { logger } from '@/utils/logger';
 import { useDeleteAnalysis } from '@/hooks/useDeleteAnalysis';
 import { queryKeys } from '@/lib/react-query';
+import { ResponsiveAnalysisCard } from './ResponsiveAnalysisCard';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 
 
 interface AnalysisHistoryProps {
@@ -47,6 +49,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
     analysisId: '',
     ticker: ''
   });
+  const isMobile = useIsMobile();
 
   // 使用删除 mutation
   const deleteMutation = useDeleteAnalysis();
@@ -224,7 +227,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         {analyses.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-text-muted text-6xl mb-4">📊</div>
@@ -237,7 +240,22 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
               创建新分析
             </button>
           </div>
+        ) : isMobile ? (
+          // Mobile: Card layout
+          <div className="space-y-3">
+            {analyses.map((analysis) => (
+              <ResponsiveAnalysisCard
+                key={analysis.id}
+                analysis={analysis}
+                onViewResults={onViewResults}
+                onViewProgress={onViewProgress}
+                onDelete={handleDeleteClick}
+                isDeleting={deleteMutation.isPending}
+              />
+            ))}
+          </div>
         ) : (
+          // Desktop: Table layout
           <div className="space-y-3">
             {analyses.map((analysis) => (
               <div
@@ -408,10 +426,10 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
 
       {/* 分页控件 */}
       {analyses.length > 0 && totalPages > 1 && (
-        <div className="mt-6 p-4 border-t border-gray-200">
-          <div className="flex items-center justify-between">
+        <div className="mt-6 p-4 border-t border-dark-border">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             {/* 左侧：显示信息 */}
-            <div className="text-sm text-text-secondary">
+            <div className="text-sm text-text-secondary text-center sm:text-left">
               显示第 {(page - 1) * limit + 1} - {Math.min(page * limit, total)} 条，共 {total} 条记录
             </div>
 
@@ -421,14 +439,22 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-3 py-2 text-sm font-medium text-text-secondary bg-dark-tertiary border border-dark-border rounded-md hover:bg-dark-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-3 py-2 text-sm font-medium text-text-secondary bg-dark-tertiary border border-dark-border rounded-md hover:bg-dark-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-touch"
               >
                 <i className="fas fa-chevron-left mr-1" />
-                上一页
+                <span className="hidden sm:inline">上一页</span>
               </button>
 
-              {/* 页码 */}
+              {/* 页码 - 在移动端简化显示 */}
               <div className="flex items-center space-x-1">
+                {isMobile ? (
+                  // Mobile: Simple page indicator
+                  <span className="px-3 py-2 text-sm font-medium text-text-primary">
+                    {page} / {totalPages}
+                  </span>
+                ) : (
+                  // Desktop: Full pagination
+                  <>
                 {/* 第一页 */}
                 {page > 3 && (
                   <>
@@ -470,15 +496,17 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                     </button>
                   </>
                 )}
+                  </>
+                )}
               </div>
 
               {/* 下一页 */}
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="px-3 py-2 text-sm font-medium text-text-secondary bg-dark-tertiary border border-dark-border rounded-md hover:bg-dark-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-3 py-2 text-sm font-medium text-text-secondary bg-dark-tertiary border border-dark-border rounded-md hover:bg-dark-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-touch"
               >
-                下一页
+                <span className="hidden sm:inline">下一页</span>
                 <i className="fas fa-chevron-right ml-1" />
               </button>
             </div>
@@ -518,38 +546,38 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
 
       {/* 删除确认对话框 */}
       {deleteConfirm.show && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-md w-full mx-4 animate-fade-in">
-            <div className="p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-md w-full animate-fade-in">
+            <div className="p-4 md:p-6">
               <div className="flex items-center mb-4">
-                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mr-4">
-                  <i className="fas fa-exclamation-triangle text-red-600 text-xl" />
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-red-100 flex items-center justify-center mr-3 md:mr-4 flex-shrink-0">
+                  <i className="fas fa-exclamation-triangle text-red-600 text-lg md:text-xl" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-text-primary">确认删除</h3>
-                  <p className="text-sm text-text-secondary">此操作无法撤销</p>
+                  <h3 className="text-responsive-h4 text-text-primary">确认删除</h3>
+                  <p className="text-responsive-small text-text-secondary">此操作无法撤销</p>
                 </div>
               </div>
 
               <div className="mb-6">
-                <p className="text-text-secondary">
+                <p className="text-responsive-body text-text-secondary">
                   确定要删除 <span className="font-bold text-text-primary">{deleteConfirm.ticker}</span> 的分析记录吗？
                 </p>
-                <p className="text-sm text-text-tertiary mt-2">
+                <p className="text-responsive-small text-text-tertiary mt-2">
                   删除后，所有相关的分析数据和结果都将被永久删除。
                 </p>
               </div>
 
-              <div className="flex space-x-3">
+              <div className="flex flex-col md:flex-row gap-3 md:space-x-3">
                 <button
                   onClick={() => setDeleteConfirm({ show: false, analysisId: '', ticker: '' })}
-                  className="flex-1 px-4 py-2 bg-dark-tertiary text-text-secondary rounded-lg hover:bg-dark-primary hover:text-text-primary transition-colors font-medium"
+                  className="w-full md:flex-1 px-4 py-3 md:py-2 bg-dark-tertiary text-text-secondary rounded-lg hover:bg-dark-primary hover:text-text-primary transition-colors font-medium min-h-touch"
                 >
                   取消
                 </button>
                 <button
                   onClick={handleDeleteConfirm}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                  className="w-full md:flex-1 px-4 py-3 md:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium min-h-touch"
                 >
                   确认删除
                 </button>

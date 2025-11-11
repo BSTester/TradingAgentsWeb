@@ -1359,73 +1359,74 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
 
       <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border">
         {/* 头部 */}
-        <div className="p-6 border-b border-dark-border">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-2xl font-bold text-text-primary">
+        <div className="p-4 md:p-6 border-b border-dark-border">
+          <div className="flex justify-between items-start md:items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-responsive-h3 text-text-primary truncate">
                 <i className="fas fa-file-alt mr-2 text-accent-primary" />
                 分析结果报告
               </h3>
-              <div className="flex items-center mt-2 text-sm text-text-secondary">
+              <div className="flex items-center mt-2 text-responsive-small text-text-secondary">
                 <i className="far fa-calendar mr-1" />
                 分析日期: {results?.analysis_date}
               </div>
             </div>
             <button
               onClick={onBackToHistory}
-              className="flex items-center space-x-2 px-4 py-2 text-text-secondary hover:text-text-primary hover:bg-dark-tertiary rounded-lg transition-colors no-print"
+              className="flex items-center space-x-1 md:space-x-2 px-3 md:px-4 py-2 text-text-secondary hover:text-text-primary hover:bg-dark-tertiary rounded-lg transition-colors no-print flex-shrink-0 min-h-touch"
               title="返回"
             >
-              <i className="fas fa-arrow-left text-lg" />
-              <span className="font-medium">返回</span>
+              <i className="fas fa-arrow-left text-base md:text-lg" />
+              <span className="font-medium text-sm md:text-base">返回</span>
             </button>
           </div>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-4 md:p-6 space-y-4 md:space-y-6">
           {/* 交易决策横幅 */}
-          <div className="bg-gradient-to-r from-green-500 to-blue-500 rounded-xl p-6 text-white shadow-lg">
-            <div className="flex items-center justify-between">
+          <div className="bg-gradient-to-r from-green-500 to-blue-500 rounded-xl p-3 md:p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between gap-2 md:gap-4">
               {/* 左侧：股票代码 */}
-              <div className="flex items-center space-x-3">
-                <div className="w-16 h-16 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                  <i className="fas fa-chart-line text-3xl" />
+              <div className="flex items-center space-x-2 md:space-x-3 flex-shrink-0">
+                <div className="w-10 h-10 md:w-16 md:h-16 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                  <i className="fas fa-chart-line text-lg md:text-3xl" />
                 </div>
-                <div>
-                  <p className="text-sm opacity-90">
+                <div className="min-w-0">
+                  <p className="text-xs opacity-90 truncate">
                     {results?.market === 'US' ? '美股' : results?.market === 'HK' ? '港股' : results?.market === 'CN' ? 'A股' : '股票'}
                     {results?.company_name && ` | ${results.company_name}`}
                   </p>
-                  <p className="text-3xl font-bold">{results?.ticker}</p>
+                  <p className="text-xl md:text-3xl font-bold truncate">{results?.ticker}</p>
                 </div>
               </div>
 
               {/* 中间：交易决策 */}
-              <div className="flex-1 text-center px-6">
-                <p className="text-sm opacity-90 mb-1">最终交易决策</p>
-                <p className="text-5xl font-bold">{results?.trading_decision}</p>
+              <div className="flex-1 text-center px-2 md:px-6 min-w-0">
+                <p className="text-xs opacity-90 mb-0.5 md:mb-1">最终交易决策</p>
+                <p className="text-2xl md:text-5xl font-bold truncate">{results?.trading_decision}</p>
               </div>
 
               {/* 右侧：勾选图标 */}
-              <div className="w-20 h-20 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <i className="fas fa-check-circle text-5xl" />
+              <div className="w-12 h-12 md:w-20 md:h-20 bg-white bg-opacity-20 rounded-full flex items-center justify-center flex-shrink-0">
+                <i className="fas fa-check-circle text-2xl md:text-5xl" />
               </div>
             </div>
           </div>
 
           {/* 阶段标签页 */}
-          <div className="border-b border-gray-200 no-print">
-            <div className="flex space-x-1 overflow-x-auto">
+          <div className="border-b border-gray-200 no-print -mx-4 md:mx-0 px-4 md:px-0">
+            <div className="flex space-x-1 overflow-x-auto scrollbar-hide">
               {/* 最终分析说明标签 */}
               <button
                 onClick={() => setActivePhase(-1)}
-                className={`px-4 py-3 font-medium text-sm whitespace-nowrap transition-all ${activePhase === -1
+                className={`px-3 md:px-4 py-2 md:py-3 font-medium text-xs md:text-sm whitespace-nowrap transition-all min-h-touch ${activePhase === -1
                   ? 'border-b-2 border-accent-primary text-accent-primary'
                   : 'text-text-secondary hover:text-text-primary'
                   }`}
               >
-                <i className="fas fa-file-alt mr-2" />
-                投资组合分析
+                <i className="fas fa-file-alt mr-1 md:mr-2" />
+                <span className="hidden sm:inline">投资组合分析</span>
+                <span className="sm:hidden">组合分析</span>
               </button>
 
               {/* 四个阶段标签 */}
@@ -1433,12 +1434,12 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                 <button
                   key={phase.id}
                   onClick={() => setActivePhase(index)}
-                  className={`px-4 py-3 font-medium text-sm whitespace-nowrap transition-all ${activePhase === index
+                  className={`px-3 md:px-4 py-2 md:py-3 font-medium text-xs md:text-sm whitespace-nowrap transition-all min-h-touch ${activePhase === index
                     ? 'border-b-2 border-accent-primary text-accent-primary'
                     : 'text-text-secondary hover:text-text-primary'
                     }`}
                 >
-                  <i className={`fas ${phase.icon} mr-2`} />
+                  <i className={`fas ${phase.icon} mr-1 md:mr-2`} />
                   {phase.name}
                 </button>
               ))}
@@ -1448,7 +1449,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
           {/* 内容区域 */}
           {activePhase === -1 ? (
             /* 最终分析说明内容 - 按 h2 分割成卡片 */
-            <div className="space-y-4">
+            <div className="space-y-3 md:space-y-4">
               {(results?.final_summary || '').split(/(?=##\s)/).filter((section: string) => section.trim()).map((section: string, index: number) => {
                 const lines = section.trim().split('\n');
                 const title = lines[0]?.replace(/^##\s*/, '') || '';
@@ -1456,34 +1457,34 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
 
                 return (
                   <div key={index} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow print-card">
-                    <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4 text-white">
-                      <h2 className="font-bold text-lg flex items-center">
-                        <i className="fas fa-chart-bar mr-2" />
+                    <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-3 md:p-4 text-white">
+                      <h2 className="font-bold text-base md:text-lg flex items-center">
+                        <i className="fas fa-chart-bar mr-2 text-sm md:text-base" />
                         {title}
                       </h2>
                     </div>
-                    <div className="p-6 bg-dark-tertiary">
+                    <div className="p-4 md:p-6 bg-dark-tertiary">
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm, remarkBreaks]}
                         components={{
                           // 一级标题 - 大标题，带渐变背景和图标
                           h1: ({ children }) => (
-                            <h1 className="text-2xl font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3 rounded-lg mb-4 shadow-sm flex items-center">
-                              <i className="fas fa-star mr-3 text-yellow-300" />
+                            <h1 className="text-lg md:text-2xl font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 px-3 md:px-4 py-2 md:py-3 rounded-lg mb-3 md:mb-4 shadow-sm flex items-center">
+                              <i className="fas fa-star mr-2 md:mr-3 text-yellow-300 text-sm md:text-base" />
                               {children}
                             </h1>
                           ),
                           // 三级标题 - 小标题，带左侧装饰条和背景
                           h3: ({ children }) => (
-                            <h3 className="text-lg font-semibold text-text-primary mt-5 mb-3 pl-4 pr-3 py-2 border-l-4 border-accent-primary bg-dark-secondary rounded-r flex items-center">
-                              <i className="fas fa-chevron-right mr-2 text-accent-primary text-sm" />
+                            <h3 className="text-base md:text-lg font-semibold text-text-primary mt-4 md:mt-5 mb-2 md:mb-3 pl-3 md:pl-4 pr-2 md:pr-3 py-2 border-l-4 border-accent-primary bg-dark-secondary rounded-r flex items-center">
+                              <i className="fas fa-chevron-right mr-2 text-accent-primary text-xs md:text-sm" />
                               {children}
                             </h3>
                           ),
                           // 四级标题 - 带圆点装饰
                           h4: ({ children }) => (
-                            <h4 className="text-base font-semibold text-text-primary mt-4 mb-2 flex items-center">
-                              <span className="w-2 h-2 bg-accent-primary rounded-full mr-2"></span>
+                            <h4 className="text-sm md:text-base font-semibold text-text-primary mt-3 md:mt-4 mb-2 flex items-center">
+                              <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-accent-primary rounded-full mr-2"></span>
                               {children}
                             </h4>
                           ),
@@ -1513,38 +1514,38 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
 
                             // 普通段落
                             return (
-                              <p className="text-text-secondary leading-7 mb-4 text-justify">
+                              <p className="text-responsive-body text-text-secondary leading-relaxed mb-3 md:mb-4 text-justify">
                                 {children}
                               </p>
                             );
                           },
                           // 加粗文字 - 使用深色和更粗的字体
                           strong: ({ children }) => (
-                            <strong className="font-bold text-text-primary bg-accent-primary/10 px-1">
+                            <strong className="font-bold text-text-primary bg-accent-primary/10 px-1 text-sm md:text-base">
                               {children}
                             </strong>
                           ),
                           // 斜体
                           em: ({ children }) => (
-                            <em className="italic text-text-tertiary">
+                            <em className="italic text-text-tertiary text-sm md:text-base">
                               {children}
                             </em>
                           ),
                           // 无序列表 - 使用自定义样式
                           ul: ({ children }) => (
-                            <ul className="mb-4 space-y-2 text-text-secondary">
+                            <ul className="mb-3 md:mb-4 space-y-1.5 md:space-y-2 text-text-secondary text-sm md:text-base">
                               {children}
                             </ul>
                           ),
                           // 有序列表 - 使用自定义样式
                           ol: ({ children }) => (
-                            <ol className="mb-4 space-y-2 text-text-secondary">
+                            <ol className="mb-3 md:mb-4 space-y-1.5 md:space-y-2 text-text-secondary text-sm md:text-base">
                               {children}
                             </ol>
                           ),
                           // 列表项 - 带圆点和缩进
                           li: ({ children }) => (
-                            <li className="ml-6 pl-2 relative before:content-['•'] before:absolute before:left-[-12px] before:text-blue-500 before:font-bold">
+                            <li className="ml-4 md:ml-6 pl-2 relative before:content-['•'] before:absolute before:left-[-12px] before:text-blue-500 before:font-bold text-sm md:text-base">
                               {children}
                             </li>
                           ),
@@ -1634,42 +1635,42 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
           ) : (
             /* 阶段内容 - Markdown 渲染 */
             results?.phases?.[activePhase] && (
-              <div className="space-y-4">
+              <div className="space-y-3 md:space-y-4">
                 {results.phases[activePhase].agents.map((agent: any, index: number) => (
                   <div key={index} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow print-card">
-                    <div className={`bg-gradient-to-r ${getPhaseColor(results.phases[activePhase].color)} p-4 text-white`}>
-                      <h4 className="font-bold text-lg flex items-center">
-                        <i className="fas fa-user-tie mr-2" />
+                    <div className={`bg-gradient-to-r ${getPhaseColor(results.phases[activePhase].color)} p-3 md:p-4 text-white`}>
+                      <h4 className="font-bold text-base md:text-lg flex items-center">
+                        <i className="fas fa-user-tie mr-2 text-sm md:text-base" />
                         {agent.name}
                       </h4>
                     </div>
-                    <div className="p-6 bg-dark-tertiary">
+                    <div className="p-4 md:p-6 bg-dark-tertiary">
                       <div className="markdown-content">
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm, remarkBreaks]}
                           components={{
                             // 标题
                             h1: ({ children }) => (
-                              <h1 className="text-xl font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 rounded-lg mb-3 shadow-sm flex items-center">
-                                <i className="fas fa-star mr-2 text-yellow-300 text-sm" />
+                              <h1 className="text-lg md:text-xl font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 px-3 md:px-4 py-2 rounded-lg mb-3 shadow-sm flex items-center">
+                                <i className="fas fa-star mr-2 text-yellow-300 text-xs md:text-sm" />
                                 {children}
                               </h1>
                             ),
                             h2: ({ children }) => (
-                              <h2 className="text-lg font-bold text-text-primary mb-3 pb-2 border-b-2 border-accent-primary flex items-center">
-                                <i className="fas fa-bookmark mr-2 text-accent-primary text-sm" />
+                              <h2 className="text-base md:text-lg font-bold text-text-primary mb-2 md:mb-3 pb-2 border-b-2 border-accent-primary flex items-center">
+                                <i className="fas fa-bookmark mr-2 text-accent-primary text-xs md:text-sm" />
                                 {children}
                               </h2>
                             ),
                             h3: ({ children }) => (
-                              <h3 className="text-base font-semibold text-text-primary mt-4 mb-2 pl-4 pr-3 py-2 border-l-4 border-accent-primary bg-dark-secondary rounded-r flex items-center">
+                              <h3 className="text-sm md:text-base font-semibold text-text-primary mt-3 md:mt-4 mb-2 pl-3 md:pl-4 pr-2 md:pr-3 py-2 border-l-4 border-accent-primary bg-dark-secondary rounded-r flex items-center">
                                 <i className="fas fa-chevron-right mr-2 text-accent-primary text-xs" />
                                 {children}
                               </h3>
                             ),
                             h4: ({ children }) => (
-                              <h4 className="text-sm font-semibold text-text-primary mt-3 mb-2 flex items-center">
-                                <span className="w-2 h-2 bg-accent-primary rounded-full mr-2"></span>
+                              <h4 className="text-xs md:text-sm font-semibold text-text-primary mt-2 md:mt-3 mb-2 flex items-center">
+                                <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-accent-primary rounded-full mr-2"></span>
                                 {children}
                               </h4>
                             ),
@@ -1851,24 +1852,24 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
 
       {/* 导出预览弹窗 */}
       {showExportPreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={() => setShowExportPreview(false)}>
-          <div className="bg-dark-secondary rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col border border-dark-border" onClick={(e) => e.stopPropagation()}>
-            {/* 弹窗头部 */}
-            <div className="flex items-center justify-between p-6 border-b border-dark-border">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-accent-primary to-accent-secondary rounded-lg flex items-center justify-center shadow-glow-cyan">
-                  <i className="fas fa-file-export text-white text-lg" />
+        <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-0 md:p-4" onClick={() => setShowExportPreview(false)}>
+          <div className="bg-dark-secondary md:rounded-xl shadow-2xl max-w-4xl w-full h-full md:h-auto md:max-h-[90vh] flex flex-col border-0 md:border border-dark-border" onClick={(e) => e.stopPropagation()}>
+            {/* 弹窗头部 - Sticky */}
+            <div className="sticky top-0 z-10 flex items-center justify-between p-4 md:p-6 border-b border-dark-border bg-dark-secondary">
+              <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+                <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-r from-accent-primary to-accent-secondary rounded-lg flex items-center justify-center shadow-glow-cyan flex-shrink-0">
+                  <i className="fas fa-file-export text-white text-sm md:text-lg" />
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-text-primary">导出预览</h2>
-                  <p className="text-sm text-text-secondary">预览报告内容并选择导出格式</p>
+                <div className="min-w-0">
+                  <h2 className="text-responsive-h3 text-text-primary truncate">导出预览</h2>
+                  <p className="text-responsive-small text-text-secondary hidden md:block">预览报告内容并选择导出格式</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowExportPreview(false)}
-                className="w-10 h-10 rounded-lg hover:bg-dark-tertiary transition-colors flex items-center justify-center text-text-secondary hover:text-text-primary"
+                className="w-10 h-10 md:w-10 md:h-10 rounded-lg hover:bg-dark-tertiary transition-colors flex items-center justify-center text-text-secondary hover:text-text-primary flex-shrink-0 min-w-touch min-h-touch"
               >
-                <i className="fas fa-times text-xl" />
+                <i className="fas fa-times text-lg md:text-xl" />
               </button>
             </div>
 
