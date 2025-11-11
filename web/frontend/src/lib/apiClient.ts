@@ -365,7 +365,7 @@ export const userConfigAPI = {
 
 // Scheduled Tasks API (需要认证)
 export const scheduledTasksAPI = {
-  createTask: async (data: any) => {
+  create: async (data: any) => {
     try {
       const response = await apiClient.post('/api/scheduled-tasks', data);
       return response.data;
@@ -378,8 +378,9 @@ export const scheduledTasksAPI = {
     }
   },
 
-  getTasks: async (page = 1, limit = 10) => {
+  list: async (params: { page?: number; limit?: number } = {}) => {
     try {
+      const { page = 1, limit = 10 } = params;
       const response = await apiClient.get(`/api/scheduled-tasks?page=${page}&limit=${limit}`);
       return response.data;
     } catch (error: any) {
@@ -391,7 +392,20 @@ export const scheduledTasksAPI = {
     }
   },
 
-  updateTask: async (taskId: number, data: any) => {
+  get: async (taskId: number) => {
+    try {
+      const response = await apiClient.get(`/api/scheduled-tasks/${taskId}`);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取定时任务详情失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  update: async (taskId: number, data: any) => {
     try {
       const response = await apiClient.patch(`/api/scheduled-tasks/${taskId}`, data);
       return response.data;
@@ -404,7 +418,7 @@ export const scheduledTasksAPI = {
     }
   },
 
-  deleteTask: async (taskId: number) => {
+  delete: async (taskId: number) => {
     try {
       const response = await apiClient.delete(`/api/scheduled-tasks/${taskId}`);
       return response.data;
@@ -416,6 +430,12 @@ export const scheduledTasksAPI = {
       throw new Error(errorMessage);
     }
   },
+
+  // Legacy aliases for backward compatibility
+  createTask: async (data: any) => scheduledTasksAPI.create(data),
+  getTasks: async (page = 1, limit = 10) => scheduledTasksAPI.list({ page, limit }),
+  updateTask: async (taskId: number, data: any) => scheduledTasksAPI.update(taskId, data),
+  deleteTask: async (taskId: number) => scheduledTasksAPI.delete(taskId),
 };
 
 // Intraday Trading API (需要认证)

@@ -552,7 +552,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-4 md:p-6 space-y-4">
               {/* Info banner if using analysis config */}
               {config?.is_using_analysis_config && futuApiUrl && (
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-3">

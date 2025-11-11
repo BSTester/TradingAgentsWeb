@@ -9,6 +9,8 @@ import { useToast, Toast } from '@/components/ui/Toast';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { AppNavbar } from '@/components/common/AppNavbar';
 import { Footer } from '@/components/leaderboard/Footer';
+import { ResponsiveUserCard } from '@/components/admin/ResponsiveUserCard';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 
 interface User {
   id: number;
@@ -56,6 +58,7 @@ export default function UserManagementPage() {
   const { toast, showToast, hideToast } = useToast();
   const [page, setPage] = useState(1);
   const limit = 20;
+  const isMobile = useIsMobile();
 
   // 获取系统统计
   const { data: stats } = useQuery<SystemStats>({
@@ -119,13 +122,43 @@ export default function UserManagementPage() {
       }
       return response.json();
     },
+    onMutate: async ({ userId, isActive }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['admin', 'users'] });
+
+      // Snapshot the previous values
+      const previousLists = queryClient.getQueriesData({ queryKey: ['admin', 'users'] });
+
+      // Optimistically update all user list queries
+      queryClient.setQueriesData({ queryKey: ['admin', 'users'] }, (old: any) => {
+        if (!old || !old.users) return old;
+        
+        return {
+          ...old,
+          users: old.users.map((u: User) => 
+            u.id === userId ? { ...u, is_active: isActive } : u
+          ),
+        };
+      });
+
+      return { previousLists };
+    },
+    onError: (error: Error, _variables, context) => {
+      // Roll back on error
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      showToast(error.message, 'error');
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
-      queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
       showToast('用户状态已更新', 'success');
     },
-    onError: (error: Error) => {
-      showToast(error.message, 'error');
+    onSettled: () => {
+      // Refetch to sync with server
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
     },
   });
 
@@ -147,12 +180,42 @@ export default function UserManagementPage() {
       }
       return response.json();
     },
+    onMutate: async ({ userId, canAccess }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['admin', 'users'] });
+
+      // Snapshot the previous values
+      const previousLists = queryClient.getQueriesData({ queryKey: ['admin', 'users'] });
+
+      // Optimistically update all user list queries
+      queryClient.setQueriesData({ queryKey: ['admin', 'users'] }, (old: any) => {
+        if (!old || !old.users) return old;
+        
+        return {
+          ...old,
+          users: old.users.map((u: User) => 
+            u.id === userId ? { ...u, can_access_intraday_trading: canAccess } : u
+          ),
+        };
+      });
+
+      return { previousLists };
+    },
+    onError: (error: Error, _variables, context) => {
+      // Roll back on error
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      showToast(error.message, 'error');
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
       showToast('智能盯盘权限已更新', 'success');
     },
-    onError: (error: Error) => {
-      showToast(error.message, 'error');
+    onSettled: () => {
+      // Refetch to sync with server
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
     },
   });
 
@@ -243,8 +306,8 @@ export default function UserManagementPage() {
 
         {/* 统计卡片 */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+            <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-4 md:p-6">
               <div className="flex items-center">
                 <div className="flex-shrink-0 bg-accent-primary rounded-md p-3">
                   <i className="fas fa-users text-white text-2xl" />
@@ -256,7 +319,7 @@ export default function UserManagementPage() {
               </div>
             </div>
 
-            <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
+            <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-4 md:p-6">
               <div className="flex items-center">
                 <div className="flex-shrink-0 bg-success-500 rounded-md p-3">
                   <i className="fas fa-user-check text-white text-2xl" />
@@ -268,7 +331,7 @@ export default function UserManagementPage() {
               </div>
             </div>
 
-            <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
+            <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-4 md:p-6">
               <div className="flex items-center">
                 <div className="flex-shrink-0 bg-warning-500 rounded-md p-3">
                   <i className="fas fa-crown text-white text-2xl" />
@@ -280,7 +343,7 @@ export default function UserManagementPage() {
               </div>
             </div>
 
-            <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
+            <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-4 md:p-6">
               <div className="flex items-center">
                 <div className="flex-shrink-0 bg-accent-secondary rounded-md p-3">
                   <i className="fas fa-chart-bar text-white text-2xl" />
@@ -321,8 +384,22 @@ export default function UserManagementPage() {
             </div>
           ) : data && data.users.length > 0 ? (
             <>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-dark-border">
+              {isMobile ? (
+                // Mobile: Card layout
+                <div className="p-4 space-y-3">
+                  {data.users.map((u) => (
+                    <ResponsiveUserCard
+                      key={u.id}
+                      user={u}
+                      onToggleActive={handleStatusToggle}
+                      onToggleIntradayAccess={handleIntradayAccessToggle}
+                    />
+                  ))}
+                </div>
+              ) : (
+                // Desktop: Table layout
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-dark-border">
                   <thead className="bg-dark-tertiary">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
@@ -402,32 +479,33 @@ export default function UserManagementPage() {
                   </tbody>
                 </table>
               </div>
+              )}
 
               {/* 分页 */}
               {data.total_pages > 1 && (
-                <div className="px-6 py-4 border-t border-dark-border">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-text-secondary">
+                <div className="px-4 md:px-6 py-4 border-t border-dark-border">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-3">
+                    <div className="text-sm text-text-secondary text-center md:text-left">
                       显示第 {(page - 1) * limit + 1} - {Math.min(page * limit, data.total)} 条，共 {data.total} 条
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex items-center space-x-2">
                       <button
                         onClick={() => setPage(p => Math.max(1, p - 1))}
                         disabled={!data.has_prev}
-                        className="px-3 py-2 text-sm font-medium text-text-primary bg-dark-tertiary border border-dark-border rounded-md hover:bg-dark-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-3 py-2 text-sm font-medium text-text-primary bg-dark-tertiary border border-dark-border rounded-md hover:bg-dark-primary disabled:opacity-50 disabled:cursor-not-allowed min-h-touch"
                       >
                         <i className="fas fa-chevron-left mr-1" />
-                        上一页
+                        <span className="hidden md:inline">上一页</span>
                       </button>
-                      <span className="px-4 py-2 text-sm text-text-primary">
-                        第 {page} / {data.total_pages} 页
+                      <span className="px-3 md:px-4 py-2 text-sm text-text-primary">
+                        {page} / {data.total_pages}
                       </span>
                       <button
                         onClick={() => setPage(p => Math.min(data.total_pages, p + 1))}
                         disabled={!data.has_next}
-                        className="px-3 py-2 text-sm font-medium text-text-primary bg-dark-tertiary border border-dark-border rounded-md hover:bg-dark-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-3 py-2 text-sm font-medium text-text-primary bg-dark-tertiary border border-dark-border rounded-md hover:bg-dark-primary disabled:opacity-50 disabled:cursor-not-allowed min-h-touch"
                       >
-                        下一页
+                        <span className="hidden md:inline">下一页</span>
                         <i className="fas fa-chevron-right ml-1" />
                       </button>
                     </div>

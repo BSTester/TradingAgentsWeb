@@ -56,12 +56,13 @@ export function useUpdateScheduledTask() {
       scheduledTasksAPI.update(taskId, data),
     onMutate: async ({ taskId, data }) => {
       // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: scheduledTasksKeys.detail(taskId) });
+      await queryClient.cancelQueries({ queryKey: scheduledTasksKeys.all });
 
-      // Snapshot the previous value
+      // Snapshot the previous values
       const previousTask = queryClient.getQueryData(scheduledTasksKeys.detail(taskId));
+      const previousLists = queryClient.getQueriesData({ queryKey: scheduledTasksKeys.lists() });
 
-      // Optimistically update to the new value
+      // Optimistically update detail
       if (previousTask) {
         queryClient.setQueryData(scheduledTasksKeys.detail(taskId), {
           ...previousTask,
@@ -69,17 +70,34 @@ export function useUpdateScheduledTask() {
         });
       }
 
-      // Return a context object with the snapshotted value
-      return { previousTask };
+      // Optimistically update all list queries
+      queryClient.setQueriesData({ queryKey: scheduledTasksKeys.lists() }, (old: any) => {
+        if (!old || !old.items) return old;
+        
+        return {
+          ...old,
+          items: old.items.map((task: any) => 
+            task.id === taskId ? { ...task, ...data } : task
+          ),
+        };
+      });
+
+      // Return a context object with the snapshotted values
+      return { previousTask, previousLists };
     },
     onError: (_err, { taskId }, context) => {
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousTask) {
         queryClient.setQueryData(scheduledTasksKeys.detail(taskId), context.previousTask);
       }
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
     },
     onSettled: (_data, _error, { taskId }) => {
-      // Always refetch after error or success
+      // Always refetch after error or success to sync with server
       queryClient.invalidateQueries({ queryKey: scheduledTasksKeys.detail(taskId) });
       queryClient.invalidateQueries({ queryKey: scheduledTasksKeys.lists() });
     },
@@ -93,20 +111,25 @@ export function useDeleteScheduledTask() {
   return useMutation({
     mutationFn: (taskId: number) => scheduledTasksAPI.delete(taskId),
     onMutate: async (taskId) => {
+      console.log('🚀 Starting optimistic delete for task:', taskId);
+      
       // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: scheduledTasksKeys.lists() });
+      await queryClient.cancelQueries({ queryKey: scheduledTasksKeys.all });
 
-      // Snapshot the previous value
+      // Snapshot the previous values
       const previousLists = queryClient.getQueriesData({ queryKey: scheduledTasksKeys.lists() });
 
-      // Optimistically update all list queries
+      // Optimistically update all list queries - remove the task
       queryClient.setQueriesData({ queryKey: scheduledTasksKeys.lists() }, (old: any) => {
         if (!old || !old.items) return old;
         
+        const filteredItems = old.items.filter((task: any) => task.id !== taskId);
+        console.log(`🗑️ Optimistically removed task from cache: ${old.items.length} → ${filteredItems.length}`);
+        
         return {
           ...old,
-          items: old.items.filter((task: any) => task.id !== taskId),
-          total: old.total - 1,
+          items: filteredItems,
+          total: Math.max(0, old.total - 1),
         };
       });
 
@@ -114,6 +137,8 @@ export function useDeleteScheduledTask() {
       return { previousLists };
     },
     onError: (_err, _taskId, context) => {
+      console.error('❌ Delete failed, rolling back optimistic update');
+      
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousLists) {
         context.previousLists.forEach(([queryKey, data]) => {
@@ -122,8 +147,13 @@ export function useDeleteScheduledTask() {
       }
     },
     onSettled: () => {
-      // Always refetch after error or success
-      queryClient.invalidateQueries({ queryKey: scheduledTasksKeys.lists() });
+      console.log('🔄 Refetching task list to sync with server');
+      
+      // Always refetch after error or success to ensure sync with server
+      queryClient.invalidateQueries({ 
+        queryKey: scheduledTasksKeys.lists(),
+        refetchType: 'active'
+      });
     },
   });
 }

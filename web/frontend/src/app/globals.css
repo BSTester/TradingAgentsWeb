@@ -36,9 +36,34 @@
 @layer components {
   /* Dark Fintech Theme Components */
   
+  /* Responsive Typography */
+  .text-responsive-h1 {
+    @apply text-[1.75rem] leading-tight font-bold md:text-4xl md:leading-tight;
+  }
+
+  .text-responsive-h2 {
+    @apply text-2xl leading-snug font-bold md:text-3xl md:leading-snug;
+  }
+
+  .text-responsive-h3 {
+    @apply text-xl leading-normal font-semibold md:text-2xl md:leading-normal;
+  }
+
+  .text-responsive-h4 {
+    @apply text-lg leading-normal font-semibold md:text-xl md:leading-normal;
+  }
+
+  .text-responsive-body {
+    @apply text-base leading-relaxed;
+  }
+
+  .text-responsive-small {
+    @apply text-sm leading-normal;
+  }
+  
   /* Buttons */
   .btn {
-    @apply inline-flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-200 px-4 py-2 border border-transparent;
+    @apply inline-flex items-center justify-center rounded-lg text-sm md:text-base font-medium transition-all duration-200 px-4 py-2 border border-transparent;
   }
 
   .btn-primary {
@@ -76,7 +101,7 @@
   }
 
   .card-title {
-    @apply text-2xl font-semibold leading-none tracking-tight text-text-primary;
+    @apply text-responsive-h3 font-semibold leading-none tracking-tight text-text-primary;
   }
 
   .card-body {
@@ -194,6 +219,17 @@
   img, video, canvas, svg {
     max-width: 100%;
     height: auto;
+  }
+}
+
+@layer utilities {
+  /* 隐藏滚动条但保持滚动功能 */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
 

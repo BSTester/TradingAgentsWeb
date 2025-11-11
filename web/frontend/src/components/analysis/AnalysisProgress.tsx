@@ -686,7 +686,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
   };
 
   return (
-    <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
+    <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-4 md:p-6">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-lg font-semibold text-text-primary">
           <i className="fas fa-chart-line mr-2 text-blue-600" />

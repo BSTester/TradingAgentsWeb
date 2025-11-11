@@ -42,6 +42,51 @@ export default function IntradayTradingPage() {
     switch (message.type) {
       case 'intraday_session_start':
         showToast('分析会话已开始', 'info');
+        
+        // Create a running decision record when session starts
+        if (message.decision_id) {
+          const currentDecisions = queryClient.getQueryData(
+            intradayTradingKeys.decisionsList(1, 20)
+          ) as any;
+          
+          if (currentDecisions) {
+            // Create a temporary running decision record
+            const runningDecision = {
+              id: message.decision_id,
+              session_id: message.session_id || '',
+              market_type: message.market_type || selectedMarket,
+              status: 'running',
+              start_time: new Date().toISOString(),
+              end_time: null,
+              trades_count: 0,
+              trades_executed: [],
+            };
+            
+            // Check if this decision already exists (to avoid duplicates)
+            const existingIndex = currentDecisions.items.findIndex(
+              (item: any) => item.id === message.decision_id
+            );
+            
+            let updatedItems;
+            if (existingIndex >= 0) {
+              // Update existing decision
+              updatedItems = [...currentDecisions.items];
+              updatedItems[existingIndex] = { ...updatedItems[existingIndex], status: 'running' };
+            } else {
+              // Add new running decision at the beginning
+              updatedItems = [runningDecision, ...currentDecisions.items].slice(0, 20);
+            }
+            
+            queryClient.setQueryData(
+              intradayTradingKeys.decisionsList(1, 20),
+              {
+                ...currentDecisions,
+                items: updatedItems,
+                total: existingIndex >= 0 ? currentDecisions.total : currentDecisions.total + 1,
+              }
+            );
+          }
+        }
         break;
         
       case 'tool_call':
@@ -82,23 +127,35 @@ export default function IntradayTradingPage() {
       case 'intraday_session_complete':
         showToast('分析会话已完成', 'success');
         
-        // Add new decision to the list
+        // Update the existing running decision to completed
         if (message.decision_record) {
           const currentDecisions = queryClient.getQueryData(
             intradayTradingKeys.decisionsList(1, 20)
           ) as any;
           
           if (currentDecisions) {
-            // Prepend new decision to the list
-            const updatedDecisions = {
-              ...currentDecisions,
-              items: [message.decision_record, ...currentDecisions.items].slice(0, 20),
-              total: currentDecisions.total + 1,
-            };
+            // Find and update the existing decision
+            const existingIndex = currentDecisions.items.findIndex(
+              (item: any) => item.id === message.decision_record.id
+            );
+            
+            let updatedItems;
+            if (existingIndex >= 0) {
+              // Update existing decision with complete data
+              updatedItems = [...currentDecisions.items];
+              updatedItems[existingIndex] = message.decision_record;
+            } else {
+              // If not found (shouldn't happen), add it
+              updatedItems = [message.decision_record, ...currentDecisions.items].slice(0, 20);
+            }
             
             queryClient.setQueryData(
               intradayTradingKeys.decisionsList(1, 20),
-              updatedDecisions
+              {
+                ...currentDecisions,
+                items: updatedItems,
+                total: existingIndex >= 0 ? currentDecisions.total : currentDecisions.total + 1,
+              }
             );
           }
         }
@@ -115,6 +172,37 @@ export default function IntradayTradingPage() {
         
       case 'intraday_session_error':
         showToast(`分析出错: ${message.message}`, 'error');
+        
+        // Update the running decision to failed status
+        if (message.decision_id) {
+          const currentDecisions = queryClient.getQueryData(
+            intradayTradingKeys.decisionsList(1, 20)
+          ) as any;
+          
+          if (currentDecisions) {
+            const existingIndex = currentDecisions.items.findIndex(
+              (item: any) => item.id === message.decision_id
+            );
+            
+            if (existingIndex >= 0) {
+              const updatedItems = [...currentDecisions.items];
+              updatedItems[existingIndex] = {
+                ...updatedItems[existingIndex],
+                status: 'failed',
+                end_time: new Date().toISOString(),
+              };
+              
+              queryClient.setQueryData(
+                intradayTradingKeys.decisionsList(1, 20),
+                {
+                  ...currentDecisions,
+                  items: updatedItems,
+                }
+              );
+            }
+          }
+        }
+        
         queryClient.invalidateQueries({ queryKey: intradayTradingKeys.all });
         break;
         
@@ -205,16 +293,16 @@ export default function IntradayTradingPage() {
 
       {/* 面包屑导航 */}
       <nav className="bg-dark-secondary/80 backdrop-blur-lg border-b border-dark-border shadow-lg pt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-10">
-          <div className="flex items-center space-x-2 text-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-10 overflow-hidden">
+          <div className="flex items-center space-x-2 text-sm whitespace-nowrap">
             <button
               onClick={() => router.push('/')}
-              className="text-accent-primary hover:text-accent-secondary transition-colors"
+              className="text-accent-primary hover:text-accent-secondary transition-colors flex-shrink-0"
             >
               <i className="fas fa-home mr-1" />
               首页
             </button>
-            <i className="fas fa-chevron-right text-text-tertiary text-xs" />
+            <i className="fas fa-chevron-right text-text-tertiary text-xs flex-shrink-0" />
             <span className="text-text-primary font-medium">智能盯盘</span>
           </div>
         </div>
@@ -227,11 +315,11 @@ export default function IntradayTradingPage() {
           <div className="mb-8">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-text-primary mb-2">
+                <h1 className="text-responsive-h2 text-text-primary mb-2">
                   <i className="fas fa-chart-line mr-3 text-success-500" />
                   智能盯盘
                 </h1>
-                <p className="text-text-secondary">
+                <p className="text-responsive-body text-text-secondary">
                   实时盯盘分析，智能决策，自动监控
                 </p>
               </div>

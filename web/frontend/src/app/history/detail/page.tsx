@@ -84,25 +84,25 @@ function HistoryDetailContent() {
       <AppNavbar user={user} onLogout={logout} />
 
       <nav className="bg-dark-secondary/80 backdrop-blur-lg border-b border-dark-border shadow-lg pt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-10">
-          <div className="flex items-center space-x-2 text-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-10 overflow-hidden">
+          <div className="flex items-center space-x-2 text-sm whitespace-nowrap">
             <button
               onClick={handleBackToHome}
-              className="text-accent-primary hover:text-accent-secondary transition-colors"
+              className="text-accent-primary hover:text-accent-secondary transition-colors flex-shrink-0"
             >
               <i className="fas fa-home mr-1" />
               首页
             </button>
-            <i className="fas fa-chevron-right text-text-tertiary text-xs" />
+            <i className="fas fa-chevron-right text-text-tertiary text-xs flex-shrink-0" />
             <button
               onClick={handleBackToHistory}
-              className="text-accent-primary hover:text-accent-secondary transition-colors"
+              className="text-accent-primary hover:text-accent-secondary transition-colors flex-shrink-0"
             >
               分析历史
             </button>
-            <i className="fas fa-chevron-right text-text-tertiary text-xs" />
-            <span className="text-text-primary font-medium">分析详情</span>
-            <i className="fas fa-chevron-right text-text-tertiary text-xs" />
+            <i className="fas fa-chevron-right text-text-tertiary text-xs flex-shrink-0" />
+            <span className="text-text-primary font-medium flex-shrink-0">分析详情</span>
+            <i className="fas fa-chevron-right text-text-tertiary text-xs flex-shrink-0" />
             <span className="text-text-secondary">{analysisId}</span>
           </div>
         </div>

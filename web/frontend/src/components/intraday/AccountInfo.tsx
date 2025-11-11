@@ -11,7 +11,7 @@ interface AccountInfoProps {
 }
 
 export function AccountInfo({ selectedMarket, onMarketChange, onShowToast }: AccountInfoProps) {
-  const { data: account, isLoading, error, refetch } = useAccountInfo(selectedMarket);
+  const { data: account, isLoading, error, refetch, isFetching } = useAccountInfo(selectedMarket);
   const queryClient = useQueryClient();
 
   // Handle refresh - refresh both account and positions
@@ -73,19 +73,20 @@ export function AccountInfo({ selectedMarket, onMarketChange, onShowToast }: Acc
             </select>
             <button
               onClick={handleRefresh}
-              className="text-sm text-accent-primary hover:text-accent-secondary"
+              disabled={isFetching}
+              className="text-sm text-accent-primary hover:text-accent-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
               title="刷新账户和持仓信息"
             >
-              <i className="fas fa-sync-alt mr-1" />
-              刷新
+              <i className={`fas fa-sync-alt mr-1 ${isFetching ? 'fa-spin' : ''}`} />
+              {isFetching ? '刷新中...' : '刷新'}
             </button>
           </div>
         </div>
       </div>
-      <div className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="p-4 md:p-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           {/* Total Assets */}
-          <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 rounded-lg p-6 border border-blue-500/30">
+          <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 rounded-lg p-4 md:p-6 border border-blue-500/30">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-blue-400">总资产</span>
               <i className="fas fa-chart-pie text-2xl text-blue-500" />
