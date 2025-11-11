@@ -215,7 +215,7 @@ export default function IntradayTradingPage() {
               首页
             </button>
             <i className="fas fa-chevron-right text-text-tertiary text-xs" />
-            <span className="text-text-primary font-medium">短线交易系统</span>
+            <span className="text-text-primary font-medium">智能盯盘</span>
           </div>
         </div>
       </nav>
@@ -229,10 +229,10 @@ export default function IntradayTradingPage() {
               <div>
                 <h1 className="text-3xl font-bold text-text-primary mb-2">
                   <i className="fas fa-chart-line mr-3 text-success-500" />
-                  短线交易系统
+                  智能盯盘
                 </h1>
                 <p className="text-text-secondary">
-                  自动化短线交易分析，智能决策，实时监控
+                  实时盯盘分析，智能决策，自动监控
                 </p>
               </div>
               
