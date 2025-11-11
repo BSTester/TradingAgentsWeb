@@ -233,10 +233,10 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
                 value={captchaInput}
                 onChange={(e) => setCaptchaInput(e.target.value)}
                 placeholder="请输入验证码"
-                className="flex-1 h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary transition-all"
+                className="flex-1 min-w-0 h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary transition-all"
                 required
               />
-              <div className="flex items-center flex-shrink-0">
+              <div className="flex items-center flex-shrink-0 max-w-[140px]">
                 <CaptchaImage key={captchaKey} onIdChange={setCaptchaId} height={48} />
               </div>
             </div>
@@ -295,7 +295,7 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
                 id="code"
                 value={verificationCode}
                 onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="flex-1 h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all text-center tracking-widest font-mono"
+                className="w-2/3 h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all text-center tracking-widest font-mono"
                 placeholder="6位验证码"
                 maxLength={6}
                 required
@@ -304,7 +304,7 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
                 type="button"
                 onClick={handleSendCode}
                 disabled={countdown > 0 || isSendingCode}
-                className="px-4 h-12 bg-gradient-to-r from-accent-secondary to-accent-primary text-white rounded-lg hover:shadow-glow-cyan focus:outline-none focus:ring-2 focus:ring-accent-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap text-sm flex-shrink-0"
+                className="w-1/3 h-12 bg-gradient-to-r from-accent-secondary to-accent-primary text-white rounded-lg hover:shadow-glow-cyan focus:outline-none focus:ring-2 focus:ring-accent-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap text-sm"
               >
                 {isSendingCode ? (
                   <>
@@ -334,10 +334,10 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
                 value={captchaInput}
                 onChange={(e) => setCaptchaInput(e.target.value)}
                 placeholder="请输入验证码"
-                className="flex-1 h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
+                className="flex-1 min-w-0 h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary transition-all"
                 required
               />
-              <div className="flex items-center flex-shrink-0">
+              <div className="flex items-center flex-shrink-0 max-w-[140px]">
                 <CaptchaImage key={captchaKey} onIdChange={setCaptchaId} height={48} />
               </div>
             </div>

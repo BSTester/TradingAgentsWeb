@@ -151,8 +151,8 @@ export function CaptchaImage({
           ref={canvasRef}
           width={width}
           height={height}
-          className="rounded cursor-pointer bg-dark-tertiary hover:opacity-90 transition-opacity"
-          style={{ display: 'block', height: `${height}px`, width: `${width}px` }}
+          className="rounded cursor-pointer bg-dark-tertiary hover:opacity-90 transition-opacity max-w-full"
+          style={{ display: 'block', height: `${height}px`, width: `${width}px`, maxWidth: '100%' }}
           onClick={() => { void regenerate(); }}
           aria-label="点击刷新验证码"
           title="点击刷新验证码"
