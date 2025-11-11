@@ -19,7 +19,23 @@ export default function IntradayTradingPage() {
   const router = useRouter();
   const { toast, showToast, hideToast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedMarket, setSelectedMarket] = useState<string>('US'); // 市场状态管理
+  
+  // 从 localStorage 读取上次选择的市场,如果没有则默认为 'US'
+  const [selectedMarket, setSelectedMarket] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('intraday_selected_market');
+      return cached || 'US';
+    }
+    return 'US';
+  });
+
+  // 处理市场切换,同时保存到 localStorage
+  const handleMarketChange = useCallback((market: string) => {
+    setSelectedMarket(market);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('intraday_selected_market', market);
+    }
+  }, []);
 
   // WebSocket message handler
   const handleWebSocketMessage = useCallback((message: any) => {
@@ -261,7 +277,7 @@ export default function IntradayTradingPage() {
           <div className="mb-6">
             <AccountInfo 
               selectedMarket={selectedMarket}
-              onMarketChange={setSelectedMarket}
+              onMarketChange={handleMarketChange}
               onShowToast={showToast} 
             />
           </div>
