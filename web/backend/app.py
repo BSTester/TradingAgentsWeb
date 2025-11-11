@@ -486,6 +486,9 @@ class ConnectionManager:
         message['analysis_id'] = analysis_id
 
         if analysis_id in self.active_connections:
+            connection_count = len(self.active_connections[analysis_id])
+            print(f"📤 Sending message type '{message.get('type')}' to {connection_count} connection(s) on channel '{analysis_id}'")
+            
             for connection in list(self.active_connections[analysis_id]):
                 try:
                     await connection.send_text(json.dumps(message))
@@ -502,6 +505,8 @@ class ConnectionManager:
                         self.active_connections[analysis_id].remove(connection)
                     except Exception:
                         pass
+        else:
+            print(f"⚠️ No active connections found for channel '{analysis_id}' (message type: {message.get('type')})")
     
     async def close_connections(self, analysis_id: str):
         """Close all WebSocket connections for a specific analysis"""

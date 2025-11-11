@@ -81,9 +81,9 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
 
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { color: string; icon: string; label: string }> = {
-      running: { color: 'bg-blue-100 text-blue-800', icon: 'fa-spinner fa-spin', label: '运行中' },
-      completed: { color: 'bg-green-100 text-green-800', icon: 'fa-check-circle', label: '已完成' },
-      failed: { color: 'bg-red-100 text-red-800', icon: 'fa-times-circle', label: '失败' },
+      running: { color: 'bg-blue-500/20 text-blue-400 border border-blue-500/50', icon: 'fa-spinner fa-spin', label: '运行中' },
+      completed: { color: 'bg-green-500/20 text-green-400 border border-green-500/50', icon: 'fa-check-circle', label: '已完成' },
+      failed: { color: 'bg-red-500/20 text-red-400 border border-red-500/50', icon: 'fa-times-circle', label: '失败' },
     };
 
     const badge = badges[status] || badges.completed;
