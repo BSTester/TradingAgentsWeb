@@ -45,23 +45,25 @@ export default function IntradayTradingPage() {
         
         // Create a running decision record when session starts
         if (message.decision_id) {
+          console.log('📥 Received intraday_session_start:', message);
+          
           const currentDecisions = queryClient.getQueryData(
             intradayTradingKeys.decisionsList(1, 20)
           ) as any;
           
+          // Create a temporary running decision record
+          const runningDecision = {
+            id: message.decision_id,
+            session_id: message.session_id || '',
+            market_type: message.market_type || selectedMarket,
+            status: 'running',
+            start_time: new Date().toISOString(),
+            end_time: null,
+            trades_count: 0,
+            trades_executed: [],
+          };
+          
           if (currentDecisions) {
-            // Create a temporary running decision record
-            const runningDecision = {
-              id: message.decision_id,
-              session_id: message.session_id || '',
-              market_type: message.market_type || selectedMarket,
-              status: 'running',
-              start_time: new Date().toISOString(),
-              end_time: null,
-              trades_count: 0,
-              trades_executed: [],
-            };
-            
             // Check if this decision already exists (to avoid duplicates)
             const existingIndex = currentDecisions.items.findIndex(
               (item: any) => item.id === message.decision_id
@@ -85,8 +87,30 @@ export default function IntradayTradingPage() {
                 total: existingIndex >= 0 ? currentDecisions.total : currentDecisions.total + 1,
               }
             );
+            console.log('✅ Updated decisions list with running decision:', runningDecision);
+          } else {
+            // If no decisions list exists yet, create one with just this running decision
+            queryClient.setQueryData(
+              intradayTradingKeys.decisionsList(1, 20),
+              {
+                items: [runningDecision],
+                total: 1,
+                page: 1,
+                limit: 20,
+              }
+            );
+            console.log('✅ Created new decisions list with running decision:', runningDecision);
           }
+        } else {
+          console.warn('⚠️ Received intraday_session_start without decision_id:', message);
         }
+        break;
+        
+      case 'analysis_trigger':
+        // Analysis is being triggered by scheduler
+        console.log('📥 Analysis triggered:', message.market_type);
+        // Optional: show a subtle notification
+        // showToast(message.message || '开始分析...', 'info');
         break;
         
       case 'tool_call':

@@ -59,17 +59,8 @@ async def execute_intraday_analysis(
     
     logging.info(f"Starting intraday analysis: session={session_id}, market={market_type}, user={user_id}")
 
-    # WebSocket: announce session start
-    try:
-        from web.backend.app import manager as ws_manager
-        import asyncio
-        asyncio.create_task(ws_manager.send_message({
-            'type': 'intraday_session_start',
-            'timestamp': datetime.utcnow().isoformat(),
-            'message': 'Intraday session started',
-        }, session_id))
-    except Exception:
-        pass
+    # WebSocket: announce session start (will be sent after decision record is created)
+    # Moved to after decision record creation to include decision_id
     
     try:
         # Import here to avoid circular dependencies
@@ -98,6 +89,25 @@ async def execute_intraday_analysis(
             )
             db.add(decision_record)
             db.commit()
+            db.refresh(decision_record)  # Refresh to get the ID
+            
+            # WebSocket: announce session start with decision_id
+            try:
+                from web.backend.app import manager as ws_manager
+                
+                # Send to user-specific channel
+                channel_id = f"intraday_user_{user_id}"
+                await ws_manager.send_message({
+                    'type': 'intraday_session_start',
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'message': 'Intraday session started',
+                    'decision_id': decision_record.id,
+                    'session_id': session_id,
+                    'market_type': market_type,
+                }, channel_id)
+                logging.info(f"✅ Sent intraday_session_start WebSocket message: decision_id={decision_record.id}, channel={channel_id}")
+            except Exception as ws_error:
+                logging.warning(f"❌ Failed to send session start WebSocket notification: {ws_error}")
             
             # Get user's LLM configuration (with fallback to analysis config)
             from web.backend.models import UserConfig
@@ -386,7 +396,6 @@ async def execute_intraday_analysis(
             # WebSocket: announce session complete with summary only (not full report)
             try:
                 from web.backend.app import manager as ws_manager
-                import asyncio
                 
                 # Extract summary from report (first few lines or key metrics)
                 report_summary = ""
@@ -430,14 +439,15 @@ async def execute_intraday_analysis(
                 # Send to user-specific channel
                 channel_id = f"intraday_user_{user_id}"
                 trades_count = len(decision_summary.get('trades_executed', []))
-                asyncio.create_task(ws_manager.send_message({
+                await ws_manager.send_message({
                     'type': 'intraday_session_complete',
                     'timestamp': datetime.utcnow().isoformat(),
                     'message': f'分析完成 - {trades_count} 笔交易',
                     'decision_record': decision_summary,  # Summary only, not full report
-                }, channel_id))
+                }, channel_id)
+                logging.info(f"✅ Sent intraday_session_complete WebSocket message: decision_id={decision_record.id}, channel={channel_id}")
             except Exception as ws_error:
-                logging.warning(f"Failed to send WebSocket notification: {ws_error}")
+                logging.warning(f"❌ Failed to send WebSocket notification: {ws_error}")
             
             logging.info(f"Analysis completed successfully: session_id={session_id}")
             
@@ -484,18 +494,54 @@ async def execute_intraday_analysis(
         # WebSocket: announce session error
         try:
             from web.backend.app import manager as ws_manager
+            from web.backend.database import SessionLocal
+            from web.backend.models import IntradayDecisionRecord
             import asyncio
+            
+            # Try to get decision_id from database
+            decision_id = None
+            try:
+                temp_db = SessionLocal()
+                try:
+                    temp_record = temp_db.query(IntradayDecisionRecord).filter(
+                        IntradayDecisionRecord.session_id == session_id
+                    ).first()
+                    if temp_record:
+                        decision_id = temp_record.id
+                finally:
+                    temp_db.close()
+            except:
+                pass
             
             # Send to user-specific channel
             channel_id = f"intraday_user_{user_id}"
-            asyncio.create_task(ws_manager.send_message({
-                'type': 'intraday_session_error',
-                'timestamp': datetime.utcnow().isoformat(),
-                'message': f'Intraday session error: {str(e)}',
-                'session_id': session_id,
-            }, channel_id))
-        except Exception:
-            pass
+            
+            # Create a new event loop if needed (since we're in exception handler)
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # If loop is running, create a task
+                    asyncio.create_task(ws_manager.send_message({
+                        'type': 'intraday_session_error',
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'message': f'Intraday session error: {str(e)}',
+                        'session_id': session_id,
+                        'decision_id': decision_id,
+                    }, channel_id))
+                else:
+                    # If no loop, run it synchronously
+                    loop.run_until_complete(ws_manager.send_message({
+                        'type': 'intraday_session_error',
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'message': f'Intraday session error: {str(e)}',
+                        'session_id': session_id,
+                        'decision_id': decision_id,
+                    }, channel_id))
+                logging.info(f"✅ Sent intraday_session_error WebSocket message: session_id={session_id}, channel={channel_id}")
+            except Exception as loop_error:
+                logging.warning(f"❌ Failed to send error WebSocket notification: {loop_error}")
+        except Exception as outer_error:
+            logging.warning(f"❌ Failed to prepare error WebSocket notification: {outer_error}")
 
         return {
             "status": "error",

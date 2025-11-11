@@ -233,6 +233,22 @@ class IntradayScheduler:
         try:
             logger.info(f"🚀 Triggering intraday trading analysis for {market} market (user {self.user_id})...")
             
+            # Send WebSocket notification that analysis is starting
+            try:
+                from web.backend.app import manager as ws_manager
+                from datetime import datetime
+                
+                channel_id = f"intraday_user_{self.user_id}"
+                await ws_manager.send_message({
+                    'type': 'analysis_trigger',
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'message': f'开始 {market} 市场分析...',
+                    'market_type': market,
+                }, channel_id)
+                logger.info(f"📤 Sent analysis_trigger notification for {market} market")
+            except Exception as ws_error:
+                logger.warning(f"Failed to send analysis trigger notification: {ws_error}")
+            
             # Import here to avoid circular dependencies
             from web.backend.services.intraday_executor import execute_intraday_analysis
             
