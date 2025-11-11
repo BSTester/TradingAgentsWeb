@@ -45,8 +45,6 @@ export default function IntradayTradingPage() {
         
         // Create a running decision record when session starts
         if (message.decision_id) {
-          console.log('📥 Received intraday_session_start:', message);
-          
           const currentDecisions = queryClient.getQueryData(
             intradayTradingKeys.decisionsList(1, 20)
           ) as any;
@@ -87,7 +85,6 @@ export default function IntradayTradingPage() {
                 total: existingIndex >= 0 ? currentDecisions.total : currentDecisions.total + 1,
               }
             );
-            console.log('✅ Updated decisions list with running decision:', runningDecision);
           } else {
             // If no decisions list exists yet, create one with just this running decision
             queryClient.setQueryData(
@@ -99,18 +96,12 @@ export default function IntradayTradingPage() {
                 limit: 20,
               }
             );
-            console.log('✅ Created new decisions list with running decision:', runningDecision);
           }
-        } else {
-          console.warn('⚠️ Received intraday_session_start without decision_id:', message);
         }
         break;
         
       case 'analysis_trigger':
         // Analysis is being triggered by scheduler
-        console.log('📥 Analysis triggered:', message.market_type);
-        // Optional: show a subtle notification
-        // showToast(message.message || '开始分析...', 'info');
         break;
         
       case 'tool_call':
