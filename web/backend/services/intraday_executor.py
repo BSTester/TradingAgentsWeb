@@ -105,9 +105,8 @@ async def execute_intraday_analysis(
                     'session_id': session_id,
                     'market_type': market_type,
                 }, channel_id)
-                logging.info(f"✅ Sent intraday_session_start WebSocket message: decision_id={decision_record.id}, channel={channel_id}")
             except Exception as ws_error:
-                logging.warning(f"❌ Failed to send session start WebSocket notification: {ws_error}")
+                logging.warning(f"Failed to send session start WebSocket notification: {ws_error}")
             
             # Get user's LLM configuration (with fallback to analysis config)
             from web.backend.models import UserConfig
@@ -445,9 +444,8 @@ async def execute_intraday_analysis(
                     'message': f'分析完成 - {trades_count} 笔交易',
                     'decision_record': decision_summary,  # Summary only, not full report
                 }, channel_id)
-                logging.info(f"✅ Sent intraday_session_complete WebSocket message: decision_id={decision_record.id}, channel={channel_id}")
             except Exception as ws_error:
-                logging.warning(f"❌ Failed to send WebSocket notification: {ws_error}")
+                logging.warning(f"Failed to send WebSocket notification: {ws_error}")
             
             logging.info(f"Analysis completed successfully: session_id={session_id}")
             
@@ -537,11 +535,10 @@ async def execute_intraday_analysis(
                         'session_id': session_id,
                         'decision_id': decision_id,
                     }, channel_id))
-                logging.info(f"✅ Sent intraday_session_error WebSocket message: session_id={session_id}, channel={channel_id}")
             except Exception as loop_error:
-                logging.warning(f"❌ Failed to send error WebSocket notification: {loop_error}")
+                logging.warning(f"Failed to send error WebSocket notification: {loop_error}")
         except Exception as outer_error:
-            logging.warning(f"❌ Failed to prepare error WebSocket notification: {outer_error}")
+            logging.warning(f"Failed to prepare error WebSocket notification: {outer_error}")
 
         return {
             "status": "error",

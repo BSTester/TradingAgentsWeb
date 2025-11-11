@@ -245,7 +245,6 @@ class IntradayScheduler:
                     'message': f'开始 {market} 市场分析...',
                     'market_type': market,
                 }, channel_id)
-                logger.info(f"📤 Sent analysis_trigger notification for {market} market")
             except Exception as ws_error:
                 logger.warning(f"Failed to send analysis trigger notification: {ws_error}")
             
