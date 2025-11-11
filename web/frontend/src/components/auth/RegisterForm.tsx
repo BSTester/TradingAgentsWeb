@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -182,14 +182,14 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
           <label htmlFor="emailCode" className="block text-sm font-medium text-text-secondary mb-2">
             邮箱验证码
           </label>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-row items-center gap-3">
             <input
               type="text"
               id="emailCode"
               value={emailVerificationCode}
               onChange={(e) => setEmailVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="flex-1 h-12 px-3 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all text-center text-lg tracking-widest font-mono"
-              placeholder="请输入6位验证码"
+              className="flex-1 h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all text-center tracking-widest font-mono"
+              placeholder="6位验证码"
               maxLength={6}
               required
             />
@@ -197,17 +197,21 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
               type="button"
               onClick={handleSendEmailCode}
               disabled={countdown > 0 || isSendingCode}
-              className="px-4 h-12 bg-gradient-to-r from-accent-secondary to-accent-primary text-white rounded-lg hover:shadow-glow-cyan focus:outline-none focus:ring-2 focus:ring-accent-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap text-sm"
+              className="px-4 h-12 bg-gradient-to-r from-accent-secondary to-accent-primary text-white rounded-lg hover:shadow-glow-cyan focus:outline-none focus:ring-2 focus:ring-accent-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap text-sm flex-shrink-0"
             >
               {isSendingCode ? (
                 <>
                   <i className="fas fa-spinner fa-spin mr-1" />
-                  发送中
+                  <span className="hidden xs:inline">发送中</span>
+                  <span className="xs:hidden">发送中</span>
                 </>
               ) : countdown > 0 ? (
-                `${countdown}秒后重试`
+                <span className="text-xs xs:text-sm">{countdown}秒</span>
               ) : (
-                '发送验证码'
+                <>
+                  <span className="hidden xs:inline">发送验证码</span>
+                  <span className="xs:hidden">发送</span>
+                </>
               )}
             </button>
           </div>
@@ -221,16 +225,16 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
           <label className="block text-sm font-medium text-text-secondary mb-2">
             图形验证码
           </label>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-row items-center gap-3">
             <input
               type="text"
               value={captchaInput}
               onChange={(e) => setCaptchaInput(e.target.value)}
-              placeholder="请输入右侧验证码"
-              className="flex-1 h-12 px-3 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary transition-all"
+              placeholder="请输入验证码"
+              className="flex-1 h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
               required
             />
-            <div className="flex items-center gap-2">
+            <div className="flex items-center flex-shrink-0">
               <CaptchaImage key={captchaKey} onIdChange={setCaptchaId} height={48} />
             </div>
           </div>
@@ -257,3 +261,4 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
     </>
   );
 }
+
