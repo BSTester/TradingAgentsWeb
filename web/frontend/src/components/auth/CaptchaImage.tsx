@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useEffect, useRef } from 'react';
 
@@ -151,7 +151,8 @@ export function CaptchaImage({
           ref={canvasRef}
           width={width}
           height={height}
-          className="rounded border border-dark-border cursor-pointer bg-dark-tertiary hover:border-accent-primary transition-colors"
+          className="rounded cursor-pointer bg-dark-tertiary hover:opacity-90 transition-opacity"
+          style={{ display: 'block', height: `${height}px`, width: `${width}px` }}
           onClick={() => { void regenerate(); }}
           aria-label="点击刷新验证码"
           title="点击刷新验证码"

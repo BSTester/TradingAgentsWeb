@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -146,26 +146,28 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
         <button
           type="button"
           onClick={() => setLoginMode('password')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+          className={`flex-1 py-2 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-medium transition-all ${
             loginMode === 'password'
               ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white shadow-glow-cyan'
               : 'text-text-secondary hover:text-text-primary'
           }`}
         >
-          <i className="fas fa-key mr-2" />
-          密码登录
+          <i className="fas fa-key mr-1 sm:mr-2" />
+          <span className="hidden xs:inline">密码登录</span>
+          <span className="xs:hidden">密码</span>
         </button>
         <button
           type="button"
           onClick={() => setLoginMode('email')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+          className={`flex-1 py-2 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-medium transition-all ${
             loginMode === 'email'
               ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white shadow-glow-cyan'
               : 'text-text-secondary hover:text-text-primary'
           }`}
         >
-          <i className="fas fa-envelope mr-2" />
-          邮箱验证码
+          <i className="fas fa-envelope mr-1 sm:mr-2" />
+          <span className="hidden xs:inline">邮箱验证码</span>
+          <span className="xs:hidden">验证码</span>
         </button>
       </div>
 
@@ -225,16 +227,16 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
             <label className="block text-sm font-medium text-text-secondary mb-2">
               图形验证码
             </label>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-row items-center gap-3">
               <input
                 type="text"
                 value={captchaInput}
                 onChange={(e) => setCaptchaInput(e.target.value)}
-                placeholder="请输入右侧验证码"
-                className="flex-1 h-12 px-3 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary transition-all"
+                placeholder="请输入验证码"
+                className="flex-1 h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary transition-all"
                 required
               />
-              <div className="flex items-center gap-2">
+              <div className="flex items-center flex-shrink-0">
                 <CaptchaImage key={captchaKey} onIdChange={setCaptchaId} height={48} />
               </div>
             </div>
@@ -287,14 +289,14 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
             <label htmlFor="code" className="block text-sm font-medium text-text-secondary mb-2">
               邮箱验证码
             </label>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-row items-center gap-3">
               <input
                 type="text"
                 id="code"
                 value={verificationCode}
                 onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="flex-1 h-12 px-3 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all text-center text-lg tracking-widest font-mono"
-                placeholder="请输入6位验证码"
+                className="flex-1 h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all text-center tracking-widest font-mono"
+                placeholder="6位验证码"
                 maxLength={6}
                 required
               />
@@ -302,17 +304,21 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
                 type="button"
                 onClick={handleSendCode}
                 disabled={countdown > 0 || isSendingCode}
-                className="px-4 h-12 bg-gradient-to-r from-accent-secondary to-accent-primary text-white rounded-lg hover:shadow-glow-cyan focus:outline-none focus:ring-2 focus:ring-accent-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap text-sm"
+                className="px-4 h-12 bg-gradient-to-r from-accent-secondary to-accent-primary text-white rounded-lg hover:shadow-glow-cyan focus:outline-none focus:ring-2 focus:ring-accent-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap text-sm flex-shrink-0"
               >
                 {isSendingCode ? (
                   <>
                     <i className="fas fa-spinner fa-spin mr-1" />
-                    发送中
+                    <span className="hidden xs:inline">发送中</span>
+                    <span className="xs:hidden">发送中</span>
                   </>
                 ) : countdown > 0 ? (
-                  `${countdown}秒后重试`
+                  <span className="text-xs xs:text-sm">{countdown}秒</span>
                 ) : (
-                  '发送验证码'
+                  <>
+                    <span className="hidden xs:inline">发送验证码</span>
+                    <span className="xs:hidden">发送</span>
+                  </>
                 )}
               </button>
             </div>
@@ -322,16 +328,16 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
             <label className="block text-sm font-medium text-text-secondary mb-2">
               图形验证码
             </label>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-row items-center gap-3">
               <input
                 type="text"
                 value={captchaInput}
                 onChange={(e) => setCaptchaInput(e.target.value)}
-                placeholder="请输入右侧验证码"
-                className="flex-1 h-12 px-3 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary transition-all"
+                placeholder="请输入验证码"
+                className="flex-1 h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
                 required
               />
-              <div className="flex items-center gap-2">
+              <div className="flex items-center flex-shrink-0">
                 <CaptchaImage key={captchaKey} onIdChange={setCaptchaId} height={48} />
               </div>
             </div>
@@ -359,3 +365,5 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
     </>
   );
 }
+
+
