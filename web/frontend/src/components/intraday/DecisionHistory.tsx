@@ -14,14 +14,13 @@ interface DecisionHistoryProps {
 }
 
 export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
-  const [page, setPage] = useState(1);
   const [detailModalId, setDetailModalId] = useState<number | null>(null);
   const [detailSequenceNumber, setDetailSequenceNumber] = useState<number | null>(null);
   const [detailData, setDetailData] = useState<any>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const limit = 20; // Show 20 records per page
 
-  const { data, isLoading, error } = useDecisions(page, limit);
+  // Fetch latest 20 decisions (no pagination)
+  const { data, isLoading, error } = useDecisions(1, 20);
 
   const handleViewDetail = async (id: number, sequenceNumber: number) => {
     setDetailModalId(id);
@@ -79,18 +78,18 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
     );
   }
 
-  const decisions = data?.items || [];
-  const total = data?.total || 0;
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const decisions = (data as any)?.items || [];
+  const total = (data as any)?.total || 0;
 
   const getStatusBadge = (status: string) => {
+    const defaultBadge = { color: 'bg-green-500/20 text-green-400 border border-green-500/50', icon: 'fa-check-circle', label: '已完成' };
     const badges: Record<string, { color: string; icon: string; label: string }> = {
       running: { color: 'bg-blue-500/20 text-blue-400 border border-blue-500/50', icon: 'fa-spinner fa-spin', label: '运行中' },
-      completed: { color: 'bg-green-500/20 text-green-400 border border-green-500/50', icon: 'fa-check-circle', label: '已完成' },
+      completed: defaultBadge,
       failed: { color: 'bg-red-500/20 text-red-400 border border-red-500/50', icon: 'fa-times-circle', label: '失败' },
     };
 
-    const badge = badges[status] || badges.completed;
+    const badge = badges[status] || defaultBadge;
 
     return (
       <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${badge.color}`}>
@@ -119,12 +118,12 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
           </div>
         ) : (
           <div className="space-y-4">
-            {decisions.map((decision, index) => {
+            {decisions.map((decision: any, index: number) => {
               // Calculate user-specific sequence number
               // Since decisions are sorted by time DESC (newest first),
-              // the sequence number should be: total - (page - 1) * limit - index
+              // the sequence number should be: total - index
               // This gives: newest = total, oldest = 1
-              const sequenceNumber = total - ((page - 1) * limit + index);
+              const sequenceNumber = total - index;
               
               // Get market label and color
               const getMarketInfo = (market: string) => {
@@ -193,34 +192,11 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
           </div>
         )}
 
-        {/* Pagination */}
-        {total > limit && (
+        {/* Total count display */}
+        {total > 0 && (
           <div className="mt-6 pt-4 border-t border-dark-border">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-text-secondary">
-                显示第 {(page - 1) * limit + 1} - {Math.min(page * limit, total)} 条，共 {total} 条记录
-              </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-3 py-2 text-sm font-medium text-text-primary bg-dark-tertiary border border-dark-border rounded-md hover:bg-dark-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <i className="fas fa-chevron-left mr-1" />
-                  上一页
-                </button>
-                <span className="text-sm text-text-secondary">
-                  第 {page} / {totalPages} 页
-                </span>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="px-3 py-2 text-sm font-medium text-text-primary bg-dark-tertiary border border-dark-border rounded-md hover:bg-dark-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  下一页
-                  <i className="fas fa-chevron-right ml-1" />
-                </button>
-              </div>
+            <div className="text-sm text-text-secondary text-center">
+              共 {total} 条决策记录，只显示最新的20条
             </div>
           </div>
         )}

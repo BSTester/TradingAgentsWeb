@@ -387,3 +387,161 @@ class IntradayDecisionRecord(Base):
     
     def __repr__(self):
         return f"<IntradayDecisionRecord(id={self.id}, session_id='{self.session_id}', status='{self.status}')>"
+
+
+class AgentTool(Base):
+    """
+    Agent tool definition model (system-maintained)
+    Stores metadata about available tools that agents can use
+    """
+    __tablename__ = "agent_tools"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    tool_name = Column(String(100), unique=True, nullable=False, index=True)
+    tool_description = Column(Text, nullable=False)
+    tool_parameters = Column(JSON, nullable=False)  # JSON schema of parameters
+    category = Column(String(50), nullable=True, index=True)  # account, market_data, trading, news
+    is_available = Column(Boolean, default=True, nullable=False)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "tool_name": self.tool_name,
+            "tool_description": self.tool_description,
+            "tool_parameters": self.tool_parameters,
+            "category": self.category,
+            "is_available": self.is_available,
+        }
+    
+    def __repr__(self):
+        return f"<AgentTool(id={self.id}, name='{self.tool_name}', category='{self.category}')>"
+
+
+class AgentPromptTemplate(Base):
+    """
+    Agent prompt template model (user-editable)
+    Stores user-customized system prompts for different agent types
+    """
+    __tablename__ = "agent_prompt_templates"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    agent_type = Column(String(50), nullable=False, index=True)  # intraday_trader, analyst, etc.
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    
+    # User-editable prompt
+    system_prompt = Column(Text, nullable=False)
+    
+    # Metadata
+    template_name = Column(String(100), nullable=True)
+    description = Column(Text, nullable=True)
+    version = Column(String(20), default="1.0", nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationships
+    user = relationship("User")
+    template_tools = relationship("TemplateTools", back_populates="template", cascade="all, delete-orphan")
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "agent_type": self.agent_type,
+            "user_id": self.user_id,
+            "system_prompt": self.system_prompt,
+            "template_name": self.template_name,
+            "description": self.description,
+            "version": self.version,
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+    
+    def __repr__(self):
+        return f"<AgentPromptTemplate(id={self.id}, agent_type='{self.agent_type}', user_id={self.user_id})>"
+
+
+class TemplateTools(Base):
+    """
+    Template-tool association model
+    Tracks which tools are enabled for each prompt template
+    """
+    __tablename__ = "template_tools"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(Integer, ForeignKey("agent_prompt_templates.id"), nullable=False, index=True)
+    tool_name = Column(String(100), ForeignKey("agent_tools.tool_name"), nullable=False, index=True)
+    is_enabled = Column(Boolean, default=True, nullable=False)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    
+    # Relationships
+    template = relationship("AgentPromptTemplate", back_populates="template_tools")
+    
+    def __repr__(self):
+        return f"<TemplateTools(id={self.id}, template_id={self.template_id}, tool='{self.tool_name}', enabled={self.is_enabled})>"
+
+
+class AccountSnapshot(Base):
+    """
+    Account snapshot model to track daily account balance and positions
+    Captures end-of-day account state for historical tracking and trend analysis
+    
+    Unique Constraint: Each user can only have ONE snapshot per market per day
+    - Enforced by database index: uq_user_market_date (user_id, market_type, DATE(snapshot_date))
+    - Prevents duplicate snapshots for the same trading day
+    """
+    __tablename__ = "account_snapshots"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    market_type = Column(String(10), nullable=False, index=True)  # US, HK, CN
+    snapshot_date = Column(DateTime(timezone=True), nullable=False, index=True)  # Date of snapshot (end of trading day)
+    
+    # Note: Unique constraint on (user_id, market_type, DATE(snapshot_date)) is created via migration
+    # This ensures only one snapshot per user per market per day
+    
+    # Account balance information
+    total_assets = Column(Float, nullable=False)  # Total account value
+    cash = Column(Float, nullable=False)  # Available cash
+    market_value = Column(Float, nullable=False)  # Total market value of positions
+    
+    # Additional metrics
+    unrealized_pnl = Column(Float, default=0.0)  # Unrealized profit/loss
+    realized_pnl = Column(Float, default=0.0)  # Realized profit/loss for the day
+    
+    # Raw account data (JSON)
+    account_data = Column(JSON, nullable=True)  # Full account snapshot data
+    positions_data = Column(JSON, nullable=True)  # Positions snapshot data
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    
+    # Relationships
+    user = relationship("User", backref="account_snapshots")
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "market_type": self.market_type,
+            "snapshot_date": self.snapshot_date.isoformat() if self.snapshot_date else None,
+            "total_assets": self.total_assets,
+            "cash": self.cash,
+            "market_value": self.market_value,
+            "unrealized_pnl": self.unrealized_pnl,
+            "realized_pnl": self.realized_pnl,
+            "account_data": self.account_data,
+            "positions_data": self.positions_data,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+    
+    def __repr__(self):
+        return f"<AccountSnapshot(id={self.id}, user_id={self.user_id}, market='{self.market_type}', date='{self.snapshot_date}', total={self.total_assets})>"

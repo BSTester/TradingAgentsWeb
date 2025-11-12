@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAccountInfo, intradayTradingKeys } from '@/hooks/useIntradayTrading';
 import { useQueryClient } from '@tanstack/react-query';
+import { AccountTrendModal } from './AccountTrendModal';
 
 interface AccountInfoProps {
   selectedMarket: string;
@@ -13,6 +14,8 @@ interface AccountInfoProps {
 export function AccountInfo({ selectedMarket, onMarketChange, onShowToast }: AccountInfoProps) {
   const { data: account, isLoading, error, refetch, isFetching } = useAccountInfo(selectedMarket);
   const queryClient = useQueryClient();
+  const [showTrendModal, setShowTrendModal] = useState(false);
+  const [selectedMetric, setSelectedMetric] = useState<'total_assets' | 'cash' | 'market_value'>('total_assets');
 
   // Handle refresh - refresh both account and positions
   const handleRefresh = () => {
@@ -24,6 +27,11 @@ export function AccountInfo({ selectedMarket, onMarketChange, onShowToast }: Acc
   };
 
   // Removed auto-refresh - now using WebSocket for real-time updates
+
+  const handleOpenTrendModal = (metric: 'total_assets' | 'cash' | 'market_value') => {
+    setSelectedMetric(metric);
+    setShowTrendModal(true);
+  };
 
   if (isLoading) {
     return (
@@ -86,42 +94,69 @@ export function AccountInfo({ selectedMarket, onMarketChange, onShowToast }: Acc
       <div className="p-4 md:p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           {/* Total Assets */}
-          <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 rounded-lg p-4 md:p-6 border border-blue-500/30">
+          <div className="bg-gradient-to-br from-blue-900/30 to-blue-800/20 rounded-lg p-4 md:p-6 border border-blue-500/30 flex flex-col">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-blue-400">总资产</span>
               <i className="fas fa-chart-pie text-2xl text-blue-500" />
             </div>
-            <p className="text-3xl font-bold text-text-primary">
+            <p className="text-2xl md:text-3xl font-bold text-text-primary flex-1">
               {currency}{totalAssets.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
+            <div className="flex items-center justify-end mt-1">
+              <button
+                onClick={() => handleOpenTrendModal('total_assets')}
+                className="text-blue-400 hover:text-blue-300 transition-colors p-2 hover:bg-blue-900/30 rounded-md"
+                title="查看趋势图"
+              >
+                <i className="fas fa-chart-line text-sm md:text-base" />
+              </button>
+            </div>
           </div>
 
           {/* Available Cash */}
-          <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 rounded-lg p-6 border border-green-500/30">
+          <div className="bg-gradient-to-br from-green-900/30 to-green-800/20 rounded-lg p-4 md:p-6 border border-green-500/30 flex flex-col">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-green-400">可用资金</span>
               <i className="fas fa-money-bill-wave text-2xl text-green-500" />
             </div>
-            <p className="text-3xl font-bold text-text-primary">
+            <p className="text-2xl md:text-3xl font-bold text-text-primary flex-1">
               {currency}{cash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
-            <p className="text-sm text-green-400 mt-1">
-              {totalAssets > 0 ? ((cash / totalAssets) * 100).toFixed(1) : 0}% 现金比例
-            </p>
+            <div className="flex items-center justify-between mt-1">
+              <p className="text-xs md:text-sm text-green-400">
+                {totalAssets > 0 ? ((cash / totalAssets) * 100).toFixed(1) : 0}% 现金比例
+              </p>
+              <button
+                onClick={() => handleOpenTrendModal('cash')}
+                className="text-green-400 hover:text-green-300 transition-colors p-2 hover:bg-green-900/30 rounded-md"
+                title="查看趋势图"
+              >
+                <i className="fas fa-chart-line text-sm md:text-base" />
+              </button>
+            </div>
           </div>
 
           {/* Position Value */}
-          <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/20 rounded-lg p-6 border border-purple-500/30">
+          <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/20 rounded-lg p-4 md:p-6 border border-purple-500/30 flex flex-col">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-purple-400">持仓市值</span>
               <i className="fas fa-briefcase text-2xl text-purple-500" />
             </div>
-            <p className="text-3xl font-bold text-text-primary">
+            <p className="text-2xl md:text-3xl font-bold text-text-primary flex-1">
               {currency}{positionValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
-            <p className="text-sm text-purple-400 mt-1">
-              {positionRatio.toFixed(1)}% 仓位占比
-            </p>
+            <div className="flex items-center justify-between mt-1">
+              <p className="text-xs md:text-sm text-purple-400">
+                {positionRatio.toFixed(1)}% 仓位占比
+              </p>
+              <button
+                onClick={() => handleOpenTrendModal('market_value')}
+                className="text-purple-400 hover:text-purple-300 transition-colors p-2 hover:bg-purple-900/30 rounded-md"
+                title="查看趋势图"
+              >
+                <i className="fas fa-chart-line text-sm md:text-base" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -140,6 +175,16 @@ export function AccountInfo({ selectedMarket, onMarketChange, onShowToast }: Acc
           </div>
         )}
       </div>
+
+      {/* Trend Modal */}
+      {showTrendModal && (
+        <AccountTrendModal
+          marketType={selectedMarket}
+          metric={selectedMetric}
+          onClose={() => setShowTrendModal(false)}
+          onShowToast={onShowToast}
+        />
+      )}
     </div>
   );
 }

@@ -173,7 +173,7 @@ def _extract_trades_simple(report: str) -> List[Dict[str, Any]]:
     return unique_trades
 
 
-def create_intraday_trader(llm, memory):
+def create_intraday_trader(llm, memory, user_id: int = None):
     """
     Create an intraday trading agent that automatically analyzes positions
     and executes short-term trading strategies using LangGraph.
@@ -185,9 +185,12 @@ def create_intraday_trader(llm, memory):
     4. Execute trades
     5. Generate comprehensive reports
     
+    The agent will load user's core prompt and inject system documentation at runtime.
+    
     Args:
         llm: Language model instance
         memory: Memory instance for storing trading history
+        user_id: User ID for loading custom prompt (optional)
         
     Returns:
         Compiled LangGraph agent that can be invoked with initial state
@@ -224,14 +227,36 @@ def create_intraday_trader(llm, memory):
         """
         
         # Extract state information
-        user_id = state.get("user_id")
+        state_user_id = state.get("user_id")
         market_type = state.get("market_type", "US")
         session_id = state.get("session_id", f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         # Get existing accumulated report
         existing_report = state.get("decision_report", "")
-        # System prompt with comprehensive trading logic
-        system_message = """You are an aggressive intraday trading agent operating like a professional day trader with full autonomy to analyze positions and execute trades.
+        
+        # Load user's core prompt
+        effective_user_id = state_user_id or user_id or 1
+        try:
+            from web.backend.services.prompt_loader import load_user_prompt_template
+            core_prompt = load_user_prompt_template(
+                user_id=effective_user_id,
+                agent_type="intraday_trader"
+            )
+            logging.info(f"Loaded core prompt for user {effective_user_id}")
+        except Exception as e:
+            logging.warning(f"Failed to load user prompt: {e}, using default")
+            # Fallback to default
+            import os
+            default_prompt_file = os.path.join(
+                os.path.dirname(__file__),
+                'intraday_trader_default_prompt.txt'
+            )
+            try:
+                with open(default_prompt_file, 'r', encoding='utf-8') as f:
+                    core_prompt = f.read()
+            except:
+                core_prompt = """You are an aggressive intraday trading agent operating like a professional day trader with full autonomy to analyze positions and execute trades.
 
 ## Role Definition
 **Aggressive Intraday Trader** - High Risk Tolerance with Strategic Discipline
@@ -702,27 +727,9 @@ You have full discretion to:
 - **Follow market rules**: No short selling in HK/CN, can short in US but be cautious
 - **Respect the long-term trend**: Fight the short-term noise, not the long-term trend
 - **Quality over frequency**: Fewer high-conviction trades beat many mediocre ones
-- **Cost consciousness**: Every trade has a price - make sure the potential gain justifies it
-- **Strategic patience**: For quality stocks in uptrends, holding through volatility often beats churning
-
-Now execute your trading strategy. Strictly follow the 5-phase workflow, starting with information collection.
-Current market: {market_type} - Please formulate trading strategy according to market rules.
 """
         
-        # Format system message with all required variables
-        system_message = system_message.format(
-            session_id=session_id,
-            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            market_type=market_type
-        )
-        
-        # Create prompt template
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_message),
-            MessagesPlaceholder(variable_name="messages"),
-        ])
-        
-        # Import all required tools
+        # Now assemble complete prompt with system injections
         from tradingagents.agents.utils.futu_trading_tools import (
             get_futu_account_info,
             get_futu_positions,
@@ -754,7 +761,55 @@ Current market: {market_type} - Please formulate trading strategy according to m
             place_futu_order,
         ]
         
-        # Bind tools to LLM
+        # Load workflow documentation (fixed, not customizable)
+        # Note: Tool usage is documented within the workflow, no need for separate tool list
+        import os
+        workflow_file = os.path.join(
+            os.path.dirname(__file__),
+            'intraday_trader_workflow.txt'
+        )
+        try:
+            with open(workflow_file, 'r', encoding='utf-8') as f:
+                workflow_documentation = f.read()
+        except Exception as e:
+            logging.warning(f"Failed to load workflow documentation: {e}")
+            workflow_documentation = "## Standard Execution Workflow\n\nFollow the 5-phase workflow: Information Collection → Analysis & Decision → Execute Trades → Result Verification → Generate Report"
+        
+        # Generate context information
+        context_info = f"""## Current Context
+
+- Market: {market_type}
+- Session ID: {session_id}
+- Timestamp: {timestamp}
+- User ID: {effective_user_id}
+
+## Market Rules
+- **US Market**: Supports both long and short positions, T+0 trading (can buy and sell same day)
+- **HK Market**: Only supports long positions, short selling NOT supported, T+0 trading allowed
+- **CN Market (A-shares)**: Only supports long positions, short selling NOT supported, T+1 trading (stocks bought today cannot be sold same day)
+
+Current market is {market_type}. Please formulate trading strategy according to market rules.
+"""
+        
+        # Assemble complete system message
+        # Order: User Strategy (customizable) → Workflow (fixed) → Context (dynamic)
+        # This order ensures LLM first understands the trading philosophy, then the execution process, then current state
+        system_message_parts = [
+            core_prompt,
+            workflow_documentation,
+            context_info,
+            "\nNow execute your trading strategy following the workflow above based on current context."
+        ]
+        
+        system_message = "\n\n".join(system_message_parts)
+        
+        # Create prompt template
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_message),
+            MessagesPlaceholder(variable_name="messages"),
+        ])
+        
+        # Bind tools to LLM (tools already defined above)
         llm_with_tools = llm.bind_tools(tools)
         
         # Create chain

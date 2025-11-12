@@ -478,3 +478,64 @@ class UserConfigResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# ============================================================================
+# Prompt Template Management Schemas
+# ============================================================================
+
+class PromptTemplateBase(BaseModel):
+    template_name: Optional[str] = None
+    description: Optional[str] = None
+    system_prompt: str
+    version: Optional[str] = "1.0"
+
+
+class PromptTemplateCreate(PromptTemplateBase):
+    agent_type: str = "intraday_trader"
+
+
+class PromptTemplateUpdate(BaseModel):
+    template_name: Optional[str] = None
+    description: Optional[str] = None
+    system_prompt: Optional[str] = None
+    version: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class PromptTemplateResponse(BaseModel):
+    id: int
+    agent_type: str
+    user_id: int
+    system_prompt: str
+    template_name: Optional[str]
+    description: Optional[str]
+    version: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    enabled_tools: List[str] = []
+    
+    class Config:
+        from_attributes = True
+
+
+class ToolResponse(BaseModel):
+    id: int
+    tool_name: str
+    tool_description: str
+    tool_parameters: Dict[str, Any]
+    category: Optional[str]
+    is_available: bool
+    
+    class Config:
+        from_attributes = True
+
+
+class ToolSelectionUpdate(BaseModel):
+    tool_name: str
+    is_enabled: bool
+
+
+class BulkToolSelectionUpdate(BaseModel):
+    tools: List[ToolSelectionUpdate]
