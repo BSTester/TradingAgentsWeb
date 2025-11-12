@@ -128,37 +128,37 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
                 <tr>
                   <th
                     onClick={() => handleSort('stock_code')}
-                    className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer hover:bg-dark-primary"
+                    className="px-2 md:px-4 py-2 md:py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-tight cursor-pointer hover:bg-dark-primary whitespace-nowrap"
                   >
                     <div className="flex items-center">
                       股票代码
                       {getSortIcon('stock_code')}
                     </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                  <th className="px-2 md:px-4 py-2 md:py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-tight whitespace-nowrap">
                     市场
                   </th>
                   <th
                     onClick={() => handleSort('holding_days')}
-                    className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer hover:bg-dark-primary"
+                    className="px-2 md:px-4 py-2 md:py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-tight cursor-pointer hover:bg-dark-primary whitespace-nowrap"
                   >
                     <div className="flex items-center">
                       持仓天数
                       {getSortIcon('holding_days')}
                     </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                  <th className="px-2 md:px-4 py-2 md:py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-tight whitespace-nowrap">
                     数量
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
+                  <th className="px-2 md:px-4 py-2 md:py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-tight whitespace-nowrap">
                     成本价
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-w">
+                  <th className="px-2 md:px-4 py-2 md:py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-tight whitespace-nowrap">
                     当前价
                   </th>
                   <th
                     onClick={() => handleSort('pnl_percent')}
-                    className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer hover:bg-darry"
+                    className="px-2 md:px-4 py-2 md:py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-tight cursor-pointer hover:bg-dark-primary whitespace-nowrap"
                   >
                     <div className="flex items-center">
                       盈亏
@@ -167,7 +167,7 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
                   </th>
                   <th
                     onClick={() => handleSort('position_ratio')}
-                    className="px-6 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider cursor-pointer hover:bg-darry"
+                    className="px-2 md:px-4 py-2 md:py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-tight cursor-pointer hover:bg-dark-primary whitespace-nowrap"
                   >
                     <div className="flex items-center">
                       仓位占比
@@ -179,35 +179,35 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
               <tbody className="bg-dark-secondary divide-y divide-dark-border">
                 {filteredPositions.map((position, index) => (
                       <tr key={`${position.stock_code}-${index}`} className="hover:bg-dark-tertiary transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-text-primary">
+                        <td className="px-2 md:px-4 py-2 md:py-4 whitespace-nowrap">
+                          <div className="text-xs md:text-sm font-medium text-text-primary">
                             {position.stock_code}
                           </div>
                           {position.stock_name && (
-                            <div className="text-xs text-text-tertiary">
+                            <div className="text-xs text-text-tertiary hidden md:block">
                               {position.stock_name}
                             </div>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getMarketBadgeColor(position.market_type)}`}>
-                            {marketLabels[position.market_type] || position.market_type}
+                        <td className="px-2 md:px-4 py-2 md:py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-1 md:px-2 py-0.5 md:py-1 rounded text-xs font-medium ${getMarketBadgeColor(position.market_type)}`}>
+                            {position.market_type}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
+                        <td className="px-2 md:px-4 py-2 md:py-4 whitespace-nowrap text-xs md:text-sm text-text-primary">
                           {position.holding_days || 0} 天
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
+                        <td className="px-2 md:px-4 py-2 md:py-4 whitespace-nowrap text-xs md:text-sm text-text-primary">
                           {position.quantity?.toLocaleString() || 0}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
+                        <td className="px-2 md:px-4 py-2 md:py-4 whitespace-nowrap text-xs md:text-sm text-text-primary">
                           {position.currency || '$'}{position.cost_price?.toFixed(2) || '0.00'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-primary">
+                        <td className="px-2 md:px-4 py-2 md:py-4 whitespace-nowrap text-xs md:text-sm text-text-primary">
                           {position.currency || '$'}{position.current_price?.toFixed(2) || '0.00'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm">
+                        <td className="px-2 md:px-4 py-2 md:py-4 whitespace-nowrap">
+                          <div className="text-xs md:text-sm">
                             <div className={`font-medium ${(position.pnl || 0) >= 0 ? 'text-[#f03a55]' : 'text-[#00a870]'}`}>
                               {(position.pnl || 0) >= 0 ? '+' : ''}{position.currency || '$'}{(position.pnl || 0).toFixed(2)}
                             </div>
@@ -216,15 +216,15 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-2 md:px-4 py-2 md:py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="flex-1">
-                              <div className="text-sm font-medium text-text-primary">
-                                {(position.position_ratio || 0).toFixed(2)}%
+                              <div className="text-xs md:text-sm font-medium text-text-primary">
+                                {(position.position_ratio || 0).toFixed(1)}%
                               </div>
-                              <div className="w-full bg-dark-tertiary rounded-full h-2 mt-1">
+                              <div className="w-full bg-dark-tertiary rounded-full h-1.5 md:h-2 mt-1 hidden md:block">
                                 <div
-                                  className={`h-2 rounded-full ${
+                                  className={`h-1.5 md:h-2 rounded-full ${
                                     (position.pnl || 0) >= 0
                                       ? 'bg-[#f03a55]'
                                       : 'bg-[#00a870]'

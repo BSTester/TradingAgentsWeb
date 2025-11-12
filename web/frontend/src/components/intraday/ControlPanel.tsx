@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSchedulerStatus, useSchedulerControl, useSchedulerConfig } from '@/hooks/useIntradayTrading';
 import { configAPI } from '@/lib/apiClient';
+import { PromptConfigTab } from './PromptConfigTab';
 
 interface ControlPanelProps {
   onShowToast: (message: string, type: 'success' | 'error' | 'info') => void;
@@ -30,6 +31,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
   const [selectedMarkets, setSelectedMarkets] = useState<string[]>(['US', 'HK', 'CN']); // 默认全选
   const [isUpdating, setIsUpdating] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [activeConfigTab, setActiveConfigTab] = useState<'basic' | 'prompt'>('basic');
   const [showApiKey, setShowApiKey] = useState(false);
   const [configValidated, setConfigValidated] = useState(false);
   const [validatingConfig, setValidatingConfig] = useState(false);
@@ -554,7 +556,37 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
               </button>
             </div>
 
+            {/* Tabs */}
+            <div className="border-b border-dark-border">
+              <nav className="flex -mb-px px-6" aria-label="Tabs">
+                <button
+                  onClick={() => setActiveConfigTab('basic')}
+                  className={`py-4 px-6 text-sm font-medium border-b-2 ${
+                    activeConfigTab === 'basic'
+                      ? 'border-accent-primary text-accent-primary'
+                      : 'border-transparent text-text-secondary hover:text-text-primary hover:border-dark-border'
+                  }`}
+                >
+                  <i className="fas fa-sliders-h mr-2" />
+                  基础配置
+                </button>
+                <button
+                  onClick={() => setActiveConfigTab('prompt')}
+                  className={`py-4 px-6 text-sm font-medium border-b-2 ${
+                    activeConfigTab === 'prompt'
+                      ? 'border-accent-primary text-accent-primary'
+                      : 'border-transparent text-text-secondary hover:text-text-primary hover:border-dark-border'
+                  }`}
+                >
+                  <i className="fas fa-robot mr-2" />
+                  提示词配置
+                </button>
+              </nav>
+            </div>
+
             <div className="p-4 md:p-6 space-y-4">
+              {activeConfigTab === 'basic' ? (
+                <>
               {/* Info banner if using analysis config */}
               {config?.is_using_analysis_config && futuApiUrl && (
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
@@ -824,23 +856,27 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                   </div>
                 )}
               </div>
-            </div>
 
-            <div className="px-6 py-4 border-t border-dark-border flex justify-end space-x-2">
-              <button
-                onClick={() => setShowConfigModal(false)}
-                className="px-4 py-2 text-text-primary bg-dark-tertiary rounded-md hover:bg-dark-primary border border-dark-border"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSaveConfig}
-                disabled={isUpdating || !futuApiUrl}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <i className="fas fa-save mr-2" />
-                保存配置
-              </button>
+                <div className="px-6 py-4 border-t border-dark-border flex justify-end space-x-2">
+                  <button
+                    onClick={() => setShowConfigModal(false)}
+                    className="px-4 py-2 text-text-primary bg-dark-tertiary rounded-md hover:bg-dark-primary border border-dark-border"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleSaveConfig}
+                    disabled={isUpdating || !futuApiUrl}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <i className="fas fa-save mr-2" />
+                    保存配置
+                  </button>
+                </div>
+                </>
+              ) : (
+                <PromptConfigTab onShowToast={onShowToast} />
+              )}
             </div>
           </div>
         </div>

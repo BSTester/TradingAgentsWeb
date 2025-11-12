@@ -151,6 +151,12 @@ async def lifespan(app: FastAPI):
             await intraday_manager.restore_schedulers_from_db()
             print("✅ Intraday trading schedulers restored from database")
             
+            # Initialize and start snapshot scheduler for daily account snapshots
+            from web.backend.services.snapshot_scheduler import init_snapshot_scheduler
+            snapshot_scheduler = init_snapshot_scheduler()
+            app.state.snapshot_scheduler = snapshot_scheduler
+            print("✅ Snapshot scheduler started (daily account snapshots)")
+            
             app.state.monitor_task = asyncio.create_task(task_monitor())
             print("✅ Task monitor started (leader)")
         except OSError:
@@ -178,6 +184,12 @@ async def lifespan(app: FastAPI):
             print("✅ All intraday trading schedulers stopped")
         except Exception as e:
             print(f"⚠️  Error stopping intraday schedulers: {e}")
+        
+        # Stop snapshot scheduler
+        snapshot_scheduler = getattr(app.state, "snapshot_scheduler", None)
+        if snapshot_scheduler:
+            snapshot_scheduler.shutdown(wait=True)
+            print("✅ Snapshot scheduler stopped")
         
         # Stop scheduler
         scheduler = getattr(app.state, "scheduler", None)
@@ -716,6 +728,14 @@ app.include_router(intraday_trading_routes.router)
 # Include user config routes
 from web.backend.routes import user_config_routes
 app.include_router(user_config_routes.router)
+
+# Include prompt management routes
+from web.backend.routes import prompt_routes
+app.include_router(prompt_routes.router)
+
+# Include account snapshot routes
+from web.backend.routes import account_snapshot_routes
+app.include_router(account_snapshot_routes.router)
 
 # Include page and WebSocket routes
 app.include_router(page_routes.router)
