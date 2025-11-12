@@ -120,7 +120,10 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
         ) : (
           <div className="space-y-4">
             {decisions.map((decision, index) => {
-              // Calculate user-specific sequence number (reverse order, newest first)
+              // Calculate user-specific sequence number
+              // Since decisions are sorted by time DESC (newest first),
+              // the sequence number should be: total - (page - 1) * limit - index
+              // This gives: newest = total, oldest = 1
               const sequenceNumber = total - ((page - 1) * limit + index);
               
               // Get market label and color

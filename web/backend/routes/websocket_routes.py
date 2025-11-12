@@ -153,6 +153,14 @@ async def intraday_websocket_endpoint(websocket: WebSocket, user_id: int):
             
             db = SessionLocal()
             try:
+                # Get total count of user's decisions
+                from sqlalchemy import func
+                total_count_result = db.execute(
+                    select(func.count(IntradayDecisionRecord.id))
+                    .where(IntradayDecisionRecord.user_id == user_id)
+                )
+                total_count = total_count_result.scalar() or 0
+                
                 # Get recent 20 decisions
                 result = db.execute(
                     select(IntradayDecisionRecord)
@@ -193,18 +201,18 @@ async def intraday_websocket_endpoint(websocket: WebSocket, user_id: int):
                         'created_at': decision.created_at.isoformat(),
                     })
                 
-                # Send decisions list
+                # Send decisions list with correct total count
                 await websocket.send_text(json.dumps({
                     'type': 'decisions_initial',
                     'timestamp': datetime.now().isoformat(),
                     'decisions': {
                         'items': decisions_data,
-                        'total': len(decisions_data),
+                        'total': total_count,  # Total count of all user's decisions
                         'page': 1,
                         'limit': 20,
                     },
                 }))
-                print(f"📤 Sent initial decisions to user {user_id}: {len(decisions_data)} records")
+                print(f"📤 Sent initial decisions to user {user_id}: {len(decisions_data)} records (total: {total_count})")
                 
             finally:
                 db.close()
