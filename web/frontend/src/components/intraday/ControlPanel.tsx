@@ -470,63 +470,65 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
   return (
     <>
       {/* Compact Control Bar */}
-      <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border px-6 py-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border px-3 md:px-6 py-3 md:py-4">
+        <div className="flex items-center justify-between gap-2">
           {/* Left: Status */}
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center">
-              <span className={`w-3 h-3 rounded-full mr-2 ${
+          <div className="flex items-center space-x-2 md:space-x-4 min-w-0 flex-1">
+            <div className="flex items-center flex-shrink-0">
+              <span className={`w-2 h-2 md:w-3 md:h-3 rounded-full mr-1 md:mr-2 ${
                 isRunning ? 'bg-green-600 animate-pulse' : 'bg-text-muted'
               }`} />
-              <span className="text-sm font-medium text-text-primary">
+              <span className="text-xs md:text-sm font-medium text-text-primary whitespace-nowrap">
                 {isRunning ? '运行中' : '已停止'}
               </span>
             </div>
             {isRunning && nextRunTime && (
-              <div className="text-sm font-medium text-text-primary">
+              <div className="text-xs md:text-sm font-medium text-text-primary truncate">
                 <i className="fas fa-clock mr-1" />
-                下次分析时间: {new Date(nextRunTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                <span className="hidden sm:inline">下次分析时间: </span>
+                <span className="sm:hidden">下次: </span>
+                {new Date(nextRunTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </div>
             )}
           </div>
 
           {/* Right: Control Buttons */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 md:space-x-2 flex-shrink-0">
             {/* Start/Stop Button */}
             {isRunning ? (
               <button
                 onClick={handleStop}
                 disabled={isUpdating}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+                className="w-8 h-8 md:w-auto md:h-auto md:px-4 md:py-2 text-xs md:text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
                 title="停止系统"
               >
                 {isUpdating && pendingAction === 'stop' ? (
-                  <i className="fas fa-spinner fa-spin mr-2" />
+                  <i className="fas fa-spinner fa-spin md:mr-2" />
                 ) : (
-                  <i className="fas fa-stop mr-2" />
+                  <i className="fas fa-stop md:mr-2" />
                 )}
-                停止
+                <span className="hidden md:inline">停止</span>
               </button>
             ) : (
               <button
                 onClick={handleStart}
                 disabled={isUpdating}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+                className="w-8 h-8 md:w-auto md:h-auto md:px-4 md:py-2 text-xs md:text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
                 title="启动系统"
               >
                 {isUpdating && pendingAction === 'start' ? (
-                  <i className="fas fa-spinner fa-spin mr-2" />
+                  <i className="fas fa-spinner fa-spin md:mr-2" />
                 ) : (
-                  <i className="fas fa-play mr-2" />
+                  <i className="fas fa-play md:mr-2" />
                 )}
-                启动
+                <span className="hidden md:inline">启动</span>
               </button>
             )}
 
             {/* Config Button */}
             <button
               onClick={() => setShowConfigModal(true)}
-              className="px-4 py-2 bg-dark-tertiary text-text-primary rounded-md hover:bg-dark-primary border border-dark-border transition-colors"
+              className="w-8 h-8 md:w-auto md:h-auto md:px-4 md:py-2 text-xs md:text-sm bg-dark-tertiary text-text-primary rounded-md hover:bg-dark-primary border border-dark-border transition-colors flex items-center justify-center"
               title="系统配置"
             >
               <i className="fas fa-cog" />
