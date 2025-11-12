@@ -3,8 +3,7 @@
  */
 
 import axios from 'axios';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+import { buildApiUrl } from '@/utils/api';
 
 /**
  * Get auth token from localStorage
@@ -49,7 +48,7 @@ export async function getAvailableTools(category?: string): Promise<Tool[]> {
   const token = getAuthToken();
   const params = category ? { category } : {};
   
-  const response = await axios.get(`${API_BASE_URL}/api/prompts/tools`, {
+  const response = await axios.get(buildApiUrl('/api/prompts/tools'), {
     headers: { Authorization: `Bearer ${token}` },
     params,
   });
@@ -63,7 +62,7 @@ export async function getAvailableTools(category?: string): Promise<Tool[]> {
 export async function getPromptTemplate(agentType: string = 'intraday_trader'): Promise<PromptTemplate> {
   const token = getAuthToken();
   
-  const response = await axios.get(`${API_BASE_URL}/api/prompts/templates/${agentType}`, {
+  const response = await axios.get(buildApiUrl(`/api/prompts/templates/${agentType}`), {
     headers: { Authorization: `Bearer ${token}` },
   });
   
@@ -85,7 +84,7 @@ export async function updatePromptTemplate(
   const token = getAuthToken();
   
   const response = await axios.put(
-    `${API_BASE_URL}/api/prompts/templates/${agentType}`,
+    buildApiUrl(`/api/prompts/templates/${agentType}`),
     data,
     {
       headers: { Authorization: `Bearer ${token}` },
@@ -102,7 +101,7 @@ export async function resetToDefault(agentType: string = 'intraday_trader'): Pro
   const token = getAuthToken();
   
   const response = await axios.post(
-    `${API_BASE_URL}/api/prompts/templates/${agentType}/reset`,
+    buildApiUrl(`/api/prompts/templates/${agentType}/reset`),
     {},
     {
       headers: { Authorization: `Bearer ${token}` },
@@ -119,7 +118,7 @@ export async function getEnabledTools(agentType: string = 'intraday_trader'): Pr
   const token = getAuthToken();
   
   const response = await axios.get(
-    `${API_BASE_URL}/api/prompts/templates/${agentType}/tools`,
+    buildApiUrl(`/api/prompts/templates/${agentType}/tools`),
     {
       headers: { Authorization: `Bearer ${token}` },
     }
@@ -138,7 +137,7 @@ export async function updateToolSelection(
   const token = getAuthToken();
   
   const response = await axios.put(
-    `${API_BASE_URL}/api/prompts/templates/${agentType}/tools`,
+    buildApiUrl(`/api/prompts/templates/${agentType}/tools`),
     { tools },
     {
       headers: { Authorization: `Bearer ${token}` },
@@ -171,7 +170,7 @@ export async function validatePromptTemplate(
   const token = getAuthToken();
   
   const response = await axios.post(
-    `${API_BASE_URL}/api/prompts/templates/${agentType}/validate`,
+    buildApiUrl(`/api/prompts/templates/${agentType}/validate`),
     data,
     {
       headers: { Authorization: `Bearer ${token}` },
