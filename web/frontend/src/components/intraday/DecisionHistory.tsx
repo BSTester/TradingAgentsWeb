@@ -16,14 +16,16 @@ interface DecisionHistoryProps {
 export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
   const [page, setPage] = useState(1);
   const [detailModalId, setDetailModalId] = useState<number | null>(null);
+  const [detailSequenceNumber, setDetailSequenceNumber] = useState<number | null>(null);
   const [detailData, setDetailData] = useState<any>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const limit = 20; // Show 20 records per page
 
   const { data, isLoading, error } = useDecisions(page, limit);
 
-  const handleViewDetail = async (id: number) => {
+  const handleViewDetail = async (id: number, sequenceNumber: number) => {
     setDetailModalId(id);
+    setDetailSequenceNumber(sequenceNumber);
     setLoadingDetail(true);
     
     try {
@@ -43,6 +45,7 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
     } catch (error: any) {
       onShowToast(error.message || '获取决策详情失败', 'error');
       setDetailModalId(null);
+      setDetailSequenceNumber(null);
     } finally {
       setLoadingDetail(false);
     }
@@ -50,6 +53,7 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
 
   const handleCloseDetail = () => {
     setDetailModalId(null);
+    setDetailSequenceNumber(null);
     setDetailData(null);
   };
 
@@ -115,50 +119,74 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
           </div>
         ) : (
           <div className="space-y-4">
-            {decisions.map((decision, index) => (
-              <div
-                key={`${decision.id}-${index}`}
-                className="border border-dark-border rounded-lg overflow-hidden hover:shadow-md transition-shadow bg-dark-tertiary"
-              >
-                {/* Decision Card - Click to open detail modal */}
+            {decisions.map((decision, index) => {
+              // Calculate user-specific sequence number (reverse order, newest first)
+              const sequenceNumber = total - ((page - 1) * limit + index);
+              
+              // Get market label and color
+              const getMarketInfo = (market: string) => {
+                switch (market?.toUpperCase()) {
+                  case 'US':
+                    return { label: '美股', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' };
+                  case 'HK':
+                    return { label: '港股', color: 'bg-purple-500/20 text-purple-400 border-purple-500/50' };
+                  case 'CN':
+                    return { label: 'A股', color: 'bg-red-500/20 text-red-400 border-red-500/50' };
+                  default:
+                    return { label: market || '未知', color: 'bg-gray-500/20 text-gray-400 border-gray-500/50' };
+                }
+              };
+              
+              const marketInfo = getMarketInfo(decision.market_type);
+              
+              return (
                 <div
-                  className="p-4 cursor-pointer hover:bg-dark-primary transition-colors"
-                  onClick={() => handleViewDetail(decision.id)}
+                  key={`${decision.id}-${index}`}
+                  className="border border-dark-border rounded-lg overflow-hidden hover:shadow-md transition-shadow bg-dark-tertiary"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-lg font-medium text-text-primary">
-                          决策 #{decision.id}
-                        </h3>
-                        {getStatusBadge(decision.status)}
-                      </div>
-                      <div className="flex items-center space-x-4 text-sm text-text-secondary">
-                        <span>
-                          <i className="fas fa-clock mr-1" />
-                          {new Date(decision.start_time).toLocaleString('zh-CN')}
-                        </span>
-                        <span>
-                          <i className="fas fa-exchange-alt mr-1" />
-                          执行 {decision.trades_count ?? decision.trades_executed?.length ?? 0} 笔交易
-                        </span>
-                      </div>
-                      {decision.end_time && (
-                        <div className="text-xs text-text-tertiary mt-1">
-                          {formatDistanceToNow(new Date(decision.end_time), {
-                            addSuffix: true,
-                            locale: zhCN,
-                          })}
+                  {/* Decision Card - Click to open detail modal */}
+                  <div
+                    className="p-4 cursor-pointer hover:bg-dark-primary transition-colors"
+                    onClick={() => handleViewDetail(decision.id, sequenceNumber)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center flex-wrap gap-2 mb-2">
+                          <h3 className="text-lg font-medium text-text-primary">
+                            决策 #{sequenceNumber}
+                          </h3>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${marketInfo.color}`}>
+                            {marketInfo.label}
+                          </span>
+                          {getStatusBadge(decision.status)}
                         </div>
-                      )}
-                    </div>
-                    <div>
-                      <i className="fas fa-chevron-right text-text-muted" />
+                        <div className="flex items-center flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary">
+                          <span>
+                            <i className="fas fa-clock mr-1" />
+                            {new Date(decision.start_time).toLocaleString('zh-CN')}
+                          </span>
+                          <span>
+                            <i className="fas fa-exchange-alt mr-1" />
+                            执行 {decision.trades_count ?? decision.trades_executed?.length ?? 0} 笔交易
+                          </span>
+                        </div>
+                        {decision.end_time && (
+                          <div className="text-xs text-text-tertiary mt-1">
+                            {formatDistanceToNow(new Date(decision.end_time), {
+                              addSuffix: true,
+                              locale: zhCN,
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <i className="fas fa-chevron-right text-text-muted" />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -201,10 +229,32 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
           <div className="bg-dark-secondary md:rounded-lg shadow-xl border-0 md:border border-dark-border max-w-4xl w-full h-full md:h-auto md:max-h-[90vh] overflow-hidden flex flex-col">
             {/* Modal Header - Sticky */}
             <div className="sticky top-0 z-10 px-4 md:px-6 py-3 md:py-4 border-b border-dark-border flex items-center justify-between bg-dark-secondary">
-              <h3 className="text-responsive-h4 text-text-primary">
-                <i className="fas fa-file-alt mr-2 text-accent-primary" />
-                决策详情 #{detailModalId}
-              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-responsive-h4 text-text-primary">
+                  <i className="fas fa-file-alt mr-2 text-accent-primary" />
+                  决策详情 #{detailSequenceNumber || detailModalId}
+                </h3>
+                {detailData?.market_type && (() => {
+                  const getMarketInfo = (market: string) => {
+                    switch (market?.toUpperCase()) {
+                      case 'US':
+                        return { label: '美股', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' };
+                      case 'HK':
+                        return { label: '港股', color: 'bg-purple-500/20 text-purple-400 border-purple-500/50' };
+                      case 'CN':
+                        return { label: 'A股', color: 'bg-red-500/20 text-red-400 border-red-500/50' };
+                      default:
+                        return { label: market, color: 'bg-gray-500/20 text-gray-400 border-gray-500/50' };
+                    }
+                  };
+                  const marketInfo = getMarketInfo(detailData.market_type);
+                  return (
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${marketInfo.color}`}>
+                      {marketInfo.label}
+                    </span>
+                  );
+                })()}
+              </div>
               <button
                 onClick={handleCloseDetail}
                 className="text-text-muted hover:text-text-secondary min-w-touch min-h-touch flex items-center justify-center"
