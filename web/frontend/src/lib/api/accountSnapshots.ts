@@ -3,8 +3,7 @@
  */
 
 import axios from 'axios';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+import { buildApiUrl } from '@/utils/api';
 
 /**
  * Get auth token from localStorage
@@ -53,7 +52,7 @@ export async function getAccountTrend(
   const token = getAuthToken();
   
   const response = await axios.get(
-    `${API_BASE_URL}/api/account-snapshots/trend/${marketType}`,
+    buildApiUrl(`/api/account-snapshots/trend/${marketType}`),
     {
       params: { days },
       headers: { Authorization: `Bearer ${token}` },
@@ -70,7 +69,7 @@ export async function getLatestSnapshot(marketType: string): Promise<any> {
   const token = getAuthToken();
   
   const response = await axios.get(
-    `${API_BASE_URL}/api/account-snapshots/latest/${marketType}`,
+    buildApiUrl(`/api/account-snapshots/latest/${marketType}`),
     {
       headers: { Authorization: `Bearer ${token}` },
     }
@@ -86,7 +85,7 @@ export async function createSnapshot(marketType: string): Promise<any> {
   const token = getAuthToken();
   
   const response = await axios.post(
-    `${API_BASE_URL}/api/account-snapshots/create/${marketType}`,
+    buildApiUrl(`/api/account-snapshots/create/${marketType}`),
     {},
     {
       headers: { Authorization: `Bearer ${token}` },
@@ -103,7 +102,7 @@ export async function getAccountStats(marketType: string): Promise<AccountStats>
   const token = getAuthToken();
   
   const response = await axios.get(
-    `${API_BASE_URL}/api/account-snapshots/stats/${marketType}`,
+    buildApiUrl(`/api/account-snapshots/stats/${marketType}`),
     {
       headers: { Authorization: `Bearer ${token}` },
     }
