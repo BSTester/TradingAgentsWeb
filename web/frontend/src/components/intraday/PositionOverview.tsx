@@ -80,6 +80,19 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
     CN: 'A股',
   };
 
+  const getMarketBadgeColor = (market: string) => {
+    switch (market?.toUpperCase()) {
+      case 'US':
+        return 'bg-blue-500/20 text-blue-400 border border-blue-500/50';
+      case 'HK':
+        return 'bg-purple-500/20 text-purple-400 border border-purple-500/50';
+      case 'CN':
+        return 'bg-red-500/20 text-red-400 border border-red-500/50';
+      default:
+        return 'bg-gray-500/20 text-gray-400 border border-gray-500/50';
+    }
+  };
+
   const getSortIcon = (field: SortField) => {
     if (sortField !== field) {
       return <i className="fas fa-sort text-text-muted ml-1" />;
@@ -177,7 +190,7 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getMarketBadgeColor(position.market_type)}`}>
                             {marketLabels[position.market_type] || position.market_type}
                           </span>
                         </td>
