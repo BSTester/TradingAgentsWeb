@@ -450,15 +450,47 @@ async def execute_intraday_analysis(
             logging.info(f"Analysis completed successfully: session_id={session_id}")
             
             # Create account snapshot after analysis completes
+            # Skip market check since we want to capture the state after analysis regardless of market hours
+            snapshot_id = None
             try:
                 from web.backend.services.snapshot_scheduler import create_account_snapshot
-                snapshot_created = await create_account_snapshot(user_id, market_type)
+                from web.backend.models import AccountSnapshot
+                from sqlalchemy import select, and_, desc
+                
+                snapshot_created = await create_account_snapshot(user_id, market_type, skip_market_check=True)
                 if snapshot_created:
-                    logging.info(f"Account snapshot created for user {user_id} in {market_type} market")
+                    # Get the snapshot ID that was just created/updated
+                    snapshot_query = select(AccountSnapshot).where(
+                        and_(
+                            AccountSnapshot.user_id == user_id,
+                            AccountSnapshot.market_type == market_type.upper()
+                        )
+                    ).order_by(desc(AccountSnapshot.snapshot_date)).limit(1)
+                    
+                    snapshot_result = await db.execute(snapshot_query)
+                    latest_snapshot = snapshot_result.scalar_one_or_none()
+                    
+                    if latest_snapshot:
+                        snapshot_id = latest_snapshot.id
+                        # Add snapshot reference to decision record's account_snapshot
+                        if not decision_record.account_snapshot:
+                            decision_record.account_snapshot = {}
+                        decision_record.account_snapshot['snapshot_id'] = snapshot_id
+                        decision_record.account_snapshot['snapshot_date'] = latest_snapshot.snapshot_date.isoformat()
+                        decision_record.account_snapshot['total_assets'] = latest_snapshot.total_assets
+                        decision_record.account_snapshot['cash'] = latest_snapshot.cash
+                        decision_record.account_snapshot['market_value'] = latest_snapshot.market_value
+                        await db.commit()
+                        
+                        logging.info(f"✅ Account snapshot created/updated (ID: {snapshot_id}) for user {user_id} in {market_type} market after intraday analysis")
+                    else:
+                        logging.warning(f"⚠️ Snapshot created but could not retrieve ID")
                 else:
-                    logging.warning(f"Failed to create account snapshot for user {user_id}")
+                    logging.warning(f"⚠️ Failed to create account snapshot for user {user_id} in {market_type} market")
             except Exception as snapshot_error:
-                logging.error(f"Error creating account snapshot: {snapshot_error}")
+                logging.error(f"❌ Error creating account snapshot: {snapshot_error}")
+                import traceback
+                logging.error(traceback.format_exc())
             
             return {
                 "status": "success",
