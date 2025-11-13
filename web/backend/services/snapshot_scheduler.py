@@ -178,21 +178,21 @@ class SnapshotScheduler:
                             logger.warning(f"No account info for user {user.id} in {market_type} market")
                             continue
                         
-                        # Get positions for the market
-                        positions = await client.get_positions(market_type)
+                        # Get positions for the market (pass user_id for database enrichment)
+                        positions = await client.get_positions(market_type, user_id=user.id)
                         
-                        # Calculate totals
-                        total_assets = account_info.get("total_assets", 0.0)
+                        # Calculate totals - map field names from futu_trading.py API
+                        total_assets = account_info.get("net_asset_value", 0.0)
                         cash = account_info.get("cash", 0.0)
-                        market_value = account_info.get("market_value", 0.0)
+                        market_value = account_info.get("position_value", 0.0)
                         
                         # Calculate P&L from positions
                         realized_pnl = 0.0
                         unrealized_pnl = 0.0
                         if positions:
                             for pos in positions:
-                                realized_pnl += pos.get("realized_pnl", 0.0)
-                                unrealized_pnl += pos.get("unrealized_pnl", 0.0)
+                                # Use profit_loss from position as unrealized P&L
+                                unrealized_pnl += pos.get("profit_loss", 0.0)
                         
                         # Check if snapshot already exists for today (using market local date)
                         # Get market timezone
