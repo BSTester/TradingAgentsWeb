@@ -308,16 +308,17 @@ def init_snapshot_scheduler() -> SnapshotScheduler:
 
 
 # Standalone function to create snapshot for a specific user and market
-async def create_account_snapshot(user_id: int, market_type: str) -> bool:
+async def create_account_snapshot(user_id: int, market_type: str, skip_market_check: bool = False) -> bool:
     """
     Create an account snapshot for a specific user and market.
     
     This function can be called from anywhere (e.g., after intraday trading analysis).
-    Only creates snapshot if market is open.
     
     Args:
         user_id: User ID
         market_type: Market type (US, HK, CN)
+        skip_market_check: If True, create snapshot regardless of market status (default: False)
+                          Set to True when called after intraday analysis completion
         
     Returns:
         bool: True if snapshot created successfully, False otherwise
@@ -339,11 +340,12 @@ async def create_account_snapshot(user_id: int, market_type: str) -> bool:
         market_tz = pytz.timezone(market_tz_name)
         market_now = datetime.now(market_tz)
         
-        # Check if market is open
-        is_open, status_msg = is_market_open(market_type, market_now)
-        if not is_open:
-            logger.info(f"Market {market_type} is closed, skipping snapshot: {status_msg}")
-            return False
+        # Check if market is open (unless skip_market_check is True)
+        if not skip_market_check:
+            is_open, status_msg = is_market_open(market_type, market_now)
+            if not is_open:
+                logger.info(f"Market {market_type} is closed, skipping snapshot: {status_msg}")
+                return False
         
         async with AsyncSessionLocal() as db:
             # Get user
@@ -386,26 +388,56 @@ async def create_account_snapshot(user_id: int, market_type: str) -> bool:
             
             # Get market local time
             local_now = datetime.now(market_tz)
+            # Round to nearest second to avoid microsecond differences
+            snapshot_date_naive = local_now.replace(tzinfo=None, microsecond=0)
             
-            # Create snapshot with market local time (naive datetime for SQLite)
-            # SQLite doesn't preserve timezone, so we store as naive datetime in local time
-            snapshot = AccountSnapshot(
-                user_id=user_id,
-                market_type=market_type,
-                snapshot_date=local_now.replace(tzinfo=None),  # Store as naive datetime in local time
-                total_assets=total_assets,
-                cash=cash,
-                market_value=market_value,
-                realized_pnl=realized_pnl,
-                unrealized_pnl=unrealized_pnl,
-                account_data=None
+            # Check if a snapshot already exists at this exact time (same second)
+            # This allows multiple snapshots per day at different times
+            from sqlalchemy import and_
+            
+            existing_query = select(AccountSnapshot).where(
+                and_(
+                    AccountSnapshot.user_id == user_id,
+                    AccountSnapshot.market_type == market_type.upper(),
+                    AccountSnapshot.snapshot_date == snapshot_date_naive
+                )
             )
             
-            db.add(snapshot)
-            await db.commit()
+            existing_result = await db.execute(existing_query)
+            existing_snapshot = existing_result.scalar_one_or_none()
             
-            logger.info(f"Created snapshot for user {user_id} in {market_type} market")
-            return True
+            if existing_snapshot:
+                # Update existing snapshot at this exact time
+                existing_snapshot.total_assets = total_assets
+                existing_snapshot.cash = cash
+                existing_snapshot.market_value = market_value
+                existing_snapshot.realized_pnl = realized_pnl
+                existing_snapshot.unrealized_pnl = unrealized_pnl
+                existing_snapshot.account_data = None
+                
+                await db.commit()
+                logger.info(f"✅ Updated existing snapshot for user {user_id} in {market_type} market at {snapshot_date_naive} (ID: {existing_snapshot.id})")
+                return True
+            else:
+                # Create new snapshot with market local time (naive datetime for SQLite)
+                # SQLite doesn't preserve timezone, so we store as naive datetime in local time
+                snapshot = AccountSnapshot(
+                    user_id=user_id,
+                    market_type=market_type.upper(),
+                    snapshot_date=snapshot_date_naive,  # Store as naive datetime in local time (no microseconds)
+                    total_assets=total_assets,
+                    cash=cash,
+                    market_value=market_value,
+                    realized_pnl=realized_pnl,
+                    unrealized_pnl=unrealized_pnl,
+                    account_data=None
+                )
+                
+                db.add(snapshot)
+                await db.commit()
+                
+                logger.info(f"✅ Created new snapshot for user {user_id} in {market_type} market at {snapshot_date_naive}")
+                return True
             
     except Exception as e:
         logger.error(f"Error creating snapshot for user {user_id}: {e}")
