@@ -55,7 +55,8 @@ async def get_prompt_template(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get current user's prompt template for specified agent type
+    Get current user's prompt template for specified agent type.
+    If no template exists, automatically creates a default one.
     """
     from sqlalchemy import select
     
@@ -68,11 +69,38 @@ async def get_prompt_template(
     result = await db.execute(query)
     template = result.scalar_one_or_none()
     
+    # Auto-create default template for new users
     if not template:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No template found for agent type '{agent_type}'"
+        default_prompt = get_default_intraday_prompt()
+        
+        template = AgentPromptTemplate(
+            agent_type=agent_type,
+            user_id=current_user.id,
+            system_prompt=default_prompt,
+            template_name="默认日内交易策略",
+            description="系统默认的日内交易 Agent 提示词",
+            version="1.0",
+            is_active=True
         )
+        
+        db.add(template)
+        await db.flush()
+        
+        # Enable all tools by default
+        tools_query = select(AgentTool).where(AgentTool.is_available == True)
+        tools_result = await db.execute(tools_query)
+        all_tools = tools_result.scalars().all()
+        
+        for tool in all_tools:
+            template_tool = TemplateTools(
+                template_id=template.id,
+                tool_name=tool.tool_name,
+                is_enabled=True
+            )
+            db.add(template_tool)
+        
+        await db.commit()
+        await db.refresh(template)
     
     # Get enabled tools
     tools_query = select(TemplateTools).where(
@@ -158,7 +186,8 @@ async def update_prompt_template(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Update current user's prompt template
+    Update current user's prompt template.
+    If no template exists, creates one first.
     """
     from sqlalchemy import select
     from datetime import datetime
@@ -173,10 +202,37 @@ async def update_prompt_template(
     template = result.scalar_one_or_none()
     
     if not template:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No template found for agent type '{agent_type}'"
+        # Auto-create default template
+        default_prompt = get_default_intraday_prompt()
+        
+        template = AgentPromptTemplate(
+            agent_type=agent_type,
+            user_id=current_user.id,
+            system_prompt=default_prompt,
+            template_name="默认日内交易策略",
+            description="系统默认的日内交易 Agent 提示词",
+            version="1.0",
+            is_active=True
         )
+        
+        db.add(template)
+        await db.flush()
+        
+        # Enable all tools by default
+        tools_query = select(AgentTool).where(AgentTool.is_available == True)
+        tools_result = await db.execute(tools_query)
+        all_tools = tools_result.scalars().all()
+        
+        for tool in all_tools:
+            template_tool = TemplateTools(
+                template_id=template.id,
+                tool_name=tool.tool_name,
+                is_enabled=True
+            )
+            db.add(template_tool)
+        
+        await db.commit()
+        await db.refresh(template)
     
     # Update fields
     if data.template_name is not None:
@@ -232,7 +288,8 @@ async def reset_to_default(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Reset template to default prompt
+    Reset template to default prompt.
+    If no template exists, creates one with default values.
     """
     from sqlalchemy import select
     from datetime import datetime
@@ -246,24 +303,49 @@ async def reset_to_default(
     result = await db.execute(query)
     template = result.scalar_one_or_none()
     
-    if not template:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No template found for agent type '{agent_type}'"
-        )
-    
     # Get default prompt
     default_prompt = get_default_intraday_prompt()
     
-    # Reset template
-    template.system_prompt = default_prompt
-    template.version = "1.0"
-    template.template_name = "默认日内交易策略"
-    template.description = "系统默认的日内交易 Agent 提示词"
-    template.updated_at = datetime.utcnow()
-    
-    await db.commit()
-    await db.refresh(template)
+    if not template:
+        # Create new template with defaults
+        template = AgentPromptTemplate(
+            agent_type=agent_type,
+            user_id=current_user.id,
+            system_prompt=default_prompt,
+            template_name="默认日内交易策略",
+            description="系统默认的日内交易 Agent 提示词",
+            version="1.0",
+            is_active=True
+        )
+        
+        db.add(template)
+        await db.flush()
+        
+        # Enable all tools by default
+        tools_query = select(AgentTool).where(AgentTool.is_available == True)
+        tools_result = await db.execute(tools_query)
+        all_tools = tools_result.scalars().all()
+        
+        for tool in all_tools:
+            template_tool = TemplateTools(
+                template_id=template.id,
+                tool_name=tool.tool_name,
+                is_enabled=True
+            )
+            db.add(template_tool)
+        
+        await db.commit()
+        await db.refresh(template)
+    else:
+        # Reset existing template
+        template.system_prompt = default_prompt
+        template.version = "1.0"
+        template.template_name = "默认日内交易策略"
+        template.description = "系统默认的日内交易 Agent 提示词"
+        template.updated_at = datetime.utcnow()
+        
+        await db.commit()
+        await db.refresh(template)
     
     # Get enabled tools
     tools_query = select(TemplateTools).where(
@@ -286,7 +368,8 @@ async def get_enabled_tools(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get list of enabled tool names for current user's template
+    Get list of enabled tool names for current user's template.
+    If no template exists, creates one with all tools enabled.
     """
     from sqlalchemy import select
     
@@ -300,10 +383,37 @@ async def get_enabled_tools(
     template = result.scalar_one_or_none()
     
     if not template:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No template found for agent type '{agent_type}'"
+        # Auto-create default template
+        default_prompt = get_default_intraday_prompt()
+        
+        template = AgentPromptTemplate(
+            agent_type=agent_type,
+            user_id=current_user.id,
+            system_prompt=default_prompt,
+            template_name="默认日内交易策略",
+            description="系统默认的日内交易 Agent 提示词",
+            version="1.0",
+            is_active=True
         )
+        
+        db.add(template)
+        await db.flush()
+        
+        # Enable all tools by default
+        tools_query = select(AgentTool).where(AgentTool.is_available == True)
+        tools_result = await db.execute(tools_query)
+        all_tools = tools_result.scalars().all()
+        
+        for tool in all_tools:
+            template_tool = TemplateTools(
+                template_id=template.id,
+                tool_name=tool.tool_name,
+                is_enabled=True
+            )
+            db.add(template_tool)
+        
+        await db.commit()
+        await db.refresh(template)
     
     tools_query = select(TemplateTools).where(
         TemplateTools.template_id == template.id,
@@ -322,7 +432,8 @@ async def update_tool_selection(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Update tool selection for current user's template
+    Update tool selection for current user's template.
+    If no template exists, creates one first.
     """
     from sqlalchemy import select, delete
     
@@ -336,10 +447,21 @@ async def update_tool_selection(
     template = result.scalar_one_or_none()
     
     if not template:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No template found for agent type '{agent_type}'"
+        # Auto-create default template
+        default_prompt = get_default_intraday_prompt()
+        
+        template = AgentPromptTemplate(
+            agent_type=agent_type,
+            user_id=current_user.id,
+            system_prompt=default_prompt,
+            template_name="默认日内交易策略",
+            description="系统默认的日内交易 Agent 提示词",
+            version="1.0",
+            is_active=True
         )
+        
+        db.add(template)
+        await db.flush()
     
     # Delete existing tool associations
     await db.execute(
