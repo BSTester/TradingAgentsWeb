@@ -113,7 +113,7 @@ export function AccountTrendModal({
                   ({change.change >= 0 ? '+' : ''}{change.percentage.toFixed(2)}%)
                 </span>
                 <span className="text-text-secondary ml-2">
-                  {timeRange}天变化
+                  {timeRange === 'today' ? '今日变化' : `${timeRange}天变化`}
                 </span>
               </div>
             )}
