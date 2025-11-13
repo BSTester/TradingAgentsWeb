@@ -26,22 +26,50 @@ class FutuAPIError(Exception):
         self.retry_able = retry_able
 
 
-def _get_base_url() -> str:
+def _get_base_url(user_id: Optional[int] = None) -> str:
     """
-    Get configured Futu API base URL from environment variable or config.
+    Get configured Futu API base URL from user config, environment variable, or default config.
+    
+    Priority order:
+    1. User-specific configuration (if user_id provided)
+    2. Environment variable
+    3. Default config
+    
+    Args:
+        user_id: Optional user ID to fetch user-specific configuration
     
     Returns:
         str: Base URL for Futu API
     """
     import os
     
-    # Try environment variable first (set by FutuAPIClient)
+    # Try user-specific config first (highest priority)
+    if user_id:
+        try:
+            from web.backend.database import SessionLocal
+            from web.backend.models import UserConfig
+            
+            db = SessionLocal()
+            try:
+                user_config = db.query(UserConfig).filter(UserConfig.user_id == user_id).first()
+                if user_config:
+                    # Prefer intraday URL if available, otherwise use regular URL
+                    base_url = user_config.intraday_futu_api_url or user_config.futu_api_base_url
+                    if base_url:
+                        logger.debug(f"Using Futu API base URL from user {user_id} config: {base_url}")
+                        return base_url
+            finally:
+                db.close()
+        except Exception as e:
+            logger.debug(f"Failed to get user config for user {user_id}: {e}")
+    
+    # Try environment variable as fallback
     base_url = os.getenv("FUTU_API_BASE_URL")
     if base_url:
         logger.debug(f"Using Futu API base URL from environment: {base_url}")
         return base_url
     
-    # Try config as fallback
+    # Try default config as last resort
     try:
         from .config import get_config
         config = get_config()
@@ -70,22 +98,50 @@ def _get_timeout() -> int:
         return 30
 
 
-def _get_api_key() -> Optional[str]:
+def _get_api_key(user_id: Optional[int] = None) -> Optional[str]:
     """
-    Get Futu API key from environment variable or config.
+    Get Futu API key from user config, environment variable, or default config.
+    
+    Priority order:
+    1. User-specific configuration (if user_id provided)
+    2. Environment variable
+    3. Default config
+    
+    Args:
+        user_id: Optional user ID to fetch user-specific configuration
     
     Returns:
         str: API key or None if not configured
     """
     import os
     
-    # Try environment variable first
+    # Try user-specific config first (highest priority)
+    if user_id:
+        try:
+            from web.backend.database import SessionLocal
+            from web.backend.models import UserConfig
+            
+            db = SessionLocal()
+            try:
+                user_config = db.query(UserConfig).filter(UserConfig.user_id == user_id).first()
+                if user_config:
+                    # Prefer intraday key if available, otherwise use regular key
+                    api_key = user_config.intraday_futu_api_key or user_config.futu_api_key
+                    if api_key:
+                        logger.debug(f"Using Futu API key from user {user_id} config")
+                        return api_key
+            finally:
+                db.close()
+        except Exception as e:
+            logger.debug(f"Failed to get user config for user {user_id}: {e}")
+    
+    # Try environment variable as fallback
     api_key = os.getenv("FUTU_API_KEY")
     if api_key:
         logger.debug("Using Futu API key from environment variable")
         return api_key
     
-    # Try config as fallback
+    # Try default config as last resort
     try:
         from .config import get_config
         config = get_config()
@@ -132,7 +188,8 @@ def _make_request(
     method: str,
     endpoint: str,
     params: Optional[Dict] = None,
-    json_data: Optional[Dict] = None
+    json_data: Optional[Dict] = None,
+    user_id: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Make HTTP request to Futu API with error handling and retry logic.
@@ -142,6 +199,7 @@ def _make_request(
         endpoint: API endpoint path (e.g., "/api/account")
         params: Query parameters for GET requests
         json_data: JSON body for POST requests
+        user_id: Optional user ID for user-specific configuration
         
     Returns:
         dict: Parsed JSON response
@@ -149,9 +207,9 @@ def _make_request(
     Raises:
         FutuAPIError: If request fails or returns error
     """
-    base_url = _get_base_url()
+    base_url = _get_base_url(user_id)
     timeout = _get_timeout()
-    api_key = _get_api_key()
+    api_key = _get_api_key(user_id)
     url = f"{base_url}{endpoint}"
     
     # Prepare headers
@@ -244,13 +302,15 @@ def _make_request(
 
 
 def get_account_info(
-    market_type: Annotated[str, "Market type: US, HK, or CN"]
+    market_type: Annotated[str, "Market type: US, HK, or CN"],
+    user_id: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Get account information for a specific market.
     
     Args:
         market_type: Market type (US/HK/CN)
+        user_id: Optional user ID for user-specific configuration
         
     Returns:
         dict: Account details including:
@@ -278,7 +338,8 @@ def get_account_info(
         response = _make_request(
             method="GET",
             endpoint="/api/account",
-            params={"market_type": market_type}
+            params={"market_type": market_type},
+            user_id=user_id
         )
         
         logger.info(f"Successfully retrieved account info for {market_type}")
@@ -342,7 +403,8 @@ def get_positions(
         response = _make_request(
             method="GET",
             endpoint="/api/positions",
-            params={"market_type": market_type}
+            params={"market_type": market_type},
+            user_id=user_id
         )
         
         # Handle different response formats
@@ -426,7 +488,8 @@ def get_positions(
 
 
 def get_quote(
-    stock_code: Annotated[str, "Stock symbol (e.g., AAPL, 00700, 600519)"]
+    stock_code: Annotated[str, "Stock symbol (e.g., AAPL, 00700, 600519)"],
+    user_id: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Get real-time quote for a specific stock (auto-detects market type).
@@ -471,7 +534,8 @@ def get_quote(
         response = _make_request(
             method="GET",
             endpoint="/api/quote",
-            params={"stock_code": stock_code}
+            params={"stock_code": stock_code},
+            user_id=user_id
         )
         
         logger.info(f"Successfully retrieved quote for {stock_code}")
@@ -487,7 +551,8 @@ def get_kline_data(
     interval: Annotated[str, "Time interval: 1min, 5min, 15min, 30min, 60min, daily, weekly, monthly, quarterly, yearly"] = "daily",
     start_date: Annotated[Optional[str], "Start date in YYYY-MM-DD format (date only, no time component)"] = None,
     end_date: Annotated[Optional[str], "End date in YYYY-MM-DD format (date only, no time component)"] = None,
-    format: Annotated[str, "Return format: json or csv"] = "csv"
+    format: Annotated[str, "Return format: json or csv"] = "csv",
+    user_id: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Get K-line (candlestick) data for a stock (auto-detects market type).
@@ -567,7 +632,8 @@ def get_kline_data(
         response = _make_request(
             method="GET",
             endpoint="/api/kline",
-            params=params
+            params=params,
+            user_id=user_id
         )
         
         # For csv format, return response directly
@@ -595,7 +661,8 @@ def get_kline_data(
 
 def get_hot_stocks(
     market_type: Annotated[str, "Market type: US, HK, or CN"] = "US",
-    count: Annotated[int, "Number of stocks to return"] = 10
+    count: Annotated[int, "Number of stocks to return"] = 10,
+    user_id: Optional[int] = None
 ) -> List[Dict[str, Any]]:
     """
     Get list of hot/trending stocks.
@@ -637,7 +704,8 @@ def get_hot_stocks(
             params={
                 "market_type": market_type,
                 "count": count
-            }
+            },
+            user_id=user_id
         )
         
         # Handle different response formats
@@ -664,7 +732,8 @@ def place_order(
     side: Annotated[str, "Order side: BUY or SELL"],
     quantity: Annotated[int, "Number of shares"],
     price: Annotated[Optional[float], "Limit price (required for LIMIT orders)"] = None,
-    order_type: Annotated[str, "Order type: LIMIT or MARKET"] = "LIMIT"
+    order_type: Annotated[str, "Order type: LIMIT or MARKET"] = "LIMIT",
+    user_id: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Place a buy or sell order (auto-detects market type from stock code).
@@ -732,7 +801,8 @@ def place_order(
         response = _make_request(
             method="POST",
             endpoint="/api/trade",
-            json_data=order_data
+            json_data=order_data,
+            user_id=user_id
         )
         
         if response.get("success"):
@@ -749,7 +819,8 @@ def place_order(
 
 def cancel_order(
     order_id: Annotated[str, "Order ID to cancel"],
-    stock_code: Annotated[str, "Stock code for auto-detecting market type"]
+    stock_code: Annotated[str, "Stock code for auto-detecting market type"],
+    user_id: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Cancel a pending order (auto-detects market type from stock code).
@@ -794,7 +865,8 @@ def cancel_order(
             json_data={
                 "order_id": order_id,
                 "stock_code": stock_code
-            }
+            },
+            user_id=user_id
         )
         
         if response.get("success"):
@@ -811,7 +883,8 @@ def cancel_order(
 
 def get_orders(
     market_type: Annotated[str, "Market type: US, HK, or CN"],
-    filter_status: Annotated[int, "Filter by status: 0=all, 1=filled, 2=pending, 3=cancelled"] = 0
+    filter_status: Annotated[int, "Filter by status: 0=all, 1=filled, 2=pending, 3=cancelled"] = 0,
+    user_id: Optional[int] = None
 ) -> List[Dict[str, Any]]:
     """
     Query order history and status.
@@ -862,7 +935,8 @@ def get_orders(
             params={
                 "market_type": market_type,
                 "filter_status": filter_status
-            }
+            },
+            user_id=user_id
         )
         
         # Handle different response formats
@@ -890,7 +964,8 @@ def get_technical_analysis(
     indicator: Annotated[str, "Technical indicator: close_50_sma, close_200_sma, close_10_ema, macd, rsi, boll, atr, vwma"] = "macd",
     start_date: Annotated[Optional[str], "Start date in YYYY-MM-DD format (date only, no time component)"] = None,
     end_date: Annotated[Optional[str], "End date in YYYY-MM-DD format (date only, no time component)"] = None,
-    format: Annotated[str, "Return format: json or csv"] = "csv"
+    format: Annotated[str, "Return format: json or csv"] = "csv",
+    user_id: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Get technical analysis indicators (returns time series data, auto-detects market type).
@@ -978,7 +1053,8 @@ def get_technical_analysis(
         response = _make_request(
             method="GET",
             endpoint="/api/technical-analysis",
-            params=params
+            params=params,
+            user_id=user_id
         )
         
         logger.info(f"Successfully retrieved {indicator} data for {symbol} in {format} format")
@@ -990,7 +1066,8 @@ def get_technical_analysis(
 
 
 def get_hot_news(
-    lang: Annotated[str, "Language code: zh-cn, zh-hk, or en-us"] = "zh-cn"
+    lang: Annotated[str, "Language code: zh-cn, zh-hk, or en-us"] = "zh-cn",
+    user_id: Optional[int] = None
 ) -> List[Dict[str, Any]]:
     """
     Get hot/trending news articles.
@@ -1030,7 +1107,8 @@ def get_hot_news(
         response = _make_request(
             method="GET",
             endpoint="/api/hot-news",
-            params={"lang": lang}
+            params={"lang": lang},
+            user_id=user_id
         )
         
         # Handle different response formats

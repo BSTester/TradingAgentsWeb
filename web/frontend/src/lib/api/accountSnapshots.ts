@@ -24,6 +24,7 @@ export interface SnapshotData {
 
 export interface TrendResponse {
   market_type: string;
+  currency: string;
   start_date: string;
   end_date: string;
   data: SnapshotData[];
@@ -47,14 +48,15 @@ export interface AccountStats {
  */
 export async function getAccountTrend(
   marketType: string,
-  days: number = 30
+  days: number = 30,
+  todayOnly: boolean = false
 ): Promise<TrendResponse> {
   const token = getAuthToken();
   
   const response = await axios.get(
     buildApiUrl(`/api/account-snapshots/trend/${marketType}`),
     {
-      params: { days },
+      params: { days, today_only: todayOnly },
       headers: { Authorization: `Bearer ${token}` },
     }
   );

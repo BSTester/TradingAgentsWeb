@@ -58,7 +58,24 @@ export function AccountInfo({ selectedMarket, onMarketChange, onShowToast }: Acc
   const totalAssets = account?.total_assets || 0;
   const cash = account?.cash || 0;
   const positionValue = account?.position_value || 0;
-  const currency = account?.currency || '$';
+  const todayProfitLoss = account?.today_profit_loss || 0;
+  const todayProfitLossRatio = account?.today_profit_loss_ratio || 0;
+  
+  // Determine currency based on market type
+  const getCurrencySymbol = (market: string) => {
+    switch (market.toUpperCase()) {
+      case 'US':
+        return '$';
+      case 'HK':
+        return 'HK$';
+      case 'CN':
+        return '¥';
+      default:
+        return '$';
+    }
+  };
+  const currency = getCurrencySymbol(selectedMarket);
+  
   const positionRatio = totalAssets > 0 ? (positionValue / totalAssets) * 100 : 0;
 
   return (
@@ -102,7 +119,10 @@ export function AccountInfo({ selectedMarket, onMarketChange, onShowToast }: Acc
             <p className="text-2xl md:text-3xl font-bold text-text-primary flex-1">
               {currency}{totalAssets.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
-            <div className="flex items-center justify-end mt-1">
+            <div className="flex items-center justify-between mt-1">
+              <p className={`text-xs md:text-sm ${todayProfitLoss >= 0 ? 'text-[#f03a55]' : 'text-[#00a870]'}`}>
+                {todayProfitLoss >= 0 ? '+' : ''}{currency}{todayProfitLoss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({todayProfitLoss >= 0 ? '+' : ''}{(todayProfitLossRatio * 100).toFixed(2)}%)
+              </p>
               <button
                 onClick={() => handleOpenTrendModal('total_assets')}
                 className="text-blue-400 hover:text-blue-300 transition-colors p-2 hover:bg-blue-900/30 rounded-md"

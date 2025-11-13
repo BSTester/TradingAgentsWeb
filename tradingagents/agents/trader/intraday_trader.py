@@ -828,11 +828,12 @@ Current market is {market_type}. Please formulate trading strategy according to 
         except Exception:
             pass
         
-        # Invoke agent
+        # Invoke agent with user_id in config
         try:
-            result = chain.invoke({
-                "messages": state.get("messages", []),
-            })
+            result = chain.invoke(
+                {"messages": state.get("messages", [])},
+                config={"configurable": {"user_id": effective_user_id}}
+            )
             
             # Extract current AI message content (only text, not tool calls)
             current_content = ""

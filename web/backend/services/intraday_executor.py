@@ -449,6 +449,17 @@ async def execute_intraday_analysis(
             
             logging.info(f"Analysis completed successfully: session_id={session_id}")
             
+            # Create account snapshot after analysis completes
+            try:
+                from web.backend.services.snapshot_scheduler import create_account_snapshot
+                snapshot_created = await create_account_snapshot(user_id, market_type)
+                if snapshot_created:
+                    logging.info(f"Account snapshot created for user {user_id} in {market_type} market")
+                else:
+                    logging.warning(f"Failed to create account snapshot for user {user_id}")
+            except Exception as snapshot_error:
+                logging.error(f"Error creating account snapshot: {snapshot_error}")
+            
             return {
                 "status": "success",
                 "session_id": session_id,

@@ -51,6 +51,7 @@ class AgentState(MessagesState):
     company_of_interest: Annotated[str, "Company that we are interested in trading"]
     ticker: Annotated[Optional[str], "Stock ticker symbol (e.g., AAPL, 00700, 600519)"]
     trade_date: Annotated[str, "What date we are trading at"]
+    user_id: Annotated[Optional[int], "User ID for accessing user-specific configurations"]
 
     sender: Annotated[str, "Agent that sent this message"]
 
