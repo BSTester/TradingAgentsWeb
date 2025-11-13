@@ -96,6 +96,10 @@ async def update_user_config(
     await db.commit()
     await db.refresh(config)
     
+    # Invalidate cache after update
+    from web.backend.services.user_config_cache import invalidate_user_config_cache
+    invalidate_user_config_cache(current_user.id)
+    
     return UserConfigResponse(
         last_ticker=config.last_ticker,
         last_analysts=config.last_analysts,

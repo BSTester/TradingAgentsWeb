@@ -157,6 +157,11 @@ async def lifespan(app: FastAPI):
             app.state.snapshot_scheduler = snapshot_scheduler
             print("✅ Snapshot scheduler started (daily account snapshots)")
             
+            # Preload user configurations into cache
+            from web.backend.services.user_config_cache import preload_user_configs
+            config_count = preload_user_configs()
+            print(f"✅ User configurations preloaded into cache ({config_count} users)")
+            
             app.state.monitor_task = asyncio.create_task(task_monitor())
             print("✅ Task monitor started (leader)")
         except OSError:

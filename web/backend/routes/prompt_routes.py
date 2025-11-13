@@ -185,7 +185,19 @@ async def update_prompt_template(
         template.description = data.description
     if data.system_prompt is not None:
         template.system_prompt = data.system_prompt
+        # Auto-increment version when system_prompt is updated
+        if template.version:
+            try:
+                # Try to parse version as float and increment
+                current_version = float(template.version)
+                template.version = f"{current_version + 0.1:.1f}"
+            except ValueError:
+                # If version is not a number, append timestamp
+                template.version = f"{template.version}_{datetime.utcnow().strftime('%Y%m%d')}"
+        else:
+            template.version = "1.0"
     if data.version is not None:
+        # Allow manual version override
         template.version = data.version
     if data.is_active is not None:
         template.is_active = data.is_active
@@ -194,6 +206,10 @@ async def update_prompt_template(
     
     await db.commit()
     await db.refresh(template)
+    
+    # Invalidate prompt cache after update
+    from web.backend.services.prompt_loader import invalidate_prompt_cache
+    invalidate_prompt_cache(current_user.id, agent_type)
     
     # Get enabled tools
     tools_query = select(TemplateTools).where(

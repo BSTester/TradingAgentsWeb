@@ -102,6 +102,10 @@ def execute_scheduled_task(scheduled_task_id: int):
         db.commit()
         print(f"✅ Updated user configuration cache for user {task.user_id}")
         
+        # Invalidate cache after updating user config
+        from web.backend.services.user_config_cache import invalidate_user_config_cache
+        invalidate_user_config_cache(task.user_id)
+        
         # Create analysis record (use Beijing time)
         from pytz import timezone as pytz_timezone
         beijing_tz = pytz_timezone('Asia/Shanghai')

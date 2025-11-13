@@ -5,14 +5,70 @@ Handles loading and managing user-specific agent prompt templates.
 """
 
 import logging
+import threading
 from datetime import datetime
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 
 from web.backend.database import SessionLocal
 from web.backend.models import AgentPromptTemplate, TemplateTools, AgentTool
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Prompt Cache
+# ============================================================================
+
+class PromptCache:
+    """
+    Thread-safe cache for user prompt templates
+    
+    Cache key: (user_id, agent_type)
+    Cache value: prompt string
+    """
+    
+    def __init__(self):
+        self._cache: Dict[Tuple[int, str], str] = {}
+        self._lock = threading.RLock()
+        logger.info("PromptCache initialized (no expiration, manual invalidation only)")
+    
+    def get(self, key: Tuple[int, str]) -> Optional[str]:
+        """Get prompt from cache"""
+        with self._lock:
+            return self._cache.get(key)
+    
+    def set(self, key: Tuple[int, str], prompt: str) -> None:
+        """Set prompt in cache"""
+        with self._lock:
+            self._cache[key] = prompt
+            logger.debug(f"Cached prompt for user {key[0]}, agent_type {key[1]}")
+    
+    def invalidate(self, user_id: int, agent_type: str) -> None:
+        """Invalidate cache for a specific user and agent type"""
+        key = (user_id, agent_type)
+        with self._lock:
+            if key in self._cache:
+                del self._cache[key]
+                logger.info(f"✅ Invalidated prompt cache for user {user_id}, agent_type {agent_type}")
+    
+    def clear(self) -> None:
+        """Clear all cache"""
+        with self._lock:
+            self._cache.clear()
+            logger.info("Prompt cache cleared")
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get cache statistics"""
+        with self._lock:
+            return {
+                "total_entries": len(self._cache),
+                "cached_keys": list(self._cache.keys())
+            }
+
+
+# Global prompt cache instance
+_prompt_cache = PromptCache()
 
 
 def generate_tool_documentation() -> str:
@@ -203,6 +259,8 @@ def load_user_prompt_template(
     This function loads ONLY the user's custom strategy content.
     System documentation (tools, variables) will be injected by the agent at runtime.
     
+    Uses caching to reduce database queries.
+    
     Args:
         user_id: User ID
         agent_type: Type of agent (default: intraday_trader)
@@ -210,8 +268,31 @@ def load_user_prompt_template(
     Returns:
         User's core prompt string (without system injections)
     """
+    # Try to get from cache first
+    cache_key = (user_id, agent_type)
+    cached_prompt = _prompt_cache.get(cache_key)
+    
+    if cached_prompt is not None:
+        logger.debug(f"✅ Loaded prompt from cache for user {user_id}, agent_type {agent_type}")
+        return cached_prompt
+    
+    # Cache miss - load from database
     db = SessionLocal()
     try:
+        # Check if user is active first
+        from web.backend.models import User
+        user = db.query(User).filter(User.id == user_id).first()
+        
+        if not user:
+            logger.warning(f"User {user_id} not found")
+            default_prompt = get_default_intraday_prompt()
+            return default_prompt
+        
+        if not user.is_active:
+            logger.debug(f"User {user_id} is disabled, skipping cache, using default prompt")
+            # Don't cache for disabled users
+            return get_default_intraday_prompt()
+        
         # Query user's template
         template = db.query(AgentPromptTemplate).filter(
             AgentPromptTemplate.agent_type == agent_type,
@@ -224,20 +305,26 @@ def load_user_prompt_template(
             logger.info(f"No template found for user {user_id}, creating default")
             template = create_default_template_for_user(user_id, db)
         
+        # Cache the prompt (only for active users)
+        prompt = template.system_prompt
+        _prompt_cache.set(cache_key, prompt)
+        
         # Return ONLY user's core prompt (no system injections)
         # System documentation will be added by agent at runtime
         logger.info(
-            f"Loaded core prompt for user {user_id}: "
+            f"📋 Loaded core prompt from database for user {user_id}: "
             f"version={template.version}, "
-            f"length={len(template.system_prompt)}"
+            f"length={len(prompt)}"
         )
         
-        return template.system_prompt
+        return prompt
         
     except Exception as e:
         logger.error(f"Error loading prompt template for user {user_id}: {e}", exc_info=True)
         # Fallback to default core prompt (no system injections)
-        return get_default_intraday_prompt()
+        default_prompt = get_default_intraday_prompt()
+        # Don't cache error cases
+        return default_prompt
         
     finally:
         db.close()
@@ -276,3 +363,17 @@ def get_enabled_tools_for_user(user_id: int, agent_type: str = "intraday_trader"
         
     finally:
         db.close()
+
+
+
+def invalidate_prompt_cache(user_id: int, agent_type: str = "intraday_trader"):
+    """
+    Invalidate prompt cache for a user
+    
+    This function should be called when a user's prompt template is updated.
+    
+    Args:
+        user_id: User ID
+        agent_type: Agent type (default: intraday_trader)
+    """
+    _prompt_cache.invalidate(user_id, agent_type)

@@ -385,21 +385,6 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
                     </div>
                   )}
 
-                  {/* Account Snapshot */}
-                  {detailData.account_snapshot && Object.keys(detailData.account_snapshot).length > 0 && (
-                    <div>
-                      <h4 className="text-lg font-semibold text-text-primary mb-3">
-                        <i className="fas fa-wallet mr-2 text-success-500" />
-                        账户快照
-                      </h4>
-                      <div className="bg-gradient-to-br from-success-900/20 to-accent-primary/20 rounded-lg p-4 border border-success-500/30">
-                        <pre className="text-sm text-text-primary whitespace-pre-wrap font-mono overflow-x-auto">
-                          {JSON.stringify(detailData.account_snapshot, null, 2)}
-                        </pre>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Trades Executed */}
                   {detailData.trades_executed && detailData.trades_executed.length > 0 && (
                     <div>

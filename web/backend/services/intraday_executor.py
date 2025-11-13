@@ -59,19 +59,56 @@ async def execute_intraday_analysis(
     
     logging.info(f"Starting intraday analysis: session={session_id}, market={market_type}, user={user_id}")
 
-    # WebSocket: announce session start (will be sent after decision record is created)
-    # Moved to after decision record creation to include decision_id
+    # ========================================
+    # STEP 1: Pre-load all configuration from cache
+    # ========================================
+    from web.backend.services.user_config_cache import get_user_config_from_cache
+    from tradingagents.default_config import DEFAULT_CONFIG
+    import os
     
+    # Get user configuration from cache (no database query)
+    user_config_dict = None
+    if user_id:
+        user_config_dict = get_user_config_from_cache(user_id)
+        if user_config_dict:
+            logging.info(f"✅ Loaded user config from cache for user {user_id}")
+        else:
+            logging.warning(f"⚠️ No cached config for user {user_id}, will use defaults")
+    
+    # Extract all needed configuration upfront
+    if user_config_dict:
+        llm_provider = user_config_dict.get('intraday_llm_provider') or user_config_dict.get('last_llm_provider') or DEFAULT_CONFIG.get("llm_provider", "openai")
+        api_key = user_config_dict.get('intraday_api_key') or user_config_dict.get('last_api_key')
+        model_name = user_config_dict.get('intraday_llm_model') or user_config_dict.get('last_deep_thinker') or DEFAULT_CONFIG.get("deep_think_llm", "gpt-4o-mini")
+        backend_url = user_config_dict.get('intraday_backend_url') or user_config_dict.get('last_backend_url') or DEFAULT_CONFIG.get("backend_url")
+        futu_api_url = user_config_dict.get('intraday_futu_api_url') or user_config_dict.get('futu_api_base_url')
+        futu_api_key = user_config_dict.get('futu_api_key')
+    else:
+        llm_provider = DEFAULT_CONFIG.get("llm_provider", "openai")
+        api_key = None
+        model_name = DEFAULT_CONFIG.get("deep_think_llm", "gpt-4o-mini")
+        backend_url = DEFAULT_CONFIG.get("backend_url")
+        futu_api_url = None
+        futu_api_key = None
+    
+    logging.info(f"📋 Configuration loaded from cache:")
+    logging.info(f"   LLM Provider: {llm_provider}")
+    logging.info(f"   Model: {model_name}")
+    logging.info(f"   Backend URL: {backend_url or 'default'}")
+    logging.info(f"   Futu API URL: {futu_api_url or 'default'}")
+    logging.info(f"   API Key: {'***' if api_key else 'not set'}")
+    
+    # ========================================
+    # STEP 2: Create database session and decision record
+    # ========================================
     try:
         # Import here to avoid circular dependencies
         from web.backend.database import SessionLocal
         from web.backend.models import IntradayDecisionRecord, PositionRecord
-        from tradingagents.default_config import DEFAULT_CONFIG
         from tradingagents.agents.trader.intraday_trader import create_intraday_trader
         from langchain_openai import ChatOpenAI
         from langchain_anthropic import ChatAnthropic
         from langchain_google_genai import ChatGoogleGenerativeAI
-        import os
         
         # Create database session
         db = SessionLocal()
@@ -108,30 +145,6 @@ async def execute_intraday_analysis(
             except Exception as ws_error:
                 logging.warning(f"Failed to send session start WebSocket notification: {ws_error}")
             
-            # Get user's LLM configuration (with fallback to analysis config)
-            from web.backend.models import UserConfig
-            from sqlalchemy import select
-            
-            user_config = None
-            if user_id:
-                result = db.execute(
-                    select(UserConfig).where(UserConfig.user_id == user_id)
-                )
-                user_config = result.scalar_one_or_none()
-            
-            # Determine LLM configuration (priority: intraday config -> analysis config -> env/default)
-            # For each field, use intraday config first, fallback to analysis config
-            if user_config:
-                llm_provider = user_config.intraday_llm_provider or user_config.last_llm_provider or DEFAULT_CONFIG.get("llm_provider", "openai")
-                api_key = user_config.intraday_api_key or user_config.last_api_key
-                model_name = user_config.intraday_llm_model or user_config.last_deep_thinker or DEFAULT_CONFIG.get("deep_think_llm", "gpt-4o-mini")
-                backend_url = user_config.intraday_backend_url or user_config.last_backend_url or DEFAULT_CONFIG.get("backend_url")
-            else:
-                llm_provider = DEFAULT_CONFIG.get("llm_provider", "openai")
-                api_key = None
-                model_name = DEFAULT_CONFIG.get("deep_think_llm", "gpt-4o-mini")
-                backend_url = DEFAULT_CONFIG.get("backend_url")
-            
             # Create LLM instance
             if llm_provider in ("openai", "ollama", "openrouter", "oneai", "deepseek", "qwen"):
                 llm = ChatOpenAI(
@@ -155,7 +168,9 @@ async def execute_intraday_analysis(
             else:
                 raise ValueError(f"Unsupported LLM provider: {llm_provider}")
             
-            # Get previous decision for context (last completed decision for this user and market)
+            # ========================================
+            # STEP 3: Get previous decision for context (one-time query)
+            # ========================================
             previous_decision_context = ""
             try:
                 from sqlalchemy import desc
@@ -205,11 +220,15 @@ async def execute_intraday_analysis(
                             summary = summary[:500] + "..."
                         previous_decision_context += f"\n**决策摘要**:\n{summary}\n"
                     
-                    logging.info(f"Found previous decision (ID: {prev_decision.id}) for context")
+                    logging.info(f"✅ Found previous decision (ID: {prev_decision.id}) for context")
                 else:
-                    logging.info("No previous decision found for this user/market")
+                    logging.info("ℹ️ No previous decision found for this user/market")
             except Exception as e:
-                logging.warning(f"Failed to fetch previous decision: {e}")
+                logging.warning(f"⚠️ Failed to fetch previous decision: {e}")
+            
+            # ========================================
+            # STEP 4: Create LangGraph agent with pre-loaded config
+            # ========================================
             
             # Create intraday trader agent
             logging.info(f"Creating LangGraph agent with provider={llm_provider}, model={model_name}")
@@ -455,20 +474,14 @@ async def execute_intraday_analysis(
             try:
                 from web.backend.services.snapshot_scheduler import create_account_snapshot
                 from web.backend.models import AccountSnapshot
-                from sqlalchemy import select, and_, desc
                 
                 snapshot_created = await create_account_snapshot(user_id, market_type, skip_market_check=True)
                 if snapshot_created:
-                    # Get the snapshot ID that was just created/updated
-                    snapshot_query = select(AccountSnapshot).where(
-                        and_(
-                            AccountSnapshot.user_id == user_id,
-                            AccountSnapshot.market_type == market_type.upper()
-                        )
-                    ).order_by(desc(AccountSnapshot.snapshot_date)).limit(1)
-                    
-                    snapshot_result = await db.execute(snapshot_query)
-                    latest_snapshot = snapshot_result.scalar_one_or_none()
+                    # Get the snapshot ID that was just created/updated (using sync query)
+                    latest_snapshot = db.query(AccountSnapshot).filter(
+                        AccountSnapshot.user_id == user_id,
+                        AccountSnapshot.market_type == market_type.upper()
+                    ).order_by(AccountSnapshot.snapshot_date.desc()).first()
                     
                     if latest_snapshot:
                         snapshot_id = latest_snapshot.id
@@ -480,7 +493,7 @@ async def execute_intraday_analysis(
                         decision_record.account_snapshot['total_assets'] = latest_snapshot.total_assets
                         decision_record.account_snapshot['cash'] = latest_snapshot.cash
                         decision_record.account_snapshot['market_value'] = latest_snapshot.market_value
-                        await db.commit()
+                        db.commit()
                         
                         logging.info(f"✅ Account snapshot created/updated (ID: {snapshot_id}) for user {user_id} in {market_type} market after intraday analysis")
                     else:

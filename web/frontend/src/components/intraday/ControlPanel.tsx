@@ -336,8 +336,8 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
       return;
     }
 
-    if (interval < 5 || interval > 60) {
-      onShowToast('分析间隔必须在5-60分钟之间', 'error');
+    if (interval < 5 || interval > 120) {
+      onShowToast('分析间隔必须在5-120分钟之间', 'error');
       return;
     }
 
@@ -438,8 +438,8 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
   };
 
   const handleUpdateInterval = async () => {
-    if (interval < 5 || interval > 60) {
-      onShowToast('分析间隔必须在5-60分钟之间', 'error');
+    if (interval < 5 || interval > 120) {
+      onShowToast('分析间隔必须在5-120分钟之间', 'error');
       return;
     }
 
@@ -685,11 +685,11 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
                   value={interval}
                   onChange={(e) => setInterval(Number(e.target.value))}
                   min={5}
-                  max={60}
+                  max={120}
                   className="w-full px-3 py-2 bg-dark-tertiary border border-dark-border text-text-primary rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary"
                 />
                 <p className="text-xs text-text-tertiary mt-1">
-                  系统每隔多少分钟执行一次分析（最低5分钟，最高60分钟）
+                  系统每隔多少分钟执行一次分析（范围：5-120分钟，默认60分钟）
                 </p>
               </div>
 

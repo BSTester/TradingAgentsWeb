@@ -97,7 +97,7 @@ export function AccountTrendModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-0 md:p-4">
-      <div className="bg-dark-secondary md:rounded-lg shadow-xl border-0 md:border border-dark-border w-full h-full md:h-auto md:max-h-[90vh] md:max-w-4xl overflow-hidden flex flex-col">
+      <div className="bg-dark-secondary md:rounded-lg shadow-xl border-0 md:border border-dark-border w-full h-full md:h-auto md:max-h-[90vh] md:max-w-6xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="sticky top-0 z-10 px-4 md:px-6 py-3 md:py-4 border-b border-dark-border flex items-center justify-between bg-dark-secondary">
           <div className="flex-1">

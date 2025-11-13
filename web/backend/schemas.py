@@ -5,7 +5,7 @@ Pydantic schemas for TradingAgents Web Interface
 
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, Field, validator
 
 # User schemas
 class UserBase(BaseModel):
@@ -485,10 +485,10 @@ class UserConfigResponse(BaseModel):
 # ============================================================================
 
 class PromptTemplateBase(BaseModel):
-    template_name: Optional[str] = None
-    description: Optional[str] = None
-    system_prompt: str
-    version: Optional[str] = "1.0"
+    template_name: Optional[str] = Field(None, max_length=200, description="策略标题，最多200个字符")
+    description: Optional[str] = Field(None, max_length=500, description="策略描述，最多500个字符")
+    system_prompt: str = Field(..., max_length=20000, description="系统提示词，最多20000个字符")
+    version: Optional[str] = Field("1.0", max_length=50)
 
 
 class PromptTemplateCreate(PromptTemplateBase):
@@ -496,10 +496,10 @@ class PromptTemplateCreate(PromptTemplateBase):
 
 
 class PromptTemplateUpdate(BaseModel):
-    template_name: Optional[str] = None
-    description: Optional[str] = None
-    system_prompt: Optional[str] = None
-    version: Optional[str] = None
+    template_name: Optional[str] = Field(None, max_length=200, description="策略标题，最多200个字符")
+    description: Optional[str] = Field(None, max_length=500, description="策略描述，最多500个字符")
+    system_prompt: Optional[str] = Field(None, max_length=20000, description="系统提示词，最多20000个字符")
+    version: Optional[str] = Field(None, max_length=50)
     is_active: Optional[bool] = None
 
 

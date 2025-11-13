@@ -14,7 +14,7 @@ import logging
 from web.backend.database import get_db
 from web.backend.models import User, IntradayDecisionRecord, PositionRecord, TradingHistory
 from web.backend.auth_routes import get_current_active_user, require_intraday_access
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ class SchedulerControlRequest(BaseModel):
 
 class SchedulerConfigRequest(BaseModel):
     """Request to configure scheduler"""
-    interval_minutes: int
+    interval_minutes: int = Field(..., ge=5, le=120, description="分析间隔（分钟），范围：5-120，默认60")
     market_type: Optional[str] = "US,HK,CN"  # Single market (US/HK/CN) or comma-separated (US,HK,CN)
 
 
