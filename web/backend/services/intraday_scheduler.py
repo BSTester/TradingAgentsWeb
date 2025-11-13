@@ -388,8 +388,8 @@ class IntradayScheduler:
     
     def update_interval(self, interval_minutes: int):
         """Update analysis interval"""
-        if interval_minutes < 1 or interval_minutes > 60:
-            raise ValueError("Interval must be between 1 and 60 minutes")
+        if interval_minutes < 5 or interval_minutes > 120:
+            raise ValueError("Interval must be between 5 and 120 minutes")
         
         self.interval_minutes = interval_minutes
         logger.info(f"IntradayScheduler interval updated to {interval_minutes} minutes")

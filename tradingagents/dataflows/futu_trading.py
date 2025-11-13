@@ -31,7 +31,7 @@ def _get_base_url(user_id: Optional[int] = None) -> str:
     Get configured Futu API base URL from user config, environment variable, or default config.
     
     Priority order:
-    1. User-specific configuration (if user_id provided)
+    1. User-specific configuration (if user_id provided) - with caching
     2. Environment variable
     3. Default config
     
@@ -43,23 +43,18 @@ def _get_base_url(user_id: Optional[int] = None) -> str:
     """
     import os
     
-    # Try user-specific config first (highest priority)
+    # Try user-specific config first (highest priority) - with caching
     if user_id:
         try:
-            from web.backend.database import SessionLocal
-            from web.backend.models import UserConfig
+            from web.backend.services.user_config_cache import get_user_config_from_cache
             
-            db = SessionLocal()
-            try:
-                user_config = db.query(UserConfig).filter(UserConfig.user_id == user_id).first()
-                if user_config:
-                    # Prefer intraday URL if available, otherwise use regular URL
-                    base_url = user_config.intraday_futu_api_url or user_config.futu_api_base_url
-                    if base_url:
-                        logger.debug(f"Using Futu API base URL from user {user_id} config: {base_url}")
-                        return base_url
-            finally:
-                db.close()
+            user_config = get_user_config_from_cache(user_id)
+            if user_config:
+                # Prefer intraday URL if available, otherwise use regular URL
+                base_url = user_config.get('intraday_futu_api_url') or user_config.get('futu_api_base_url')
+                if base_url:
+                    logger.debug(f"Using Futu API base URL from user {user_id} config (cached): {base_url}")
+                    return base_url
         except Exception as e:
             logger.debug(f"Failed to get user config for user {user_id}: {e}")
     

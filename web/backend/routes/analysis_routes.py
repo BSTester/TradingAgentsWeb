@@ -91,6 +91,10 @@ async def start_analysis(
     
     await db.commit()
     
+    # Invalidate cache after updating user config
+    from web.backend.services.user_config_cache import invalidate_user_config_cache
+    invalidate_user_config_cache(current_user.id)
+    
     # Use cached API key if not provided in request
     api_key = request.api_key or user_config.last_api_key
     

@@ -42,7 +42,6 @@ export function PromptConfigTab({ onShowToast }: PromptConfigTabProps) {
     setLoading(true);
     try {
       const templateData = await getPromptTemplate('intraday_trader');
-
       setTemplate(templateData);
       setEditedPrompt(templateData.system_prompt);
       setTemplateName(templateData.template_name || '');
@@ -60,18 +59,33 @@ export function PromptConfigTab({ onShowToast }: PromptConfigTabProps) {
       return;
     }
 
+    if (templateName.length > 200) {
+      onShowToast('策略名称不能超过200个字符', 'error');
+      return;
+    }
+    
+    if (description.length > 500) {
+      onShowToast('策略描述不能超过500个字符', 'error');
+      return;
+    }
+    
+    if (editedPrompt.length > 20000) {
+      onShowToast('提示词不能超过20,000个字符（当前' + editedPrompt.length.toLocaleString() + '字符）', 'error');
+      return;
+    }
+
     setSaving(true);
 
     try {
-      // Save the template directly (validation happens on backend)
-      const data = await updatePromptTemplate('intraday_trader', {
+      const updateData: any = {
         system_prompt: editedPrompt,
-        template_name: templateName || undefined,
-        description: description || undefined,
-        version: `${template?.version || '1.0'}_edited`,
-      });
+        version: (template?.version || '1.0') + '_edited',
+      };
+      if (templateName) updateData.template_name = templateName;
+      if (description) updateData.description = description;
       
-      // Update local state with saved data
+      const data = await updatePromptTemplate('intraday_trader', updateData);
+      
       setTemplate(data);
       setEditedPrompt(data.system_prompt);
       setTemplateName(data.template_name || '');
@@ -94,16 +108,18 @@ export function PromptConfigTab({ onShowToast }: PromptConfigTabProps) {
     try {
       const { validatePromptTemplate } = await import('@/lib/api/prompts');
       
-      const result = await validatePromptTemplate('intraday_trader', {
+      const validateData: any = {
         system_prompt: editedPrompt,
-        template_name: templateName || undefined,
-        description: description || undefined,
-      });
+      };
+      if (templateName) validateData.template_name = templateName;
+      if (description) validateData.description = description;
+      
+      const result = await validatePromptTemplate('intraday_trader', validateData);
 
       setValidationResult(result);
       
       if (result.valid) {
-        onShowToast('✅ 提示词验证通过', 'success');
+        onShowToast('提示词验证通过', 'success');
       } else {
         onShowToast(result.message || '验证失败', 'error');
       }
@@ -150,48 +166,63 @@ export function PromptConfigTab({ onShowToast }: PromptConfigTabProps) {
     );
   }
 
+  const charCountClass = editedPrompt.length > 20000 
+    ? 'text-xs text-red-500 font-semibold' 
+    : 'text-xs text-text-secondary';
+
+  const saveButtonClass = saving || !hasChanges
+    ? 'bg-gray-400 cursor-not-allowed'
+    : 'bg-accent-primary hover:bg-accent-secondary';
+
   return (
     <div className="space-y-6">
-
-
-      {/* Template Name and Description */}
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-text-primary mb-2">
             策略名称
+            <span className="ml-2 text-xs text-text-tertiary">
+              ({templateName.length}/200)
+            </span>
           </label>
           <input
             type="text"
             value={templateName}
             onChange={(e) => setTemplateName(e.target.value)}
+            maxLength={200}
             className="w-full px-3 py-2 bg-dark-tertiary border border-dark-border text-text-primary rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary"
             placeholder="例如：激进型日内交易策略"
           />
+          <p className="text-xs text-text-tertiary mt-1">
+            策略标题，最多200个字符
+          </p>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-text-primary mb-2">
             策略描述
+            <span className="ml-2 text-xs text-text-tertiary">
+              ({description.length}/500)
+            </span>
           </label>
           <input
             type="text"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            maxLength={500}
             className="w-full px-3 py-2 bg-dark-tertiary border border-dark-border text-text-primary rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary"
             placeholder="简要描述策略特点"
           />
         </div>
       </div>
 
-      {/* Prompt Editor */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
-            <label className="block text-sm font-medium text-text-primary">
+            <label className="text-sm font-medium text-text-primary">
               系统提示词
             </label>
-            <span className="text-xs text-text-secondary">
-              {editedPrompt.length.toLocaleString()} 字符
+            <span className={charCountClass}>
+              {editedPrompt.length.toLocaleString()} / 20,000 字符
             </span>
           </div>
           <button
@@ -211,16 +242,31 @@ export function PromptConfigTab({ onShowToast }: PromptConfigTabProps) {
           className="w-full h-96 px-3 py-2 font-mono text-sm bg-dark-tertiary border border-dark-border text-text-primary rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary resize-none"
           placeholder="定义 Agent 的行为、交易理念和执行流程..."
         />
+        <p className="text-xs text-text-tertiary mt-1">
+          核心提示词内容，最多 20,000 个字符。系统会自动注入工具文档和变量说明。
+        </p>
         
-        {/* Validation Result */}
-        {validationResult && (
-          <div className={`mt-2 p-3 rounded-md text-sm ${
-            validationResult.valid 
-              ? 'bg-green-50 border border-green-200 text-green-800'
-              : 'bg-red-50 border border-red-200 text-red-800'
-          }`}>
+        {editedPrompt.length > 20000 && (
+          <div className="mt-2 p-3 rounded-md text-sm bg-red-50 border border-red-200 text-red-800">
             <div className="flex items-start gap-2">
-              <i className={`fas ${validationResult.valid ? 'fa-check-circle' : 'fa-exclamation-circle'} mt-0.5`} />
+              <i className="fas fa-exclamation-triangle mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium">提示词超出长度限制</p>
+                <p className="text-xs mt-1">
+                  当前 {editedPrompt.length.toLocaleString()} 字符，超出 {(editedPrompt.length - 20000).toLocaleString()} 字符。请精简内容后再保存。
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {validationResult && (
+          <div className={validationResult.valid 
+            ? 'mt-2 p-3 rounded-md text-sm bg-green-50 border border-green-200 text-green-800'
+            : 'mt-2 p-3 rounded-md text-sm bg-red-50 border border-red-200 text-red-800'
+          }>
+            <div className="flex items-start gap-2">
+              <i className={validationResult.valid ? 'fas fa-check-circle mt-0.5' : 'fas fa-exclamation-circle mt-0.5'} />
               <div className="flex-1">
                 <p className="font-medium">{validationResult.message}</p>
                 {validationResult.valid && validationResult.total_length && (
@@ -234,18 +280,11 @@ export function PromptConfigTab({ onShowToast }: PromptConfigTabProps) {
         )}
       </div>
 
-
-
-      {/* Action Buttons */}
       <div className="flex gap-3 pt-4 border-t border-dark-border">
         <button
           onClick={handleSave}
           disabled={saving || !hasChanges}
-          className={`px-4 py-2 rounded-md text-white font-medium transition-colors ${
-            saving || !hasChanges
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-accent-primary hover:bg-accent-secondary'
-          }`}
+          className={'px-4 py-2 rounded-md text-white font-medium transition-colors ' + saveButtonClass}
         >
           {saving ? '保存中...' : '保存配置'}
         </button>
@@ -270,7 +309,6 @@ export function PromptConfigTab({ onShowToast }: PromptConfigTabProps) {
         )}
       </div>
 
-      {/* Reset Confirmation Modal */}
       {showResetConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-dark-secondary rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
