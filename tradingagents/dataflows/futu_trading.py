@@ -28,16 +28,25 @@ class FutuAPIError(Exception):
 
 def _get_base_url() -> str:
     """
-    Get configured Futu API base URL from config.
+    Get configured Futu API base URL from environment variable or config.
     
     Returns:
         str: Base URL for Futu API
     """
+    import os
+    
+    # Try environment variable first (set by FutuAPIClient)
+    base_url = os.getenv("FUTU_API_BASE_URL")
+    if base_url:
+        logger.debug(f"Using Futu API base URL from environment: {base_url}")
+        return base_url
+    
+    # Try config as fallback
     try:
         from .config import get_config
         config = get_config()
         base_url = config.get("futu_api_base_url", "http://localhost:9000")
-        logger.debug(f"Using Futu API base URL: {base_url}")
+        logger.debug(f"Using Futu API base URL from config: {base_url}")
         return base_url
     except Exception as e:
         logger.warning(f"Failed to get config, using default base URL: {e}")
