@@ -265,6 +265,24 @@ class IntradayScheduler:
             
             logger.info(f"✅ {market} analysis completed: {result.get('status', 'unknown')}")
             
+            # Create account snapshot after successful analysis
+            # This is done here (in the main event loop) to avoid event loop conflicts
+            if result.get('status') == 'success':
+                try:
+                    from web.backend.services.snapshot_scheduler import create_account_snapshot
+                    
+                    snapshot_created = await create_account_snapshot(
+                        self.user_id, 
+                        market, 
+                        skip_market_check=True
+                    )
+                    if snapshot_created:
+                        logger.info(f"✅ Account snapshot created for user {self.user_id} in {market} market")
+                    else:
+                        logger.warning(f"⚠️ Failed to create account snapshot for user {self.user_id} in {market} market")
+                except Exception as snapshot_error:
+                    logger.error(f"❌ Error creating account snapshot: {snapshot_error}", exc_info=True)
+            
         except asyncio.CancelledError:
             logger.info(f"🛑 {market} analysis was cancelled")
             raise  # Re-raise to properly handle cancellation

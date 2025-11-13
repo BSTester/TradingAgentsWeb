@@ -468,8 +468,7 @@ async def execute_intraday_analysis(
             
             logging.info(f"Analysis completed successfully: session_id={session_id}")
             
-            # Return success first, then create snapshot in background
-            # This avoids event loop conflicts between sync and async database sessions
+            # Return success - snapshot will be created by the scheduler
             result_data = {
                 "status": "success",
                 "session_id": session_id,
@@ -482,24 +481,6 @@ async def execute_intraday_analysis(
                 "start_time": decision_record.start_time.isoformat(),
                 "end_time": decision_record.end_time.isoformat() if decision_record.end_time else None,
             }
-            
-            # Close the sync database session before creating async snapshot
-            db.close()
-            
-            # Create account snapshot after analysis completes (in separate async context)
-            # Skip market check since we want to capture the state after analysis regardless of market hours
-            try:
-                from web.backend.services.snapshot_scheduler import create_account_snapshot
-                
-                snapshot_created = await create_account_snapshot(user_id, market_type, skip_market_check=True)
-                if snapshot_created:
-                    logging.info(f"✅ Account snapshot created for user {user_id} in {market_type} market after intraday analysis")
-                else:
-                    logging.warning(f"⚠️ Failed to create account snapshot for user {user_id} in {market_type} market")
-            except Exception as snapshot_error:
-                logging.error(f"❌ Error creating account snapshot: {snapshot_error}")
-                import traceback
-                logging.error(traceback.format_exc())
             
             return result_data
         
