@@ -142,7 +142,7 @@ class SnapshotScheduler:
             
             from web.backend.database import AsyncSessionLocal
             from web.backend.models import User, UserConfig, AccountSnapshot
-            from web.backend.services.futu_api_client import FutuAPIClient
+            from web.backend.services.futu_async_wrapper import get_account_info_async
             from sqlalchemy import select
             from datetime import datetime
             
@@ -164,78 +164,44 @@ class SnapshotScheduler:
                         if user.role != 'admin' and not user.can_access_intraday_trading:
                             continue
                         
-                        # Get Futu API URL
-                        futu_api_url = config.intraday_futu_api_url or config.futu_api_base_url
-                        if not futu_api_url:
-                            continue
-                        
-                        # Create API client
-                        client = FutuAPIClient(base_url=futu_api_url)
-                        
-                        # Get account info for the market
-                        account_info = await client.get_account_info(market_type)
+                        # Get account info for the market (user_id will be used to fetch user-specific config)
+                        account_info = await get_account_info_async(market_type, user_id=user.id)
                         if not account_info:
                             logger.warning(f"No account info for user {user.id} in {market_type} market")
                             continue
                         
-                        # Get positions for the market (pass user_id for database enrichment)
-                        positions = await client.get_positions(market_type, user_id=user.id)
-                        
-                        # Calculate totals - map field names from futu_trading.py API
-                        total_assets = account_info.get("net_asset_value", 0.0)
+                        # Extract account data - use correct field names from Futu API response
+                        # API returns: net_asset, cash, market_value, profit_loss, today_profit_loss
+                        total_assets = account_info.get("net_asset", 0.0)
                         cash = account_info.get("cash", 0.0)
-                        market_value = account_info.get("position_value", 0.0)
+                        market_value = account_info.get("market_value", 0.0)
                         
-                        # Calculate P&L from positions
-                        realized_pnl = 0.0
-                        unrealized_pnl = 0.0
-                        if positions:
-                            for pos in positions:
-                                # Use profit_loss from position as unrealized P&L
-                                unrealized_pnl += pos.get("profit_loss", 0.0)
+                        # Use profit_loss from API (total unrealized P&L)
+                        # Use today_profit_loss as realized P&L for the day
+                        unrealized_pnl = account_info.get("profit_loss", 0.0)
+                        realized_pnl = account_info.get("today_profit_loss", 0.0)
                         
-                        # Check if snapshot already exists for today (using market local date)
-                        # Get market timezone
-                        market_tz_name = self.MARKET_CLOSE_TIMES[market_type]['timezone']
-                        market_tz = pytz.timezone(market_tz_name)
+                        # Get market timezone and current local time
+                        market_tz_map = {
+                            'US': 'America/New_York',
+                            'HK': 'Asia/Hong_Kong',
+                            'CN': 'Asia/Shanghai'
+                        }
+                        market_tz = pytz.timezone(market_tz_map.get(market_type, 'UTC'))
+                        local_now = datetime.now(market_tz)
                         
-                        # Get current date in market timezone
-                        market_now = datetime.now(market_tz)
-                        market_today = market_now.date()
-                        
-                        # Convert to datetime range for query (in UTC)
-                        market_day_start = market_tz.localize(datetime.combine(market_today, time.min))
-                        market_day_end = market_tz.localize(datetime.combine(market_today, time.max))
-                        
-                        # Query for existing snapshot on this market date
-                        existing = await db.execute(
-                            select(AccountSnapshot)
-                            .where(
-                                AccountSnapshot.user_id == user.id,
-                                AccountSnapshot.market_type == market_type,
-                                AccountSnapshot.snapshot_date >= market_day_start,
-                                AccountSnapshot.snapshot_date <= market_day_end
-                            )
-                        )
-                        existing_snapshot = existing.scalar_one_or_none()
-                        
-                        if existing_snapshot:
-                            logger.info(
-                                f"Snapshot already exists for user {user.id} in {market_type} market "
-                                f"on {market_today} (market local date)"
-                            )
-                            continue
-                        
-                        # Create snapshot
+                        # Create snapshot with market local time (naive datetime for SQLite)
+                        # SQLite doesn't preserve timezone, so we store as naive datetime in local time
                         snapshot = AccountSnapshot(
                             user_id=user.id,
                             market_type=market_type,
-                            snapshot_date=datetime.now(),
+                            snapshot_date=local_now.replace(tzinfo=None),  # Store as naive datetime in local time
                             total_assets=total_assets,
                             cash=cash,
                             market_value=market_value,
                             realized_pnl=realized_pnl,
                             unrealized_pnl=unrealized_pnl,
+                            account_data=None  # No need to store currency, frontend determines it
                         )
                         
                         db.add(snapshot)
@@ -338,3 +304,109 @@ def init_snapshot_scheduler() -> SnapshotScheduler:
     if not scheduler._started:
         scheduler.start()
     return scheduler
+
+
+
+# Standalone function to create snapshot for a specific user and market
+async def create_account_snapshot(user_id: int, market_type: str) -> bool:
+    """
+    Create an account snapshot for a specific user and market.
+    
+    This function can be called from anywhere (e.g., after intraday trading analysis).
+    Only creates snapshot if market is open.
+    
+    Args:
+        user_id: User ID
+        market_type: Market type (US, HK, CN)
+        
+    Returns:
+        bool: True if snapshot created successfully, False otherwise
+    """
+    try:
+        from web.backend.database import AsyncSessionLocal
+        from web.backend.models import User, UserConfig, AccountSnapshot
+        from web.backend.services.futu_async_wrapper import get_account_info_async
+        from sqlalchemy import select
+        from tradingagents.agents.utils.market_utils import is_market_open
+        
+        # Get market timezone and current time
+        market_tz_map = {
+            'US': 'America/New_York',
+            'HK': 'Asia/Hong_Kong',
+            'CN': 'Asia/Shanghai'
+        }
+        market_tz_name = market_tz_map.get(market_type.upper(), 'UTC')
+        market_tz = pytz.timezone(market_tz_name)
+        market_now = datetime.now(market_tz)
+        
+        # Check if market is open
+        is_open, status_msg = is_market_open(market_type, market_now)
+        if not is_open:
+            logger.info(f"Market {market_type} is closed, skipping snapshot: {status_msg}")
+            return False
+        
+        async with AsyncSessionLocal() as db:
+            # Get user
+            result = await db.execute(
+                select(User).where(User.id == user_id)
+            )
+            user = result.scalar_one_or_none()
+            
+            if not user:
+                logger.warning(f"User {user_id} not found")
+                return False
+            
+            # Check if user has access
+            if user.role != 'admin' and not user.can_access_intraday_trading:
+                logger.warning(f"User {user_id} does not have intraday trading access")
+                return False
+            
+            # Get user config
+            result = await db.execute(
+                select(UserConfig).where(UserConfig.user_id == user_id)
+            )
+            user_config = result.scalar_one_or_none()
+            
+            if not user_config or not (user_config.intraday_futu_api_url or user_config.futu_api_base_url):
+                logger.warning(f"User {user_id} does not have Futu API configured")
+                return False
+            
+            # Get account info
+            account_info = await get_account_info_async(market_type, user_id=user_id)
+            if not account_info:
+                logger.warning(f"No account info for user {user_id} in {market_type} market")
+                return False
+            
+            # Extract account data
+            total_assets = account_info.get("net_asset", 0.0)
+            cash = account_info.get("cash", 0.0)
+            market_value = account_info.get("market_value", 0.0)
+            unrealized_pnl = account_info.get("profit_loss", 0.0)
+            realized_pnl = account_info.get("today_profit_loss", 0.0)
+            
+            # Get market local time
+            local_now = datetime.now(market_tz)
+            
+            # Create snapshot with market local time (naive datetime for SQLite)
+            # SQLite doesn't preserve timezone, so we store as naive datetime in local time
+            snapshot = AccountSnapshot(
+                user_id=user_id,
+                market_type=market_type,
+                snapshot_date=local_now.replace(tzinfo=None),  # Store as naive datetime in local time
+                total_assets=total_assets,
+                cash=cash,
+                market_value=market_value,
+                realized_pnl=realized_pnl,
+                unrealized_pnl=unrealized_pnl,
+                account_data=None
+            )
+            
+            db.add(snapshot)
+            await db.commit()
+            
+            logger.info(f"Created snapshot for user {user_id} in {market_type} market")
+            return True
+            
+    except Exception as e:
+        logger.error(f"Error creating snapshot for user {user_id}: {e}")
+        return False

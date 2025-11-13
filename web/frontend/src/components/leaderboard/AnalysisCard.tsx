@@ -24,8 +24,9 @@ export function AnalysisCard({ analysis, onClick, market }: AnalysisCardProps) {
   
   const getDecisionColor = (decision: string) => {
     const d = (decision || '').toLowerCase();
-    if (d.includes('买入') || d.includes('buy')) return 'from-success-500 to-success-600';
-    if (d.includes('卖出') || d.includes('sell')) return 'from-danger-500 to-danger-600';
+    // 中国市场习惯：买入红色，卖出绿色
+    if (d.includes('买入') || d.includes('buy')) return 'from-[#f03a55] to-[#d02a45]';
+    if (d.includes('卖出') || d.includes('sell')) return 'from-[#00a870] to-[#008860]';
     if (d.includes('持有') || d.includes('观望') || d.includes('hold')) return 'from-warning-500 to-warning-600';
     return 'from-warning-500 to-warning-600';
   };

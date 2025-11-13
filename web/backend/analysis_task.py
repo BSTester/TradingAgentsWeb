@@ -359,7 +359,8 @@ def run_analysis_task(
         # 初始化状态
         init_agent_state = graph.propagator.create_initial_state(
             request_data.get('ticker'),
-            request_data.get('analysis_date')
+            request_data.get('analysis_date'),
+            user_id=analysis_record.user_id
         )
         # Pass user_id to graph args for tools to access
         args = graph.propagator.get_graph_args(user_id=analysis_record.user_id)

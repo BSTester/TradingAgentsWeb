@@ -240,7 +240,7 @@ async def control_scheduler(
                 
                 await manager.create_scheduler(
                     user_id=user_id,
-                    interval_minutes=user_config.intraday_interval_minutes or 5,
+                    interval_minutes=user_config.intraday_interval_minutes or 60,
                     market_type=market_type,
                     futu_api_url=futu_api_url,
                 )
@@ -298,7 +298,7 @@ async def control_scheduler(
                 if not status:
                     status = {
                         "is_running": False,
-                        "interval_minutes": user_config.intraday_interval_minutes if user_config else 5,
+                        "interval_minutes": user_config.intraday_interval_minutes if user_config else 60,
                         "market_type": user_config.intraday_market_type if user_config else "US,HK,CN",
                         "market_status": "Scheduler stopped",
                         "market_is_open": False,
@@ -420,7 +420,7 @@ async def get_scheduler_config(
             "futu_api_url": futu_api_url,
             "futu_api_key": futu_api_key,  # Return actual key for validation
             "has_futu_api_key": bool(futu_api_key),  # Indicate if key exists
-            "interval_minutes": user_config.intraday_interval_minutes or 5,
+            "interval_minutes": user_config.intraday_interval_minutes or 60,
             "market_type": user_config.intraday_market_type or "US,HK,CN",  # Default to all markets (comma-separated)
             "llm_provider": llm_provider,
             "api_key": api_key,
@@ -465,10 +465,10 @@ async def configure_scheduler(
         
         # Validate and update configuration
         if config.interval_minutes is not None:
-            if config.interval_minutes < 5 or config.interval_minutes > 60:
+            if config.interval_minutes < 5 or config.interval_minutes > 120:
                 raise HTTPException(
                     status_code=400,
-                    detail="分析间隔必须�?�?0分钟之间"
+                    detail="分析间隔必须在5-120分钟之间"
                 )
             user_config.intraday_interval_minutes = config.interval_minutes
         
@@ -969,6 +969,8 @@ async def get_account_info(
                     "total_assets": data.get("net_asset", 0.0),
                     "cash": data.get("cash", 0.0),
                     "position_value": data.get("market_value", 0.0),
+                    "today_profit_loss": data.get("today_profit_loss", 0.0),
+                    "today_profit_loss_ratio": data.get("today_profit_loss_ratio", 0.0),
                     "market": market,
                     "currency": currency,
                     "configured": True,

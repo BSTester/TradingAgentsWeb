@@ -65,12 +65,12 @@ next_run = scheduler.get_next_run_time('US')
 #### 2. Futu API 客户端 (`futu_api_client.py`)
 
 ```python
-from web.backend.services.futu_api_client import FutuAPIClient
+from web.backend.services.futu_async_wrapper import get_account_info_async
 
-# 创建客户端
-client = FutuAPIClient(base_url="http://localhost:11111")
+# 获取账户信息（使用用户配置）
+account_info = await get_account_info_async("US", user_id=user.id)
 
-# 获取账户信息
+# 或者不指定用户（使用环境变量配置）
 account_info = await client.get_account_info("US")
 
 # 获取持仓信息

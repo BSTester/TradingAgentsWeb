@@ -31,7 +31,7 @@ export function AccountTrendModal({
   onClose,
   onShowToast,
 }: AccountTrendModalProps) {
-  const [timeRange, setTimeRange] = useState<7 | 30 | 90 | 365>(30);
+  const [timeRange, setTimeRange] = useState<'today' | 7 | 30 | 90 | 365>('today');
   const [loading, setLoading] = useState(true);
   const [trendData, setTrendData] = useState<TrendResponse | null>(null);
 
@@ -42,7 +42,9 @@ export function AccountTrendModal({
   const loadTrendData = async () => {
     setLoading(true);
     try {
-      const data = await getAccountTrend(marketType, timeRange);
+      const todayOnly = timeRange === 'today';
+      const days = typeof timeRange === 'number' ? timeRange : 1;
+      const data = await getAccountTrend(marketType, days, todayOnly);
       setTrendData(data);
     } catch (error: any) {
       onShowToast(error.response?.data?.detail || '加载趋势数据失败', 'error');
@@ -52,12 +54,23 @@ export function AccountTrendModal({
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('zh-CN', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value);
+    // Determine currency based on market type
+    const getCurrencySymbol = (market: string) => {
+      switch (market.toUpperCase()) {
+        case 'US':
+          return '$';
+        case 'HK':
+          return 'HK$';
+        case 'CN':
+          return '¥';
+        default:
+          return '$';
+      }
+    };
+    const currencySymbol = getCurrencySymbol(marketType);
+    
+    // Simple formatting with currency symbol prefix
+    return `${currencySymbol}${value.toFixed(2)}`;
   };
 
   const formatDate = (dateStr: string) => {
@@ -94,7 +107,7 @@ export function AccountTrendModal({
             </h3>
             {change && (
               <div className="text-sm md:text-base mt-1">
-                <span className={`font-semibold ${change.change >= 0 ? 'text-success-500' : 'text-danger-500'}`}>
+                <span className={`font-semibold ${change.change >= 0 ? 'text-[#f03a55]' : 'text-[#00a870]'}`}>
                   {change.change >= 0 ? '+' : ''}{formatCurrency(change.change)}
                   {' '}
                   ({change.change >= 0 ? '+' : ''}{change.percentage.toFixed(2)}%)
@@ -117,10 +130,11 @@ export function AccountTrendModal({
         <div className="px-4 md:px-6 py-3 border-b border-dark-border bg-dark-tertiary">
           <div className="flex gap-2 overflow-x-auto">
             {[
-              { value: 7, label: '7天' },
-              { value: 30, label: '30天' },
-              { value: 90, label: '90天' },
-              { value: 365, label: '1年' },
+              { value: 'today' as const, label: '今日', icon: 'fa-clock' },
+              { value: 7 as const, label: '7天', icon: 'fa-calendar-week' },
+              { value: 30 as const, label: '30天', icon: 'fa-calendar-alt' },
+              { value: 90 as const, label: '90天', icon: 'fa-calendar' },
+              { value: 365 as const, label: '1年', icon: 'fa-calendar-check' },
             ].map((range) => (
               <button
                 key={range.value}
@@ -131,6 +145,7 @@ export function AccountTrendModal({
                     : 'bg-dark-secondary text-text-secondary hover:bg-dark-primary'
                 }`}
               >
+                <i className={`fas ${range.icon} mr-1`} />
                 {range.label}
               </button>
             ))}
@@ -219,11 +234,23 @@ export function AccountTrendModal({
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-64 md:h-96 text-center">
-              <i className="fas fa-chart-line text-4xl md:text-6xl text-text-muted mb-4" />
-              <h3 className="text-base md:text-lg font-medium text-text-primary mb-2">暂无数据</h3>
-              <p className="text-sm md:text-base text-text-secondary">
-                系统还没有记录账户快照数据
-              </p>
+              {timeRange === 'today' ? (
+                <>
+                  <i className="fas fa-moon text-4xl md:text-6xl text-text-muted mb-4" />
+                  <h3 className="text-base md:text-lg font-medium text-text-primary mb-2">市场已休市</h3>
+                  <p className="text-sm md:text-base text-text-secondary">
+                    {marketType} 市场当前没有交易数据
+                  </p>
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-chart-line text-4xl md:text-6xl text-text-muted mb-4" />
+                  <h3 className="text-base md:text-lg font-medium text-text-primary mb-2">暂无数据</h3>
+                  <p className="text-sm md:text-base text-text-secondary">
+                    系统还没有记录账户快照数据
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>

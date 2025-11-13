@@ -15,6 +15,21 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
   const { data: positions, isLoading, error } = usePositions(selectedMarket);
   const [sortField, setSortField] = useState<SortField>('stock_code');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  
+  // Determine currency based on market type
+  const getCurrencySymbol = (market: string) => {
+    switch (market.toUpperCase()) {
+      case 'US':
+        return '$';
+      case 'HK':
+        return 'HK$';
+      case 'CN':
+        return '¥';
+      default:
+        return '$';
+    }
+  };
+  const currency = getCurrencySymbol(selectedMarket);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -201,15 +216,15 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
                           {position.quantity?.toLocaleString() || 0}
                         </td>
                         <td className="px-2 md:px-4 py-2 md:py-4 whitespace-nowrap text-xs md:text-sm text-text-primary">
-                          {position.currency || '$'}{position.cost_price?.toFixed(2) || '0.00'}
+                          {currency}{position.cost_price?.toFixed(2) || '0.00'}
                         </td>
                         <td className="px-2 md:px-4 py-2 md:py-4 whitespace-nowrap text-xs md:text-sm text-text-primary">
-                          {position.currency || '$'}{position.current_price?.toFixed(2) || '0.00'}
+                          {currency}{position.current_price?.toFixed(2) || '0.00'}
                         </td>
                         <td className="px-2 md:px-4 py-2 md:py-4 whitespace-nowrap">
                           <div className="text-xs md:text-sm">
                             <div className={`font-medium ${(position.pnl || 0) >= 0 ? 'text-[#f03a55]' : 'text-[#00a870]'}`}>
-                              {(position.pnl || 0) >= 0 ? '+' : ''}{position.currency || '$'}{(position.pnl || 0).toFixed(2)}
+                              {(position.pnl || 0) >= 0 ? '+' : ''}{currency}{(position.pnl || 0).toFixed(2)}
                             </div>
                             <div className={`text-xs ${(position.pnl_percent || 0) >= 0 ? 'text-[#f03a55]' : 'text-[#00a870]'}`}>
                               {(position.pnl_percent || 0) >= 0 ? '+' : ''}{(position.pnl_percent || 0).toFixed(2)}%

@@ -406,7 +406,14 @@ Available Tools: get_futu_account_info, get_futu_positions, get_futu_orders, get
         
         chain = prompt | llm.bind_tools(tools)
         
-        result = chain.invoke(state["messages"])
+        # Get user_id from state
+        user_id_from_state = state.get("user_id")
+        
+        # Invoke with user_id in config
+        result = chain.invoke(
+            state["messages"],
+            config={"configurable": {"user_id": user_id_from_state}} if user_id_from_state else None
+        )
         
         # Extract execution report from response
         execution_report = ""

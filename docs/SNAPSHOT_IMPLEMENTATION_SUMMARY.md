@@ -206,8 +206,10 @@ INFO: ✅ US market snapshot job completed: 1 created, 0 errors
 ```python
 # 测试快照创建
 async def test_create_snapshot():
-    client = FutuAPIClient(base_url="http://localhost:11111")
-    account = await client.get_account_info("US")
+    from web.backend.services.futu_async_wrapper import get_account_info_async
+    
+    # 使用用户配置获取账户信息
+    account = await get_account_info_async("US", user_id=1)
     assert account is not None
 ```
 
