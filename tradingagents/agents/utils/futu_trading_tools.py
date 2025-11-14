@@ -43,10 +43,20 @@ def get_futu_account_info(
         >>> account = get_futu_account_info("US")
     """
     try:
-        # Extract user_id from config if available
-        user_id = None
-        if config and "configurable" in config:
-            user_id = config["configurable"].get("user_id")
+        # Validate config parameter
+        if not config or "configurable" not in config:
+            return json.dumps({
+                "success": False,
+                "error": "Configuration is required but not provided. Please ensure the tool is called with proper context."
+            }, ensure_ascii=False, indent=2)
+        
+        # Extract user_id from config
+        user_id = config["configurable"].get("user_id")
+        if not user_id:
+            return json.dumps({
+                "success": False,
+                "error": "User ID is required in configuration but not found."
+            }, ensure_ascii=False, indent=2)
         
         result = _get_account_info(market_type, user_id=user_id)
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -76,10 +86,20 @@ def get_futu_positions(
         >>> positions = get_futu_positions("US")
     """
     try:
-        # Extract user_id from config if available
-        user_id = None
-        if config and "configurable" in config:
-            user_id = config["configurable"].get("user_id")
+        # Validate config parameter
+        if not config or "configurable" not in config:
+            return json.dumps({
+                "success": False,
+                "error": "Configuration is required but not provided. Please ensure the tool is called with proper context."
+            }, ensure_ascii=False, indent=2)
+        
+        # Extract user_id from config
+        user_id = config["configurable"].get("user_id")
+        if not user_id:
+            return json.dumps({
+                "success": False,
+                "error": "User ID is required in configuration but not found."
+            }, ensure_ascii=False, indent=2)
         
         result = _get_positions(market_type, user_id=user_id)
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -114,10 +134,20 @@ def get_futu_quote(
         >>> quote = get_futu_quote("AAPL")
     """
     try:
-        # Extract user_id from config if available
-        user_id = None
-        if config and "configurable" in config:
-            user_id = config["configurable"].get("user_id")
+        # Validate config parameter
+        if not config or "configurable" not in config:
+            return json.dumps({
+                "success": False,
+                "error": "Configuration is required but not provided. Please ensure the tool is called with proper context."
+            }, ensure_ascii=False, indent=2)
+        
+        # Extract user_id from config
+        user_id = config["configurable"].get("user_id")
+        if not user_id:
+            return json.dumps({
+                "success": False,
+                "error": "User ID is required in configuration but not found."
+            }, ensure_ascii=False, indent=2)
         
         result = _get_quote(stock_code, user_id=user_id)
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -163,10 +193,20 @@ def place_futu_order(
         >>> result = place_futu_order("AAPL", "SELL", 10, order_type="MARKET")
     """
     try:
-        # Extract user_id from config if available
-        user_id = None
-        if config and "configurable" in config:
-            user_id = config["configurable"].get("user_id")
+        # Validate config parameter
+        if not config or "configurable" not in config:
+            return json.dumps({
+                "success": False,
+                "error": "Configuration is required but not provided. Please ensure the tool is called with proper context."
+            }, ensure_ascii=False, indent=2)
+        
+        # Extract user_id from config
+        user_id = config["configurable"].get("user_id")
+        if not user_id:
+            return json.dumps({
+                "success": False,
+                "error": "User ID is required in configuration but not found."
+            }, ensure_ascii=False, indent=2)
         
         result = _place_order(
             stock_code=stock_code,
@@ -241,10 +281,20 @@ def get_futu_orders(
         >>> filled = get_futu_orders("US", filter_status=1)
     """
     try:
-        # Extract user_id from config if available
-        user_id = None
-        if config and "configurable" in config:
-            user_id = config["configurable"].get("user_id")
+        # Validate config parameter
+        if not config or "configurable" not in config:
+            return json.dumps({
+                "success": False,
+                "error": "Configuration is required but not provided. Please ensure the tool is called with proper context."
+            }, ensure_ascii=False, indent=2)
+        
+        # Extract user_id from config
+        user_id = config["configurable"].get("user_id")
+        if not user_id:
+            return json.dumps({
+                "success": False,
+                "error": "User ID is required in configuration but not found."
+            }, ensure_ascii=False, indent=2)
         
         result = _get_orders(market_type, filter_status, user_id=user_id)
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -308,10 +358,20 @@ def get_futu_kline(
         >>> klines_weekly = get_futu_kline("AAPL", interval="weekly", start_date="2025-01-01", end_date="2025-11-03")
     """
     try:
-        # Extract user_id from config if available
-        user_id = None
-        if config and "configurable" in config:
-            user_id = config["configurable"].get("user_id")
+        # Validate config parameter
+        if not config or "configurable" not in config:
+            return json.dumps({
+                "success": False,
+                "error": "Configuration is required but not provided. Please ensure the tool is called with proper context."
+            }, ensure_ascii=False, indent=2)
+        
+        # Extract user_id from config
+        user_id = config["configurable"].get("user_id")
+        if not user_id:
+            return json.dumps({
+                "success": False,
+                "error": "User ID is required in configuration but not found."
+            }, ensure_ascii=False, indent=2)
         
         result = _get_kline_data(symbol, interval, start_date, end_date, format, user_id=user_id)
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -342,10 +402,20 @@ def get_futu_hot_stocks(
         >>> hot_stocks = get_futu_hot_stocks("US", count=5)
     """
     try:
-        # Extract user_id from config if available
-        user_id = None
-        if config and "configurable" in config:
-            user_id = config["configurable"].get("user_id")
+        # Validate config parameter
+        if not config or "configurable" not in config:
+            return json.dumps({
+                "success": False,
+                "error": "Configuration is required but not provided. Please ensure the tool is called with proper context."
+            }, ensure_ascii=False, indent=2)
+        
+        # Extract user_id from config
+        user_id = config["configurable"].get("user_id")
+        if not user_id:
+            return json.dumps({
+                "success": False,
+                "error": "User ID is required in configuration but not found."
+            }, ensure_ascii=False, indent=2)
         
         result = _get_hot_stocks(market_type, count, user_id=user_id)
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -374,10 +444,20 @@ def get_futu_hot_news(
         >>> news = get_futu_hot_news("zh-cn")
     """
     try:
-        # Extract user_id from config if available
-        user_id = None
-        if config and "configurable" in config:
-            user_id = config["configurable"].get("user_id")
+        # Validate config parameter
+        if not config or "configurable" not in config:
+            return json.dumps({
+                "success": False,
+                "error": "Configuration is required but not provided. Please ensure the tool is called with proper context."
+            }, ensure_ascii=False, indent=2)
+        
+        # Extract user_id from config
+        user_id = config["configurable"].get("user_id")
+        if not user_id:
+            return json.dumps({
+                "success": False,
+                "error": "User ID is required in configuration but not found."
+            }, ensure_ascii=False, indent=2)
         
         result = _get_hot_news(lang, user_id=user_id)
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -451,10 +531,20 @@ def get_futu_technical_analysis(
         ...                                     start_date="2025-10-04", end_date="2025-11-03")
     """
     try:
-        # Extract user_id from config if available
-        user_id = None
-        if config and "configurable" in config:
-            user_id = config["configurable"].get("user_id")
+        # Validate config parameter
+        if not config or "configurable" not in config:
+            return json.dumps({
+                "success": False,
+                "error": "Configuration is required but not provided. Please ensure the tool is called with proper context."
+            }, ensure_ascii=False, indent=2)
+        
+        # Extract user_id from config
+        user_id = config["configurable"].get("user_id")
+        if not user_id:
+            return json.dumps({
+                "success": False,
+                "error": "User ID is required in configuration but not found."
+            }, ensure_ascii=False, indent=2)
         
         result = _get_technical_analysis(symbol, interval, indicator, start_date, end_date, format, user_id=user_id)
         return json.dumps(result, ensure_ascii=False, indent=2)
