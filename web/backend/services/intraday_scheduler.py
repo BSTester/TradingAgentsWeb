@@ -311,6 +311,7 @@ class IntradayScheduler:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
+        result = None
         try:
             # Run the async function in this thread's event loop
             result = loop.run_until_complete(
@@ -319,9 +320,45 @@ class IntradayScheduler:
                     user_id=self.user_id,
                 )
             )
+            
+            # Give async cleanup tasks time to complete
+            # This is important for database connection cleanup
+            # Wait for all pending tasks to complete naturally (not cancel them)
+            loop.run_until_complete(asyncio.sleep(0.2))
+            
             return result
+        except Exception as e:
+            logging.error(f"Error in analysis execution: {e}")
+            raise
         finally:
-            loop.close()
+            # Cleanup: wait for remaining tasks to complete, then close loop
+            try:
+                # Check for any remaining tasks
+                pending = asyncio.all_tasks(loop)
+                if pending:
+                    logging.info(f"Waiting for {len(pending)} pending tasks to complete...")
+                    # Give tasks more time to complete naturally (don't cancel)
+                    # This is safer than cancelling, especially for database operations
+                    for _ in range(10):  # Wait up to 1 second
+                        if not asyncio.all_tasks(loop):
+                            break
+                        loop.run_until_complete(asyncio.sleep(0.1))
+                    
+                    # If tasks still exist, log warning but don't cancel
+                    remaining = asyncio.all_tasks(loop)
+                    if remaining:
+                        logging.warning(f"{len(remaining)} tasks still pending after cleanup wait")
+                
+                # Final cleanup pass
+                loop.run_until_complete(asyncio.sleep(0))
+            except Exception as e:
+                logging.warning(f"Error during loop cleanup: {e}")
+            finally:
+                # Close the loop
+                try:
+                    loop.close()
+                except Exception as e:
+                    logging.warning(f"Error closing loop: {e}")
     
     async def _broadcast_status(self):
         """Broadcast current status via WebSocket"""
