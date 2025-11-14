@@ -140,11 +140,11 @@ def create_intraday_trader(llm, memory, user_id: int = None):
         # Get existing accumulated report
         existing_report = state.get("decision_report", "")
         
-        # Load user's core prompt
+        # Load user's core prompt (async)
         effective_user_id = state_user_id or user_id or 1
         try:
-            from web.backend.services.prompt_loader import load_user_prompt_template
-            core_prompt = load_user_prompt_template(
+            from web.backend.services.prompt_loader import load_user_prompt_template_async
+            core_prompt = await load_user_prompt_template_async(
                 user_id=effective_user_id,
                 agent_type="intraday_trader"
             )

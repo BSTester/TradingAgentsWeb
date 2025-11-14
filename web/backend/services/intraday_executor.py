@@ -41,6 +41,14 @@ from sqlalchemy.orm import Session
 # from web.backend.models import IntradayDecisionRecord, PositionRecord, TradingHistory
 
 
+def _db_operation_sync(operation_func, *args, **kwargs):
+    """
+    Helper function to execute synchronous database operations.
+    This is called from async context via run_in_executor.
+    """
+    return operation_func(*args, **kwargs)
+
+
 async def execute_intraday_analysis(
     market_type: str = "US",
     user_id: Optional[int] = None,
@@ -99,21 +107,20 @@ async def execute_intraday_analysis(
     logging.info(f"   API Key: {'***' if api_key else 'not set'}")
     
     # ========================================
-    # STEP 2: Create database session and decision record
+    # STEP 2: Create async database session and decision record
     # ========================================
     try:
         # Import here to avoid circular dependencies
-        from web.backend.database import SessionLocal
+        from web.backend.database import AsyncSessionLocal
         from web.backend.models import IntradayDecisionRecord, PositionRecord
         from tradingagents.agents.trader.intraday_trader import create_intraday_trader
         from langchain_openai import ChatOpenAI
         from langchain_anthropic import ChatAnthropic
         from langchain_google_genai import ChatGoogleGenerativeAI
+        from sqlalchemy import select
         
-        # Create database session
-        db = SessionLocal()
-        
-        try:
+        # Create async database session
+        async with AsyncSessionLocal() as db:
             # Create decision record
             decision_record = IntradayDecisionRecord(
                 user_id=user_id or 1,  # Default to user 1 if not specified
@@ -125,8 +132,8 @@ async def execute_intraday_analysis(
                 account_snapshot={},
             )
             db.add(decision_record)
-            db.commit()
-            db.refresh(decision_record)  # Refresh to get the ID
+            await db.commit()
+            await db.refresh(decision_record)
             
             # WebSocket: announce session start with decision_id
             try:
@@ -174,7 +181,7 @@ async def execute_intraday_analysis(
             previous_decision_context = ""
             try:
                 from sqlalchemy import desc
-                prev_result = db.execute(
+                prev_result = await db.execute(
                     select(IntradayDecisionRecord).where(
                         IntradayDecisionRecord.user_id == user_id,
                         IntradayDecisionRecord.market_type == market_type,
@@ -407,8 +414,9 @@ async def execute_intraday_analysis(
             else:
                 logging.info("ℹ️ No trades executed in this session")
 
-            db.commit()
-            db.refresh(decision_record)  # Refresh to get updated data
+            # Commit and refresh (async)
+            await db.commit()
+            await db.refresh(decision_record)
             logging.info(f"✓ Decision record saved successfully (ID: {decision_record.id})")
 
             # WebSocket: announce session complete with summary only (not full report)
@@ -483,33 +491,30 @@ async def execute_intraday_analysis(
             }
             
             return result_data
-        
-        except Exception as inner_error:
-            # If any error occurs, make sure to close the database session
-            db.close()
-            raise inner_error
     
     except Exception as e:
         logging.error(f"Error executing intraday analysis: {e}", exc_info=True)
         
-        # Try to update decision record with error
+        # Try to update decision record with error (async)
         try:
-            from web.backend.database import SessionLocal
+            from web.backend.database import AsyncSessionLocal
             from web.backend.models import IntradayDecisionRecord
+            from sqlalchemy import select
             
-            db = SessionLocal()
-            try:
-                decision_record = db.query(IntradayDecisionRecord).filter(
-                    IntradayDecisionRecord.session_id == session_id
-                ).first()
+            async with AsyncSessionLocal() as db:
+                # Query for the decision record
+                result = await db.execute(
+                    select(IntradayDecisionRecord).filter(
+                        IntradayDecisionRecord.session_id == session_id
+                    )
+                )
+                decision_record = result.scalar_one_or_none()
                 
                 if decision_record:
                     decision_record.end_time = datetime.now()
                     decision_record.status = "failed"
                     decision_record.decision_report = f"Error: {str(e)}"
-                    db.commit()
-            finally:
-                db.close()
+                    await db.commit()
         except Exception as db_error:
             logging.error(f"Error updating decision record: {db_error}")
         
@@ -520,18 +525,19 @@ async def execute_intraday_analysis(
             from web.backend.models import IntradayDecisionRecord
             import asyncio
             
-            # Try to get decision_id from database
+            # Try to get decision_id from database (async)
             decision_id = None
             try:
-                temp_db = SessionLocal()
-                try:
-                    temp_record = temp_db.query(IntradayDecisionRecord).filter(
-                        IntradayDecisionRecord.session_id == session_id
-                    ).first()
+                from sqlalchemy import select
+                async with AsyncSessionLocal() as temp_db:
+                    result = await temp_db.execute(
+                        select(IntradayDecisionRecord).filter(
+                            IntradayDecisionRecord.session_id == session_id
+                        )
+                    )
+                    temp_record = result.scalar_one_or_none()
                     if temp_record:
                         decision_id = temp_record.id
-                finally:
-                    temp_db.close()
             except:
                 pass
             
