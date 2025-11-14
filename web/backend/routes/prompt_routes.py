@@ -244,12 +244,13 @@ async def update_prompt_template(
         # Auto-increment version when system_prompt is updated
         if template.version:
             try:
-                # Try to parse version as float and increment
-                current_version = float(template.version)
+                # Extract numeric version (handle cases like "1.0_edited" -> "1.0")
+                version_str = template.version.split('_')[0]
+                current_version = float(version_str)
                 template.version = f"{current_version + 0.1:.1f}"
-            except ValueError:
-                # If version is not a number, append timestamp
-                template.version = f"{template.version}_{datetime.utcnow().strftime('%Y%m%d')}"
+            except (ValueError, IndexError):
+                # If version parsing fails, reset to 1.0
+                template.version = "1.0"
         else:
             template.version = "1.0"
     if data.version is not None:
