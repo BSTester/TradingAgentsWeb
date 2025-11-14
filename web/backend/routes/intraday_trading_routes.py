@@ -1080,3 +1080,85 @@ async def validate_futu_config(
             "message": f"验证失败: {str(e)}"
         }
 
+
+# ============================================================================
+# Orders Endpoints
+# ============================================================================
+
+@router.get("/orders")
+async def get_orders_endpoint(
+    market: str = "US",
+    filter_status: int = 0,  # 0=all, 1=filled, 2=pending, 3=cancelled
+    current_user: User = Depends(require_intraday_access),
+):
+    """
+    Get orders from Futu API using async wrapper.
+    
+    Args:
+        market: Market type (US/HK/CN)
+        filter_status: Filter by status (0=all, 1=filled, 2=pending, 3=cancelled)
+    
+    Requires authentication and Futu API configuration.
+    """
+    try:
+        from web.backend.services.futu_async_wrapper import get_orders_async
+        
+        # Call async wrapper with user_id
+        orders = await get_orders_async(
+            market_type=market,
+            filter_status=filter_status,
+            user_id=current_user.id
+        )
+        
+        # Return empty list if None
+        return orders if orders is not None else []
+    
+    except Exception as e:
+        logger.error(f"Error fetching orders: {e}")
+        return []
+
+
+class CancelOrderRequest(BaseModel):
+    """Request to cancel an order"""
+    order_id: str
+    stock_code: str
+
+
+@router.post("/cancel-order")
+async def cancel_order_endpoint(
+    request: CancelOrderRequest,
+    current_user: User = Depends(require_intraday_access),
+):
+    """
+    Cancel an order via Futu API using async wrapper.
+    
+    Requires authentication and Futu API configuration.
+    """
+    try:
+        from web.backend.services.futu_async_wrapper import cancel_order_async
+        
+        # Call async wrapper with user_id
+        result = await cancel_order_async(
+            order_id=request.order_id,
+            stock_code=request.stock_code,
+            user_id=current_user.id
+        )
+        
+        # Check if result is None (error occurred)
+        if result is None:
+            raise HTTPException(
+                status_code=500,
+                detail="撤单失败，请稍后重试"
+            )
+        
+        return result
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error cancelling order: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"撤单失败: {str(e)}"
+        )
+

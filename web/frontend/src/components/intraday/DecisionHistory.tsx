@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import { buildApiUrl } from '@/utils/api';
+import { getCurrencySymbol } from '@/utils/marketCurrency';
 
 interface DecisionHistoryProps {
   onShowToast: (message: string, type: 'success' | 'error' | 'info') => void;
@@ -393,48 +394,53 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
                         执行交易 ({detailData.trades_executed.length})
                       </h4>
                       <div className="space-y-3">
-                        {detailData.trades_executed.map((trade: any, idx: number) => (
-                          <div
-                            key={idx}
-                            className={`rounded-lg p-4 border-l-4 shadow-sm ${
-                              trade.action === 'BUY'
-                                ? 'bg-red-900/20 border-red-500'
-                                : 'bg-green-900/20 border-green-500'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-3">
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                  trade.action === 'BUY' 
-                                    ? 'bg-red-500 text-white' 
-                                    : 'bg-green-500 text-white'
-                                }`}>
-                                  {trade.action === 'BUY' ? '买入' : trade.action === 'SELL' ? '卖出' : trade.action || '未知'}
-                                </span>
-                                <span className="font-bold text-lg text-text-primary">
-                                  {trade.stock || '未知股票'}
-                                </span>
+                        {detailData.trades_executed.map((trade: any, idx: number) => {
+                          // Get currency symbol based on market type
+                          const currencySymbol = getCurrencySymbol(detailData.market_type || 'US');
+                          
+                          return (
+                            <div
+                              key={idx}
+                              className={`rounded-lg p-4 border-l-4 shadow-sm ${
+                                trade.action === 'BUY'
+                                  ? 'bg-red-900/20 border-red-500'
+                                  : 'bg-green-900/20 border-green-500'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                    trade.action === 'BUY' 
+                                      ? 'bg-red-500 text-white' 
+                                      : 'bg-green-500 text-white'
+                                  }`}>
+                                    {trade.action === 'BUY' ? '买入' : trade.action === 'SELL' ? '卖出' : trade.action || '未知'}
+                                  </span>
+                                  <span className="font-bold text-lg text-text-primary">
+                                    {trade.stock || '未知股票'}
+                                  </span>
+                                </div>
+                                {trade.price && (
+                                  <span className="text-base font-semibold text-text-secondary">
+                                    {currencySymbol}{trade.price}
+                                  </span>
+                                )}
                               </div>
-                              {trade.price && (
-                                <span className="text-base font-semibold text-text-secondary">
-                                  ${trade.price}
-                                </span>
+                              {trade.quantity && (
+                                <div className="text-sm text-text-secondary font-medium mb-2">
+                                  <i className="fas fa-layer-group mr-2 text-text-muted" />
+                                  数量: <span className="font-bold">{trade.quantity}</span> 股
+                                </div>
+                              )}
+                              {trade.description && (
+                                <div className="text-sm text-text-secondary mt-3 pt-3 border-t border-dark-border leading-relaxed">
+                                  <i className="fas fa-info-circle mr-2 text-accent-primary" />
+                                  {trade.description}
+                                </div>
                               )}
                             </div>
-                            {trade.quantity && (
-                              <div className="text-sm text-text-secondary font-medium mb-2">
-                                <i className="fas fa-layer-group mr-2 text-text-muted" />
-                                数量: <span className="font-bold">{trade.quantity}</span> 股
-                              </div>
-                            )}
-                            {trade.description && (
-                              <div className="text-sm text-text-secondary mt-3 pt-3 border-t border-dark-border leading-relaxed">
-                                <i className="fas fa-info-circle mr-2 text-accent-primary" />
-                                {trade.description}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

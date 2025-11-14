@@ -8,6 +8,7 @@ import { Footer } from '@/components/leaderboard/Footer';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { ControlPanel } from '@/components/intraday/ControlPanel';
 import { PositionOverview } from '@/components/intraday/PositionOverview';
+import { TodayOrders } from '@/components/intraday/TodayOrders';
 import { DecisionHistory } from '@/components/intraday/DecisionHistory';
 import { AccountInfo } from '@/components/intraday/AccountInfo';
 import { useIntradayWebSocket } from '@/hooks/useIntradayWebSocket';
@@ -119,6 +120,11 @@ export default function IntradayTradingPage() {
           queryClient.invalidateQueries({ 
             queryKey: [...intradayTradingKeys.positions(), selectedMarket] 
           });
+        } else if (message.tool === 'place_futu_order' || message.tool === 'cancel_futu_order') {
+          // Refresh orders when order is placed or cancelled
+          queryClient.invalidateQueries({ 
+            queryKey: [...intradayTradingKeys.orders(), selectedMarket] 
+          });
         }
         break;
         
@@ -175,13 +181,16 @@ export default function IntradayTradingPage() {
           }
         }
         
-        // Refresh account info and positions after decision is complete
+        // Refresh account info, positions, and orders after decision is complete
         // This ensures the UI shows the latest data after trades are executed
         queryClient.invalidateQueries({ 
           queryKey: [...intradayTradingKeys.account(), selectedMarket] 
         });
         queryClient.invalidateQueries({ 
           queryKey: [...intradayTradingKeys.positions(), selectedMarket] 
+        });
+        queryClient.invalidateQueries({ 
+          queryKey: [...intradayTradingKeys.orders(), selectedMarket] 
         });
         break;
         
@@ -388,6 +397,14 @@ export default function IntradayTradingPage() {
           {/* Position Overview */}
           <div className="mb-6">
             <PositionOverview 
+              selectedMarket={selectedMarket}
+              onShowToast={showToast} 
+            />
+          </div>
+
+          {/* Today's Orders */}
+          <div className="mb-6">
+            <TodayOrders 
               selectedMarket={selectedMarket}
               onShowToast={showToast} 
             />

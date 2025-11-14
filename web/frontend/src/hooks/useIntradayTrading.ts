@@ -16,6 +16,7 @@ export const intradayTradingKeys = {
   decisions: () => [...intradayTradingKeys.all, 'decisions'] as const,
   decisionsList: (page: number, limit: number) => [...intradayTradingKeys.decisions(), { page, limit }] as const,
   decision: (id: number) => [...intradayTradingKeys.decisions(), id] as const,
+  orders: () => [...intradayTradingKeys.all, 'orders'] as const,
 };
 
 // Hook to get scheduler status
@@ -132,5 +133,33 @@ export function useDecision(id: number) {
     queryFn: () => intradayTradingAPI.getDecision(id),
     enabled: !!id,
     staleTime: 30 * 1000,
+  });
+}
+
+// Hook to get orders
+export function useOrders(market: string = 'US', filterStatus: number = 0) {
+  return useQuery({
+    queryKey: [...intradayTradingKeys.orders(), market, filterStatus],
+    queryFn: () => intradayTradingAPI.getOrders(market, filterStatus),
+    // Disable all auto-refetch, rely on manual refresh when switching market
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    staleTime: Infinity, // Never consider stale, only update manually
+  });
+}
+
+// Hook to cancel order
+export function useCancelOrder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ orderId, stockCode, marketType }: { orderId: string; stockCode: string; marketType: string }) =>
+      intradayTradingAPI.cancelOrder(orderId, stockCode),
+    onSuccess: (_, variables) => {
+      // Invalidate orders query to refresh the list
+      queryClient.invalidateQueries({ queryKey: [...intradayTradingKeys.orders(), variables.marketType] });
+    },
   });
 }
