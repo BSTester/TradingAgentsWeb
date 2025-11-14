@@ -205,9 +205,57 @@ Session: {{session_id}}
 """
 
 
+async def create_default_template_for_user_async(user_id: int, db) -> AgentPromptTemplate:
+    """
+    Create a default prompt template for a user - Async version
+    
+    Args:
+        user_id: User ID
+        db: Async database session
+        
+    Returns:
+        Created template
+    """
+    from sqlalchemy import select
+    
+    default_prompt = get_default_intraday_prompt()
+    
+    template = AgentPromptTemplate(
+        agent_type="intraday_trader",
+        user_id=user_id,
+        system_prompt=default_prompt,
+        template_name="默认日内交易策略",
+        description="系统默认的日内交易 Agent 提示词",
+        version="1.0",
+        is_active=True
+    )
+    
+    db.add(template)
+    await db.commit()
+    await db.refresh(template)
+    
+    # Enable all tools by default
+    result = await db.execute(select(AgentTool).filter(AgentTool.is_available == True))
+    all_tools = result.scalars().all()
+    
+    for tool in all_tools:
+        template_tool = TemplateTools(
+            template_id=template.id,
+            tool_name=tool.tool_name,
+            is_enabled=True
+        )
+        db.add(template_tool)
+    
+    await db.commit()
+    
+    logger.info(f"Created default template for user {user_id} with {len(all_tools)} tools")
+    
+    return template
+
+
 def create_default_template_for_user(user_id: int, db: Session) -> AgentPromptTemplate:
     """
-    Create a default prompt template for a user
+    Create a default prompt template for a user - Sync version
     
     Args:
         user_id: User ID
@@ -249,12 +297,97 @@ def create_default_template_for_user(user_id: int, db: Session) -> AgentPromptTe
     return template
 
 
+async def load_user_prompt_template_async(
+    user_id: int,
+    agent_type: str = "intraday_trader",
+) -> str:
+    """
+    Load user's core prompt template (strategy and behavior only) - Async version
+    
+    This function loads ONLY the user's custom strategy content.
+    System documentation (tools, variables) will be injected by the agent at runtime.
+    
+    Uses caching to reduce database queries.
+    
+    Args:
+        user_id: User ID
+        agent_type: Type of agent (default: intraday_trader)
+        
+    Returns:
+        User's core prompt string (without system injections)
+    """
+    # Try to get from cache first
+    cache_key = (user_id, agent_type)
+    cached_prompt = _prompt_cache.get(cache_key)
+    
+    if cached_prompt is not None:
+        logger.debug(f"✅ Loaded prompt from cache for user {user_id}, agent_type {agent_type}")
+        return cached_prompt
+    
+    # Cache miss - load from database (async)
+    from web.backend.database import AsyncSessionLocal
+    from sqlalchemy import select
+    
+    async with AsyncSessionLocal() as db:
+        try:
+            # Check if user is active first
+            from web.backend.models import User
+            result = await db.execute(select(User).filter(User.id == user_id))
+            user = result.scalar_one_or_none()
+            
+            if not user:
+                logger.warning(f"User {user_id} not found")
+                default_prompt = get_default_intraday_prompt()
+                return default_prompt
+            
+            if not user.is_active:
+                logger.debug(f"User {user_id} is disabled, skipping cache, using default prompt")
+                # Don't cache for disabled users
+                return get_default_intraday_prompt()
+            
+            # Query user's template
+            result = await db.execute(
+                select(AgentPromptTemplate).filter(
+                    AgentPromptTemplate.agent_type == agent_type,
+                    AgentPromptTemplate.user_id == user_id,
+                    AgentPromptTemplate.is_active == True
+                )
+            )
+            template = result.scalar_one_or_none()
+            
+            # Create default if not exists
+            if not template:
+                logger.info(f"No template found for user {user_id}, creating default")
+                template = await create_default_template_for_user_async(user_id, db)
+            
+            # Cache the prompt (only for active users)
+            prompt = template.system_prompt
+            _prompt_cache.set(cache_key, prompt)
+            
+            # Return ONLY user's core prompt (no system injections)
+            # System documentation will be added by agent at runtime
+            logger.info(
+                f"📋 Loaded core prompt from database for user {user_id}: "
+                f"version={template.version}, "
+                f"length={len(prompt)}"
+            )
+            
+            return prompt
+            
+        except Exception as e:
+            logger.error(f"Error loading prompt template for user {user_id}: {e}", exc_info=True)
+            # Fallback to default core prompt (no system injections)
+            default_prompt = get_default_intraday_prompt()
+            # Don't cache error cases
+            return default_prompt
+
+
 def load_user_prompt_template(
     user_id: int,
     agent_type: str = "intraday_trader",
 ) -> str:
     """
-    Load user's core prompt template (strategy and behavior only)
+    Load user's core prompt template (strategy and behavior only) - Sync version
     
     This function loads ONLY the user's custom strategy content.
     System documentation (tools, variables) will be injected by the agent at runtime.
