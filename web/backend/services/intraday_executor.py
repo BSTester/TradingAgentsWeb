@@ -107,11 +107,13 @@ async def execute_intraday_analysis(
     logging.info(f"   API Key: {'***' if api_key else 'not set'}")
     
     # ========================================
-    # STEP 2: Create async database session and decision record
+    # STEP 2: Create sync database session and decision record
     # ========================================
+    # NOTE: Using sync database operations to avoid event loop conflicts
+    # when running in a separate thread with its own event loop
     try:
         # Import here to avoid circular dependencies
-        from web.backend.database import AsyncSessionLocal
+        from web.backend.database import SessionLocal
         from web.backend.models import IntradayDecisionRecord, PositionRecord
         from tradingagents.agents.trader.intraday_trader import create_intraday_trader
         from langchain_openai import ChatOpenAI
@@ -119,8 +121,9 @@ async def execute_intraday_analysis(
         from langchain_google_genai import ChatGoogleGenerativeAI
         from sqlalchemy import select
         
-        # Create async database session
-        async with AsyncSessionLocal() as db:
+        # Create sync database session
+        db = SessionLocal()
+        try:
             # Create decision record
             decision_record = IntradayDecisionRecord(
                 user_id=user_id or 1,  # Default to user 1 if not specified
@@ -132,8 +135,8 @@ async def execute_intraday_analysis(
                 account_snapshot={},
             )
             db.add(decision_record)
-            await db.commit()
-            await db.refresh(decision_record)
+            db.commit()
+            db.refresh(decision_record)
             
             # WebSocket: announce session start with decision_id
             try:
@@ -181,7 +184,7 @@ async def execute_intraday_analysis(
             previous_decision_context = ""
             try:
                 from sqlalchemy import desc
-                prev_result = await db.execute(
+                prev_result = db.execute(
                     select(IntradayDecisionRecord).where(
                         IntradayDecisionRecord.user_id == user_id,
                         IntradayDecisionRecord.market_type == market_type,
@@ -414,9 +417,9 @@ async def execute_intraday_analysis(
             else:
                 logging.info("ℹ️ No trades executed in this session")
 
-            # Commit and refresh (async)
-            await db.commit()
-            await db.refresh(decision_record)
+            # Commit and refresh (sync)
+            db.commit()
+            db.refresh(decision_record)
             logging.info(f"✓ Decision record saved successfully (ID: {decision_record.id})")
 
             # WebSocket: announce session complete with summary only (not full report)
@@ -491,6 +494,9 @@ async def execute_intraday_analysis(
             }
             
             return result_data
+        finally:
+            # Close database session
+            db.close()
     
     except Exception as e:
         logging.error(f"Error executing intraday analysis: {e}", exc_info=True)
@@ -501,9 +507,10 @@ async def execute_intraday_analysis(
             from web.backend.models import IntradayDecisionRecord
             from sqlalchemy import select
             
-            async with AsyncSessionLocal() as db:
+            error_db = SessionLocal()
+            try:
                 # Query for the decision record
-                result = await db.execute(
+                result = error_db.execute(
                     select(IntradayDecisionRecord).filter(
                         IntradayDecisionRecord.session_id == session_id
                     )
@@ -514,7 +521,9 @@ async def execute_intraday_analysis(
                     decision_record.end_time = datetime.now()
                     decision_record.status = "failed"
                     decision_record.decision_report = f"Error: {str(e)}"
-                    await db.commit()
+                    error_db.commit()
+            finally:
+                error_db.close()
         except Exception as db_error:
             logging.error(f"Error updating decision record: {db_error}")
         
@@ -529,8 +538,9 @@ async def execute_intraday_analysis(
             decision_id = None
             try:
                 from sqlalchemy import select
-                async with AsyncSessionLocal() as temp_db:
-                    result = await temp_db.execute(
+                temp_db = SessionLocal()
+                try:
+                    result = temp_db.execute(
                         select(IntradayDecisionRecord).filter(
                             IntradayDecisionRecord.session_id == session_id
                         )
@@ -538,6 +548,8 @@ async def execute_intraday_analysis(
                     temp_record = result.scalar_one_or_none()
                     if temp_record:
                         decision_id = temp_record.id
+                finally:
+                    temp_db.close()
             except:
                 pass
             
