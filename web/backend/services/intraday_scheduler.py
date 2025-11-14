@@ -254,7 +254,7 @@ class IntradayScheduler:
             # Run the analysis in a separate thread to avoid blocking the event loop
             # This is important because execute_intraday_analysis contains:
             # 1. Synchronous database operations (SessionLocal)
-            # 2. Synchronous LLM calls (trader_agent.invoke)
+            # 2. Async LLM calls (trader_agent.ainvoke) - now async but still long-running
             # 3. Potentially long-running operations
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(

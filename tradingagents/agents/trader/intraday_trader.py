@@ -12,165 +12,70 @@ from typing import Dict, Any, List
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 
-def _extract_trades_from_report(report: str, llm=None) -> List[Dict[str, Any]]:
+def _parse_trades_from_response(content: str) -> tuple[List[Dict[str, Any]], str]:
     """
-    Extract actual trade information from the decision report using LLM.
+    Parse formatted trade details from LLM response and extract clean report.
     
-    Uses LLM to intelligently parse the report and extract trade information,
-    which is more flexible and accurate than regex patterns.
+    Looks for the special trade details marker and JSON array in the response.
     
     Args:
-        report: The trading report text (can be in English or Chinese)
-        llm: Language model instance (optional, will use simple extraction if not provided)
+        content: The full LLM response content
     
     Returns:
-        List of trade dictionaries with stock, action, quantity, price, etc.
-        Empty list if no trades found.
-    """
-    # If no LLM provided, fall back to simple regex extraction
-    if llm is None:
-        return _extract_trades_simple(report)
-    
-    try:
-        from langchain_core.prompts import ChatPromptTemplate
-        from langchain_core.output_parsers import JsonOutputParser
-        
-        # Create extraction prompt
-        extraction_prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a trade information extraction assistant. 
-Your task is to extract ONLY the trades that were ACTUALLY EXECUTED from the trading report.
-
-IMPORTANT RULES:
-1. Only extract trades where the tool was CALLED and SUCCEEDED
-2. Ignore trades that were:
-   - Not executed (未调用/not called)
-   - Failed (失败/failed)
-   - Skipped (跳过/skipped)
-   - Just held (持有/hold)
-3. Extract the following information for each executed trade:
-   - stock: Stock code (e.g., "AAPL", "00700", "600519")
-   - action: Trade action - "BUY" (买入/买入开仓), "SELL" (卖出/平多), or "SHORT" (卖空/开仓做空)
-   - quantity: Number of shares (integer)
-   - price: Trade price (float, if available)
-   - description: Brief description of the trade **IN CHINESE** (必须用中文描述)
-
-Return a JSON array of trade objects. If no trades were executed, return an empty array [].
-
-Example output (note that description MUST be in Chinese):
-[
-  {{"stock": "AAPL", "action": "BUY", "quantity": 100, "price": 150.50, "description": "以$150.50买入100股"}},
-  {{"stock": "TSLA", "action": "SELL", "quantity": 50, "price": 200.00, "description": "以$200.00卖出50股"}},
-  {{"stock": "00700", "action": "BUY", "quantity": 200, "price": 320.50, "description": "以HK$320.50买入200股腾讯"}},
-  {{"stock": "600519", "action": "SELL", "quantity": 100, "price": 1680.00, "description": "以¥1680.00卖出100股贵州茅台"}}
-]
-
-CRITICAL: The "description" field MUST be in Chinese, including the action type, quantity, and price.
-"""),
-            ("user", "Extract executed trades from this report:\n\n{report}")
-        ])
-        
-        # Create chain with JSON output parser
-        chain = extraction_prompt | llm
-        
-        # Invoke LLM (limit report length to avoid token limits)
-        max_report_length = 8000
-        truncated_report = report[:max_report_length] if len(report) > max_report_length else report
-        
-        result = chain.invoke({"report": truncated_report})
-        
-        # Parse result
-        content = result.content if hasattr(result, 'content') else str(result)
-        
-        # Try to extract JSON from the response
-        # Look for JSON array pattern
-        json_match = re.search(r'\[.*\]', content, re.DOTALL)
-        if json_match:
-            trades_json = json_match.group(0)
-            trades = json.loads(trades_json)
-            
-            # Validate and normalize trades
-            validated_trades = []
-            for trade in trades:
-                if isinstance(trade, dict) and 'stock' in trade and 'action' in trade:
-                    # Normalize action
-                    action = trade.get('action', '').upper()
-                    if action in ['BUY', 'SELL', 'SHORT']:
-                        validated_trade = {
-                            'stock': trade.get('stock', '').upper(),
-                            'action': action,
-                            'quantity': int(trade.get('quantity', 0)),
-                            'price': float(trade.get('price', 0.0)) if trade.get('price') else None,
-                            'description': trade.get('description', '')
-                        }
-                        validated_trades.append(validated_trade)
-            
-            return validated_trades
-        else:
-            # No JSON found, fall back to simple extraction
-            logging.warning("LLM did not return valid JSON, falling back to simple extraction")
-            return _extract_trades_simple(report)
-    
-    except Exception as e:
-        logging.error(f"Error extracting trades with LLM: {e}", exc_info=True)
-        # Fall back to simple extraction
-        return _extract_trades_simple(report)
-
-
-def _extract_trades_simple(report: str) -> List[Dict[str, Any]]:
-    """
-    Simple regex-based trade extraction as fallback.
-    
-    Args:
-        report: The trading report text
-    
-    Returns:
-        List of trade dictionaries
+        Tuple of (trades_list, clean_report)
+        - trades_list: List of trade dictionaries
+        - clean_report: Report with trade details section removed
     """
     trades = []
+    clean_report = content
     
-    # Pattern 1: Look for tool call results (place_futu_order)
-    tool_pattern = r'place_futu_order\([^)]*stock_code=["\']([^"\']+)["\'][^)]*direction=["\']([^"\']+)["\'][^)]*quantity=(\d+)'
-    for match in re.finditer(tool_pattern, report, re.IGNORECASE):
-        direction = match.group(2).upper()
-        action = 'BUY' if direction in ['BUY', '0'] else 'SELL' if direction in ['SELL', '1'] else 'SHORT'
-        action_cn = '买入' if action == 'BUY' else '卖出' if action == 'SELL' else '卖空'
+    try:
+        # Look for trade details marker and JSON array
+        # Pattern: ## TRADE_DETAILS_JSON followed by JSON array
+        trade_marker = "## TRADE_DETAILS_JSON"
         
-        trades.append({
-            'stock': match.group(1).upper(),
-            'action': action,
-            'quantity': int(match.group(3)),
-            'price': None,
-            'description': f"{action_cn}{match.group(1)} {match.group(3)}股"
-        })
+        if trade_marker in content:
+            # Split content at marker
+            parts = content.split(trade_marker, 1)
+            clean_report = parts[0].strip()
+            
+            if len(parts) > 1:
+                # Extract JSON from the second part
+                json_section = parts[1].strip()
+                
+                # Find JSON array pattern
+                json_match = re.search(r'\[.*?\]', json_section, re.DOTALL)
+                if json_match:
+                    trades_json = json_match.group(0)
+                    trades_data = json.loads(trades_json)
+                    
+                    # Validate and normalize trades
+                    for trade in trades_data:
+                        if isinstance(trade, dict) and 'stock' in trade and 'action' in trade:
+                            action = trade.get('action', '').upper()
+                            if action in ['BUY', 'SELL', 'SHORT']:
+                                validated_trade = {
+                                    'stock': trade.get('stock', '').upper(),
+                                    'action': action,
+                                    'quantity': int(trade.get('quantity', 0)),
+                                    'price': float(trade.get('price', 0.0)) if trade.get('price') else None,
+                                    'description': trade.get('description', '')
+                                }
+                                trades.append(validated_trade)
+                    
+                    logging.info(f"Parsed {len(trades)} trade(s) from response")
+                else:
+                    logging.warning("Trade marker found but no valid JSON array")
+        else:
+            logging.info("No trade details marker found in response")
     
-    # Pattern 2: Look for Chinese execution results that indicate success
-    # Match: 工具返回结果: 成功
-    success_pattern = r'###\s*([A-Z0-9]{1,6})\s*[-–—].*?订单类型[:：]\s*(买入|卖出|卖空).*?数量.*?(\d+).*?工具返回结果[:：]\s*成功'
-    for match in re.finditer(success_pattern, report, re.DOTALL):
-        stock = match.group(1)
-        action_cn = match.group(2)
-        quantity = int(match.group(3))
-        
-        action = 'BUY' if action_cn == '买入' else 'SELL' if action_cn == '卖出' else 'SHORT'
-        
-        trades.append({
-            'stock': stock.upper(),
-            'action': action,
-            'quantity': quantity,
-            'price': None,
-            'description': f"{action_cn}{stock} {quantity}股"
-        })
+    except Exception as e:
+        logging.error(f"Error parsing trades from response: {e}", exc_info=True)
+        # Return empty trades and original content on error
+        trades = []
+        clean_report = content
     
-    # Remove duplicates
-    seen = set()
-    unique_trades = []
-    for trade in trades:
-        key = f"{trade['stock']}_{trade['action']}_{trade['quantity']}"
-        if key not in seen:
-            seen.add(key)
-            unique_trades.append(trade)
-    
-    return unique_trades
+    return trades, clean_report
 
 
 def create_intraday_trader(llm, memory, user_id: int = None):
@@ -210,9 +115,9 @@ def create_intraday_trader(llm, memory, user_id: int = None):
         decision_report: str
         trades_executed: list
     
-    def agent_node(state):
+    async def agent_node(state):
         """
-        Main agent node that decides what to do next.
+        Main agent node that decides what to do next (async version).
         
         State inputs:
             - user_id: User identifier
@@ -791,13 +696,37 @@ You have full discretion to:
 Current market is {market_type}. Please formulate trading strategy according to market rules.
 """
         
+        # Trade output format rule
+        trade_output_rule = """## ⚠️ CRITICAL - Trade Details Output Rule
+
+If you executed ANY trades (called place_futu_order and it succeeded), you MUST append a formatted trade details section at the VERY END of your final report:
+
+```
+## TRADE_DETAILS_JSON
+[
+  {{"stock": "AAPL", "action": "BUY", "quantity": 100, "price": 150.50, "description": "以$150.50买入100股"}},
+  {{"stock": "TSLA", "action": "SELL", "quantity": 50, "price": 200.00, "description": "以$200.00卖出50股"}},
+  {{"stock": "00700", "action": "BUY", "quantity": 200, "price": 320.50, "description": "以HK$320.50买入200股腾讯"}}
+]
+```
+
+**Rules for TRADE_DETAILS_JSON**:
+1. Only include trades that were ACTUALLY EXECUTED (place_futu_order was called and returned success)
+2. Do NOT include trades that were skipped, failed, or just held
+3. Each trade object must have: stock, action (BUY/SELL/SHORT), quantity, price (if available), description (in Chinese)
+4. This section must be at the VERY END of your report, after all analysis text
+5. If NO trades were executed, do NOT include this section at all
+6. The marker must be exactly "## TRADE_DETAILS_JSON" followed by the JSON array
+"""
+        
         # Assemble complete system message
-        # Order: User Strategy (customizable) → Workflow (fixed) → Context (dynamic)
-        # This order ensures LLM first understands the trading philosophy, then the execution process, then current state
+        # Order: User Strategy (customizable) → Workflow (fixed) → Context (dynamic) → Trade Output Rule (critical)
+        # This order ensures LLM first understands the trading philosophy, then the execution process, then current state, and finally the output format
         system_message_parts = [
             core_prompt,
             workflow_documentation,
             context_info,
+            trade_output_rule,
             "\nNow execute your trading strategy following the workflow above based on current context."
         ]
         
@@ -818,19 +747,18 @@ Current market is {market_type}. Please formulate trading strategy according to 
         # Send agent start event
         try:
             from web.backend.app import manager as ws_manager
-            import asyncio
-            asyncio.create_task(ws_manager.send_message({
+            await ws_manager.send_message({
                 'type': 'agent_start',
                 'timestamp': datetime.utcnow().isoformat(),
                 'message': 'Intraday agent started',
                 'agent': 'Intraday Trader'
-            }, f"intraday_user_{user_id}"))
+            }, f"intraday_user_{user_id}")
         except Exception:
             pass
         
-        # Invoke agent with user_id in config
+        # Invoke agent with user_id in config (async)
         try:
-            result = chain.invoke(
+            result = await chain.ainvoke(
                 {"messages": state.get("messages", [])},
                 config={"configurable": {"user_id": effective_user_id}}
             )
@@ -867,13 +795,12 @@ Current market is {market_type}. Please formulate trading strategy according to 
                 for tool_call in result.tool_calls:
                     try:
                         from web.backend.app import manager as ws_manager
-                        import asyncio
-                        asyncio.create_task(ws_manager.send_message({
+                        await ws_manager.send_message({
                             'type': 'tool_call',
                             'timestamp': datetime.utcnow().isoformat(),
                             'tool': tool_call.get('name', 'unknown'),
                             'args': tool_call.get('args', {})
-                        }, f"intraday_user_{user_id}"))
+                        }, f"intraday_user_{user_id}")
                     except Exception:
                         pass
                 
@@ -883,32 +810,29 @@ Current market is {market_type}. Please formulate trading strategy according to 
                     "decision_report": accumulated_report,
                 }
             else:
-                # Agent has finished - use accumulated report
-                decision_report = accumulated_report
+                # Agent has finished - parse trades and clean report
+                trades_executed, clean_report = _parse_trades_from_response(accumulated_report)
                 
                 # Log the final report
-                logging.info(f"Agent generated final report (length: {len(decision_report)} chars)")
-                
-                # Extract actual trades from the complete accumulated report using LLM
-                trades_executed = _extract_trades_from_report(decision_report, llm)
+                logging.info(f"Agent generated final report (length: {len(clean_report)} chars, {len(trades_executed)} trades)")
                 
                 # Send agent result event
                 try:
                     from web.backend.app import manager as ws_manager
-                    import asyncio
-                    asyncio.create_task(ws_manager.send_message({
+                    await ws_manager.send_message({
                         'type': 'agent_result',
                         'timestamp': datetime.utcnow().isoformat(),
                         'message': 'Agent completed analysis',
                         'agent': 'Intraday Trader',
-                        'report_length': len(decision_report)
-                    }, f"intraday_user_{user_id}"))
+                        'report_length': len(clean_report),
+                        'trades_count': len(trades_executed)
+                    }, f"intraday_user_{user_id}")
                 except Exception:
                     pass
                 
                 return {
                     "messages": [result],
-                    "decision_report": decision_report,
+                    "decision_report": clean_report,
                     "trades_executed": trades_executed,
                 }
         
@@ -957,9 +881,9 @@ Current market is {market_type}. Please formulate trading strategy according to 
     # Create base tool node
     base_tool_node = ToolNode(tools)
     
-    # Wrap tool node to add logging
-    def tool_node_with_logging(state):
-        """Tool node wrapper that adds logging"""
+    # Wrap tool node to add logging (async version)
+    async def tool_node_with_logging(state):
+        """Tool node wrapper that adds logging (async)"""
         messages = state.get("messages", [])
         last_message = messages[-1] if messages else None
         
@@ -972,8 +896,8 @@ Current market is {market_type}. Please formulate trading strategy according to 
             else:
                 logging.info(f"Executing {num_tools} tool(s): {', '.join(tool_names)}")
         
-        # Execute tools - ToolNode executes them in parallel automatically
-        result = base_tool_node.invoke(state)
+        # Execute tools - ToolNode executes them in parallel automatically (async)
+        result = await base_tool_node.ainvoke(state)
         
         # Log results
         if 'messages' in result:
