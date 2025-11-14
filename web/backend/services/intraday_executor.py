@@ -262,7 +262,7 @@ async def execute_intraday_analysis(
             # Set recursion limit to 100 to allow more tool calls
             # Default is 25, but intraday trading may need more iterations
             # Pass user_id in configurable field for tools to access
-            result = trader_agent.invoke(
+            result = await trader_agent.ainvoke(
                 initial_state,
                 config={
                     "recursion_limit": 100,
