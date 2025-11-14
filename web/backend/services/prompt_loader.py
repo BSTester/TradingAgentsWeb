@@ -373,23 +373,30 @@ def _load_user_prompt_template_sync(
         if not template:
             logger.info(f"No template found for user {user_id}, creating default")
             template = _create_default_template_for_user_sync(user_id, db)
-            
-            # Cache the prompt (only for active users)
-            prompt = template.system_prompt
-            _prompt_cache.set(cache_key, prompt)
-            
-            # Return ONLY user's core prompt (no system injections)
-            # System documentation will be added by agent at runtime
-            logger.info(
-                f"📋 Loaded core prompt from database for user {user_id}: "
-                f"version={template.version}, "
-                f"length={len(prompt)}"
+        
+        # Cache the prompt (only for active users)
+        prompt = template.system_prompt
+        
+        # Validate prompt is not None or empty
+        if not prompt:
+            logger.error(
+                f"❌ Template found but system_prompt is empty for user {user_id}, "
+                f"template_id={template.id}, using default prompt"
             )
-            
-            return prompt
+            prompt = get_default_intraday_prompt()
+            # Don't cache empty prompts
+        else:
+            _prompt_cache.set(cache_key, prompt)
+            logger.info(
+                f"✅ Successfully loaded core prompt for user {user_id}: "
+                f"template_id={template.id}, version={template.version}, "
+                f"length={len(prompt)} chars"
+            )
+        
+        return prompt
             
     except Exception as e:
-        logger.error(f"Error loading prompt template for user {user_id}: {e}", exc_info=True)
+        logger.error(f"❌ Error loading prompt template for user {user_id}: {e}", exc_info=True)
         # Fallback to default core prompt (no system injections)
         default_prompt = get_default_intraday_prompt()
         return default_prompt
@@ -479,20 +486,27 @@ def load_user_prompt_template(
         
         # Cache the prompt (only for active users)
         prompt = template.system_prompt
-        _prompt_cache.set(cache_key, prompt)
         
-        # Return ONLY user's core prompt (no system injections)
-        # System documentation will be added by agent at runtime
-        logger.info(
-            f"📋 Loaded core prompt from database for user {user_id}: "
-            f"version={template.version}, "
-            f"length={len(prompt)}"
-        )
+        # Validate prompt is not None or empty
+        if not prompt:
+            logger.error(
+                f"❌ Template found but system_prompt is empty for user {user_id}, "
+                f"template_id={template.id}, using default prompt"
+            )
+            prompt = get_default_intraday_prompt()
+            # Don't cache empty prompts
+        else:
+            _prompt_cache.set(cache_key, prompt)
+            logger.info(
+                f"✅ Successfully loaded core prompt for user {user_id}: "
+                f"template_id={template.id}, version={template.version}, "
+                f"length={len(prompt)} chars"
+            )
         
         return prompt
         
     except Exception as e:
-        logger.error(f"Error loading prompt template for user {user_id}: {e}", exc_info=True)
+        logger.error(f"❌ Error loading prompt template for user {user_id}: {e}", exc_info=True)
         # Fallback to default core prompt (no system injections)
         default_prompt = get_default_intraday_prompt()
         # Don't cache error cases

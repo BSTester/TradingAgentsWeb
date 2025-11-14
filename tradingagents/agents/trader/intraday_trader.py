@@ -142,16 +142,27 @@ def create_intraday_trader(llm, memory, user_id: int = None):
         
         # Load user's core prompt (async)
         effective_user_id = state_user_id or user_id or 1
+        core_prompt = None
         try:
             from web.backend.services.prompt_loader import load_user_prompt_template_async
             core_prompt = await load_user_prompt_template_async(
                 user_id=effective_user_id,
                 agent_type="intraday_trader"
             )
-            logging.info(f"Loaded core prompt for user {effective_user_id}")
+            
+            # Validate core_prompt is not None or empty
+            if not core_prompt:
+                logging.error(f"❌ core_prompt is empty for user {effective_user_id}, will use default")
+                core_prompt = None  # Force fallback
+            else:
+                logging.info(f"✅ Successfully loaded core prompt for user {effective_user_id}, length={len(core_prompt)} chars")
         except Exception as e:
-            logging.warning(f"Failed to load user prompt: {e}, using default")
-            # Fallback to default
+            logging.error(f"❌ Failed to load user prompt: {e}, using default")
+            core_prompt = None  # Force fallback
+        
+        # Fallback to default if core_prompt is still None or empty
+        if not core_prompt:
+            logging.warning(f"⚠️ Using default prompt for user {effective_user_id}")
             import os
             default_prompt_file = os.path.join(
                 os.path.dirname(__file__),
@@ -160,7 +171,9 @@ def create_intraday_trader(llm, memory, user_id: int = None):
             try:
                 with open(default_prompt_file, 'r', encoding='utf-8') as f:
                     core_prompt = f.read()
-            except:
+                logging.info(f"✅ Loaded default prompt from file, length={len(core_prompt)} chars")
+            except Exception as file_error:
+                logging.error(f"❌ Failed to load default prompt file: {file_error}, using inline default")
                 core_prompt = """You are an aggressive intraday trading agent operating like a professional day trader with full autonomy to analyze positions and execute trades.
 
 ## Role Definition
@@ -634,6 +647,13 @@ You have full discretion to:
 - **Quality over frequency**: Fewer high-conviction trades beat many mediocre ones
 """
         
+        # Final validation: ensure core_prompt is never None
+        if not core_prompt:
+            logging.critical(f"🚨 CRITICAL: core_prompt is still None after all fallbacks for user {effective_user_id}!")
+            raise ValueError(f"Failed to load core_prompt for user {effective_user_id}")
+        
+        logging.info(f"📋 Final core_prompt ready: length={len(core_prompt)} chars")
+        
         # Now assemble complete prompt with system injections
         from tradingagents.agents.utils.futu_trading_tools import (
             get_futu_account_info,
@@ -730,7 +750,24 @@ If you executed ANY trades (called place_futu_order and it succeeded), you MUST 
             "\nNow execute your trading strategy following the workflow above based on current context."
         ]
         
+        # Validate all parts have values
+        part_names = ["core_prompt", "workflow_documentation", "context_info", "trade_output_rule", "final_instruction"]
+        for i, part in enumerate(system_message_parts):
+            if not part:
+                logging.error(f"❌ {part_names[i]} is None or empty!")
+                raise ValueError(f"System message part '{part_names[i]}' is missing")
+        
+        logging.info(
+            f"📋 System message parts ready: "
+            f"core_prompt={len(core_prompt)}, "
+            f"workflow={len(workflow_documentation)}, "
+            f"context={len(context_info)}, "
+            f"trade_rule={len(trade_output_rule)} chars"
+        )
+        
+        # Join all parts
         system_message = "\n\n".join(system_message_parts)
+        logging.info(f"📋 Final system_message assembled: {len(system_message)} chars")
         
         # Create prompt template
         prompt = ChatPromptTemplate.from_messages([
