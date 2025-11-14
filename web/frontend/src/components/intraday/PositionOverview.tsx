@@ -43,25 +43,44 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
   const getFutuStockUrl = (stockCode: string, marketType: string): string => {
     const market = marketType.toUpperCase();
     
+    // Extract pure stock code using regex
+    // For HK/CN: extract digits (e.g., "HK.00700" or "00700.HK" -> "00700")
+    // For US: extract letters, prefer longer match (e.g., "US.AAPL" -> "AAPL", not "US")
+    let pureCode = stockCode;
+    if (market === 'US') {
+      // Extract all letter sequences and pick the longest one (to avoid matching "US" in "US.AAPL")
+      const matches = stockCode.match(/[A-Z]+/g);
+      if (matches && matches.length > 0) {
+        pureCode = matches.reduce((a, b) => a.length >= b.length ? a : b);
+      }
+    } else {
+      // Extract digits for HK/CN stocks
+      const match = stockCode.match(/\d+/);
+      pureCode = match ? match[0] : stockCode;
+    }
+    
     if (market === 'US') {
       // US stocks: AAPL, NVDA, etc.
-      return `https://www.futunn.com/stock/${stockCode}-US`;
+      // Format: https://www.futunn.com/stock/NVDA-US
+      return `https://www.futunn.com/stock/${pureCode}-US`;
     } else if (market === 'HK') {
       // HK stocks: 00700, 02258, etc.
-      return `https://www.futunn.com/stock/${stockCode}-HK`;
+      // Format: https://www.futunn.com/stock/02258-HK
+      return `https://www.futunn.com/stock/${pureCode}-HK`;
     } else if (market === 'CN') {
       // CN stocks: need to determine SH or SZ
       // Shanghai: 60xxxx, 688xxx (科创板)
       // Shenzhen: 00xxxx, 30xxxx (创业板), 002xxx (中小板)
-      if (stockCode.startsWith('60') || stockCode.startsWith('688')) {
-        return `https://www.futunn.com/stock/${stockCode}-SH`;
+      // Format: https://www.futunn.com/stock/688670-SH or https://www.futunn.com/stock/301017-SZ
+      if (pureCode.startsWith('60') || pureCode.startsWith('688')) {
+        return `https://www.futunn.com/stock/${pureCode}-SH`;
       } else {
-        return `https://www.futunn.com/stock/${stockCode}-SZ`;
+        return `https://www.futunn.com/stock/${pureCode}-SZ`;
       }
     }
     
     // Fallback
-    return `https://www.futunn.com/stock/${stockCode}`;
+    return `https://www.futunn.com/stock/${pureCode}`;
   };
 
   const handleStockClick = (stockCode: string, marketType: string) => {
@@ -243,7 +262,7 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
                               <i className="fas fa-external-link-alt ml-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity" />
                             </div>
                             {position.stock_name && (
-                              <div className="text-xs text-text-tertiary hidden md:block">
+                              <div className="text-xs text-text-tertiary">
                                 {position.stock_name}
                               </div>
                             )}
