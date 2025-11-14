@@ -937,6 +937,9 @@ def get_orders(
         # Handle different response formats
         if isinstance(response, list):
             orders = response
+        elif isinstance(response, dict) and "list" in response:
+            # Futu API returns {"list": [...]} format
+            orders = response["list"]
         elif isinstance(response, dict) and "orders" in response:
             orders = response["orders"]
         elif isinstance(response, dict) and "data" in response:
@@ -944,8 +947,104 @@ def get_orders(
         else:
             orders = []
         
-        logger.info(f"Successfully retrieved {len(orders)} orders for {market_type}")
-        return orders
+        # Helper function to convert Futu timestamp format to ISO format
+        def convert_futu_timestamp(futu_time: str) -> str:
+            """Convert Futu timestamp format to ISO format
+            
+            Futu format: "11/14 21:24:22" (MM/DD HH:MM:SS)
+            ISO format: "2024-11-14T21:24:22"
+            """
+            if not futu_time or '/' not in futu_time:
+                return futu_time
+            
+            try:
+                from datetime import datetime
+                # Parse "11/14 21:24:22" format
+                # Assume current year if not specified
+                current_year = datetime.now().year
+                parts = futu_time.split(' ')
+                if len(parts) == 2:
+                    date_part = parts[0]  # "11/14"
+                    time_part = parts[1]  # "21:24:22"
+                    # Convert to ISO format
+                    month, day = date_part.split('/')
+                    iso_time = f"{current_year}-{month.zfill(2)}-{day.zfill(2)}T{time_part}"
+                    return iso_time
+            except Exception as e:
+                logger.warning(f"Failed to convert timestamp {futu_time}: {e}")
+                return futu_time
+            
+            return futu_time
+        
+        # Normalize field names for consistency
+        # Futu API uses different field names, map them to standard names
+        normalized_orders = []
+        for order in orders:
+            normalized = {}
+            
+            # Map order_id
+            normalized['order_id'] = str(order.get('id', order.get('order_id', '')))
+            
+            # Map stock_code and stock_name
+            normalized['stock_code'] = order.get('stock_code', order.get('sc_code', ''))
+            normalized['stock_name'] = order.get('stock_name', '')
+            
+            # Map side: "A" = SELL, "B" = BUY (Futu API convention)
+            side = order.get('side', '')
+            if side == 'A':
+                normalized['side'] = 'SELL'
+            elif side == 'B':
+                normalized['side'] = 'BUY'
+            else:
+                normalized['side'] = side
+            
+            # Map quantity and filled_quantity
+            normalized['quantity'] = int(order.get('quantity', 0))
+            normalized['filled_quantity'] = int(order.get('matched_qty', order.get('filled_quantity', 0)))
+            
+            # Map price
+            normalized['price'] = float(order.get('price', 0))
+            
+            # Map order_type: 1 = LIMIT, 2 = MARKET
+            order_type = order.get('order_type', 1)
+            if order_type == 1:
+                normalized['order_type'] = 'LIMIT'
+            elif order_type == 2:
+                normalized['order_type'] = 'MARKET'
+            else:
+                normalized['order_type'] = str(order_type)
+            
+            # Map status based on Futu API status codes
+            # Common status codes:
+            # "1" or "2" = pending (waiting for execution)
+            # "3" = filled (fully executed)
+            # "4" or "5" = cancelled
+            # "6" = partially filled
+            status = str(order.get('status', ''))
+            if status in ['3', '6']:  # Filled or partially filled
+                normalized['status'] = 'filled'
+            elif status in ['1', '2']:  # Pending
+                normalized['status'] = 'pending'
+            elif status in ['4', '5']:  # Cancelled
+                normalized['status'] = 'cancelled'
+            else:
+                # Keep original status if unknown
+                normalized['status'] = status
+            
+            # Map timestamps - convert Futu format to ISO format
+            created_at = order.get('created_at', order.get('create_time', ''))
+            updated_at = order.get('updated_at', order.get('update_time', ''))
+            
+            normalized['create_time'] = convert_futu_timestamp(created_at)
+            normalized['update_time'] = convert_futu_timestamp(updated_at)
+            
+            # Keep market_type
+            normalized['market_type'] = market_type
+            
+            normalized_orders.append(normalized)
+        
+        logger.info(f"Successfully retrieved {len(normalized_orders)} orders for {market_type}")
+        return normalized_orders
         
     except FutuAPIError as e:
         logger.error(f"Failed to get orders for {market_type}: {e}")

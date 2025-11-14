@@ -17,12 +17,15 @@ export function AccountInfo({ selectedMarket, onMarketChange, onShowToast }: Acc
   const [showTrendModal, setShowTrendModal] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<'total_assets' | 'cash' | 'market_value'>('total_assets');
 
-  // Handle refresh - refresh both account and positions
+  // Handle refresh - refresh account, positions, and orders
   const handleRefresh = () => {
     refetch();
-    // Also refresh positions for the same market
+    // Also refresh positions and orders for the same market
     queryClient.invalidateQueries({ 
       queryKey: [...intradayTradingKeys.positions(), selectedMarket] 
+    });
+    queryClient.invalidateQueries({ 
+      queryKey: [...intradayTradingKeys.orders(), selectedMarket] 
     });
   };
 
@@ -100,7 +103,7 @@ export function AccountInfo({ selectedMarket, onMarketChange, onShowToast }: Acc
               onClick={handleRefresh}
               disabled={isFetching}
               className="text-sm text-accent-primary hover:text-accent-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-              title="刷新账户和持仓信息"
+              title="刷新账户、持仓和订单信息"
             >
               <i className={`fas fa-sync-alt mr-1 ${isFetching ? 'fa-spin' : ''}`} />
               {isFetching ? '刷新中...' : '刷新'}

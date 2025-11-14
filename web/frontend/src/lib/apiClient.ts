@@ -570,6 +570,36 @@ export const intradayTradingAPI = {
       throw new Error(errorMessage);
     }
   },
+
+  // Orders
+  getOrders: async (market: string = 'US', filterStatus: number = 0) => {
+    try {
+      const response = await apiClient.get(`/api/intraday/orders?market=${market}&filter_status=${filterStatus}`);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取订单列表失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  cancelOrder: async (orderId: string, stockCode: string) => {
+    try {
+      const response = await apiClient.post('/api/intraday/cancel-order', {
+        order_id: orderId,
+        stock_code: stockCode,
+      });
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '撤销订单失败';
+      throw new Error(errorMessage);
+    }
+  },
 };
 
 export default apiClient;
