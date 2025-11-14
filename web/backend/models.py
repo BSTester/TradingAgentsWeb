@@ -438,7 +438,7 @@ class AgentPromptTemplate(Base):
     # Metadata
     template_name = Column(String(100), nullable=True)
     description = Column(Text, nullable=True)
-    version = Column(String(20), default="1.0", nullable=False)
+    version = Column(String(50), default="1.0", nullable=False)
     is_active = Column(Boolean, default=True, nullable=False, index=True)
     
     # Timestamps

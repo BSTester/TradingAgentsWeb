@@ -1,118 +1,73 @@
 # Database Migrations
 
-This directory contains SQL migration scripts for the TradingAgents database.
+This directory contains database migration scripts for the TradingAgentsWeb backend.
 
-## Migration History
+## Available Migrations
 
-### 001_add_intraday_trading_tables.sql (2025-11-06)
+### 001 - Increase version column length
+**File**: `001_increase_version_column_length.sql`  
+**Date**: 2025-11-14  
+**Description**: Increases the `version` column in `agent_prompt_templates` table from VARCHAR(20) to VARCHAR(50) to support longer version strings.
 
-Adds three new tables for the Intraday Trading Agent System:
+**Issue**: The application was generating version strings longer than 20 characters, causing database errors:
+```
+sqlalchemy.exc.DataError: (pymysql.err.DataError) (1406, "Data too long for column 'version' at row 1")
+```
 
-#### 1. position_records
-Tracks stock positions with first opening time and current status.
+### 002 - Fix corrupted version strings
+**File**: `002_fix_version_strings.py`  
+**Date**: 2025-11-14  
+**Description**: Cleans up corrupted version strings like "1.0_edited_edited_edited" by extracting the numeric part or resetting to "1.0".
 
-**Key Fields:**
-- `stock_code`, `market_type` - Stock identifier and market
-- `first_open_time`, `first_open_price` - Initial position details
-- `current_quantity` - Current position size
-- `is_closed` - Whether position is closed
+**Issue**: A bug in the version increment logic was appending strings instead of incrementing numbers, resulting in versions like "1.0_edited_edited_edited".
 
-**Indexes:**
-- `idx_position_records_user_id` - Query by user
-- `idx_position_records_stock_code` - Query by stock
-- `idx_position_records_user_stock` - Composite index for user+stock queries
-
-#### 2. trading_history
-Records all trades for each position with decision context.
-
-**Key Fields:**
-- `trade_type` - BUY or SELL
-- `quantity`, `price` - Trade details
-- `decision_reason` - Why the trade was made
-- `technical_signals` - Technical indicators (JSON)
-- `news_sentiment` - News sentiment at trade time
-
-**Indexes:**
-- `idx_trading_history_position_id` - Query by position
-- `idx_trading_history_trade_time` - Query by time
-
-#### 3. intraday_decision_records
-Stores complete analysis sessions with full decision-making process.
-
-**Key Fields:**
-- `session_id` - Unique session identifier
-- `positions_analyzed` - List of stocks analyzed (JSON)
-- `account_snapshot` - Account state at analysis time (JSON)
-- `decision_report` - Full decision report text
-- `trades_executed` - List of executed trades (JSON)
-- `tool_calls` - Complete tool call sequence (JSON)
-
-**Indexes:**
-- `idx_intraday_decisions_user_id` - Query by user
-- `idx_intraday_decisions_session_id` - Query by session
-- `idx_intraday_decisions_start_time` - Query by time
-- `idx_intraday_decisions_status` - Query by status
+**Fix**: The version increment logic in `prompt_routes.py` has been corrected to properly parse and increment numeric versions (1.0 → 1.1 → 1.2, etc.)
 
 ## How to Apply Migrations
 
-### Automatic (Recommended)
-The migrations are automatically applied when the application starts via SQLAlchemy's `create_all()` method in `database.py`.
+### Migration 001 - Increase version column length
 
-```python
-from web.backend.database import init_db_sync
-init_db_sync()
+#### Option 1: Using Python Script (Recommended)
+```bash
+cd web/backend/migrations
+python apply_migration_001.py
 ```
 
-### Manual (SQLite)
-If you need to manually apply migrations to an existing database:
+#### Option 2: Using MySQL CLI
+```bash
+mysql -u your_username -p your_database < 001_increase_version_column_length.sql
+```
+
+#### Option 3: Using Docker
+If running in Docker, execute inside the MySQL container:
+```bash
+docker exec -i tradingagents-mysql mysql -u root -p your_database < 001_increase_version_column_length.sql
+```
+
+### Migration 002 - Fix corrupted version strings
+
+**Run this AFTER applying migration 001:**
 
 ```bash
-sqlite3 db/tradingagents.db < web/backend/migrations/001_add_intraday_trading_tables.sql
+cd web/backend/migrations
+python 002_fix_version_strings.py
 ```
 
-### Manual (PostgreSQL)
-For PostgreSQL deployments, use the PostgreSQL-specific version in the migration file:
+This will scan all templates and clean up any corrupted version strings.
 
-```bash
-psql -U username -d tradingagents < web/backend/migrations/001_add_intraday_trading_tables.sql
+## Verification
+
+After applying the migration, verify the change:
+```sql
+SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
+FROM INFORMATION_SCHEMA.COLUMNS 
+WHERE TABLE_NAME = 'agent_prompt_templates' AND COLUMN_NAME = 'version';
 ```
 
-## Testing Migrations
-
-Run the test script to verify models are correctly configured:
-
-```bash
-python web/backend/test_intraday_models.py
-```
-
-## Database Schema
-
-The complete schema includes:
-
-**Existing Tables:**
-- users
-- user_configs
-- analysis_records
-- analysis_logs
-- export_records
-- scheduled_tasks
-
-**New Tables (Intraday Trading):**
-- position_records
-- trading_history
-- intraday_decision_records
-
-## Relationships
-
-```
-User (1) ----< (N) PositionRecord
-PositionRecord (1) ----< (N) TradingHistory
-User (1) ----< (N) IntradayDecisionRecord
-```
+Expected result: `CHARACTER_MAXIMUM_LENGTH` should be `50`.
 
 ## Notes
 
-- All tables use `ON DELETE CASCADE` for foreign keys to maintain referential integrity
-- JSON fields are stored as TEXT in SQLite and JSONB in PostgreSQL
-- Timestamps use timezone-aware types for consistency across deployments
-- Indexes are optimized for common query patterns (user lookups, time-based queries)
+- The model definition in `web/backend/models.py` has been updated to reflect this change
+- Existing data will not be affected, only the column constraint is modified
+- This migration is backward compatible (shorter strings still work)
