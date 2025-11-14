@@ -103,21 +103,9 @@ export function TodayOrders({ selectedMarket, onShowToast }: TodayOrdersProps) {
     );
   };
 
-  // Filter today's orders
-  const getTodayOrders = () => {
-    if (!orders) return [];
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    return orders.filter((order: any) => {
-      const orderDate = new Date(order.create_time);
-      orderDate.setHours(0, 0, 0, 0);
-      return orderDate.getTime() === today.getTime();
-    });
-  };
-
-  const todayOrders = getTodayOrders();
+  // Backend already filters today's orders based on market local time
+  // No need to filter on frontend
+  const todayOrders = orders || [];
 
   if (isLoading) {
     return (
