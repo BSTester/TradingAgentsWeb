@@ -31,6 +31,44 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
   };
   const currency = getCurrencySymbol(selectedMarket);
 
+  /**
+   * Generate Futu stock detail page URL
+   * 
+   * URL format:
+   * - US stocks: https://www.futunn.com/stock/NVDA-US
+   * - HK stocks: https://www.futunn.com/stock/02258-HK
+   * - CN stocks (SH): https://www.futunn.com/stock/688670-SH
+   * - CN stocks (SZ): https://www.futunn.com/stock/301017-SZ
+   */
+  const getFutuStockUrl = (stockCode: string, marketType: string): string => {
+    const market = marketType.toUpperCase();
+    
+    if (market === 'US') {
+      // US stocks: AAPL, NVDA, etc.
+      return `https://www.futunn.com/stock/${stockCode}-US`;
+    } else if (market === 'HK') {
+      // HK stocks: 00700, 02258, etc.
+      return `https://www.futunn.com/stock/${stockCode}-HK`;
+    } else if (market === 'CN') {
+      // CN stocks: need to determine SH or SZ
+      // Shanghai: 60xxxx, 688xxx (科创板)
+      // Shenzhen: 00xxxx, 30xxxx (创业板), 002xxx (中小板)
+      if (stockCode.startsWith('60') || stockCode.startsWith('688')) {
+        return `https://www.futunn.com/stock/${stockCode}-SH`;
+      } else {
+        return `https://www.futunn.com/stock/${stockCode}-SZ`;
+      }
+    }
+    
+    // Fallback
+    return `https://www.futunn.com/stock/${stockCode}`;
+  };
+
+  const handleStockClick = (stockCode: string, marketType: string) => {
+    const url = getFutuStockUrl(stockCode, marketType);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -195,14 +233,21 @@ export function PositionOverview({ selectedMarket, onShowToast }: PositionOvervi
                 {filteredPositions.map((position, index) => (
                       <tr key={`${position.stock_code}-${index}`} className="hover:bg-dark-tertiary transition-colors">
                         <td className="px-2 md:px-4 py-2 md:py-4 whitespace-nowrap">
-                          <div className="text-xs md:text-sm font-medium text-text-primary">
-                            {position.stock_code}
-                          </div>
-                          {position.stock_name && (
-                            <div className="text-xs text-text-tertiary hidden md:block">
-                              {position.stock_name}
+                          <button
+                            onClick={() => handleStockClick(position.stock_code, position.market_type)}
+                            className="text-left hover:opacity-80 transition-opacity group"
+                            title="点击查看富途股票详情"
+                          >
+                            <div className="text-xs md:text-sm font-medium text-accent-primary group-hover:underline flex items-center">
+                              {position.stock_code}
+                              <i className="fas fa-external-link-alt ml-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity" />
                             </div>
-                          )}
+                            {position.stock_name && (
+                              <div className="text-xs text-text-tertiary hidden md:block">
+                                {position.stock_name}
+                              </div>
+                            )}
+                          </button>
                         </td>
                         <td className="px-2 md:px-4 py-2 md:py-4 whitespace-nowrap">
                           <span className={`inline-flex items-center px-1 md:px-2 py-0.5 md:py-1 rounded text-xs font-medium ${getMarketBadgeColor(position.market_type)}`}>

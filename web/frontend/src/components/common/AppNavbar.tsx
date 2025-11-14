@@ -310,7 +310,6 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
                   </div>
                   <div className="ml-3 flex-1">
                     <p className="text-sm font-semibold text-text-primary">{user.username}</p>
-                    <p className="text-xs text-text-tertiary">{user.email}</p>
                   </div>
                   {user.role === 'admin' && (
                     <span className="px-2 py-1 bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-xs font-bold rounded">
