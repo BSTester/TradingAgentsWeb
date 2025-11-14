@@ -110,23 +110,18 @@ def _get_api_key(user_id: Optional[int] = None) -> Optional[str]:
     """
     import os
     
-    # Try user-specific config first (highest priority)
+    # Try user-specific config first (highest priority) - use cache to avoid event loop issues
     if user_id:
         try:
-            from web.backend.database import SessionLocal
-            from web.backend.models import UserConfig
+            from web.backend.services.user_config_cache import get_user_config_from_cache
             
-            db = SessionLocal()
-            try:
-                user_config = db.query(UserConfig).filter(UserConfig.user_id == user_id).first()
-                if user_config:
-                    # Prefer intraday key if available, otherwise use regular key
-                    api_key = user_config.intraday_futu_api_key or user_config.futu_api_key
-                    if api_key:
-                        logger.debug(f"Using Futu API key from user {user_id} config")
-                        return api_key
-            finally:
-                db.close()
+            user_config = get_user_config_from_cache(user_id)
+            if user_config:
+                # Prefer intraday key if available, otherwise use regular key
+                api_key = user_config.get('intraday_futu_api_key') or user_config.get('futu_api_key')
+                if api_key:
+                    logger.debug(f"Using Futu API key from user {user_id} config (cached)")
+                    return api_key
         except Exception as e:
             logger.debug(f"Failed to get user config for user {user_id}: {e}")
     
@@ -412,59 +407,13 @@ def get_positions(
         else:
             positions = []
         
-        # Try to enrich with database information (first open time)
-        # user_id should be passed as parameter from the tool
-        if user_id:
-            try:
-                from web.backend.database import SessionLocal
-                from web.backend.models import PositionRecord
-                from datetime import datetime, date
-                
-                db = SessionLocal()
-                try:
-                    # Query position records for this user and market
-                    records = db.query(PositionRecord).filter(
-                        PositionRecord.user_id == user_id,
-                        PositionRecord.market_type == market_type,
-                        PositionRecord.is_closed == False
-                    ).all()
-                    
-                    # Create lookup dict
-                    records_dict = {rec.stock_code: rec for rec in records}
-                    
-                    # Get today's date for calculating holding days
-                    today = date.today()
-                    
-                    # Enrich positions with database info
-                    for pos in positions:
-                        stock_code = pos.get('stock_code', '')
-                        if stock_code in records_dict:
-                            record = records_dict[stock_code]
-                            pos['first_open_time'] = record.first_open_time.isoformat() if record.first_open_time else None
-                            if record.first_open_time:
-                                # Convert to date only (ignore time component)
-                                open_date = record.first_open_time.date() if hasattr(record.first_open_time, 'date') else record.first_open_time
-                                pos['holding_days'] = (today - open_date).days
-                            else:
-                                pos['holding_days'] = 0
-                        else:
-                            pos['first_open_time'] = None
-                            pos['holding_days'] = 0
-                    
-                    logger.info(f"Enriched {len(positions)} positions with database info for user {user_id}")
-                finally:
-                    db.close()
-            except Exception as e:
-                # If enrichment fails, just log and continue with basic position data
-                logger.warning(f"Failed to enrich positions with database info: {e}")
-                for pos in positions:
-                    pos['first_open_time'] = None
-                    pos['holding_days'] = 0
-        else:
-            # No user_id provided, add empty fields
-            for pos in positions:
-                pos['first_open_time'] = None
-                pos['holding_days'] = 0
+        # Note: Database enrichment (first_open_time, holding_days) has been moved to
+        # the backend API layer to avoid event loop conflicts in async contexts.
+        # The futu_trading module should remain database-free for better isolation.
+        # Add placeholder fields for compatibility
+        for pos in positions:
+            pos['first_open_time'] = None
+            pos['holding_days'] = 0
         
         logger.info(f"Successfully retrieved {len(positions)} positions for {market_type}")
         return positions
