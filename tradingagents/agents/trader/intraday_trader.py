@@ -670,6 +670,12 @@ You have full discretion to:
             get_akshare_news,
             get_akshare_hot_stocks,
         )
+        from tradingagents.agents.utils.fundamental_data_tools import (
+            get_fundamentals,
+            get_balance_sheet,
+            get_cashflow,
+            get_income_statement,
+        )
         
         # Define all available tools
         tools = [
@@ -683,6 +689,10 @@ You have full discretion to:
             get_futu_hot_news,
             get_akshare_news,
             get_akshare_hot_stocks,
+            get_fundamentals,
+            get_balance_sheet,
+            get_cashflow,
+            get_income_statement,
             place_futu_order,
         ]
         
@@ -900,6 +910,12 @@ If you executed ANY trades (called place_futu_order and it succeeded), you MUST 
         get_akshare_news,
         get_akshare_hot_stocks,
     )
+    from tradingagents.agents.utils.fundamental_data_tools import (
+        get_fundamentals,
+        get_balance_sheet,
+        get_cashflow,
+        get_income_statement,
+    )
     
     tools = [
         get_futu_account_info,
@@ -912,6 +928,10 @@ If you executed ANY trades (called place_futu_order and it succeeded), you MUST 
         get_futu_hot_news,
         get_akshare_news,
         get_akshare_hot_stocks,
+        get_fundamentals,
+        get_balance_sheet,
+        get_cashflow,
+        get_income_statement,
         place_futu_order,
     ]
     
