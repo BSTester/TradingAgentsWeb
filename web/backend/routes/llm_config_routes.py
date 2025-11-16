@@ -163,7 +163,7 @@ async def create_provider(
         base_url=provider_data.base_url,
         description=provider_data.description,
         is_active=provider_data.is_active,
-        config_json=provider_data.config_json,
+        config_json=provider_data.config_json or None,
     )
     
     db.add(new_provider)
@@ -390,7 +390,7 @@ async def create_model(
         display_name=model_data.display_name,
         description=model_data.description,
         is_active=model_data.is_active,
-        config_json=model_data.config_json,
+        config_json=model_data.config_json or None,
     )
     
     db.add(new_model)
