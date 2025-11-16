@@ -22,8 +22,18 @@ For each position and candidate stock, call these tools together:
 - `get_futu_technical_analysis(symbol=stock_code, interval="5min", indicator="macd", format="csv")` - Get 5-min MACD
 - `get_futu_technical_analysis(symbol=stock_code, interval="5min", indicator="rsi", format="csv")` - Get 5-min RSI
 - `get_futu_technical_analysis(symbol=stock_code, interval="5min", indicator="boll", format="csv")` - Get 5-min Bollinger Bands
+- `get_fundamentals(ticker=stock_code, curr_date="[current date]")` - Get comprehensive fundamental analysis data
+- `get_balance_sheet(ticker=stock_code, freq="quarterly", curr_date="[current date]")` - Get balance sheet data for financial position analysis
+- `get_cashflow(ticker=stock_code, freq="quarterly", curr_date="[current date]")` - Get cash flow statement data for liquidity assessment
+- `get_income_statement(ticker=stock_code, freq="quarterly", curr_date="[current date]")` - Get income statement data for profitability analysis
 
-Example: If analyzing AAPL and TSLA, call all 18 tools (9 per stock) in one response!
+**Fundamental Analysis Integration**:
+- **Long-term Investment Perspective**: Use fundamental data to assess if stocks align with long-term investment themes
+- **Value Assessment**: Compare current market prices with fundamental metrics (P/E, P/B, etc.)
+- **Financial Health Check**: Review balance sheet strength, cash flow stability, and profitability trends
+- **Risk Assessment**: Identify potential financial risks through comprehensive fundamental analysis
+
+Example: If analyzing AAPL and TSLA, call all 22 tools (11 per stock) in one response!
 
 **Step 3: Market Scanning & News Analysis** (optional, call these in parallel):
 - `get_futu_hot_news(lang="zh-cn")` - Get latest hot financial news from Futu 
