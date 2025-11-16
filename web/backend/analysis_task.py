@@ -276,12 +276,12 @@ def run_analysis_task(
         llm_provider = request_data.get('llm_provider', '').lower()
         
         if api_key:
-            if llm_provider in ("openai", "oneai", "openrouter", "deepseek", "qwen"):
-                os.environ["OPENAI_API_KEY"] = api_key
-            elif llm_provider == "anthropic":
+            if llm_provider == "anthropic":
                 os.environ["ANTHROPIC_API_KEY"] = api_key
             elif llm_provider == "google":
                 os.environ["GOOGLE_API_KEY"] = api_key
+            else:
+                os.environ["OPENAI_API_KEY"] = api_key
         
         # 准备配置
         send_log('info', '⚙️ 准备分析配置...', 'system', '配置', 4.0, '准备阶段')
@@ -853,13 +853,18 @@ def run_analysis_task(
         # 获取最终决策
         decision_raw = report_sections.get("final_trade_decision", "UNKNOWN")
         decision = graph.process_signal(decision_raw)
+        decision = re.sub(r'<thinking>.*?</thinking>', '', decision, flags=re.DOTALL).strip()
+        decision = re.sub(r'<思考>.*?</思考>', '', decision, flags=re.DOTALL).strip()
+        decision = re.sub(r'<think>.*?</think>', '', decision, flags=re.DOTALL).strip()
+        decision = re.sub(r'\s+', ' ', decision).strip()
+
         if decision.upper() == 'HOLD':
             decision = '观望'
         elif decision.upper() == 'SELL':
             decision = '卖出'
         elif decision.upper() == 'BUY':
             decision = '买入'
-        else:
+        elif decision.upper() == 'UNKNOWN':
             decision = '未明确'
         
         # 获取基本信息（从收集的字段中）- use Beijing time
@@ -1126,7 +1131,6 @@ def run_analysis_task(
         # 检测 token 超限错误
         elif 'context_length_exceeded' in error_msg or 'maximum context length' in error_msg.lower():
             # 提取 token 数量信息
-            import re
             token_match = re.search(r'(\d+)\s+tokens', error_msg)
             if token_match:
                 token_count = token_match.group(1)
@@ -1150,7 +1154,6 @@ def run_analysis_task(
         # 检测工具调用错误（如 fundamentals 获取失败）
         elif 'runtimeerror' in error_msg.lower() and 'vendor implementations failed' in error_msg.lower():
             # 提取工具名称
-            import re
             tool_match = re.search(r"method '(\w+)'", error_msg)
             if tool_match:
                 tool_name = tool_match.group(1)

@@ -156,14 +156,7 @@ async def execute_intraday_analysis(
                 logging.warning(f"Failed to send session start WebSocket notification: {ws_error}")
             
             # Create LLM instance
-            if llm_provider in ("openai", "ollama", "openrouter", "oneai", "deepseek", "qwen"):
-                llm = ChatOpenAI(
-                    model=model_name,
-                    temperature=0.1,
-                    api_key=api_key or os.getenv("OPENAI_API_KEY"),
-                    base_url=backend_url or DEFAULT_CONFIG.get("backend_url"),
-                )
-            elif llm_provider == "anthropic":
+            if llm_provider == "anthropic":
                 llm = ChatAnthropic(
                     model=model_name,
                     temperature=0.1,
@@ -176,7 +169,12 @@ async def execute_intraday_analysis(
                     google_api_key=api_key or os.getenv("GOOGLE_API_KEY"),
                 )
             else:
-                raise ValueError(f"Unsupported LLM provider: {llm_provider}")
+                llm = ChatOpenAI(
+                    model=model_name,
+                    temperature=0.1,
+                    api_key=api_key or os.getenv("OPENAI_API_KEY"),
+                    base_url=backend_url or DEFAULT_CONFIG.get("backend_url"),
+                )
             
             # ========================================
             # STEP 3: Get previous decision for context (one-time query)

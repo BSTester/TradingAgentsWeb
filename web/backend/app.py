@@ -742,6 +742,10 @@ app.include_router(prompt_routes.router)
 from web.backend.routes import account_snapshot_routes
 app.include_router(account_snapshot_routes.router)
 
+# Include LLM configuration routes
+from web.backend.routes import llm_config_routes
+app.include_router(llm_config_routes.router)
+
 # Include page and WebSocket routes
 app.include_router(page_routes.router)
 app.include_router(websocket_routes.router)

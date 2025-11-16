@@ -22,6 +22,7 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
   const router = useRouter();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const isActive = (path: string) => {
     return pathname === path || pathname?.startsWith(path + '/');
@@ -31,6 +32,18 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [pathname]);
+
+  // Close dropdown menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showUserMenu) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showUserMenu]);
 
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
@@ -65,6 +78,7 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
   const handleLogout = () => {
     onLogout();
     setIsMobileMenuOpen(false);
+    setShowUserMenu(false);
     router.push('/');
   };
 
@@ -145,25 +159,17 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
                   智能盯盘
                 </button>
               )}
-              {showUserManagement && user?.role === 'admin' && (
-                <button
-                  onClick={() => handleNavigation('/admin/users')}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    isActive('/admin')
-                      ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white shadow-glow-cyan'
-                      : 'text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary'
-                  }`}
-                >
-                  <i className="fas fa-users-cog mr-1" />
-                  用户管理
-                </button>
-              )}
+              
+              {/* User dropdown menu */}
               {user && (
-                <>
+                <div className="relative">
                   <button
-                    onClick={() => handleNavigation('/profile')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowUserMenu(!showUserMenu);
+                    }}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center ${
-                      isActive('/profile')
+                      isActive('/profile') || isActive('/admin')
                         ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white shadow-glow-cyan'
                         : 'text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary'
                     }`}
@@ -171,19 +177,75 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
                     <i className={`fas ${user?.role === 'admin' ? 'fa-crown' : 'fa-user-circle'} mr-2`} />
                     {user?.username}
                     {user?.role === 'admin' && (
-                      <span className="ml-2 px-2 py-0.5 bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-xs font-bold rounded">
+                      <span className="mx-2 px-2 py-0.5 bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-xs font-bold rounded">
                         管理员
                       </span>
                     )}
+                    <i className={`fas fa-chevron-down ml-2 text-xs transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
                   </button>
-                  <button
-                    onClick={handleLogout}
-                    className="text-text-secondary hover:text-danger-500 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    <i className="fas fa-power-off mr-1" />
-                    退出
-                  </button>
-                </>
+                  
+                  {showUserMenu && (
+                    <div className="absolute top-full right-0 mt-1 w-48 bg-dark-secondary border border-dark-border rounded-lg shadow-lg py-2 z-50">
+                      <button
+                        onClick={() => {
+                          handleNavigation('/profile');
+                          setShowUserMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary transition-all flex items-center"
+                      >
+                        <i className="fas fa-user-circle w-4 mr-3" />
+                        个人中心
+                      </button>
+                      
+                      {/* Admin menu items */}
+                      {showUserManagement && user?.role === 'admin' && (
+                        <>
+                          <div className="border-t border-dark-border my-1"></div>
+                          <button
+                            onClick={() => {
+                              handleNavigation('/admin/users');
+                              setShowUserMenu(false);
+                            }}
+                            className={`w-full text-left px-4 py-2 text-sm transition-all flex items-center ${
+                              isActive('/admin/users')
+                                ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white'
+                                : 'text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary'
+                            }`}
+                          >
+                            <i className="fas fa-users w-4 mr-3" />
+                            用户列表
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleNavigation('/admin/llm-config');
+                              setShowUserMenu(false);
+                            }}
+                            className={`w-full text-left px-4 py-2 text-sm transition-all flex items-center ${
+                              isActive('/admin/llm-config')
+                                ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white'
+                                : 'text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary'
+                            }`}
+                          >
+                            <i className="fas fa-brain w-4 mr-3" />
+                            LLM管理
+                          </button>
+                        </>
+                      )}
+                      
+                      <div className="border-t border-dark-border my-1"></div>
+                      <button
+                        onClick={() => {
+                          handleLogout();
+                          setShowUserMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-danger-500 hover:bg-danger-500/10 transition-all flex items-center"
+                      >
+                        <i className="fas fa-power-off w-4 mr-3" />
+                        退出登录
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -273,59 +335,84 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
                   </button>
                 )}
 
-                {showUserManagement && user?.role === 'admin' && (
-                  <button
-                    onClick={() => handleNavigation('/admin/users')}
-                    className={`w-full flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all min-h-touch ${
-                      isActive('/admin')
-                        ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white shadow-glow-cyan'
-                        : 'text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary'
-                    }`}
-                  >
-                    <i className="fas fa-users-cog w-6 text-lg" />
-                    <span className="ml-3">用户管理</span>
-                  </button>
+                {/* Mobile User Menu */}
+                {user && (
+                  <div className="border border-dark-border rounded-lg overflow-hidden bg-dark-tertiary">
+                    {/* User section header */}
+                    <div className="flex items-center justify-between p-4 border-b border-dark-border">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent-primary to-accent-secondary flex items-center justify-center text-white font-bold mr-3">
+                          {user.username.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-text-primary">{user.username}</p>
+                          {user.role === 'admin' && (
+                            <span className="px-2 py-1 bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-xs font-bold rounded">
+                              管理员
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* User menu items */}
+                    <div className="py-2">
+                      <button
+                        onClick={() => handleNavigation('/profile')}
+                        className={`w-full flex items-center px-4 py-3 text-base font-medium transition-all ${
+                          isActive('/profile')
+                            ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white'
+                            : 'text-text-secondary hover:text-accent-primary hover:bg-dark-secondary'
+                        }`}
+                      >
+                        <i className="fas fa-user-circle w-6 text-lg mr-3" />
+                        个人中心
+                      </button>
+                      
+                      {/* Admin menu items */}
+                      {showUserManagement && user.role === 'admin' && (
+                        <>
+                          <div className="border-t border-dark-border my-2"></div>
+                          <button
+                            onClick={() => handleNavigation('/admin/users')}
+                            className={`w-full flex items-center px-4 py-3 text-base font-medium transition-all ${
+                              isActive('/admin/users')
+                                ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white'
+                                : 'text-text-secondary hover:text-accent-primary hover:bg-dark-secondary'
+                            }`}
+                          >
+                            <i className="fas fa-users w-6 text-lg mr-3" />
+                            用户列表
+                          </button>
+                          <button
+                            onClick={() => handleNavigation('/admin/llm-config')}
+                            className={`w-full flex items-center px-4 py-3 text-base font-medium transition-all ${
+                              isActive('/admin/llm-config')
+                                ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white'
+                                : 'text-text-secondary hover:text-accent-primary hover:bg-dark-secondary'
+                            }`}
+                          >
+                            <i className="fas fa-brain w-6 text-lg mr-3" />
+                            LLM管理
+                          </button>
+                        </>
+                      )}
+                      
+                      <div className="border-t border-dark-border my-2"></div>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center px-4 py-3 text-base font-medium text-danger-500 hover:bg-danger-500/10 transition-all"
+                      >
+                        <i className="fas fa-power-off w-6 text-lg mr-3" />
+                        退出登录
+                      </button>
+                    </div>
+                  </div>
                 )}
-
-                <button
-                  onClick={() => handleNavigation('/profile')}
-                  className={`w-full flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all min-h-touch ${
-                    isActive('/profile')
-                      ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white shadow-glow-cyan'
-                      : 'text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary'
-                  }`}
-                >
-                  <i className={`fas ${user?.role === 'admin' ? 'fa-crown' : 'fa-user-circle'} w-6 text-lg`} />
-                  <span className="ml-3">个人中心</span>
-                </button>
               </div>
             </nav>
 
-            {/* User Section at Bottom */}
-            {user && (
-              <div className="border-t border-dark-border p-4 bg-dark-tertiary">
-                <div className="flex items-center mb-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent-primary to-accent-secondary flex items-center justify-center text-white font-bold">
-                    {user.username.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="ml-3 flex-1">
-                    <p className="text-sm font-semibold text-text-primary">{user.username}</p>
-                  </div>
-                  {user.role === 'admin' && (
-                    <span className="px-2 py-1 bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-xs font-bold rounded">
-                      管理员
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center justify-center px-4 py-3 rounded-lg text-base font-medium text-danger-500 hover:bg-danger-500/10 transition-all min-h-touch"
-                >
-                  <i className="fas fa-power-off mr-2" />
-                  退出登录
-                </button>
-              </div>
-            )}
+            {/* User Section at Bottom - removed to avoid duplication with mobile menu */}
           </div>
         </div>
       )}
