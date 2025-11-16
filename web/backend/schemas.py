@@ -539,3 +539,132 @@ class ToolSelectionUpdate(BaseModel):
 
 class BulkToolSelectionUpdate(BaseModel):
     tools: List[ToolSelectionUpdate]
+
+
+# ============================================================================
+# LLM Provider and Model Management Schemas
+# ============================================================================
+
+class LLMProviderBase(BaseModel):
+    provider_name: str = Field(..., max_length=100, description="供应商唯一标识")
+    display_name: str = Field(..., max_length=200, description="显示名称")
+    api_key: Optional[str] = Field(None, max_length=1000, description="API密钥 - 支持长密钥如JWT")
+    base_url: Optional[str] = Field(None, max_length=500, description="API基础URL")
+    description: Optional[str] = Field(None, description="供应商描述")
+    is_active: bool = Field(True, description="是否启用")
+    config_json: Optional[Dict[str, Any]] = Field(None, description="额外配置参数")
+    
+    @validator('provider_name')
+    def validate_provider_name(cls, v):
+        if not v or len(v.strip()) == 0:
+            raise ValueError('Provider name cannot be empty')
+        # Only allow alphanumeric, underscore, and hyphen
+        import re
+        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+            raise ValueError('Provider name can only contain letters, numbers, underscores, and hyphens')
+        return v.strip().lower()
+
+
+class LLMProviderCreate(LLMProviderBase):
+    pass
+
+
+class LLMProviderUpdate(BaseModel):
+    display_name: Optional[str] = Field(None, max_length=200)
+    api_key: Optional[str] = Field(None, max_length=1000)
+    base_url: Optional[str] = Field(None, max_length=500)
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    config_json: Optional[Dict[str, Any]] = None
+
+
+class LLMProviderResponse(BaseModel):
+    model_config = {"from_attributes": True}
+    
+    id: int
+    provider_name: str
+    display_name: str
+    api_key: Optional[str]  # Will be masked in response
+    base_url: Optional[str]
+    description: Optional[str]
+    is_active: bool
+    config_json: Optional[Dict[str, Any]]
+    created_at: datetime
+    updated_at: datetime
+    models_count: Optional[int] = 0  # Number of models under this provider
+
+
+class LLMModelBase(BaseModel):
+    model_config = {"protected_namespaces": ()}  # Disable model_ namespace protection
+    
+    model_name: str = Field(..., max_length=200, description="模型名称")
+    model_type: str = Field(..., max_length=50, description="模型类型：shallow_thinker/deep_thinker")
+    display_name: str = Field(..., max_length=200, description="显示名称")
+    description: Optional[str] = Field(None, description="模型描述")
+    is_active: bool = Field(True, description="是否启用")
+    config_json: Optional[Dict[str, Any]] = Field(None, description="模型配置参数")
+    
+    @validator('model_type')
+    def validate_model_type(cls, v):
+        if v not in ['shallow_thinker', 'deep_thinker']:
+            raise ValueError('Model type must be either shallow_thinker or deep_thinker')
+        return v
+
+
+class LLMModelCreate(LLMModelBase):
+    provider_id: int = Field(..., description="所属供应商ID")
+
+
+class LLMModelUpdate(BaseModel):
+    model_config = {"protected_namespaces": ()}  # Disable model_ namespace protection
+    
+    model_name: Optional[str] = Field(None, max_length=200)
+    model_type: Optional[str] = Field(None, max_length=50)
+    display_name: Optional[str] = Field(None, max_length=200)
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    config_json: Optional[Dict[str, Any]] = None
+    
+    @validator('model_type')
+    def validate_model_type(cls, v):
+        if v is not None and v not in ['shallow_thinker', 'deep_thinker']:
+            raise ValueError('Model type must be either shallow_thinker or deep_thinker')
+        return v
+
+
+class LLMModelResponse(BaseModel):
+    model_config = {
+        "protected_namespaces": (),  # Disable model_ namespace protection
+        "from_attributes": True
+    }
+    
+    id: int
+    provider_id: int
+    model_name: str
+    model_type: str
+    display_name: str
+    description: Optional[str]
+    is_active: bool
+    config_json: Optional[Dict[str, Any]]
+    created_at: datetime
+    updated_at: datetime
+    provider_name: Optional[str] = None  # Include provider name for convenience
+    provider_display_name: Optional[str] = None
+
+
+class LLMConnectionTest(BaseModel):
+    """Schema for testing LLM provider connection"""
+    model_config = {"protected_namespaces": ()}  # Disable model_ namespace protection
+    
+    provider_id: Optional[int] = None
+    provider_name: Optional[str] = None
+    api_key: str
+    base_url: str
+    model_name: Optional[str] = None  # Optional: test with specific model
+
+
+class LLMConnectionTestResponse(BaseModel):
+    success: bool
+    message: str
+    details: Optional[Dict[str, Any]] = None
+

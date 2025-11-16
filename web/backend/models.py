@@ -545,3 +545,94 @@ class AccountSnapshot(Base):
     
     def __repr__(self):
         return f"<AccountSnapshot(id={self.id}, user_id={self.user_id}, market='{self.market_type}', date='{self.snapshot_date}', total={self.total_assets})>"
+
+
+class LLMProvider(Base):
+    """
+    LLM Provider model for managing LLM service providers
+    管理LLM服务供应商
+    """
+    __tablename__ = "llm_providers"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    provider_name = Column(String(100), unique=True, nullable=False, index=True)  # 供应商名称（唯一标识）
+    display_name = Column(String(200), nullable=False)  # 显示名称
+    api_key = Column(String(1000), nullable=True)  # API密钥（加密存储）- 增加长度支持长API key如JWT
+    base_url = Column(String(500), nullable=True)  # API基础URL
+    description = Column(Text, nullable=True)  # 供应商描述
+    is_active = Column(Boolean, default=True, nullable=False, index=True)  # 是否启用
+    config_json = Column(JSON, nullable=True)  # 额外配置参数（JSON格式）
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationships
+    models = relationship("LLMModel", back_populates="provider", cascade="all, delete-orphan")
+    
+    def to_dict(self, include_api_key=False):
+        """Convert to dictionary, optionally masking API key"""
+        # 获取实际值而不是Column对象
+        api_key_value = self.api_key
+        masked_api_key = None
+        if api_key_value and include_api_key:
+            masked_api_key = api_key_value
+        elif api_key_value and len(str(api_key_value)) > 4:
+            masked_api_key = "***" + str(api_key_value)[-4:]
+        
+        return {
+            "id": self.id,
+            "provider_name": self.provider_name,
+            "display_name": self.display_name,
+            "api_key": masked_api_key,
+            "base_url": self.base_url,
+            "description": self.description,
+            "is_active": self.is_active,
+            "config_json": self.config_json,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+    
+    def __repr__(self):
+        return f"<LLMProvider(id={self.id}, name='{self.provider_name}', display='{self.display_name}', active={self.is_active})>"
+
+
+class LLMModel(Base):
+    """
+    LLM Model model for managing specific models under providers
+    管理供应商下的具体模型
+    """
+    __tablename__ = "llm_models"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    provider_id = Column(Integer, ForeignKey("llm_providers.id", ondelete="CASCADE"), nullable=False, index=True)
+    model_name = Column(String(200), nullable=False, index=True)  # 模型名称
+    model_type = Column(String(50), nullable=False, index=True)  # 模型类型：shallow_thinker/deep_thinker
+    display_name = Column(String(200), nullable=False)  # 显示名称
+    description = Column(Text, nullable=True)  # 模型描述
+    is_active = Column(Boolean, default=True, nullable=False, index=True)  # 是否启用
+    config_json = Column(JSON, nullable=True)  # 模型配置参数（JSON格式）
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationships
+    provider = relationship("LLMProvider", back_populates="models")
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "provider_id": self.provider_id,
+            "model_name": self.model_name,
+            "model_type": self.model_type,
+            "display_name": self.display_name,
+            "description": self.description,
+            "is_active": self.is_active,
+            "config_json": self.config_json,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+    
+    def __repr__(self):
+        return f"<LLMModel(id={self.id}, name='{self.model_name}', type='{self.model_type}', provider_id={self.provider_id}, active={self.is_active})>"

@@ -1,5 +1,6 @@
 import time
 import json
+import re
 from tradingagents.agents.utils.market_utils import detect_market_type
 
 
@@ -117,7 +118,13 @@ Requirements:
 6. Output the company name directly without any additional text"""
 
         company_name_response = llm.invoke(extract_name_prompt)
-        company_name = company_name_response.content.strip()
+        raw_company_name = company_name_response.content.strip()
+        
+        # Remove reasoning tags and extract company name using regex
+        company_name = re.sub(r'<thinking>.*?</thinking>', '', raw_company_name, flags=re.DOTALL).strip()
+        company_name = re.sub(r'<思考>.*?</思考>', '', company_name, flags=re.DOTALL).strip()
+        company_name = re.sub(r'<think>.*?</think>', '', company_name, flags=re.DOTALL).strip()
+        company_name = re.sub(r'\s+', ' ', company_name).strip()
 
         # Detect market type from ticker
         market_type = detect_market_type(ticker)
