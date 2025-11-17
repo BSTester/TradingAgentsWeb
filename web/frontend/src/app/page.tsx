@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { buildApiUrl } from '@/utils/api';
-import { Header } from '@/components/leaderboard/Header';
+import { AppNavbar } from '@/components/common/AppNavbar';
 import { HeroSection } from '@/components/home/HeroSection';
 import { FeaturesShowcase } from '@/components/home/FeaturesShowcase';
 import { MarketTabs } from '@/components/leaderboard/MarketTabs';
@@ -82,7 +82,7 @@ export default function HomePage() {
   return (
     <>
       <div className="min-h-screen bg-dark-primary flex flex-col">
-        <Header user={user} onLogout={logout} />
+        <AppNavbar user={user} onLogout={logout} />
         
         {/* Add padding top to account for fixed header */}
         <div className="pt-16">

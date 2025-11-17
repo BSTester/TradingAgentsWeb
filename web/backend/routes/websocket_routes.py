@@ -6,6 +6,7 @@ WebSocket 路由
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import json
+from datetime import datetime
 
 router = APIRouter(tags=["websocket"])
 
@@ -323,3 +324,225 @@ async def websocket_endpoint(websocket: WebSocket, analysis_id: str):
         print(f"❌ WebSocket error: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
+
+
+@router.websocket("/ws/leaderboard")
+async def leaderboard_websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time leaderboard updates (public, no auth required)"""
+    print("🔌 Leaderboard WebSocket connection attempt received")
+    
+    # Get channel ID for leaderboard broadcasts
+    channel_id = "leaderboard_public"
+    
+    try:
+        # Connect to leaderboard channel (this will accept the connection)
+        await manager.connect(websocket, channel_id)
+        print(f"✅ Leaderboard WebSocket connected successfully to channel: {channel_id}")
+
+        # Get initial data with better error handling
+        try:
+            from web.backend.database import AsyncSessionLocal
+            from web.backend.models import User, AccountSnapshot, UserConfig
+            from sqlalchemy import select, desc
+
+            async with AsyncSessionLocal() as db:
+                # First, try to get users participating in leaderboard
+                users_query = select(User).where(User.participate_in_leaderboard == True)
+                users_result = await db.execute(users_query)
+                participating_users = users_result.scalars().all()
+
+                print(f"📊 Found {len(participating_users)} users participating in leaderboard")
+
+                users_list = []
+                
+                # Get user configs for model information
+                user_ids = [user.id for user in participating_users]
+                configs = {}
+                if user_ids:
+                    config_query = select(UserConfig).where(UserConfig.user_id.in_(user_ids))
+                    config_result = await db.execute(config_query)
+                    configs = {config.user_id: config for config in config_result.scalars().all()}
+                    print(f"📊 Found {len(configs)} user configs")
+
+                if participating_users:
+                    # For each participating user, get their latest snapshot for each market
+                    for user in participating_users:
+                        # Get model name from config
+                        model_name = None
+                        if user.id in configs:
+                            config = configs[user.id]
+                            model_name = config.intraday_llm_model if config.intraday_llm_model else None
+                        
+                        # Get all snapshots for this user
+                        snapshot_query = select(AccountSnapshot).where(
+                            AccountSnapshot.user_id == user.id
+                        ).order_by(AccountSnapshot.snapshot_date.desc())
+
+                        snapshot_result = await db.execute(snapshot_query)
+                        all_snapshots = snapshot_result.scalars().all()
+
+                        if all_snapshots:
+                            # Group by market_type and get the latest for each market
+                            market_snapshots = {}
+                            for snapshot in all_snapshots:
+                                market = snapshot.market_type or 'US'
+                                if market not in market_snapshots:
+                                    market_snapshots[market] = snapshot
+                            
+                            # Add one entry per market
+                            for market, snapshot in market_snapshots.items():
+                                users_list.append({
+                                    'user_id': user.id,
+                                    'username': user.username,
+                                    'market_type': market,
+                                    'total_assets': float(snapshot.total_assets) if snapshot.total_assets else 100000.0,
+                                    'latest_snapshot_date': snapshot.snapshot_date.strftime('%Y-%m-%d') if snapshot.snapshot_date else datetime.now().strftime('%Y-%m-%d'),
+                                    'model_name': model_name
+                                })
+                        else:
+                            # Create default snapshots for all markets if no data exists
+                            for market in ['US', 'HK', 'CN']:
+                                users_list.append({
+                                    'user_id': user.id,
+                                    'username': user.username,
+                                    'market_type': market,
+                                    'total_assets': 100000.0,  # Default starting amount
+                                    'latest_snapshot_date': datetime.now().strftime('%Y-%m-%d'),
+                                    'model_name': model_name
+                                })
+                else:
+                    # No participating users, send empty data
+                    print("ℹ️ No users participating in leaderboard yet")
+
+        except Exception as db_error:
+            print(f"❌ Database error in leaderboard WebSocket: {db_error}")
+            # Send empty data if database query fails
+            users_list = []
+
+        # Sort by total_assets descending
+        users_list.sort(key=lambda x: x['total_assets'], reverse=True)
+        print(f"📤 Sending initial data with {len(users_list)} users")
+
+        # Send initial data to client
+        await websocket.send_text(json.dumps({
+            'type': 'initial_data',
+            'timestamp': datetime.now().isoformat(),
+            'data': {
+                'users': users_list
+            }
+        }))
+        print("✅ Initial data sent successfully")
+
+        # Listen for messages from client
+        while True:
+            try:
+                data = await websocket.receive_text()
+                message = json.loads(data)
+                message_type = message.get('type')
+
+                if message_type == 'get_initial_data':
+                    # Resend current data
+                    await websocket.send_text(json.dumps({
+                        'type': 'initial_data',
+                        'timestamp': datetime.now().isoformat(),
+                        'data': {
+                            'users': users_list
+                        }
+                    }))
+                    print("📤 Resent initial data on request")
+                elif message_type == 'ping':
+                    # Respond to ping
+                    await websocket.send_text(json.dumps({'type': 'pong'}))
+                    print("🏓 Responded to ping")
+
+            except json.JSONDecodeError:
+                print(f"⚠️ Invalid JSON received from leaderboard WebSocket client: {data}")
+                await websocket.send_text(json.dumps({
+                    'type': 'error',
+                    'message': 'Invalid JSON format'
+                }))
+            except Exception as msg_error:
+                print(f"⚠️ Error processing leaderboard WebSocket message: {msg_error}")
+                await websocket.send_text(json.dumps({
+                    'type': 'error',
+                    'message': 'Error processing message'
+                }))
+
+    except WebSocketDisconnect:
+        print(f"🔌 Leaderboard WebSocket disconnected normally")
+        try:
+            manager.disconnect(websocket, channel_id)
+        except Exception as cleanup_error:
+            print(f"⚠️ Error during cleanup: {cleanup_error}")
+    except Exception as e:
+        print(f"❌ Leaderboard WebSocket error: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        try:
+            manager.disconnect(websocket, channel_id)
+        except Exception as cleanup_error:
+            print(f"⚠️ Error during cleanup: {cleanup_error}")
+
+
+# Function to broadcast leaderboard updates
+async def broadcast_leaderboard_update(users_data: list = None, user_data: dict = None):
+    """Broadcast leaderboard updates to all connected leaderboard clients"""
+    if not manager:
+        return
+
+    message = {
+        'type': 'leaderboard_update' if users_data else 'user_update',
+        'timestamp': datetime.now().isoformat(),
+        'data': {}
+    }
+
+    if users_data:
+        message['data']['users'] = users_data
+    elif user_data:
+        message['data']['user'] = user_data
+
+    await manager.broadcast_to_channel("leaderboard_public", json.dumps(message))
+
+
+# Simple test WebSocket endpoint
+@router.websocket("/ws/test")
+async def test_websocket_endpoint(websocket: WebSocket):
+    """Simple test WebSocket endpoint"""
+    print("🔌 Test WebSocket connection attempt received")
+    try:
+        await websocket.accept()
+        print("✅ Test WebSocket connected successfully")
+
+        # Send a test message
+        await websocket.send_text(json.dumps({
+            'type': 'test_message',
+            'message': 'WebSocket connection successful!',
+            'timestamp': datetime.now().isoformat()
+        }))
+
+        # Keep connection alive and echo messages
+        while True:
+            try:
+                data = await websocket.receive_text()
+                message = json.loads(data)
+                if message.get('type') == 'ping':
+                    await websocket.send_text(json.dumps({'type': 'pong'}))
+                else:
+                    await websocket.send_text(json.dumps({
+                        'type': 'echo',
+                        'data': message,
+                        'timestamp': datetime.now().isoformat()
+                    }))
+            except WebSocketDisconnect:
+                print("🔌 Test WebSocket disconnected")
+                break
+            except Exception as e:
+                print(f"⚠️ Test WebSocket error: {e}")
+                break
+
+    except Exception as e:
+        print(f"❌ Test WebSocket connection error: {e}")
+
+
+# Export the broadcast function for use in other routes
+__all__ = ['router', 'init_websocket_routes', 'broadcast_leaderboard_update']

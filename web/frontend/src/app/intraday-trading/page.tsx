@@ -14,13 +14,26 @@ import { AccountInfo } from '@/components/intraday/AccountInfo';
 import { useIntradayWebSocket } from '@/hooks/useIntradayWebSocket';
 import { useQueryClient } from '@tanstack/react-query';
 import { intradayTradingKeys } from '@/hooks/useIntradayTrading';
+import { buildApiUrl } from '@/utils/api';
 
 export default function IntradayTradingPage() {
-  const { user, logout, isLoading: authLoading } = useAuth();
+  const { user, logout, isLoading: authLoading, refreshUser } = useAuth();
   const router = useRouter();
   const { toast, showToast, hideToast } = useToast();
   const queryClient = useQueryClient();
-  
+
+  // 管理排名参与状态
+  const [participateInLeaderboard, setParticipateInLeaderboard] = useState<boolean>(
+    user?.participate_in_leaderboard || false
+  );
+
+  // 当用户数据加载时，更新排名参与状态
+  React.useEffect(() => {
+    if (user) {
+      setParticipateInLeaderboard(user.participate_in_leaderboard || false);
+    }
+  }, [user]);
+
   // 从 localStorage 读取上次选择的市场,如果没有则默认为 'US'
   const [selectedMarket, setSelectedMarket] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -348,34 +361,122 @@ export default function IntradayTradingPage() {
                 </p>
               </div>
               
-              {/* WebSocket Status Indicator */}
-              <div className="flex items-center space-x-2">
-                <div className={`flex items-center px-3 py-1 rounded-full text-sm ${
-                  isConnected 
-                    ? 'bg-success-500/20 text-success-500' 
-                    : wsStatus === 'connecting'
-                    ? 'bg-warning-500/20 text-warning-500'
-                    : wsStatus === 'error'
-                    ? 'bg-warning-500/20 text-warning-500'
-                    : 'bg-dark-tertiary text-text-tertiary'
-                }`}>
-                  <span className={`w-2 h-2 rounded-full mr-2 ${
-                    isConnected 
-                      ? 'bg-success-500 animate-pulse' 
+              {/* Right side controls */}
+              <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+                {/* WebSocket Status Indicator - Icon only on all screens */}
+                <div 
+                  className={`flex items-center px-2 py-1 rounded-full ${
+                    isConnected
+                      ? 'bg-success-500/20'
+                      : wsStatus === 'connecting'
+                      ? 'bg-warning-500/20'
+                      : wsStatus === 'error'
+                      ? 'bg-warning-500/20'
+                      : 'bg-dark-tertiary'
+                  }`}
+                  title={
+                    isConnected
+                      ? '实时连接'
+                      : wsStatus === 'connecting'
+                      ? '连接中'
+                      : wsStatus === 'error'
+                      ? '轮询模式'
+                      : '未连接'
+                  }
+                >
+                  <span className={`w-2 h-2 rounded-full ${
+                    isConnected
+                      ? 'bg-success-500 animate-pulse'
                       : wsStatus === 'connecting'
                       ? 'bg-warning-500 animate-pulse'
                       : wsStatus === 'error'
                       ? 'bg-warning-500'
                       : 'bg-text-tertiary'
                   }`} />
-                  {isConnected 
-                    ? '实时连接' 
-                    : wsStatus === 'connecting' 
-                    ? '连接中' 
-                    : wsStatus === 'error'
-                    ? '轮询模式'
-                    : '未连接'}
                 </div>
+
+                {/* Participate in Ranking Toggle */}
+                <div className="flex items-center space-x-2">
+                  <div className="relative group">
+                    <i 
+                      className="fas fa-info-circle text-text-tertiary cursor-pointer sm:cursor-help" 
+                      onClick={(e) => {
+                        // Mobile: toggle tooltip on click
+                        if (window.innerWidth < 640) {
+                          const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
+                          if (tooltip) {
+                            tooltip.classList.toggle('opacity-0');
+                            tooltip.classList.toggle('opacity-100');
+                          }
+                        }
+                      }}
+                    />
+                    <div className="absolute bottom-full right-0 sm:left-1/2 sm:transform sm:-translate-x-1/2 mb-2 px-3 py-2 bg-dark-secondary border border-dark-border rounded-lg shadow-lg text-xs text-text-primary opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 w-56 sm:w-auto sm:whitespace-nowrap text-left">
+                      开启后，您的资产信息将展示在实时排名页面，供所有人查看对比（可随时关闭）
+                      <div className="absolute top-full right-4 sm:left-1/2 sm:transform sm:-translate-x-1/2">
+                        <div className="w-2 h-2 bg-dark-secondary border-r border-b border-dark-border transform rotate-45 -translate-y-1"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="relative group">
+                    <label className="flex items-center cursor-pointer">
+                      <span className="hidden sm:inline text-sm text-text-secondary mr-2">参加排名</span>
+                      <div className="relative inline-block">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={participateInLeaderboard}
+                          onChange={async (e) => {
+                            const newCheckedState = e.target.checked;
+                            setParticipateInLeaderboard(newCheckedState); // 立即更新UI
+
+                            try {
+                              const token = localStorage.getItem('access_token');
+                              const response = await fetch(buildApiUrl('/api/user/leaderboard-toggle'), {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${token}`,
+                                },
+                                credentials: 'include',
+                              });
+
+                              if (!response.ok) {
+                                throw new Error('更新设置失败');
+                              }
+
+                              const result = await response.json();
+
+                              // Update the actual state based on backend response
+                              setParticipateInLeaderboard(result.participating);
+
+                              // Refresh user data to sync with backend
+                              if (refreshUser) {
+                                await refreshUser();
+                              }
+
+                              showToast(
+                                result.message || (result.participating ? '已开启排名展示' : '已关闭排名展示'),
+                                'success'
+                              );
+                            } catch (error: any) {
+                              showToast(error.message || '操作失败', 'error');
+                              // Revert toggle on error
+                              setParticipateInLeaderboard(!newCheckedState);
+                            }
+                          }}
+                        />
+                        <div className={`w-10 h-5 rounded-full shadow-inner transition-all duration-300 ease-in-out ${
+                          participateInLeaderboard ? 'bg-accent-primary' : 'bg-dark-tertiary'
+                        }`}>
+                          <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300 ease-in-out translate-y-0.5 ${
+                            participateInLeaderboard ? 'translate-x-5' : 'translate-x-0.5'
+                          }`}></div>
+                        </div>
+                      </div>
+                  </label>
+                </div>
+              </div>
               </div>
             </div>
           </div>

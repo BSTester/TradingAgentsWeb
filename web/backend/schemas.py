@@ -63,6 +63,7 @@ class User(UserBase):
     role: str
     is_active: bool
     can_access_intraday_trading: bool
+    participate_in_leaderboard: bool
     has_set_password: bool
     created_at: datetime
     

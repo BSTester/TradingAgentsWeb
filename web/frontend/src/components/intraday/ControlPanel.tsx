@@ -41,7 +41,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
   // LLM Configuration states
   const [llmProvider, setLlmProvider] = useState('');
   const [llmApiKey, setLlmApiKey] = useState('');
-  const [showLlmApiKey, setShowLlmApiKey] = useState(true); // 默认显示密钥用于验证
+  const [showLlmApiKey, setShowLlmApiKey] = useState(false); // 默认隐藏密钥保护隐私
   const [llmKeyValidated, setLlmKeyValidated] = useState(false);
   const [validatingLlmKey, setValidatingLlmKey] = useState(false);
   const [llmModel, setLlmModel] = useState(''); // 只需要一个模型（深度思考模型）

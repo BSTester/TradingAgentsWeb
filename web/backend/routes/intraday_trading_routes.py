@@ -763,10 +763,16 @@ async def get_positions(
                     if stock_code in position_records:
                         record = position_records[stock_code]
                         first_open_time = record.first_open_time
-                        if first_open_time:
-                            # Convert to date only (ignore time component)
-                            open_date = first_open_time.date() if hasattr(first_open_time, 'date') else first_open_time
-                            holding_days = (today - open_date).days
+                    
+                    # If no open time in database, use current date (today)
+                    if not first_open_time:
+                        from datetime import datetime
+                        first_open_time = datetime.now()
+                        holding_days = 0  # Just opened today
+                    else:
+                        # Convert to date only (ignore time component)
+                        open_date = first_open_time.date() if hasattr(first_open_time, 'date') else first_open_time
+                        holding_days = (today - open_date).days
                     
                     result_positions.append({
                         "stock_code": stock_code,
@@ -780,7 +786,7 @@ async def get_positions(
                         "position_value": market_value,
                         "position_ratio": round(position_ratio, 2),
                         "holding_days": holding_days,
-                        "first_open_time": first_open_time.isoformat() if first_open_time else None,
+                        "first_open_time": first_open_time.isoformat(),
                         "currency": currency,
                     })
                 

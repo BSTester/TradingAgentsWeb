@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(python:*)",
+      "Bash(pip install aiosqlite)",
+      "Bash(npx tsc:*)",
+      "Bash(python3 -m py_compile:*)",
+      "Bash(git checkout web/frontend/src/components/common/AppNavbar.tsx)",
+      "Bash(sqlite3:*)",
+      "Bash(cat:*)",
+      "Bash(__NEW_LINE__)",
+      "Bash(npm run build)",
+      "Bash(gawk:*)",
+      "Bash(awk:*)",
+      "Bash(npm install:*)",
+      "Bash(jsx-linter:*)",
+      "Bash(node:*)",
+      "Bash(find:*)",
+      "Bash(curl:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(npx jsx-linter:*)",
+      "Bash(npm run dev:*)",
+      "Bash(make:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
