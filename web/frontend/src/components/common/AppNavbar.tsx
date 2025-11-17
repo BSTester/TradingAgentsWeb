@@ -463,6 +463,27 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
                 )}
                   </>
                 )}
+
+                {/* Show login/register for non-logged in users */}
+                {!user && (
+                  <>
+                    <div className="border-t border-dark-border my-2"></div>
+                    <button
+                      onClick={() => handleNavigation('/login')}
+                      className="w-full flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all min-h-touch text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary"
+                    >
+                      <i className="fas fa-sign-in-alt w-6 text-lg" />
+                      <span className="ml-3">登录</span>
+                    </button>
+                    <button
+                      onClick={() => handleNavigation('/register')}
+                      className="w-full flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all min-h-touch bg-gradient-to-r from-accent-primary to-accent-secondary text-white hover:shadow-glow-cyan"
+                    >
+                      <i className="fas fa-user-plus w-6 text-lg" />
+                      <span className="ml-3">注册</span>
+                    </button>
+                  </>
+                )}
               </div>
             </nav>
 
