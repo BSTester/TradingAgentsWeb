@@ -560,8 +560,10 @@ class LLMProvider(Base):
     display_name = Column(String(200), nullable=False)  # 显示名称
     api_key = Column(String(1000), nullable=True)  # API密钥（加密存储）- 支持JWT token
     base_url = Column(String(500), nullable=True)  # API基础URL
-    description = Column(Text, nullable=True)  # 供应商描�?    is_active = Column(Boolean, default=True, nullable=False, index=True)  # 是否启用
-    config_json = Column(JSON, nullable=True)  # 额外配置参数（JSON格式�?    
+    description = Column(Text, nullable=True)  # 供应商描述
+    is_active = Column(Boolean, default=True, nullable=False, index=True)  # 是否启用
+    config_json = Column(JSON, nullable=True)  # 额外配置参数（JSON格式）
+    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
