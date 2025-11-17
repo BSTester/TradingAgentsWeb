@@ -90,23 +90,31 @@ export function AccountInfo({ selectedMarket, onMarketChange, onShowToast }: Acc
             账户信息
           </h2>
           <div className="flex items-center space-x-3">
-            <select
-              value={selectedMarket}
-              onChange={(e) => onMarketChange(e.target.value)}
-              className="px-3 py-1 bg-dark-tertiary border border-dark-border text-text-primary rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-accent-primary"
-            >
-              <option value="US" className="bg-dark-tertiary text-text-primary">美股</option>
-              <option value="HK" className="bg-dark-tertiary text-text-primary">港股</option>
-              <option value="CN" className="bg-dark-tertiary text-text-primary">A股</option>
-            </select>
+            {/* Market selector - button style */}
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              {['US', 'HK', 'CN'].map((market) => (
+                <button
+                  key={market}
+                  onClick={() => onMarketChange(market)}
+                  className={`px-2 sm:px-3 py-1 rounded-md text-xs sm:text-sm font-medium transition-all ${
+                    selectedMarket === market
+                      ? 'bg-accent-primary text-white'
+                      : 'bg-dark-tertiary text-text-secondary hover:bg-dark-primary hover:text-text-primary'
+                  }`}
+                >
+                  {market === 'US' ? '美股' : market === 'HK' ? '港股' : 'A股'}
+                </button>
+              ))}
+            </div>
             <button
               onClick={handleRefresh}
               disabled={isFetching}
-              className="text-sm text-accent-primary hover:text-accent-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              className="text-xs sm:text-sm text-accent-primary hover:text-accent-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-opacity whitespace-nowrap"
               title="刷新账户、持仓和订单信息"
             >
               <i className={`fas fa-sync-alt mr-1 ${isFetching ? 'fa-spin' : ''}`} />
-              {isFetching ? '刷新中...' : '刷新'}
+              <span className="hidden sm:inline">{isFetching ? '刷新中...' : '刷新'}</span>
+              <span className="sm:hidden">{isFetching ? '...' : ''}</span>
             </button>
           </div>
         </div>

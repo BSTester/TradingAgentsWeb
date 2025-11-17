@@ -12,6 +12,7 @@ interface AuthContextType {
   loginWithEmailCode: (email: string, code: string, captcha?: { id: string; answer: string }) => Promise<void>;
   register: (username: string, email: string, password?: string, captcha?: { id: string; answer: string }, emailCode?: string) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   token: string | null;
 }
 
@@ -118,6 +119,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     queryClient.clear();
   };
 
+  const refreshUser = async () => {
+    const currentToken = token || localStorage.getItem('access_token');
+    if (currentToken) {
+      try {
+        const userData = await authAPI.getCurrentUser();
+        setUser(userData);
+      } catch (error) {
+        console.error('Failed to refresh user data:', error);
+      }
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -127,6 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loginWithEmailCode,
         register,
         logout,
+        refreshUser,
         token,
       }}
     >

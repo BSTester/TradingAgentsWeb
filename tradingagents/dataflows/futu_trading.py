@@ -407,13 +407,55 @@ def get_positions(
         else:
             positions = []
         
-        # Note: Database enrichment (first_open_time, holding_days) has been moved to
-        # the backend API layer to avoid event loop conflicts in async contexts.
-        # The futu_trading module should remain database-free for better isolation.
-        # Add placeholder fields for compatibility
-        for pos in positions:
-            pos['first_open_time'] = None
-            pos['holding_days'] = 0
+        # Enrich positions with database information (first_open_time, holding_days)
+        # This is done synchronously to avoid event loop conflicts
+        try:
+            from datetime import datetime, timezone
+            from web.backend.database import SessionLocal
+            from web.backend.models import IntradayPosition
+            
+            # Create a new database session (synchronous)
+            db = SessionLocal()
+            try:
+                for pos in positions:
+                    stock_code = pos.get('stock_code', '')
+                    if not stock_code:
+                        pos['first_open_time'] = None
+                        pos['holding_days'] = 0
+                        continue
+                    
+                    # Query database for first open time
+                    db_position = db.query(IntradayPosition).filter(
+                        IntradayPosition.user_id == user_id,
+                        IntradayPosition.stock_code == stock_code,
+                        IntradayPosition.market_type == market_type
+                    ).first()
+                    
+                    if db_position and db_position.first_open_time:
+                        pos['first_open_time'] = db_position.first_open_time.isoformat()
+                        
+                        # Calculate holding days
+                        now = datetime.now(timezone.utc)
+                        first_open = db_position.first_open_time
+                        if first_open.tzinfo is None:
+                            # If first_open_time is naive, assume UTC
+                            first_open = first_open.replace(tzinfo=timezone.utc)
+                        
+                        holding_duration = now - first_open
+                        pos['holding_days'] = holding_duration.days
+                    else:
+                        pos['first_open_time'] = None
+                        pos['holding_days'] = 0
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"Failed to enrich positions with database info: {e}")
+            # Add placeholder fields if enrichment fails
+            for pos in positions:
+                if 'first_open_time' not in pos:
+                    pos['first_open_time'] = None
+                if 'holding_days' not in pos:
+                    pos['holding_days'] = 0
         
         logger.info(f"Successfully retrieved {len(positions)} positions for {market_type}")
         return positions

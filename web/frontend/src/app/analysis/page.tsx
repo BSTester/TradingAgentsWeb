@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { AnalysisResults } from '@/components/analysis/AnalysisResults';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { Footer } from '@/components/leaderboard/Footer';
-import { Header } from '@/components/leaderboard/Header';
+import { AppNavbar } from '@/components/common/AppNavbar';
 
 function AnalysisDetailContent() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -106,8 +106,9 @@ function AnalysisDetailContent() {
 
   return (
     <div className="min-h-screen bg-dark-primary flex flex-col">
-      <Header user={user} onLogout={logout} />
+      <AppNavbar user={user} onLogout={logout} />
 
+      {/* Breadcrumb Navigation */}
       <nav className="bg-dark-secondary/80 backdrop-blur-lg border-b border-dark-border shadow-lg pt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-10 overflow-hidden">
           <div className="flex items-center space-x-2 text-sm whitespace-nowrap">

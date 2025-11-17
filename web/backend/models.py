@@ -24,6 +24,7 @@ class User(Base):
     role = Column(String(20), default="user", nullable=False, index=True)  # admin, user
     is_active = Column(Boolean, default=True, nullable=False)
     can_access_intraday_trading = Column(Boolean, default=False, nullable=False, index=True)  # Whether user can access intraday trading features
+    participate_in_leaderboard = Column(Boolean, default=False, nullable=False, index=True)  # Whether user participates in public ranking
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     
@@ -60,11 +61,11 @@ class UserConfig(Base):
     # Trading executor configuration
     enable_trading_executor = Column(Boolean, default=False, nullable=False)  # Whether to enable trading executor
     futu_api_base_url = Column(String(255), nullable=True)  # Futu API base URL
-    futu_api_key = Column(String(255), nullable=True)  # Futu API key (should be encrypted in production)
+    futu_api_key = Column(String(1000), nullable=True)  # Futu API key (supports JWT tokens)
     
     # Intraday trading configuration
     intraday_futu_api_url = Column(String(255), nullable=True)  # Intraday trading Futu API URL
-    intraday_futu_api_key = Column(String(255), nullable=True)  # Intraday trading Futu API key
+    intraday_futu_api_key = Column(String(1000), nullable=True)  # Intraday trading Futu API key (supports JWT tokens)
     intraday_scheduler_enabled = Column(Boolean, default=False, nullable=False)  # Whether intraday scheduler is running
     intraday_scheduler_auto_start = Column(Boolean, default=False, nullable=False)  # Whether to auto-start scheduler on service restart
     intraday_interval_minutes = Column(Integer, default=5, nullable=False)  # Analysis interval in minutes
@@ -72,12 +73,12 @@ class UserConfig(Base):
     
     # Intraday trading LLM configuration
     intraday_llm_provider = Column(String(50), nullable=True)  # LLM provider for intraday trading
-    intraday_api_key = Column(String(255), nullable=True)  # API key for intraday trading LLM
+    intraday_api_key = Column(String(1000), nullable=True)  # API key for intraday trading LLM (supports JWT tokens)
     intraday_llm_model = Column(String(100), nullable=True)  # LLM model for intraday trading (uses deep thinker options)
     intraday_backend_url = Column(String(255), nullable=True)  # Backend URL for intraday trading LLM
     
     # API Key cache (single field for all LLM providers, should be encrypted in production)
-    last_api_key = Column(String(255), nullable=True)  # Last used API key (matches last_llm_provider)
+    last_api_key = Column(String(1000), nullable=True)  # Last used API key (supports JWT tokens)
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -110,13 +111,13 @@ class ScheduledTask(Base):
     shallow_thinker = Column(String(100), nullable=False)
     deep_thinker = Column(String(100), nullable=False)
     backend_url = Column(String(255), nullable=False)
-    api_key = Column(String(255), nullable=True)  # LLM API key for this scheduled task
+    api_key = Column(String(1000), nullable=True)  # LLM API key for this scheduled task (supports JWT tokens)
     is_public = Column(Boolean, default=False)
     
     # Trading executor configuration
     enable_trading_executor = Column(Boolean, default=False, nullable=False)
     futu_api_base_url = Column(String(255), nullable=True)
-    futu_api_key = Column(String(255), nullable=True)
+    futu_api_key = Column(String(1000), nullable=True)  # Futu API key (supports JWT tokens)
     
     # Email notification settings
     email_notification_enabled = Column(Boolean, default=False, nullable=False)  # Whether to send email notification
@@ -171,7 +172,7 @@ class AnalysisRecord(Base):
     shallow_thinker = Column(String(100), nullable=False)
     deep_thinker = Column(String(100), nullable=False)
     backend_url = Column(String(255), nullable=False)
-    api_key = Column(String(255), nullable=True)  # LLM API key for this specific task
+    api_key = Column(String(1000), nullable=True)  # LLM API key for this specific task (supports JWT tokens)
     
     # Privacy settings
     is_public = Column(Boolean, default=False, nullable=False, index=True)  # Whether to show in public leaderboard
@@ -179,7 +180,7 @@ class AnalysisRecord(Base):
     # Trading executor configuration
     enable_trading_executor = Column(Boolean, default=False, nullable=False)  # Whether to enable trading executor
     futu_api_base_url = Column(String(255), nullable=True)  # Futu API base URL
-    futu_api_key = Column(String(255), nullable=True)  # Futu API key
+    futu_api_key = Column(String(1000), nullable=True)  # Futu API key (supports JWT tokens)
     
     # Email notification settings
     email_notification_enabled = Column(Boolean, default=False, nullable=False)  # Whether to send email notification
@@ -557,7 +558,7 @@ class LLMProvider(Base):
     id = Column(Integer, primary_key=True, index=True)
     provider_name = Column(String(100), unique=True, nullable=False, index=True)  # 供应商名称（唯一标识）
     display_name = Column(String(200), nullable=False)  # 显示名称
-    api_key = Column(String(1000), nullable=True)  # API密钥（加密存储）- 增加长度支持长API key如JWT
+    api_key = Column(String(1000), nullable=True)  # API密钥（加密存储）- 支持JWT token
     base_url = Column(String(500), nullable=True)  # API基础URL
     description = Column(Text, nullable=True)  # 供应商描述
     is_active = Column(Boolean, default=True, nullable=False, index=True)  # 是否启用

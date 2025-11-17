@@ -77,7 +77,106 @@ from web.backend.auth_routes import router as auth_router, get_current_active_us
 from web.backend.middleware import LoggingMiddleware
 
 # Import API routes
-from web.backend.routes import analysis_routes, config_routes, task_routes, page_routes, websocket_routes, export_routes, leaderboard_routes, user_management_routes, scheduled_task_routes
+from web.backend.routes import analysis_routes, config_routes, task_routes, page_routes, websocket_routes, export_routes, leaderboard_routes, user_management_routes, scheduled_task_routes, user_config_routes, intraday_trading_routes, user_leaderboard_routes, public_leaderboard_routes
+
+
+async def leaderboard_update_task():
+    """Background task to periodically update leaderboard data via WebSocket"""
+    from web.backend.routes.websocket_routes import broadcast_leaderboard_update
+    from web.backend.database import get_db
+    from web.backend.models import User, AccountSnapshot, UserConfig
+    from sqlalchemy import select, desc
+
+    print("🚀 Leaderboard update task started")
+
+    while True:
+        try:
+            await asyncio.sleep(60)  # Update every minute
+
+            # Check if there are any leaderboard WebSocket connections
+            if "leaderboard_public" in manager.active_connections:
+                print(f"📡 Broadcasting leaderboard update to {len(manager.active_connections['leaderboard_public'])} clients")
+
+                try:
+                    # Fetch latest leaderboard data with better error handling
+                    async with AsyncSessionLocal() as db:
+                        # Get participating users first
+                        users_query = select(User).where(User.participate_in_leaderboard == True)
+                        users_result = await db.execute(users_query)
+                        participating_users = users_result.scalars().all()
+
+                        users_list = []
+                        
+                        # Get user configs for model information
+                        user_ids = [user.id for user in participating_users]
+                        configs = {}
+                        if user_ids:
+                            config_query = select(UserConfig).where(UserConfig.user_id.in_(user_ids))
+                            config_result = await db.execute(config_query)
+                            configs = {config.user_id: config for config in config_result.scalars().all()}
+
+                        if participating_users:
+                            # For each participating user, get their latest snapshot for each market
+                            for user in participating_users:
+                                # Get model name from config
+                                model_name = None
+                                if user.id in configs:
+                                    config = configs[user.id]
+                                    model_name = config.intraday_llm_model if config.intraday_llm_model else None
+                                
+                                # Get all snapshots for this user
+                                snapshot_query = select(AccountSnapshot).where(
+                                    AccountSnapshot.user_id == user.id
+                                ).order_by(AccountSnapshot.snapshot_date.desc())
+
+                                snapshot_result = await db.execute(snapshot_query)
+                                all_snapshots = snapshot_result.scalars().all()
+
+                                if all_snapshots:
+                                    # Group by market_type and get the latest for each market
+                                    market_snapshots = {}
+                                    for snapshot in all_snapshots:
+                                        market = snapshot.market_type or 'US'
+                                        if market not in market_snapshots:
+                                            market_snapshots[market] = snapshot
+                                    
+                                    # Add one entry per market
+                                    for market, snapshot in market_snapshots.items():
+                                        users_list.append({
+                                            'user_id': user.id,
+                                            'username': user.username,
+                                            'market_type': market,
+                                            'total_assets': float(snapshot.total_assets) if snapshot.total_assets else 100000.0,
+                                            'latest_snapshot_date': snapshot.snapshot_date.strftime('%Y-%m-%d') if snapshot.snapshot_date else datetime.now().strftime('%Y-%m-%d'),
+                                            'model_name': model_name
+                                        })
+                                else:
+                                    # Create default snapshots for all markets if no data exists
+                                    for market in ['US', 'HK', 'CN']:
+                                        users_list.append({
+                                            'user_id': user.id,
+                                            'username': user.username,
+                                            'market_type': market,
+                                            'total_assets': 100000.0,
+                                            'latest_snapshot_date': datetime.now().strftime('%Y-%m-%d'),
+                                            'model_name': model_name
+                                        })
+
+                        # Sort by total_assets descending
+                        users_list.sort(key=lambda x: x['total_assets'], reverse=True)
+
+                    # Broadcast updates to all leaderboard clients
+                    await broadcast_leaderboard_update(users_data=users_list)
+                    print(f"📤 Leaderboard update broadcasted with {len(users_list)} users")
+
+                except Exception as db_error:
+                    print(f"❌ Database error in leaderboard update: {db_error}")
+                    # Broadcast empty data if database query fails
+                    await broadcast_leaderboard_update(users_data=[])
+
+        except Exception as e:
+            print(f"⚠️ Leaderboard update task error: {e}")
+            await asyncio.sleep(60)  # Wait before retrying
 
 
 @asynccontextmanager
@@ -156,6 +255,10 @@ async def lifespan(app: FastAPI):
             snapshot_scheduler = init_snapshot_scheduler()
             app.state.snapshot_scheduler = snapshot_scheduler
             print("✅ Snapshot scheduler started (daily account snapshots)")
+
+            # Start leaderboard WebSocket update task
+            asyncio.create_task(leaderboard_update_task())
+            print("✅ Leaderboard real-time update task started")
             
             # Preload user configurations into cache
             from web.backend.services.user_config_cache import preload_user_configs
@@ -539,6 +642,26 @@ class ConnectionManager:
             except Exception:
                 self.active_connections[analysis_id] = []
 
+    async def broadcast_to_channel(self, channel_id: str, message: str):
+        """Broadcast a message to all connections in a specific channel"""
+        if channel_id in self.active_connections:
+            connections = list(self.active_connections[channel_id])
+            for connection in connections:
+                try:
+                    await connection.send_text(message)
+                except (ConnectionResetError, BrokenPipeError, OSError, RuntimeError):
+                    # Connection closed, remove it
+                    try:
+                        self.active_connections[channel_id].remove(connection)
+                    except Exception:
+                        pass
+                except Exception as e:
+                    print(f"⚠️ Error broadcasting to channel {channel_id}: {e}")
+                    try:
+                        self.active_connections[channel_id].remove(connection)
+                    except Exception:
+                        pass
+
 manager = ConnectionManager()
 
 # Task management
@@ -712,7 +835,6 @@ task_manager = TaskManager(max_workers=50)
 # Initialize route dependencies
 analysis_routes.init_analysis_routes(task_manager, manager)
 task_routes.init_task_routes(task_manager)
-websocket_routes.init_websocket_routes(manager)
 
 # Include authentication routes
 app.include_router(auth_router)
@@ -732,11 +854,19 @@ app.include_router(intraday_trading_routes.router)
 
 # Include user config routes
 from web.backend.routes import user_config_routes
+from web.backend.routes import user_leaderboard_routes
+from web.backend.routes import public_leaderboard_routes
 app.include_router(user_config_routes.router)
+app.include_router(user_leaderboard_routes.router)
+app.include_router(public_leaderboard_routes.router)
 
 # Include prompt management routes
 from web.backend.routes import prompt_routes
 app.include_router(prompt_routes.router)
+
+# Include WebSocket routes
+websocket_routes.init_websocket_routes(manager)
+app.include_router(websocket_routes.router)
 
 # Include account snapshot routes
 from web.backend.routes import account_snapshot_routes
@@ -746,9 +876,8 @@ app.include_router(account_snapshot_routes.router)
 from web.backend.routes import llm_config_routes
 app.include_router(llm_config_routes.router)
 
-# Include page and WebSocket routes
+# Include page routes
 app.include_router(page_routes.router)
-app.include_router(websocket_routes.router)
 
 
 def generate_final_summary(ticker: str, decision: str, final_state: dict) -> str:
