@@ -453,40 +453,20 @@ async def send_email_code_for_register(
     # For registration, we don't need to check if user exists
     # Just generate code and send email
     import random
-    from datetime import datetime, timedelta, timezone
-    from web.backend.models import EmailVerificationCode
-    from sqlalchemy import delete
+    from web.backend.services.verification_code_cache import get_verification_cache
     
     try:
-        # Delete any existing unused codes for this email
-        await db.execute(
-            delete(EmailVerificationCode).where(
-                EmailVerificationCode.email == request_data.email,
-                EmailVerificationCode.used == False
-            )
-        )
-        await db.commit()
-        
         # Generate new code
         code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
-        code_hash = verification_service._hash_code(code)
         
-        # Calculate expiration time (5 minutes from now)
-        created_at = datetime.now(timezone.utc)
-        expires_at = created_at + timedelta(minutes=5)
-        
-        # Store in database
-        verification_code = EmailVerificationCode(
+        # Store in memory cache
+        cache = get_verification_cache()
+        cache.store_code(
             email=request_data.email,
-            code_hash=code_hash,
-            created_at=created_at,
-            expires_at=expires_at,
-            used=False,
+            code=code,
+            expires_in_minutes=5,
             ip_address=client_ip
         )
-        
-        db.add(verification_code)
-        await db.commit()
         
         print(f"📧 [VerificationCode] Generated code for registration: {request_data.email}")
         

@@ -455,31 +455,42 @@ async def leaderboard_websocket_endpoint(websocket: WebSocket):
                     await websocket.send_text(json.dumps({'type': 'pong'}))
                     print("🏓 Responded to ping")
 
+            except WebSocketDisconnect:
+                # Client disconnected, break the loop
+                print(f"🔌 Client disconnected from leaderboard WebSocket")
+                break
             except json.JSONDecodeError:
                 print(f"⚠️ Invalid JSON received from leaderboard WebSocket client: {data}")
-                await websocket.send_text(json.dumps({
-                    'type': 'error',
-                    'message': 'Invalid JSON format'
-                }))
+                try:
+                    await websocket.send_text(json.dumps({
+                        'type': 'error',
+                        'message': 'Invalid JSON format'
+                    }))
+                except Exception:
+                    # Connection might be closed, break the loop
+                    break
             except Exception as msg_error:
                 print(f"⚠️ Error processing leaderboard WebSocket message: {msg_error}")
-                await websocket.send_text(json.dumps({
-                    'type': 'error',
-                    'message': 'Error processing message'
-                }))
+                try:
+                    await websocket.send_text(json.dumps({
+                        'type': 'error',
+                        'message': 'Error processing message'
+                    }))
+                except Exception:
+                    # Connection might be closed, break the loop
+                    break
 
     except WebSocketDisconnect:
         print(f"🔌 Leaderboard WebSocket disconnected normally")
-        try:
-            manager.disconnect(websocket, channel_id)
-        except Exception as cleanup_error:
-            print(f"⚠️ Error during cleanup: {cleanup_error}")
     except Exception as e:
         print(f"❌ Leaderboard WebSocket error: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
+    finally:
+        # Always cleanup connection
         try:
             manager.disconnect(websocket, channel_id)
+            print(f"✅ Cleaned up leaderboard WebSocket connection for channel: {channel_id}")
         except Exception as cleanup_error:
             print(f"⚠️ Error during cleanup: {cleanup_error}")
 

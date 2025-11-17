@@ -551,19 +551,15 @@ class AccountSnapshot(Base):
 class LLMProvider(Base):
     """
     LLM Provider model for managing LLM service providers
-    管理LLM服务供应商
-    """
+    管理LLM服务供应�?    """
     __tablename__ = "llm_providers"
     
     id = Column(Integer, primary_key=True, index=True)
-    provider_name = Column(String(100), unique=True, nullable=False, index=True)  # 供应商名称（唯一标识）
-    display_name = Column(String(200), nullable=False)  # 显示名称
+    provider_name = Column(String(100), unique=True, nullable=False, index=True)  # 供应商名称（唯一标识�?    display_name = Column(String(200), nullable=False)  # 显示名称
     api_key = Column(String(1000), nullable=True)  # API密钥（加密存储）- 支持JWT token
     base_url = Column(String(500), nullable=True)  # API基础URL
-    description = Column(Text, nullable=True)  # 供应商描述
-    is_active = Column(Boolean, default=True, nullable=False, index=True)  # 是否启用
-    config_json = Column(JSON, nullable=True)  # 额外配置参数（JSON格式）
-    
+    description = Column(Text, nullable=True)  # 供应商描�?    is_active = Column(Boolean, default=True, nullable=False, index=True)  # 是否启用
+    config_json = Column(JSON, nullable=True)  # 额外配置参数（JSON格式�?    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -601,8 +597,7 @@ class LLMProvider(Base):
 class LLMModel(Base):
     """
     LLM Model model for managing specific models under providers
-    管理供应商下的具体模型
-    """
+    管理供应商下的具体模�?    """
     __tablename__ = "llm_models"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -612,8 +607,7 @@ class LLMModel(Base):
     display_name = Column(String(200), nullable=False)  # 显示名称
     description = Column(Text, nullable=True)  # 模型描述
     is_active = Column(Boolean, default=True, nullable=False, index=True)  # 是否启用
-    config_json = Column(JSON, nullable=True)  # 模型配置参数（JSON格式）
-    
+    config_json = Column(JSON, nullable=True)  # 模型配置参数（JSON格式�?    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
