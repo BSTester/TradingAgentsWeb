@@ -448,25 +448,26 @@ async def send_email_code_for_register(
         )
     
     # Generate and send verification code (without checking if user exists)
-    verification_service = VerificationCodeService(db)
-    
     # For registration, we don't need to check if user exists
     # Just generate code and send email
     import random
-    from web.backend.services.verification_code_cache import get_verification_cache
+    from web.backend.services.verification_code_service import get_verification_code_service
     
     try:
-        # Generate new code
-        code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+        verification_service = get_verification_code_service(db)
         
-        # Store in memory cache
-        cache = get_verification_cache()
-        cache.store_code(
-            email=request_data.email,
-            code=code,
-            expires_in_minutes=5,
-            ip_address=client_ip
-        )
+        # Generate new code
+        code = verification_service._generate_code()
+        code_hash = verification_service._hash_code(code)
+        
+        # Calculate expiration time (5 minutes from now)
+        from datetime import datetime, timedelta, timezone
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+        
+        # Store in memory (using the same storage as verification_code_service)
+        from web.backend.services.verification_code_service import _verification_codes, _codes_lock
+        with _codes_lock:
+            _verification_codes[request_data.email] = (code_hash, expires_at, False)
         
         print(f"📧 [VerificationCode] Generated code for registration: {request_data.email}")
         
