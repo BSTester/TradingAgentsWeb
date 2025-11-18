@@ -497,7 +497,36 @@ async def execute_intraday_analysis(
             db.close()
     
     except Exception as e:
-        logging.error(f"Error executing intraday analysis: {e}", exc_info=True)
+        # 获取详细的错误信息
+        import traceback
+        error_type = type(e).__name__
+        error_msg = str(e)
+        error_traceback = traceback.format_exc()
+        
+        # 构建详细的错误报告
+        detailed_error = f"{error_type}: {error_msg}"
+        
+        # 特殊处理常见错误
+        error_hints = []
+        if "null value" in error_msg.lower() and "choices" in error_msg.lower():
+            error_hints.append("LLM API 返回了空响应")
+            error_hints.append("请检查：API 密钥是否有效、模型名称是否正确、API 配额是否充足、网络连接是否正常")
+        elif "rate limit" in error_msg.lower():
+            error_hints.append("API 请求频率超限，请稍后重试")
+        elif "timeout" in error_msg.lower():
+            error_hints.append("API 请求超时，请检查网络连接")
+        elif "authentication" in error_msg.lower() or "unauthorized" in error_msg.lower():
+            error_hints.append("API 认证失败，请检查 API 密钥配置")
+        elif "connection" in error_msg.lower():
+            error_hints.append("网络连接失败，请检查网络设置")
+        
+        # 构建完整的错误报告
+        full_error_report = f"## 错误详情\n\n**错误类型**: {error_type}\n\n**错误信息**: {error_msg}\n\n"
+        if error_hints:
+            full_error_report += "**可能原因**:\n" + "\n".join(f"- {hint}" for hint in error_hints) + "\n\n"
+        full_error_report += f"**技术详情**:\n```\n{error_traceback}\n```"
+        
+        logging.error(f"Error executing intraday analysis: {detailed_error}\n\nFull traceback:\n{error_traceback}")
         
         # Try to update decision record with error (async)
         try:
@@ -518,7 +547,7 @@ async def execute_intraday_analysis(
                 if decision_record:
                     decision_record.end_time = datetime.now()
                     decision_record.status = "failed"
-                    decision_record.decision_report = f"Error: {str(e)}"
+                    decision_record.decision_report = full_error_report
                     error_db.commit()
             finally:
                 error_db.close()
@@ -562,7 +591,9 @@ async def execute_intraday_analysis(
                     asyncio.create_task(ws_manager.send_message({
                         'type': 'intraday_session_error',
                         'timestamp': datetime.utcnow().isoformat(),
-                        'message': f'Intraday session error: {str(e)}',
+                        'message': f'智能盯盘执行失败: {detailed_error}',
+                        'error_type': error_type,
+                        'error_hints': error_hints,
                         'session_id': session_id,
                         'decision_id': decision_id,
                     }, channel_id))
@@ -571,7 +602,9 @@ async def execute_intraday_analysis(
                     loop.run_until_complete(ws_manager.send_message({
                         'type': 'intraday_session_error',
                         'timestamp': datetime.utcnow().isoformat(),
-                        'message': f'Intraday session error: {str(e)}',
+                        'message': f'智能盯盘执行失败: {detailed_error}',
+                        'error_type': error_type,
+                        'error_hints': error_hints,
                         'session_id': session_id,
                         'decision_id': decision_id,
                     }, channel_id))

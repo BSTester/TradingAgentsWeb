@@ -181,6 +181,26 @@ class SnapshotScheduler:
                         unrealized_pnl = account_info.get("profit_loss", 0.0)
                         realized_pnl = account_info.get("today_profit_loss", 0.0)
                         
+                        # Get positions data with company names
+                        from web.backend.services.futu_async_wrapper import get_positions_async
+                        positions = await get_positions_async(market_type, user_id=user.id)
+                        
+                        # Format positions data for storage (include company name)
+                        positions_data = []
+                        if positions:
+                            for pos in positions:
+                                positions_data.append({
+                                    'stock_code': pos.get('stock_code', ''),
+                                    'stock_name': pos.get('stock_name', ''),  # 公司名称
+                                    'quantity': pos.get('quantity', 0),
+                                    'cost_price': pos.get('cost_price', 0.0),
+                                    'current_price': pos.get('current_price', 0.0),
+                                    'market_value': pos.get('market_value', 0.0),
+                                    'unrealized_pnl': pos.get('profit_loss', 0.0),
+                                    'first_open_time': pos.get('first_open_time'),
+                                    'holding_days': pos.get('holding_days', 0)
+                                })
+                        
                         # Get market timezone and current local time
                         market_tz_map = {
                             'US': 'America/New_York',
@@ -201,7 +221,8 @@ class SnapshotScheduler:
                             market_value=market_value,
                             realized_pnl=realized_pnl,
                             unrealized_pnl=unrealized_pnl,
-                            account_data=None  # No need to store currency, frontend determines it
+                            account_data=None,  # No need to store currency, frontend determines it
+                            positions_data=positions_data  # 保存持仓数据（包含公司名称）
                         )
                         
                         db.add(snapshot)
@@ -386,6 +407,26 @@ async def create_account_snapshot(user_id: int, market_type: str, skip_market_ch
             unrealized_pnl = account_info.get("profit_loss", 0.0)
             realized_pnl = account_info.get("today_profit_loss", 0.0)
             
+            # Get positions data with company names
+            from web.backend.services.futu_async_wrapper import get_positions_async
+            positions = await get_positions_async(market_type, user_id=user_id)
+            
+            # Format positions data for storage (include company name)
+            positions_data = []
+            if positions:
+                for pos in positions:
+                    positions_data.append({
+                        'stock_code': pos.get('stock_code', ''),
+                        'stock_name': pos.get('stock_name', ''),  # 公司名称
+                        'quantity': pos.get('quantity', 0),
+                        'cost_price': pos.get('cost_price', 0.0),
+                        'current_price': pos.get('current_price', 0.0),
+                        'market_value': pos.get('market_value', 0.0),
+                        'unrealized_pnl': pos.get('profit_loss', 0.0),
+                        'first_open_time': pos.get('first_open_time'),
+                        'holding_days': pos.get('holding_days', 0)
+                    })
+            
             # Get market local time
             local_now = datetime.now(market_tz)
             # Round to nearest second to avoid microsecond differences
@@ -414,6 +455,7 @@ async def create_account_snapshot(user_id: int, market_type: str, skip_market_ch
                 existing_snapshot.realized_pnl = realized_pnl
                 existing_snapshot.unrealized_pnl = unrealized_pnl
                 existing_snapshot.account_data = None
+                existing_snapshot.positions_data = positions_data  # 更新持仓数据
                 
                 await db.commit()
                 logger.info(f"✅ Updated existing snapshot for user {user_id} in {market_type} market at {snapshot_date_naive} (ID: {existing_snapshot.id})")
@@ -430,7 +472,8 @@ async def create_account_snapshot(user_id: int, market_type: str, skip_market_ch
                     market_value=market_value,
                     realized_pnl=realized_pnl,
                     unrealized_pnl=unrealized_pnl,
-                    account_data=None
+                    account_data=None,
+                    positions_data=positions_data  # 保存持仓数据（包含公司名称）
                 )
                 
                 db.add(snapshot)

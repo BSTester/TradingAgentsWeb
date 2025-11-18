@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { formatAmount } from '@/utils/marketCurrency';
+import { openFutuStockPage } from '@/utils/futuLink';
 
 interface Position {
   stock_code: string;
@@ -50,22 +52,26 @@ export function UserPositionsPanel({ userId, username, positions }: UserPosition
               key={index}
               className="bg-dark-tertiary rounded-lg p-4 border border-dark-border hover:border-accent-primary/50 transition-colors"
             >
-              {/* 头部：股票代码、市场、数量 */}
+              {/* 头部：股票代码、公司名称、市场、数量 */}
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-2">
-                  <span className="font-semibold text-text-primary">
+                <div className="flex items-center space-x-2 flex-1 min-w-0">
+                  <button
+                    onClick={() => openFutuStockPage(position.stock_code, position.market_type)}
+                    className="font-semibold text-accent-primary flex-shrink-0 hover:underline transition-opacity hover:opacity-80"
+                    title="点击查看富途股票详情"
+                  >
                     {position.stock_code}
-                  </span>
+                  </button>
                   {position.stock_name && (
-                    <span className="text-xs text-text-tertiary">
+                    <span className="text-sm text-text-secondary truncate">
                       {position.stock_name}
                     </span>
                   )}
-                  <span className="text-xs px-2 py-1 bg-dark-primary rounded text-text-tertiary">
+                  <span className="text-xs px-2 py-1 bg-dark-primary rounded text-text-tertiary flex-shrink-0">
                     {position.market_type}
                   </span>
                 </div>
-                <span className="text-sm font-medium text-text-primary">
+                <span className="text-sm font-medium text-text-primary flex-shrink-0 ml-2">
                   {position.quantity.toLocaleString()} 股
                 </span>
               </div>
@@ -101,19 +107,19 @@ export function UserPositionsPanel({ userId, username, positions }: UserPosition
                   <div>
                     <p className="text-text-tertiary text-xs">成本价</p>
                     <p className="text-text-primary font-medium">
-                      ${position.cost_price?.toFixed(2) || '0.00'}
+                      {formatAmount(position.cost_price || 0, position.market_type, 2)}
                     </p>
                   </div>
                   <div>
                     <p className="text-text-tertiary text-xs">当前价</p>
                     <p className="text-text-primary font-medium">
-                      ${position.current_price.toFixed(2)}
+                      {formatAmount(position.current_price, position.market_type, 2)}
                     </p>
                   </div>
                   <div>
                     <p className="text-text-tertiary text-xs">市值</p>
                     <p className="text-text-primary font-medium">
-                      ${position.market_value?.toLocaleString() || '0'}
+                      {formatAmount(position.market_value || 0, position.market_type, 0)}
                     </p>
                   </div>
                   <div>
@@ -126,7 +132,7 @@ export function UserPositionsPanel({ userId, username, positions }: UserPosition
                       }`}
                     >
                       {position.unrealized_pnl && position.unrealized_pnl >= 0 ? '+' : ''}
-                      ${position.unrealized_pnl?.toLocaleString() || '0'}
+                      {formatAmount(position.unrealized_pnl || 0, position.market_type, 0)}
                       {position.pnl_percentage !== undefined && (
                         <span className="text-xs ml-1">
                           ({position.pnl_percentage > 0 ? '+' : ''}

@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { buildApiUrl } from '@/utils/api';
+import { getCurrencySymbol, formatAmount } from '@/utils/marketCurrency';
 
 interface User {
   user_id: number;
@@ -466,7 +467,7 @@ export function LeaderboardTrendChart({
               }
             </div>
             <div className="text-sm font-bold text-accent-primary">
-              ${tooltip.data.value.toLocaleString(undefined, { 
+              {getCurrencySymbol(selectedMarket)}{tooltip.data.value.toLocaleString(undefined, { 
                 minimumFractionDigits: 2, 
                 maximumFractionDigits: 2 
               })}
@@ -523,7 +524,7 @@ export function LeaderboardTrendChart({
                 {/* 资产和模型 */}
                 <div className="text-right flex-shrink-0 ml-2">
                   <p className="text-sm font-semibold text-text-primary mb-1">
-                    ${user.total_assets.toLocaleString()}
+                    {formatAmount(user.total_assets, selectedMarket, 0)}
                   </p>
                   {user.model_name && (
                     <p className="text-xs text-accent-primary font-medium truncate max-w-[100px] sm:max-w-[120px] ml-auto" title={user.model_name}>

@@ -304,6 +304,7 @@ async def get_user_positions(
                 
                 # Debug: Log the raw data from Futu API
                 print(f"[Leaderboard] {stock_code} ({market}) - Raw API data:")
+                print(f"  stock_name: {stock_name}")
                 print(f"  cost_price: {cost_price}, current_price: {current_price}")
                 print(f"  market_value: {market_value}, profit_loss: {profit_loss}")
                 print(f"  holding_days: {pos.get('holding_days', 0)}")
