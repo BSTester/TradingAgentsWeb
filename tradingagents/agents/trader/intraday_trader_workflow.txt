@@ -41,6 +41,13 @@ Example: If analyzing AAPL and TSLA, call all 22 tools (11 per stock) in one res
 - `get_akshare_hot_stocks(symbol="A股", time_range="今日", limit=10)` - Get Baidu hot search stocks (for CN market)
 - `get_futu_hot_stocks(market_type)` - Discover market hot stocks and trading opportunities
 
+⚠️ **Hot Stock Analysis Requirement**:
+After discovering hot stocks, you MUST conduct the same comprehensive analysis as Step 2 for any stock you consider investing in:
+- Call the same 11 tools per stock: quote, daily K-line, 5-min K-line, daily/5-min MACD/RSI/BOLL, fundamentals, balance sheet, cash flow, income statement
+- Evaluate both technical indicators (trend, momentum, support/resistance) and fundamental metrics (valuation, financial health, profitability)
+- Only proceed to investment if analysis confirms the opportunity aligns with your strategy
+- Hot stocks without proper analysis should NOT be traded
+
 💡 **Efficiency Tip**: Group related tool calls together to minimize round trips and speed up analysis!
 
 ### Phase 2: Analysis & Decision (Complete for ALL stocks before Phase 3)
