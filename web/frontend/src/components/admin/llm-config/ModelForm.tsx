@@ -97,9 +97,9 @@ export function ModelForm({ model, providers, onClose, onSuccess }: ModelFormPro
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-dark-border flex items-center justify-between">
+      <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header - Fixed */}
+        <div className="flex-shrink-0 px-6 py-4 border-b border-dark-border flex items-center justify-between bg-dark-secondary">
           <h3 className="text-lg font-semibold text-text-primary">
             <i className="fas fa-cube mr-2 text-accent-primary" />
             {model ? '编辑模型' : '添加模型'}
@@ -112,8 +112,8 @@ export function ModelForm({ model, providers, onClose, onSuccess }: ModelFormPro
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="px-6 py-4">
+        {/* Form - Scrollable */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4">
           {error && (
             <div className="mb-4 p-3 bg-danger-500/20 border border-danger-500 rounded-lg text-danger-500 text-sm">
               <i className="fas fa-exclamation-circle mr-2" />

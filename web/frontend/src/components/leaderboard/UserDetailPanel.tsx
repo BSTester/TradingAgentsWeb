@@ -98,8 +98,8 @@ export function UserDetailPanel({ isOpen, userId, username, market, onClose }: U
           isOpen ? 'translate-x-0' : 'translate-x-full'
         } flex flex-col`}
       >
-        {/* 头部 */}
-        <div className="flex items-center justify-between p-4 border-b border-dark-border">
+        {/* 头部 - Fixed */}
+        <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-dark-border bg-dark-secondary">
           <div>
             <h2 className="text-xl font-bold text-text-primary">
               <i className="fas fa-user mr-2" />
@@ -117,8 +117,8 @@ export function UserDetailPanel({ isOpen, userId, username, market, onClose }: U
           </button>
         </div>
 
-        {/* 标签页 */}
-        <div className="flex border-b border-dark-border">
+        {/* 标签页 - Fixed */}
+        <div className="flex-shrink-0 flex border-b border-dark-border bg-dark-secondary">
           <button
             onClick={() => setActiveTab('positions')}
             className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
@@ -352,8 +352,8 @@ export function UserDetailPanel({ isOpen, userId, username, market, onClose }: U
               isDecisionDetailOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'
             } flex flex-col`}
           >
-            {/* 详情头部 */}
-            <div className="flex items-center justify-between p-4 border-b border-dark-border">
+            {/* 详情头部 - Fixed */}
+            <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-dark-border bg-dark-secondary">
               <div className="flex items-center space-x-3">
                 <h3 className="text-lg font-bold text-text-primary">
                   <i className="fas fa-file-alt mr-2" />

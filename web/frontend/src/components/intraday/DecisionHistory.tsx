@@ -207,8 +207,8 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
       {detailModalId && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-0 md:p-4">
           <div className="bg-dark-secondary md:rounded-lg shadow-xl border-0 md:border border-dark-border max-w-4xl w-full h-full md:h-auto md:max-h-[90vh] overflow-hidden flex flex-col">
-            {/* Modal Header - Sticky */}
-            <div className="sticky top-0 z-10 px-4 md:px-6 py-3 md:py-4 border-b border-dark-border flex items-center justify-between bg-dark-secondary">
+            {/* Modal Header - Fixed */}
+            <div className="flex-shrink-0 px-4 md:px-6 py-3 md:py-4 border-b border-dark-border flex items-center justify-between bg-dark-secondary">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-responsive-h4 text-text-primary">
                   <i className="fas fa-file-alt mr-2 text-accent-primary" />
@@ -289,6 +289,65 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
                       </div>
                     </div>
                   </div>
+
+                  {/* Trades Executed */}
+                  {detailData.trades_executed && detailData.trades_executed.length > 0 && (
+                    <div>
+                      <h4 className="text-lg font-semibold text-text-primary mb-3">
+                        <i className="fas fa-exchange-alt mr-2 text-warning-500" />
+                        执行交易 ({detailData.trades_executed.length})
+                      </h4>
+                      <div className="space-y-3">
+                        {detailData.trades_executed.map((trade: any, idx: number) => {
+                          // Get currency symbol based on market type
+                          const currencySymbol = getCurrencySymbol(detailData.market_type || 'US');
+                          
+                          return (
+                            <div
+                              key={idx}
+                              className={`rounded-lg p-4 border-l-4 shadow-sm ${
+                                trade.action === 'BUY'
+                                  ? 'bg-red-900/20 border-red-500'
+                                  : 'bg-green-900/20 border-green-500'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                    trade.action === 'BUY' 
+                                      ? 'bg-red-500 text-white' 
+                                      : 'bg-green-500 text-white'
+                                  }`}>
+                                    {trade.action === 'BUY' ? '买入' : trade.action === 'SELL' ? '卖出' : trade.action || '未知'}
+                                  </span>
+                                  <span className="font-bold text-lg text-text-primary">
+                                    {trade.stock || '未知股票'}
+                                  </span>
+                                </div>
+                                {trade.price && (
+                                  <span className="text-base font-semibold text-text-secondary">
+                                    {currencySymbol}{trade.price}
+                                  </span>
+                                )}
+                              </div>
+                              {trade.quantity && (
+                                <div className="text-sm text-text-secondary font-medium mb-2">
+                                  <i className="fas fa-layer-group mr-2 text-text-muted" />
+                                  数量: <span className="font-bold">{trade.quantity}</span> 股
+                                </div>
+                              )}
+                              {trade.description && (
+                                <div className="text-sm text-text-secondary mt-3 pt-3 border-t border-dark-border leading-relaxed">
+                                  <i className="fas fa-info-circle mr-2 text-accent-primary" />
+                                  {trade.description}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Full Decision Report */}
                   {detailData.decision_report && (
@@ -382,65 +441,6 @@ export function DecisionHistory({ onShowToast }: DecisionHistoryProps) {
                             {detailData.decision_report}
                           </ReactMarkdown>
                         </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Trades Executed */}
-                  {detailData.trades_executed && detailData.trades_executed.length > 0 && (
-                    <div>
-                      <h4 className="text-lg font-semibold text-text-primary mb-3">
-                        <i className="fas fa-exchange-alt mr-2 text-warning-500" />
-                        执行交易 ({detailData.trades_executed.length})
-                      </h4>
-                      <div className="space-y-3">
-                        {detailData.trades_executed.map((trade: any, idx: number) => {
-                          // Get currency symbol based on market type
-                          const currencySymbol = getCurrencySymbol(detailData.market_type || 'US');
-                          
-                          return (
-                            <div
-                              key={idx}
-                              className={`rounded-lg p-4 border-l-4 shadow-sm ${
-                                trade.action === 'BUY'
-                                  ? 'bg-red-900/20 border-red-500'
-                                  : 'bg-green-900/20 border-green-500'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between mb-3">
-                                <div className="flex items-center gap-3">
-                                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                    trade.action === 'BUY' 
-                                      ? 'bg-red-500 text-white' 
-                                      : 'bg-green-500 text-white'
-                                  }`}>
-                                    {trade.action === 'BUY' ? '买入' : trade.action === 'SELL' ? '卖出' : trade.action || '未知'}
-                                  </span>
-                                  <span className="font-bold text-lg text-text-primary">
-                                    {trade.stock || '未知股票'}
-                                  </span>
-                                </div>
-                                {trade.price && (
-                                  <span className="text-base font-semibold text-text-secondary">
-                                    {currencySymbol}{trade.price}
-                                  </span>
-                                )}
-                              </div>
-                              {trade.quantity && (
-                                <div className="text-sm text-text-secondary font-medium mb-2">
-                                  <i className="fas fa-layer-group mr-2 text-text-muted" />
-                                  数量: <span className="font-bold">{trade.quantity}</span> 股
-                                </div>
-                              )}
-                              {trade.description && (
-                                <div className="text-sm text-text-secondary mt-3 pt-3 border-t border-dark-border leading-relaxed">
-                                  <i className="fas fa-info-circle mr-2 text-accent-primary" />
-                                  {trade.description}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
                       </div>
                     </div>
                   )}

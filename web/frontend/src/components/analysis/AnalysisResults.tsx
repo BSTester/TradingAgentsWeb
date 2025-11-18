@@ -1854,8 +1854,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
       {showExportPreview && (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-0 md:p-4" onClick={() => setShowExportPreview(false)}>
           <div className="bg-dark-secondary md:rounded-xl shadow-2xl max-w-4xl w-full h-full md:h-auto md:max-h-[90vh] flex flex-col border-0 md:border border-dark-border" onClick={(e) => e.stopPropagation()}>
-            {/* 弹窗头部 - Sticky */}
-            <div className="sticky top-0 z-10 flex items-center justify-between p-4 md:p-6 border-b border-dark-border bg-dark-secondary">
+            {/* 弹窗头部 - Fixed */}
+            <div className="flex-shrink-0 flex items-center justify-between p-4 md:p-6 border-b border-dark-border bg-dark-secondary">
               <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
                 <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-r from-accent-primary to-accent-secondary rounded-lg flex items-center justify-center shadow-glow-cyan flex-shrink-0">
                   <i className="fas fa-file-export text-white text-sm md:text-lg" />

@@ -542,8 +542,8 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
       {/* Configuration Modal */}
       {showConfigModal && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-dark-border flex items-center justify-between">
+          <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex-shrink-0 px-6 py-4 border-b border-dark-border flex items-center justify-between bg-dark-secondary">
               <h3 className="text-xl font-bold text-text-primary">
                 <i className="fas fa-cog mr-2 text-blue-600" />
                 系统配置
@@ -556,8 +556,8 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
               </button>
             </div>
 
-            {/* Tabs */}
-            <div className="border-b border-dark-border">
+            {/* Tabs - Fixed */}
+            <div className="flex-shrink-0 border-b border-dark-border bg-dark-secondary">
               <nav className="flex -mb-px px-6" aria-label="Tabs">
                 <button
                   onClick={() => setActiveConfigTab('basic')}
@@ -584,7 +584,8 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
               </nav>
             </div>
 
-            <div className="p-4 md:p-6 space-y-4">
+            {/* Content Area - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
               {activeConfigTab === 'basic' ? (
                 <>
               {/* Info banner if using analysis config */}

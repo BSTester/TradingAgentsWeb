@@ -98,8 +98,8 @@ export function AccountTrendModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-0 md:p-4">
       <div className="bg-dark-secondary md:rounded-lg shadow-xl border-0 md:border border-dark-border w-full h-full md:h-auto md:max-h-[90vh] md:max-w-6xl overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="sticky top-0 z-10 px-4 md:px-6 py-3 md:py-4 border-b border-dark-border flex items-center justify-between bg-dark-secondary">
+        {/* Header - Fixed */}
+        <div className="flex-shrink-0 px-4 md:px-6 py-3 md:py-4 border-b border-dark-border flex items-center justify-between bg-dark-secondary">
           <div className="flex-1">
             <h3 className="text-lg md:text-xl font-bold text-text-primary">
               <i className="fas fa-chart-line mr-2 text-accent-primary" />
@@ -126,8 +126,8 @@ export function AccountTrendModal({
           </button>
         </div>
 
-        {/* Time Range Selector */}
-        <div className="px-4 md:px-6 py-3 border-b border-dark-border bg-dark-tertiary">
+        {/* Time Range Selector - Fixed */}
+        <div className="flex-shrink-0 px-4 md:px-6 py-3 border-b border-dark-border bg-dark-tertiary">
           <div className="flex gap-2 overflow-x-auto">
             {[
               { value: 'today' as const, label: '今日', icon: 'fa-clock' },
@@ -255,8 +255,8 @@ export function AccountTrendModal({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-4 md:px-6 py-3 md:py-4 border-t border-dark-border flex justify-end bg-dark-secondary">
+        {/* Footer - Fixed */}
+        <div className="flex-shrink-0 px-4 md:px-6 py-3 md:py-4 border-t border-dark-border flex justify-end bg-dark-secondary">
           <button
             onClick={onClose}
             className="px-4 py-2 bg-dark-tertiary text-text-primary rounded-md hover:bg-dark-primary border border-dark-border transition-colors text-sm md:text-base"
