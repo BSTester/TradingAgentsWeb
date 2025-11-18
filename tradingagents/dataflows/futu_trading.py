@@ -410,13 +410,16 @@ def get_positions(
         # Enrich positions with database information (first_open_time, holding_days)
         # This is done synchronously to avoid event loop conflicts
         try:
-            from datetime import datetime, timezone
+            from datetime import datetime, date
             from web.backend.database import SessionLocal
-            from web.backend.models import IntradayPosition
+            from web.backend.models import PositionRecord
             
             # Create a new database session (synchronous)
             db = SessionLocal()
             try:
+                # Get today's date for calculating holding days
+                today = date.today()
+                
                 for pos in positions:
                     stock_code = pos.get('stock_code', '')
                     if not stock_code:
@@ -425,27 +428,25 @@ def get_positions(
                         continue
                     
                     # Query database for first open time
-                    db_position = db.query(IntradayPosition).filter(
-                        IntradayPosition.user_id == user_id,
-                        IntradayPosition.stock_code == stock_code,
-                        IntradayPosition.market_type == market_type
+                    db_position = db.query(PositionRecord).filter(
+                        PositionRecord.user_id == user_id,
+                        PositionRecord.stock_code == stock_code,
+                        PositionRecord.market_type == market_type,
+                        PositionRecord.is_closed == False
                     ).first()
                     
                     if db_position and db_position.first_open_time:
-                        pos['first_open_time'] = db_position.first_open_time.isoformat()
+                        first_open_time = db_position.first_open_time
+                        pos['first_open_time'] = first_open_time.isoformat()
                         
-                        # Calculate holding days
-                        now = datetime.now(timezone.utc)
-                        first_open = db_position.first_open_time
-                        if first_open.tzinfo is None:
-                            # If first_open_time is naive, assume UTC
-                            first_open = first_open.replace(tzinfo=timezone.utc)
-                        
-                        holding_duration = now - first_open
-                        pos['holding_days'] = holding_duration.days
+                        # Calculate holding days (only date difference, not time)
+                        open_date = first_open_time.date() if hasattr(first_open_time, 'date') else first_open_time
+                        holding_days = (today - open_date).days
+                        pos['holding_days'] = holding_days
                     else:
-                        pos['first_open_time'] = None
-                        pos['holding_days'] = 0
+                        # If no open time in database, use current date (today)
+                        pos['first_open_time'] = datetime.now().isoformat()
+                        pos['holding_days'] = 0  # Just opened today
             finally:
                 db.close()
         except Exception as e:

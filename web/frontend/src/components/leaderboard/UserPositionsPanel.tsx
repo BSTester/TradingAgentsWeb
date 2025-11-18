@@ -4,12 +4,16 @@ import React from 'react';
 
 interface Position {
   stock_code: string;
+  stock_name?: string;
   market_type: string;
   quantity: number;
+  cost_price?: number;
   current_price?: number;
   market_value?: number;
   unrealized_pnl?: number;
   pnl_percentage?: number;
+  first_open_time?: string;
+  holding_days?: number;
 }
 
 interface UserPositionsPanelProps {
@@ -46,11 +50,17 @@ export function UserPositionsPanel({ userId, username, positions }: UserPosition
               key={index}
               className="bg-dark-tertiary rounded-lg p-4 border border-dark-border hover:border-accent-primary/50 transition-colors"
             >
-              <div className="flex items-center justify-between mb-2">
+              {/* 头部：股票代码、市场、数量 */}
+              <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-2">
                   <span className="font-semibold text-text-primary">
                     {position.stock_code}
                   </span>
+                  {position.stock_name && (
+                    <span className="text-xs text-text-tertiary">
+                      {position.stock_name}
+                    </span>
+                  )}
                   <span className="text-xs px-2 py-1 bg-dark-primary rounded text-text-tertiary">
                     {position.market_type}
                   </span>
@@ -60,22 +70,54 @@ export function UserPositionsPanel({ userId, username, positions }: UserPosition
                 </span>
               </div>
 
+              {/* 持仓时长和开仓时间 */}
+              {(position.holding_days !== undefined || position.first_open_time) && (
+                <div className="flex items-center space-x-4 mb-3 text-xs text-text-tertiary">
+                  {position.holding_days !== undefined && (
+                    <div className="flex items-center space-x-1">
+                      <i className="fas fa-clock" />
+                      <span>持仓 {position.holding_days} 天</span>
+                    </div>
+                  )}
+                  {position.first_open_time && (
+                    <div className="flex items-center space-x-1">
+                      <i className="fas fa-calendar" />
+                      <span>
+                        开仓: {new Date(position.first_open_time).toLocaleDateString('zh-CN', {
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 价格和盈亏信息 */}
               {position.current_price && (
-                <div className="grid grid-cols-3 gap-2 text-sm">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                   <div>
-                    <p className="text-text-tertiary">当前价格</p>
+                    <p className="text-text-tertiary text-xs">成本价</p>
+                    <p className="text-text-primary font-medium">
+                      ${position.cost_price?.toFixed(2) || '0.00'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-text-tertiary text-xs">当前价</p>
                     <p className="text-text-primary font-medium">
                       ${position.current_price.toFixed(2)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-text-tertiary">市值</p>
+                    <p className="text-text-tertiary text-xs">市值</p>
                     <p className="text-text-primary font-medium">
                       ${position.market_value?.toLocaleString() || '0'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-text-tertiary">盈亏</p>
+                    <p className="text-text-tertiary text-xs">盈亏</p>
                     <p
                       className={`font-medium ${
                         (position.unrealized_pnl || 0) >= 0
@@ -85,7 +127,7 @@ export function UserPositionsPanel({ userId, username, positions }: UserPosition
                     >
                       {position.unrealized_pnl && position.unrealized_pnl >= 0 ? '+' : ''}
                       ${position.unrealized_pnl?.toLocaleString() || '0'}
-                      {position.pnl_percentage && (
+                      {position.pnl_percentage !== undefined && (
                         <span className="text-xs ml-1">
                           ({position.pnl_percentage > 0 ? '+' : ''}
                           {position.pnl_percentage.toFixed(2)}%)

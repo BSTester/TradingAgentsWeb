@@ -218,15 +218,26 @@ export function UserDetailPanel({ isOpen, userId, username, market, onClose }: U
                       </div>
                     </div>
 
-                    {position.first_open_time && (
+                    {(position.first_open_time || position.holding_days !== undefined) && (
                       <div className="mt-3 pt-3 border-t border-dark-border">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-text-tertiary">
-                            开仓时间: {new Date(position.first_open_time).toLocaleString('zh-CN')}
-                          </span>
-                          <span className="text-text-tertiary">
-                            持仓: {Math.floor((new Date().getTime() - new Date(position.first_open_time).getTime()) / (1000 * 60 * 60 * 24))} 天
-                          </span>
+                          {position.first_open_time && (
+                            <span className="text-text-tertiary">
+                              <i className="fas fa-calendar mr-1" />
+                              开仓: {new Date(position.first_open_time).toLocaleString('zh-CN', {
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          )}
+                          {position.holding_days !== undefined && (
+                            <span className="text-text-tertiary">
+                              <i className="fas fa-clock mr-1" />
+                              持仓 {position.holding_days} 天
+                            </span>
+                          )}
                         </div>
                       </div>
                     )}
