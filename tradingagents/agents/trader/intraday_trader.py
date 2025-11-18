@@ -884,13 +884,36 @@ If you executed ANY trades (called place_futu_order and it succeeded), you MUST 
                 }
         
         except Exception as e:
-            error_msg = f"Error in intraday trader: {str(e)}"
-            logging.error(error_msg, exc_info=True)
+            # 获取详细的错误信息
+            import traceback
+            error_type = type(e).__name__
+            error_msg = str(e)
+            error_traceback = traceback.format_exc()
+            
+            # 构建详细的错误报告
+            detailed_error = f"Error in intraday trader: {error_type}: {error_msg}"
+            
+            # 特殊处理常见错误
+            if "null value" in error_msg.lower() and "choices" in error_msg.lower():
+                detailed_error += "\n\n可能原因：LLM API 返回了空响应。请检查："
+                detailed_error += "\n- API 密钥是否有效"
+                detailed_error += "\n- 模型名称是否正确"
+                detailed_error += "\n- API 配额是否充足"
+                detailed_error += "\n- 网络连接是否正常"
+            elif "rate limit" in error_msg.lower():
+                detailed_error += "\n\n错误原因：API 请求频率超限，请稍后重试。"
+            elif "timeout" in error_msg.lower():
+                detailed_error += "\n\n错误原因：API 请求超时，请检查网络连接。"
+            elif "authentication" in error_msg.lower() or "unauthorized" in error_msg.lower():
+                detailed_error += "\n\n错误原因：API 认证失败，请检查 API 密钥配置。"
+            
+            # 记录完整的错误信息
+            logging.error(f"{detailed_error}\n\nFull traceback:\n{error_traceback}")
             
             from langchain_core.messages import AIMessage
             return {
-                "messages": [AIMessage(content=error_msg)],
-                "decision_report": f"## Error\n\n{error_msg}",
+                "messages": [AIMessage(content=detailed_error)],
+                "decision_report": f"## 错误\n\n{detailed_error}\n\n### 技术详情\n\n```\n{error_msg}\n```",
                 "trades_executed": [],
             }
     

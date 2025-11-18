@@ -56,18 +56,41 @@ function getTimeInTimezone(timezone: string): Date {
  * 交易时间：周一至周五 9:30-16:00 EST/EDT
  */
 function checkUSMarketStatus(): MarketStatus {
-  // 美东时间（自动处理夏令时）
-  const localTime = getTimeInTimezone('America/New_York');
-  const day = localTime.getDay();
-  const hour = localTime.getHours();
-  const minute = localTime.getMinutes();
+  // 获取当前时间并转换为美东时区
+  const now = new Date();
+  
+  // 使用Intl API获取美东时间的各个部分
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    weekday: 'short'
+  });
+  
+  const parts = formatter.formatToParts(now);
+  const dateParts: Record<string, string> = {};
+  parts.forEach(part => {
+    if (part.type !== 'literal') {
+      dateParts[part.type] = part.value;
+    }
+  });
+  
+  // 获取星期几（0=周日, 1=周一, ..., 6=周六）
+  const weekdayMap: Record<string, number> = {
+    'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
+  };
+  const day = weekdayMap[dateParts.weekday] || 0;
+  
+  const hour = parseInt(dateParts.hour);
+  const minute = parseInt(dateParts.minute);
   const time = hour * 60 + minute;
   
-  const timeStr = localTime.toLocaleTimeString('zh-CN', { 
-    hour: '2-digit', 
-    minute: '2-digit',
-    timeZone: 'America/New_York'
-  });
+  const timeStr = `${dateParts.hour}:${dateParts.minute}`;
   
   let isOpen = false;
   let message = '';
@@ -94,18 +117,39 @@ function checkUSMarketStatus(): MarketStatus {
  * 交易时间：周一至周五 9:30-12:00, 13:00-16:00 HKT
  */
 function checkHKMarketStatus(): MarketStatus {
-  // 香港时间
-  const localTime = getTimeInTimezone('Asia/Hong_Kong');
-  const day = localTime.getDay();
-  const hour = localTime.getHours();
-  const minute = localTime.getMinutes();
+  // 获取当前时间并转换为香港时区
+  const now = new Date();
+  
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Hong_Kong',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    weekday: 'short'
+  });
+  
+  const parts = formatter.formatToParts(now);
+  const dateParts: Record<string, string> = {};
+  parts.forEach(part => {
+    if (part.type !== 'literal') {
+      dateParts[part.type] = part.value;
+    }
+  });
+  
+  const weekdayMap: Record<string, number> = {
+    'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
+  };
+  const day = weekdayMap[dateParts.weekday] || 0;
+  
+  const hour = parseInt(dateParts.hour);
+  const minute = parseInt(dateParts.minute);
   const time = hour * 60 + minute;
   
-  const timeStr = localTime.toLocaleTimeString('zh-CN', { 
-    hour: '2-digit', 
-    minute: '2-digit',
-    timeZone: 'Asia/Hong_Kong'
-  });
+  const timeStr = `${dateParts.hour}:${dateParts.minute}`;
   
   let isOpen = false;
   let message = '';
@@ -135,18 +179,39 @@ function checkHKMarketStatus(): MarketStatus {
  * 交易时间：周一至周五 9:30-11:30, 13:00-15:00 CST
  */
 function checkCNMarketStatus(): MarketStatus {
-  // 中国时间
-  const localTime = getTimeInTimezone('Asia/Shanghai');
-  const day = localTime.getDay();
-  const hour = localTime.getHours();
-  const minute = localTime.getMinutes();
+  // 获取当前时间并转换为中国时区
+  const now = new Date();
+  
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    weekday: 'short'
+  });
+  
+  const parts = formatter.formatToParts(now);
+  const dateParts: Record<string, string> = {};
+  parts.forEach(part => {
+    if (part.type !== 'literal') {
+      dateParts[part.type] = part.value;
+    }
+  });
+  
+  const weekdayMap: Record<string, number> = {
+    'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
+  };
+  const day = weekdayMap[dateParts.weekday] || 0;
+  
+  const hour = parseInt(dateParts.hour);
+  const minute = parseInt(dateParts.minute);
   const time = hour * 60 + minute;
   
-  const timeStr = localTime.toLocaleTimeString('zh-CN', { 
-    hour: '2-digit', 
-    minute: '2-digit',
-    timeZone: 'Asia/Shanghai'
-  });
+  const timeStr = `${dateParts.hour}:${dateParts.minute}`;
   
   let isOpen = false;
   let message = '';
@@ -213,9 +278,9 @@ export function getMarketTimezone(market: string): string {
  */
 export function getMarketLocalTime(market: string): string {
   const timezone = getMarketTimezone(market);
-  const localTime = getTimeInTimezone(timezone);
   
-  return localTime.toLocaleString('zh-CN', {
+  // 直接使用当前时间和指定时区格式化，不需要通过getTimeInTimezone
+  return new Date().toLocaleString('zh-CN', {
     timeZone: timezone,
     year: 'numeric',
     month: '2-digit',

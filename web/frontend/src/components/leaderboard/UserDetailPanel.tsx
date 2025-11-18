@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import { getCurrencySymbol } from '@/utils/marketCurrency';
+import { openFutuStockPage } from '@/utils/futuLink';
 
 interface UserDetailPanelProps {
   isOpen: boolean;
@@ -52,7 +53,13 @@ export function UserDetailPanel({ isOpen, userId, username, market, onClose }: U
   // 根据市场过滤持仓
   const positions = React.useMemo(() => {
     if (!allPositions) return [];
-    return allPositions.filter((p: any) => p.market_type === market);
+    const filtered = allPositions.filter((p: any) => p.market_type === market);
+    // Debug: Log positions data
+    console.log('[UserDetailPanel] Positions data:', filtered);
+    filtered.forEach((p: any) => {
+      console.log(`  ${p.stock_code}: stock_name = "${p.stock_name}"`);
+    });
+    return filtered;
   }, [allPositions, market]);
 
   // 根据市场过滤决策记录
@@ -167,15 +174,24 @@ export function UserDetailPanel({ isOpen, userId, username, market, onClose }: U
                     className="bg-dark-tertiary rounded-lg p-4 border border-dark-border hover:border-accent-primary/50 transition-colors"
                   >
                     <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-semibold text-text-primary text-lg">
+                      <div className="flex items-center space-x-2 flex-1 min-w-0">
+                        <button
+                          onClick={() => openFutuStockPage(position.stock_code, position.market_type)}
+                          className="font-semibold text-accent-primary text-lg flex-shrink-0 hover:underline transition-opacity hover:opacity-80"
+                          title="点击查看富途股票详情"
+                        >
                           {position.stock_code}
-                        </span>
-                        <span className="text-xs px-2 py-1 bg-dark-primary rounded text-text-tertiary">
+                        </button>
+                        {position.stock_name && (
+                          <span className="text-sm text-text-secondary truncate">
+                            {position.stock_name}
+                          </span>
+                        )}
+                        <span className="text-xs px-2 py-1 bg-dark-primary rounded text-text-tertiary flex-shrink-0">
                           {position.market_type}
                         </span>
                       </div>
-                      <span className="text-sm font-medium text-text-primary">
+                      <span className="text-sm font-medium text-text-primary flex-shrink-0 ml-2">
                         {position.quantity.toLocaleString()} 股
                       </span>
                     </div>
