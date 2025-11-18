@@ -237,6 +237,9 @@ async def control_scheduler(
                     market_type = "US,HK,CN"
                     user_config.intraday_market_type = "US,HK,CN"
                     await db.commit()
+                    # Invalidate cache after setting default market type
+                    from web.backend.services.user_config_cache import invalidate_user_config_cache
+                    invalidate_user_config_cache(user_id)
                 
                 await manager.create_scheduler(
                     user_id=user_id,
@@ -254,6 +257,10 @@ async def control_scheduler(
             user_config.intraday_scheduler_enabled = True
             user_config.intraday_scheduler_auto_start = True  # Mark for auto-restart on service restart
             await db.commit()
+            
+            # Invalidate cache after updating scheduler status
+            from web.backend.services.user_config_cache import invalidate_user_config_cache
+            invalidate_user_config_cache(user_id)
             
             # Broadcast status update via WebSocket
             try:
@@ -288,6 +295,10 @@ async def control_scheduler(
                 user_config.intraday_scheduler_enabled = False
                 user_config.intraday_scheduler_auto_start = False  # Clear auto-restart flag (manual stop)
                 await db.commit()
+                
+                # Invalidate cache after updating scheduler status
+                from web.backend.services.user_config_cache import invalidate_user_config_cache
+                invalidate_user_config_cache(user_id)
             
             # Broadcast stopped status via WebSocket
             try:
@@ -512,6 +523,10 @@ async def configure_scheduler(
             user_config.intraday_backend_url = config.backend_url
         
         await db.commit()
+        
+        # Invalidate user config cache to force reload on next execution
+        from web.backend.services.user_config_cache import invalidate_user_config_cache
+        invalidate_user_config_cache(user_id)
         
         # Update scheduler if exists
         if manager.has_scheduler(user_id):
@@ -948,6 +963,10 @@ async def validate_futu_config(
             user_config.intraday_futu_api_url = original_url
             user_config.intraday_futu_api_key = original_key
             await db.commit()
+            
+            # Invalidate cache after restoring values
+            from web.backend.services.user_config_cache import invalidate_user_config_cache
+            invalidate_user_config_cache(user_id)
     
     except HTTPException:
         raise
