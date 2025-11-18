@@ -646,7 +646,7 @@ async def get_decisions_by_date_range(
 # ============================================================================
 
 @router.get("/positions")
-async def get_positions(
+async def get_positions_endpoint(
     market: str = "US",  # Market parameter for Futu API
     include_closed: bool = False,
     current_user: User = Depends(require_intraday_access),
@@ -658,144 +658,68 @@ async def get_positions(
     Requires authentication and Futu API configuration.
     """
     try:
-        import httpx
-        from web.backend.models import UserConfig
-        from sqlalchemy import select
+        from web.backend.services.futu_async_wrapper import get_positions_async, get_account_info_async
         
-        # Get user config
-        result = await db.execute(
-            select(UserConfig).where(UserConfig.user_id == current_user.id)
+        # Use async wrapper to get positions (includes database enrichment)
+        positions = await get_positions_async(
+            market_type=market,
+            user_id=current_user.id
         )
-        user_config = result.scalar_one_or_none()
         
-        # Priority: Use intraday config first, fallback to analysis config
-        futu_api_url = None
-        futu_api_key = None
-        
-        if user_config:
-            futu_api_url = user_config.intraday_futu_api_url or user_config.futu_api_base_url
-            futu_api_key = user_config.intraday_futu_api_key or user_config.futu_api_key
-        
-        if not futu_api_url:
+        if not positions:
             return []
         
-        # Call Futu API to get positions
-        base_url = futu_api_url.rstrip('/')
-        positions_url = f"{base_url}/api/positions?market_type={market}"
+        # Sync positions to database
+        await sync_positions_to_db(
+            db=db,
+            user_id=current_user.id,
+            futu_positions=positions,
+            market=market
+        )
         
-        headers = {
-            'Content-Type': 'application/json'
+        # Get account info to calculate position ratios
+        account_info = await get_account_info_async(
+            market_type=market,
+            user_id=current_user.id
+        )
+        total_assets = account_info.get("net_asset", 0.0) if account_info else 0.0
+        
+        # Determine currency symbol based on market
+        currency_map = {
+            "US": "$",      # US Dollar
+            "HK": "HK$",    # Hong Kong Dollar
+            "CN": "¥"       # Chinese Yuan
         }
-        if futu_api_key:
-            headers['X-API-Key'] = futu_api_key
+        currency = currency_map.get(market, "$")
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(positions_url, headers=headers)
+        # Build result with additional fields
+        result_positions = []
+        for pos in positions:
+            market_value = float(pos.get('market_value', 0))
+            profit_loss = float(pos.get('profit_loss', 0))
+            profit_loss_ratio = float(pos.get('profit_loss_ratio', 0))
             
-            if response.status_code == 200:
-                positions_data = response.json()
-                
-                # Handle different response formats
-                if isinstance(positions_data, dict) and 'positions' in positions_data:
-                    positions = positions_data['positions']
-                elif isinstance(positions_data, list):
-                    positions = positions_data
-                else:
-                    positions = []
-                
-                # Sync positions to database
-                await sync_positions_to_db(
-                    db=db,
-                    user_id=current_user.id,
-                    futu_positions=positions,
-                    market=market
-                )
-                
-                # Get account info to calculate position ratios
-                account_url = f"{base_url}/api/account?market_type={market}"
-                account_response = await client.get(account_url, headers=headers)
-                
-                total_assets = 0.0
-                if account_response.status_code == 200:
-                    account_data = account_response.json()
-                    total_assets = account_data.get("net_asset", 0.0)
-                
-                # Determine currency symbol based on market
-                currency_map = {
-                    "US": "$",      # US Dollar
-                    "HK": "HK$",    # Hong Kong Dollar
-                    "CN": "¥"       # Chinese Yuan
-                }
-                currency = currency_map.get(market, "$")
-                
-                # Query database for position records to get open time
-                from datetime import datetime, date
-                position_records_query = await db.execute(
-                    select(PositionRecord).where(
-                        PositionRecord.user_id == current_user.id,
-                        PositionRecord.market_type == market,
-                        PositionRecord.is_closed == False
-                    )
-                )
-                position_records = {rec.stock_code: rec for rec in position_records_query.scalars().all()}
-                
-                # Get today's date for calculating holding days
-                today = date.today()
-                
-                # Build result
-                result_positions = []
-                for pos in positions:
-                    stock_code = pos.get('stock_code', '')
-                    stock_name = pos.get('stock_name', '')
-                    quantity = float(pos.get('quantity', 0))
-                    cost_price = float(pos.get('cost_price', 0))
-                    current_price = float(pos.get('current_price', 0))
-                    market_value = float(pos.get('market_value', 0))
-                    profit_loss = float(pos.get('profit_loss', 0))
-                    profit_loss_ratio = float(pos.get('profit_loss_ratio', 0))
-                    
-                    # Calculate position ratio
-                    position_ratio = (market_value / total_assets * 100) if total_assets > 0 else 0
-                    
-                    # Get holding days from database (only calculate date difference, not time)
-                    holding_days = 0
-                    first_open_time = None
-                    if stock_code in position_records:
-                        record = position_records[stock_code]
-                        first_open_time = record.first_open_time
-                    
-                    # If no open time in database, use current date (today)
-                    if not first_open_time:
-                        from datetime import datetime
-                        first_open_time = datetime.now()
-                        holding_days = 0  # Just opened today
-                    else:
-                        # Convert to date only (ignore time component)
-                        open_date = first_open_time.date() if hasattr(first_open_time, 'date') else first_open_time
-                        holding_days = (today - open_date).days
-                    
-                    result_positions.append({
-                        "stock_code": stock_code,
-                        "stock_name": stock_name,
-                        "market_type": pos.get('market_type', market),
-                        "quantity": int(quantity),
-                        "cost_price": cost_price,
-                        "current_price": current_price,
-                        "pnl": profit_loss,
-                        "pnl_percent": profit_loss_ratio * 100,
-                        "position_value": market_value,
-                        "position_ratio": round(position_ratio, 2),
-                        "holding_days": holding_days,
-                        "first_open_time": first_open_time.isoformat(),
-                        "currency": currency,
-                    })
-                
-                return result_positions
-            else:
-                return []
+            # Calculate position ratio
+            position_ratio = (market_value / total_assets * 100) if total_assets > 0 else 0
+            
+            result_positions.append({
+                "stock_code": pos.get('stock_code', ''),
+                "stock_name": pos.get('stock_name', ''),
+                "market_type": pos.get('market_type', market),
+                "quantity": int(float(pos.get('quantity', 0))),
+                "cost_price": float(pos.get('cost_price', 0)),
+                "current_price": float(pos.get('current_price', 0)),
+                "pnl": profit_loss,
+                "pnl_percent": profit_loss_ratio * 100,
+                "position_value": market_value,
+                "position_ratio": round(position_ratio, 2),
+                "holding_days": pos.get('holding_days', 0),  # From tool method
+                "first_open_time": pos.get('first_open_time'),  # From tool method
+                "currency": currency,
+            })
+        
+        return result_positions
     
-    except httpx.TimeoutException:
-        return []
     except Exception as e:
         logger.error(f"Error fetching positions: {e}")
         return []
@@ -895,10 +819,9 @@ async def get_all_trading_history(
 # ============================================================================
 
 @router.get("/account")
-async def get_account_info(
+async def get_account_info_endpoint(
     market: str = "US",  # Default to US market
     current_user: User = Depends(require_intraday_access),
-    db: AsyncSession = Depends(get_db),
 ):
     """
     Get account information for current user by market.
@@ -906,23 +829,7 @@ async def get_account_info(
     Requires authentication and Futu API configuration.
     """
     try:
-        import httpx
-        from web.backend.models import UserConfig
-        from sqlalchemy import select
-        
-        # Get user config
-        result = await db.execute(
-            select(UserConfig).where(UserConfig.user_id == current_user.id)
-        )
-        user_config = result.scalar_one_or_none()
-        
-        # Priority: Use intraday config first, fallback to analysis config
-        futu_api_url = None
-        futu_api_key = None
-        
-        if user_config:
-            futu_api_url = user_config.intraday_futu_api_url or user_config.futu_api_base_url
-            futu_api_key = user_config.intraday_futu_api_key or user_config.futu_api_key
+        from web.backend.services.futu_async_wrapper import get_account_info_async
         
         # Determine currency symbol based on market
         currency_map = {
@@ -932,8 +839,14 @@ async def get_account_info(
         }
         currency = currency_map.get(market, "$")
         
-        if not futu_api_url:
-            # Return empty account info if not configured
+        # Use async wrapper to get account info
+        account_info = await get_account_info_async(
+            market_type=market,
+            user_id=current_user.id
+        )
+        
+        if not account_info:
+            # Return empty account info if not configured or error
             return {
                 "total_assets": 0.0,
                 "cash": 0.0,
@@ -943,77 +856,27 @@ async def get_account_info(
                 "configured": False,
             }
         
-        # Call Futu API to get account info
-        # According to API docs: GET /api/account?market_type=US
-        base_url = futu_api_url.rstrip('/')
-        account_url = f"{base_url}/api/account?market_type={market}"
-        
-        headers = {
-            'Content-Type': 'application/json'
-        }
-        if futu_api_key:
-            headers['X-API-Key'] = futu_api_key
-        
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(account_url, headers=headers)
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Map Futu API response fields to our format
-                # Actual API response format:
-                # {
-                #   "net_asset": 96890.672,
-                #   "cash": 75066.397,
-                #   "market_value": 21824.275,
-                #   "buying_power": 171957.069,
-                #   "profit_loss": -3109.328,
-                #   ...
-                # }
-                
-                return {
-                    "total_assets": data.get("net_asset", 0.0),
-                    "cash": data.get("cash", 0.0),
-                    "position_value": data.get("market_value", 0.0),
-                    "today_profit_loss": data.get("today_profit_loss", 0.0),
-                    "today_profit_loss_ratio": data.get("today_profit_loss_ratio", 0.0),
-                    "market": market,
-                    "currency": currency,
-                    "configured": True,
-                }
-            else:
-                # Log error for debugging
-                error_text = response.text if hasattr(response, 'text') else str(response.content)
-                logger.error(f"Futu API Error: {response.status_code} - {error_text}")
-                
-                # Return empty data with error info
-                return {
-                    "total_assets": 0.0,
-                    "cash": 0.0,
-                    "position_value": 0.0,
-                    "market": market,
-                    "currency": currency,
-                    "configured": True,
-                    "error": f"API返回错误: {response.status_code}"
-                }
-    
-    except httpx.TimeoutException:
+        # Map response fields to our format
         return {
-            "total_assets": 0.0,
-            "cash": 0.0,
-            "position_value": 0.0,
+            "total_assets": account_info.get("net_asset", 0.0),
+            "cash": account_info.get("cash", 0.0),
+            "position_value": account_info.get("market_value", 0.0),
+            "today_profit_loss": account_info.get("today_profit_loss", 0.0),
+            "today_profit_loss_ratio": account_info.get("today_profit_loss_ratio", 0.0),
             "market": market,
             "currency": currency,
             "configured": True,
-            "error": "连接超时"
         }
+    
     except Exception as e:
+        logger.error(f"Error fetching account info: {e}")
+        currency_map = {"US": "$", "HK": "HK$", "CN": "¥"}
         return {
             "total_assets": 0.0,
             "cash": 0.0,
             "position_value": 0.0,
             "market": market,
-            "currency": currency,
+            "currency": currency_map.get(market, "$"),
             "configured": True,
             "error": str(e)
         }
@@ -1023,6 +886,7 @@ async def get_account_info(
 async def validate_futu_config(
     config: IntradayConfigRequest,
     current_user: User = Depends(require_intraday_access),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Validate Futu API configuration by testing connection.
@@ -1030,7 +894,9 @@ async def validate_futu_config(
     Requires authentication.
     """
     try:
-        import httpx
+        from web.backend.services.futu_async_wrapper import get_hot_news_async
+        from web.backend.models import UserConfig
+        from sqlalchemy import select
         
         if not config.futu_api_url:
             raise HTTPException(
@@ -1038,48 +904,53 @@ async def validate_futu_config(
                 detail="请提供富途API地址"
             )
         
-        # Test connection to Futu API
-        base_url = config.futu_api_url.rstrip('/')
-        test_url = f"{base_url}/api/hot-news?lang=en-us"
+        # Temporarily update user config for validation
+        result = await db.execute(
+            select(UserConfig).where(UserConfig.user_id == current_user.id)
+        )
+        user_config = result.scalar_one_or_none()
         
-        headers = {
-            'Content-Type': 'application/json'
-        }
+        if not user_config:
+            user_config = UserConfig(user_id=current_user.id)
+            db.add(user_config)
+        
+        # Store original values
+        original_url = user_config.intraday_futu_api_url
+        original_key = user_config.intraday_futu_api_key
+        
+        # Temporarily set new values for testing
+        user_config.intraday_futu_api_url = config.futu_api_url
         if config.futu_api_key:
-            headers['X-API-Key'] = config.futu_api_key  # Use X-API-Key header
+            user_config.intraday_futu_api_key = config.futu_api_key
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(test_url, headers=headers)
+        await db.commit()
+        
+        try:
+            # Test connection using async wrapper
+            news = await get_hot_news_async(
+                lang="en-us",
+                user_id=current_user.id
+            )
             
-            if response.status_code == 200:
-                data = response.json()
-                # Check if response has valid data structure
-                if data and (isinstance(data, list) or 'data' in data):
-                    return {
-                        "valid": True,
-                        "message": "富途API配置验证成功"
-                    }
-                else:
-                    return {
-                        "valid": False,
-                        "message": "富途API返回数据格式不正确"
-                    }
+            if news is not None:
+                return {
+                    "valid": True,
+                    "message": "富途API配置验证成功"
+                }
             else:
                 return {
                     "valid": False,
-                    "message": f"富途API验证失败: HTTP {response.status_code}"
+                    "message": "富途API验证失败"
                 }
+        
+        finally:
+            # Restore original values
+            user_config.intraday_futu_api_url = original_url
+            user_config.intraday_futu_api_key = original_key
+            await db.commit()
     
-    except httpx.TimeoutException:
-        return {
-            "valid": False,
-            "message": "连接超时，请检查API地址是否正确"
-        }
-    except httpx.ConnectError:
-        return {
-            "valid": False,
-            "message": "无法连接到富途API，请检查地址和网络"
-        }
+    except HTTPException:
+        raise
     except Exception as e:
         return {
             "valid": False,

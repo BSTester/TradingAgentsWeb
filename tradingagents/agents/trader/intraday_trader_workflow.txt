@@ -14,15 +14,15 @@ You MUST follow this 5-phase workflow for every trading session. This workflow i
 **Step 2: Stock Analysis** (call multiple tools in parallel for each stock):
 For each position and candidate stock, call these tools together:
 - `get_futu_quote(stock_code)` - Get real-time quote
-- `get_futu_kline(symbol=stock_code, interval="daily", format="csv")` - Get daily K-line data for 1-month trend analysis
-- `get_futu_kline(symbol=stock_code, interval="5min", format="csv")` - Get 5-minute K-line data for intraday trend analysis
-- `get_futu_technical_analysis(symbol=stock_code, interval="daily", indicator="macd", format="csv")` - Get daily MACD
-- `get_futu_technical_analysis(symbol=stock_code, interval="daily", indicator="rsi", format="csv")` - Get daily RSI
-- `get_futu_technical_analysis(symbol=stock_code, interval="daily", indicator="boll", format="csv")` - Get daily Bollinger Bands
-- `get_futu_technical_analysis(symbol=stock_code, interval="5min", indicator="macd", format="csv")` - Get 5-min MACD
-- `get_futu_technical_analysis(symbol=stock_code, interval="5min", indicator="rsi", format="csv")` - Get 5-min RSI
-- `get_futu_technical_analysis(symbol=stock_code, interval="5min", indicator="boll", format="csv")` - Get 5-min Bollinger Bands
-- `get_fundamentals(ticker=stock_code, curr_date="[current date]")` - Get comprehensive fundamental analysis data
+- `get_futu_kline(symbol=stock_code, interval="daily", start_date="[1 month ago]", end_date="[today]", format="csv")` - Get daily K-line data for 1-month trend analysis (e.g., start_date="2024-10-18", end_date="2024-11-18")
+- `get_futu_kline(symbol=stock_code, interval="5min", start_date="[market local today]", end_date="[market local today]", format="csv")` - Get 5-minute K-line data for intraday trend analysis (use market's local date, e.g., US market uses US date)
+- `get_futu_technical_analysis(symbol=stock_code, interval="daily", indicator="macd", start_date="[1 month ago]", end_date="[today]", format="csv")` - Get daily MACD (same date range as daily K-line)
+- `get_futu_technical_analysis(symbol=stock_code, interval="daily", indicator="rsi", start_date="[1 month ago]", end_date="[today]", format="csv")` - Get daily RSI (same date range as daily K-line)
+- `get_futu_technical_analysis(symbol=stock_code, interval="daily", indicator="boll", start_date="[1 month ago]", end_date="[today]", format="csv")` - Get daily Bollinger Bands (same date range as daily K-line)
+- `get_futu_technical_analysis(symbol=stock_code, interval="5min", indicator="macd", start_date="[market local today]", end_date="[market local today]", format="csv")` - Get 5-min MACD (intraday only, use market's local date)
+- `get_futu_technical_analysis(symbol=stock_code, interval="5min", indicator="rsi", start_date="[market local today]", end_date="[market local today]", format="csv")` - Get 5-min RSI (intraday only, use market's local date)
+- `get_futu_technical_analysis(symbol=stock_code, interval="5min", indicator="boll", start_date="[market local today]", end_date="[market local today]", format="csv")` - Get 5-min Bollinger Bands (intraday only, use market's local date)
+- `get_fundamentals(ticker=stock_code, curr_date="[current date]")` - Get comprehensive fundamental analysis data (e.g., curr_date="2024-11-18")
 - `get_balance_sheet(ticker=stock_code, freq="quarterly", curr_date="[current date]")` - Get balance sheet data for financial position analysis
 - `get_cashflow(ticker=stock_code, freq="quarterly", curr_date="[current date]")` - Get cash flow statement data for liquidity assessment
 - `get_income_statement(ticker=stock_code, freq="quarterly", curr_date="[current date]")` - Get income statement data for profitability analysis
