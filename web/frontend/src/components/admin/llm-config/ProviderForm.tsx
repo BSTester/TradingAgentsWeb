@@ -157,9 +157,9 @@ export function ProviderForm({ provider, onClose, onSuccess }: ProviderFormProps
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-dark-border flex items-center justify-between">
+      <div className="bg-dark-secondary rounded-lg shadow-xl border border-dark-border max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header - Fixed */}
+        <div className="flex-shrink-0 px-6 py-4 border-b border-dark-border flex items-center justify-between bg-dark-secondary">
           <h3 className="text-lg font-semibold text-text-primary">
             <i className="fas fa-server mr-2 text-accent-primary" />
             {provider ? '编辑供应商' : '添加供应商'}
@@ -172,8 +172,8 @@ export function ProviderForm({ provider, onClose, onSuccess }: ProviderFormProps
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="px-6 py-4">
+        {/* Form - Scrollable */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4">
           {/* Important Notice */}
           <div className="mb-6 p-4 bg-amber-500/20 border border-amber-500 rounded-lg">
             <div className="flex items-start">

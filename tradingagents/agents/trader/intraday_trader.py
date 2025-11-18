@@ -734,9 +734,10 @@ If you executed ANY trades (called place_futu_order and it succeeded), you MUST 
 ```
 ## TRADE_DETAILS_JSON
 [
-  {{"stock": "AAPL", "action": "BUY", "quantity": 100, "price": 150.50, "description": "以$150.50买入100股"}},
-  {{"stock": "TSLA", "action": "SELL", "quantity": 50, "price": 200.00, "description": "以$200.00卖出50股"}},
-  {{"stock": "00700", "action": "BUY", "quantity": 200, "price": 320.50, "description": "以HK$320.50买入200股腾讯"}}
+  {{"stock": "AAPL", "action": "BUY", "quantity": 100, "price": 150.50, "description": "以$150.50买入100股苹果"}},
+  {{"stock": "TSLA", "action": "SELL", "quantity": 50, "price": 200.00, "description": "以$200.00卖出50股特斯拉"}},
+  {{"stock": "00700", "action": "BUY", "quantity": 200, "price": 320.50, "description": "以HK$320.50买入200股腾讯"}},
+  {{"stock": "002475", "action": "BUY", "quantity": 200, "price": 56.51, "description": "以¥56.51买入200股立讯精密"}}
 ]
 ```
 
