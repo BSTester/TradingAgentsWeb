@@ -147,11 +147,14 @@ class SnapshotScheduler:
             from datetime import datetime
             
             async with AsyncSessionLocal() as db:
-                # Get all users with Futu API configured
+                # Get all users with Futu API configured AND intraday scheduler enabled
                 result = await db.execute(
                     select(User, UserConfig)
                     .join(UserConfig, User.id == UserConfig.user_id)
-                    .where(UserConfig.futu_api_base_url.isnot(None))
+                    .where(
+                        UserConfig.futu_api_base_url.isnot(None),
+                        UserConfig.intraday_scheduler_auto_start == True  # Only users with scheduler enabled
+                    )
                 )
                 users_with_config = result.all()
                 
