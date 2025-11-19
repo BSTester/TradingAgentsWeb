@@ -154,17 +154,23 @@ async def validate_openai_compatible(api_key: str, base_url: str):
             elif response.status_code == 404:
                 error_body = response.text[:1000] if response.text else ""
                 
-                # If 404 has a structured JSON response, it means API is accessible
-                try:
-                    import json
-                    if error_body:
-                        json.loads(error_body)  # Try to parse as JSON
-                        # If successful, it's a structured API response
+                # If 404 has any meaningful response body, it means API is accessible
+                if error_body and len(error_body.strip()) > 0:
+                    # Check if it's JSON or has structured content
+                    is_structured = False
+                    try:
+                        import json
+                        json.loads(error_body)
+                        is_structured = True
+                    except:
+                        # Not JSON, but check if it looks like an API error message
+                        if not error_body.strip().startswith('<') and any(keyword in error_body.lower() for keyword in ['error', 'message', 'not found', 'invalid']):
+                            is_structured = True
+                    
+                    if is_structured:
                         return {"valid": True, "message": "API密钥验证成功！连接正常（/models端点不存在，但API服务器有响应）。"}
-                except:
-                    pass
                 
-                # Empty or non-JSON 404, try chat completions endpoint
+                # Empty or HTML 404, try chat completions endpoint
                 chat_url = f"{base_url.rstrip('/')}/chat/completions"
                 
                 try:
@@ -184,14 +190,20 @@ async def validate_openai_compatible(api_key: str, base_url: str):
                     elif chat_response.status_code == 403:
                         return {"valid": False, "message": "API密钥权限不足。"}
                     elif chat_response.status_code == 404:
-                        # Check if this 404 also has JSON response
+                        # Check if this 404 also has meaningful response
                         chat_error_body = chat_response.text[:1000] if chat_response.text else ""
-                        try:
-                            if chat_error_body:
+                        if chat_error_body and len(chat_error_body.strip()) > 0:
+                            is_structured = False
+                            try:
                                 json.loads(chat_error_body)
+                                is_structured = True
+                            except:
+                                if not chat_error_body.strip().startswith('<') and any(keyword in chat_error_body.lower() for keyword in ['error', 'message', 'not found', 'invalid']):
+                                    is_structured = True
+                            
+                            if is_structured:
                                 return {"valid": True, "message": "API密钥验证成功！连接正常（端点路径可能需要调整，但API服务器有响应）。"}
-                        except:
-                            pass
+                        
                         return {"valid": False, "message": "API端点不存在，请检查基础URL是否正确（例如：https://api.openai.com/v1）。"}
                     else:
                         # 200, 400, 500 etc - all indicate API is responding
@@ -248,14 +260,19 @@ async def validate_anthropic(api_key: str, base_url: str):
             elif response.status_code == 404:
                 error_body = response.text[:1000] if response.text else ""
                 
-                # If 404 has a structured JSON response, it means API is accessible
-                try:
-                    import json
-                    if error_body:
-                        json.loads(error_body)  # Try to parse as JSON
+                # If 404 has any meaningful response body, it means API is accessible
+                if error_body and len(error_body.strip()) > 0:
+                    is_structured = False
+                    try:
+                        import json
+                        json.loads(error_body)
+                        is_structured = True
+                    except:
+                        if not error_body.strip().startswith('<') and any(keyword in error_body.lower() for keyword in ['error', 'message', 'not found', 'invalid']):
+                            is_structured = True
+                    
+                    if is_structured:
                         return {"valid": True, "message": "Anthropic API密钥验证成功！连接正常（端点路径可能需要调整，但API服务器有响应）。"}
-                except:
-                    pass
                 
                 return {"valid": False, "message": f"Anthropic API调用失败：HTTP 404 - 端点不存在。请检查基础URL是否正确（应为：https://api.anthropic.com/v1）。详情：{error_body if error_body else 'No response body'}"}
             else:
@@ -297,14 +314,19 @@ async def validate_google(api_key: str, base_url: str):
             elif response.status_code == 404:
                 error_body = response.text[:1000] if response.text else ""
                 
-                # If 404 has a structured JSON response, it means API is accessible
-                try:
-                    import json
-                    if error_body:
-                        json.loads(error_body)  # Try to parse as JSON
+                # If 404 has any meaningful response body, it means API is accessible
+                if error_body and len(error_body.strip()) > 0:
+                    is_structured = False
+                    try:
+                        import json
+                        json.loads(error_body)
+                        is_structured = True
+                    except:
+                        if not error_body.strip().startswith('<') and any(keyword in error_body.lower() for keyword in ['error', 'message', 'not found', 'invalid']):
+                            is_structured = True
+                    
+                    if is_structured:
                         return {"valid": True, "message": "Google API密钥验证成功！连接正常（端点路径可能需要调整，但API服务器有响应）。"}
-                except:
-                    pass
                 
                 return {"valid": False, "message": f"Google API调用失败：HTTP 404 - 端点不存在。请检查基础URL是否正确。详情：{error_body if error_body else 'No response body'}"}
             else:

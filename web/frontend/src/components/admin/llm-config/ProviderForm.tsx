@@ -32,15 +32,13 @@ export function ProviderForm({ provider, onClose, onSuccess }: ProviderFormProps
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [apiKeyChanged, setApiKeyChanged] = useState(false); // 跟踪API Key是否被用户修改
+  const [showApiKey, setShowApiKey] = useState(false); // 控制API Key显示/隐藏
 
   useEffect(() => {
     if (provider) {
-      // 编辑模式：清空API key（显示为掩码），但不立即更新数据库中的值
-      const editedProvider = {
-        ...provider,
-        api_key: null  // 编辑时清空API key，只有用户输入新值时才更新
-      };
-      setFormData(editedProvider);
+      // 编辑模式：使用后端返回的完整API key
+      setFormData(provider);
+      setShowApiKey(false); // 默认隐藏API key
     }
   }, [provider]);
 
@@ -249,19 +247,29 @@ export function ProviderForm({ provider, onClose, onSuccess }: ProviderFormProps
             <label className="block text-sm font-medium text-text-secondary mb-2">
               API Key
             </label>
-            <input
-              type="password"
-              value={formData.api_key || ''}
-              onChange={(e) => {
-                const newValue = e.target.value || null;
-                setFormData({ ...formData, api_key: newValue });
-                if (provider && !apiKeyChanged && newValue) {
-                  setApiKeyChanged(true); // 用户开始输入新的API Key
-                }
-              }}
-              className="w-full px-4 py-2 bg-dark-tertiary border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-accent-primary font-mono"
-              placeholder="sk-..."
-            />
+            <div className="relative">
+              <input
+                type={showApiKey ? "text" : "password"}
+                value={formData.api_key || ''}
+                onChange={(e) => {
+                  const newValue = e.target.value || null;
+                  setFormData({ ...formData, api_key: newValue });
+                  if (provider && !apiKeyChanged && newValue) {
+                    setApiKeyChanged(true); // 用户开始输入新的API Key
+                  }
+                }}
+                className="w-full px-4 py-2 pr-10 bg-dark-tertiary border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-accent-primary font-mono"
+                placeholder="sk-..."
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors focus:outline-none"
+                title={showApiKey ? "隐藏API密钥" : "显示API密钥"}
+              >
+                <i className={`fas ${showApiKey ? 'fa-eye-slash' : 'fa-eye'} text-sm`} />
+              </button>
+            </div>
           </div>
 
           {/* Description */}

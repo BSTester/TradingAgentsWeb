@@ -551,35 +551,117 @@ async def test_llm_connection(
             elif response.status_code == 404:
                 error_body = response.text[:1000] if response.text else ""
                 
-                # If 404 has a structured JSON response, it means API is accessible
+                # If 404 has any meaningful response body, it means API is accessible
                 # Just the endpoint path is wrong (which is acceptable for validation)
-                try:
-                    import json
-                    if error_body:
-                        json.loads(error_body)  # Try to parse as JSON
-                        # If successful, it's a structured API response
+                if error_body and len(error_body.strip()) > 0:
+                    # Check if it's JSON or has structured content
+                    is_structured = False
+                    try:
+                        import json
+                        json.loads(error_body)
+                        is_structured = True
+                        logger.info(f"404 response has valid JSON, treating as success")
+                    except:
+                        # Not JSON, but check if it looks like an API error message
+                        # (contains common error keywords, not HTML)
+                        if not error_body.strip().startswith('<') and any(keyword in error_body.lower() for keyword in ['error', 'message', 'not found', 'invalid']):
+                            is_structured = True
+                            logger.info(f"404 response has structured error message, treating as success")
+                    
+                    if is_structured:
                         return LLMConnectionTestResponse(
                             success=True,
                             message="连接成功！API可访问（/models端点不存在，但API服务器有响应）。",
                             details={
                                 "status_code": response.status_code,
-                                "note": "API服务器可访问，连接正常"
+                                "note": "API服务器可访问，连接正常",
+                                "response_preview": error_body[:200]
                             }
                         )
-                except:
-                    pass
                 
-                # Empty or non-JSON 404 means URL is likely wrong
-                return LLMConnectionTestResponse(
-                    success=False,
-                    message=f"API调用失败：HTTP 404 - 端点不存在。请检查基础URL是否正确。",
-                    details={
-                        "status_code": response.status_code,
-                        "test_url": test_url,
-                        "response_body": error_body if error_body else "No response body",
-                        "hint": "请确认基础URL格式正确，例如：https://api.openai.com/v1 或 https://api.anthropic.com"
-                    }
-                )
+                # Empty or HTML 404, try chat completions endpoint as fallback
+                logger.info(f"404 from /models, trying /chat/completions as fallback")
+                chat_url = f"{test_data.base_url.rstrip('/')}/chat/completions"
+                
+                try:
+                    chat_response = await client.post(
+                        chat_url,
+                        headers=headers,
+                        json={
+                            "model": "gpt-3.5-turbo",
+                            "messages": [{"role": "user", "content": "hi"}],
+                            "max_tokens": 5
+                        }
+                    )
+                    
+                    # Any response except 401/403/404 means API is accessible
+                    if chat_response.status_code == 401:
+                        return LLMConnectionTestResponse(
+                            success=False,
+                            message="认证失败：API密钥无效或已过期。",
+                            details={"status_code": chat_response.status_code}
+                        )
+                    elif chat_response.status_code == 403:
+                        return LLMConnectionTestResponse(
+                            success=False,
+                            message="权限不足：API密钥权限不足。",
+                            details={"status_code": chat_response.status_code}
+                        )
+                    elif chat_response.status_code == 404:
+                        # Check if this 404 also has meaningful response
+                        chat_error_body = chat_response.text[:1000] if chat_response.text else ""
+                        if chat_error_body and len(chat_error_body.strip()) > 0:
+                            is_chat_structured = False
+                            try:
+                                import json
+                                json.loads(chat_error_body)
+                                is_chat_structured = True
+                            except:
+                                if not chat_error_body.strip().startswith('<') and any(keyword in chat_error_body.lower() for keyword in ['error', 'message', 'not found', 'invalid']):
+                                    is_chat_structured = True
+                            
+                            if is_chat_structured:
+                                return LLMConnectionTestResponse(
+                                    success=True,
+                                    message="连接成功！API可访问（端点路径可能需要调整，但API服务器有响应）。",
+                                    details={
+                                        "status_code": chat_response.status_code,
+                                        "note": "API服务器可访问，连接正常"
+                                    }
+                                )
+                        
+                        # Both endpoints returned empty/HTML 404
+                        return LLMConnectionTestResponse(
+                            success=False,
+                            message=f"API调用失败：HTTP 404 - 端点不存在。请检查基础URL是否正确。",
+                            details={
+                                "status_code": response.status_code,
+                                "test_url": test_url,
+                                "response_body": error_body if error_body else "No response body",
+                                "hint": "请确认基础URL格式正确，例如：https://api.openai.com/v1 或 https://api.anthropic.com"
+                            }
+                        )
+                    else:
+                        # 200, 400, 500 etc - all indicate API is responding
+                        return LLMConnectionTestResponse(
+                            success=True,
+                            message="连接成功！API密钥和基础URL配置正确。",
+                            details={
+                                "status_code": chat_response.status_code,
+                                "note": "通过/chat/completions端点验证成功"
+                            }
+                        )
+                
+                except Exception as chat_error:
+                    logger.error(f"Chat completions fallback failed: {str(chat_error)}")
+                    return LLMConnectionTestResponse(
+                        success=False,
+                        message=f"API调用失败：无法连接到API端点。请检查基础URL是否正确。",
+                        details={
+                            "error": str(chat_error),
+                            "hint": "请确认基础URL格式正确，例如：https://api.openai.com/v1"
+                        }
+                    )
             else:
                 # Any other status code (400, 500, etc) means API is responding
                 return LLMConnectionTestResponse(
