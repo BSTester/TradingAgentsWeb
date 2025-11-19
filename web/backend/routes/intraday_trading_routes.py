@@ -966,7 +966,7 @@ async def validate_futu_config(
             
             # Invalidate cache after restoring values
             from web.backend.services.user_config_cache import invalidate_user_config_cache
-            invalidate_user_config_cache(user_id)
+            invalidate_user_config_cache(current_user.id)
     
     except HTTPException:
         raise
