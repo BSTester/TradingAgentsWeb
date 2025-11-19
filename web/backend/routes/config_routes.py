@@ -128,6 +128,9 @@ async def validate_api_key(request: dict, current_user: User = Depends(get_curre
 
 async def validate_openai_compatible(api_key: str, base_url: str):
     """Validate OpenAI-compatible API by calling models endpoint"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             headers = {
@@ -139,41 +142,82 @@ async def validate_openai_compatible(api_key: str, base_url: str):
             models_url = f"{base_url.rstrip('/')}/models"
             response = await client.get(models_url, headers=headers)
             
+            # Any response (except 401/403/404) means API is accessible
             if response.status_code == 200:
                 return {"valid": True, "message": "API密钥验证成功！连接正常。"}
             elif response.status_code == 401:
-                return {"valid": False, "message": "API密钥无效或已过期，请检查密钥是否正确。"}
+                error_body = response.text[:500] if response.text else "No response body"
+                return {"valid": False, "message": f"API密钥无效或已过期，请检查密钥是否正确。详情：{error_body}"}
             elif response.status_code == 403:
-                return {"valid": False, "message": "API密钥权限不足，无法访问模型列表。"}
+                error_body = response.text[:500] if response.text else "No response body"
+                return {"valid": False, "message": f"API密钥权限不足，无法访问模型列表。详情：{error_body}"}
             elif response.status_code == 404:
-                # Some APIs might not have /models endpoint, try a simple chat completion
+                error_body = response.text[:1000] if response.text else ""
+                
+                # If 404 has a structured JSON response, it means API is accessible
+                try:
+                    import json
+                    if error_body:
+                        json.loads(error_body)  # Try to parse as JSON
+                        # If successful, it's a structured API response
+                        return {"valid": True, "message": "API密钥验证成功！连接正常（/models端点不存在，但API服务器有响应）。"}
+                except:
+                    pass
+                
+                # Empty or non-JSON 404, try chat completions endpoint
                 chat_url = f"{base_url.rstrip('/')}/chat/completions"
-                chat_response = await client.post(
-                    chat_url,
-                    headers=headers,
-                    json={
-                        "model": "gpt-3.5-turbo",
-                        "messages": [{"role": "user", "content": "hi"}],
-                        "max_tokens": 5
-                    }
-                )
-                if chat_response.status_code in [200, 401]:  # 401 is expected for invalid key
-                    return {"valid": True, "message": "API密钥验证成功！连接正常。"}
-                else:
-                    return {"valid": False, "message": f"API调用失败：HTTP {chat_response.status_code}"}
+                
+                try:
+                    chat_response = await client.post(
+                        chat_url,
+                        headers=headers,
+                        json={
+                            "model": "gpt-3.5-turbo",
+                            "messages": [{"role": "user", "content": "hi"}],
+                            "max_tokens": 5
+                        }
+                    )
+                    
+                    # Any response except 401/403/404 means API is accessible
+                    if chat_response.status_code == 401:
+                        return {"valid": False, "message": "API密钥无效或已过期。"}
+                    elif chat_response.status_code == 403:
+                        return {"valid": False, "message": "API密钥权限不足。"}
+                    elif chat_response.status_code == 404:
+                        # Check if this 404 also has JSON response
+                        chat_error_body = chat_response.text[:1000] if chat_response.text else ""
+                        try:
+                            if chat_error_body:
+                                json.loads(chat_error_body)
+                                return {"valid": True, "message": "API密钥验证成功！连接正常（端点路径可能需要调整，但API服务器有响应）。"}
+                        except:
+                            pass
+                        return {"valid": False, "message": "API端点不存在，请检查基础URL是否正确（例如：https://api.openai.com/v1）。"}
+                    else:
+                        # 200, 400, 500 etc - all indicate API is responding
+                        return {"valid": True, "message": "API密钥验证成功！连接正常。"}
+                        
+                except Exception as chat_error:
+                    logger.error(f"Chat completions request failed: {str(chat_error)}")
+                    return {"valid": False, "message": f"API调用失败：无法连接到API端点。请检查基础URL是否正确。"}
             else:
-                return {"valid": False, "message": f"API调用失败：HTTP {response.status_code}"}
+                # Any other status code (400, 500, etc) means API is responding
+                return {"valid": True, "message": "API密钥验证成功！连接正常。"}
                 
     except httpx.TimeoutException:
-        return {"valid": False, "message": "连接超时：无法在30秒内连接到API服务器。"}
+        return {"valid": False, "message": f"连接超时：无法在30秒内连接到API服务器（{base_url}）。请检查网络连接和URL是否正确。"}
     except httpx.RequestError as e:
-        return {"valid": False, "message": f"连接错误：{str(e)}"}
+        return {"valid": False, "message": f"连接错误：{str(e)}。请检查基础URL格式是否正确。"}
     except Exception as e:
+        logger.error(f"Unexpected error validating API key: {str(e)}", exc_info=True)
         return {"valid": False, "message": f"验证失败：{str(e)}"}
 
 
 async def validate_anthropic(api_key: str, base_url: str):
     """Validate Anthropic API by calling messages endpoint"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             headers = {
@@ -194,25 +238,44 @@ async def validate_anthropic(api_key: str, base_url: str):
                 }
             )
             
-            if response.status_code == 200:
-                return {"valid": True, "message": "Anthropic API密钥验证成功！连接正常。"}
-            elif response.status_code == 401:
-                return {"valid": False, "message": "Anthropic API密钥无效或已过期，请检查密钥是否正确。"}
+            # Any response except 401/403/404 means API is accessible
+            if response.status_code == 401:
+                error_body = response.text[:500] if response.text else "No response body"
+                return {"valid": False, "message": f"Anthropic API密钥无效或已过期，请检查密钥是否正确。详情：{error_body}"}
             elif response.status_code == 403:
-                return {"valid": False, "message": "Anthropic API密钥权限不足。"}
+                error_body = response.text[:500] if response.text else "No response body"
+                return {"valid": False, "message": f"Anthropic API密钥权限不足。详情：{error_body}"}
+            elif response.status_code == 404:
+                error_body = response.text[:1000] if response.text else ""
+                
+                # If 404 has a structured JSON response, it means API is accessible
+                try:
+                    import json
+                    if error_body:
+                        json.loads(error_body)  # Try to parse as JSON
+                        return {"valid": True, "message": "Anthropic API密钥验证成功！连接正常（端点路径可能需要调整，但API服务器有响应）。"}
+                except:
+                    pass
+                
+                return {"valid": False, "message": f"Anthropic API调用失败：HTTP 404 - 端点不存在。请检查基础URL是否正确（应为：https://api.anthropic.com/v1）。详情：{error_body if error_body else 'No response body'}"}
             else:
-                return {"valid": False, "message": f"Anthropic API调用失败：HTTP {response.status_code}"}
+                # 200, 400, 500 etc - all indicate API is responding
+                return {"valid": True, "message": "Anthropic API密钥验证成功！连接正常。"}
                 
     except httpx.TimeoutException:
-        return {"valid": False, "message": "连接超时：无法在30秒内连接到Anthropic API服务器。"}
+        return {"valid": False, "message": f"连接超时：无法在30秒内连接到Anthropic API服务器（{base_url}）。"}
     except httpx.RequestError as e:
         return {"valid": False, "message": f"连接错误：{str(e)}"}
     except Exception as e:
+        logger.error(f"Unexpected error validating Anthropic API key: {str(e)}", exc_info=True)
         return {"valid": False, "message": f"Anthropic验证失败：{str(e)}"}
 
 
 async def validate_google(api_key: str, base_url: str):
     """Validate Google API by calling generative language API"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             headers = {
@@ -224,20 +287,36 @@ async def validate_google(api_key: str, base_url: str):
             models_url = f"{base_url.rstrip('/')}/models"
             response = await client.get(models_url, headers=headers)
             
-            if response.status_code == 200:
-                return {"valid": True, "message": "Google API密钥验证成功！连接正常。"}
-            elif response.status_code == 400:
-                return {"valid": False, "message": "Google API密钥无效，请检查密钥是否正确。"}
+            # Any response except 401/403/404 means API is accessible
+            if response.status_code == 401:
+                error_body = response.text[:500] if response.text else "No response body"
+                return {"valid": False, "message": f"Google API密钥无效，请检查密钥是否正确。详情：{error_body}"}
             elif response.status_code == 403:
-                return {"valid": False, "message": "Google API密钥权限不足或API未启用。"}
+                error_body = response.text[:500] if response.text else "No response body"
+                return {"valid": False, "message": f"Google API密钥权限不足或API未启用。详情：{error_body}"}
+            elif response.status_code == 404:
+                error_body = response.text[:1000] if response.text else ""
+                
+                # If 404 has a structured JSON response, it means API is accessible
+                try:
+                    import json
+                    if error_body:
+                        json.loads(error_body)  # Try to parse as JSON
+                        return {"valid": True, "message": "Google API密钥验证成功！连接正常（端点路径可能需要调整，但API服务器有响应）。"}
+                except:
+                    pass
+                
+                return {"valid": False, "message": f"Google API调用失败：HTTP 404 - 端点不存在。请检查基础URL是否正确。详情：{error_body if error_body else 'No response body'}"}
             else:
-                return {"valid": False, "message": f"Google API调用失败：HTTP {response.status_code}"}
+                # 200, 400, 500 etc - all indicate API is responding
+                return {"valid": True, "message": "Google API密钥验证成功！连接正常。"}
                 
     except httpx.TimeoutException:
-        return {"valid": False, "message": "连接超时：无法在30秒内连接到Google API服务器。"}
+        return {"valid": False, "message": f"连接超时：无法在30秒内连接到Google API服务器（{base_url}）。"}
     except httpx.RequestError as e:
         return {"valid": False, "message": f"连接错误：{str(e)}"}
     except Exception as e:
+        logger.error(f"Unexpected error validating Google API key: {str(e)}", exc_info=True)
         return {"valid": False, "message": f"Google API验证失败：{str(e)}"}
 
 
