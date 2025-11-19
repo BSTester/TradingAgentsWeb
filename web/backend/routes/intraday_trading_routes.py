@@ -400,7 +400,7 @@ async def get_scheduler_config(
             return {
                 "futu_api_url": None,
                 "futu_api_key": None,
-                "interval_minutes": 5,
+                "interval_minutes": 60,
                 "market_type": "US,HK,CN",  # Default to all markets (comma-separated)
                 "llm_provider": None,
                 "api_key": None,
@@ -431,7 +431,7 @@ async def get_scheduler_config(
             "futu_api_url": futu_api_url,
             "futu_api_key": futu_api_key,  # Return actual key for validation
             "has_futu_api_key": bool(futu_api_key),  # Indicate if key exists
-            "interval_minutes": user_config.intraday_interval_minutes or 60,
+            "interval_minutes": user_config.intraday_interval_minutes if user_config.intraday_interval_minutes is not None else 60,
             "market_type": user_config.intraday_market_type or "US,HK,CN",  # Default to all markets (comma-separated)
             "llm_provider": llm_provider,
             "api_key": api_key,
@@ -673,6 +673,18 @@ async def get_positions_endpoint(
     Requires authentication and Futu API configuration.
     """
     try:
+        from web.backend.models import UserConfig
+        
+        # Check if user has configured Futu API
+        result = await db.execute(
+            select(UserConfig).where(UserConfig.user_id == current_user.id)
+        )
+        user_config = result.scalar_one_or_none()
+        
+        if not user_config or not user_config.intraday_futu_api_url:
+            logger.info(f"User {current_user.id} has not configured Futu API")
+            return []
+        
         from web.backend.services.futu_async_wrapper import get_positions_async, get_account_info_async
         
         # Use async wrapper to get positions (includes database enrichment)
@@ -837,6 +849,7 @@ async def get_all_trading_history(
 async def get_account_info_endpoint(
     market: str = "US",  # Default to US market
     current_user: User = Depends(require_intraday_access),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Get account information for current user by market.
@@ -844,7 +857,7 @@ async def get_account_info_endpoint(
     Requires authentication and Futu API configuration.
     """
     try:
-        from web.backend.services.futu_async_wrapper import get_account_info_async
+        from web.backend.models import UserConfig
         
         # Determine currency symbol based on market
         currency_map = {
@@ -853,6 +866,25 @@ async def get_account_info_endpoint(
             "CN": "¥"       # Chinese Yuan
         }
         currency = currency_map.get(market, "$")
+        
+        # Check if user has configured Futu API
+        result = await db.execute(
+            select(UserConfig).where(UserConfig.user_id == current_user.id)
+        )
+        user_config = result.scalar_one_or_none()
+        
+        if not user_config or not user_config.intraday_futu_api_url:
+            logger.info(f"User {current_user.id} has not configured Futu API")
+            return {
+                "total_assets": 0.0,
+                "cash": 0.0,
+                "position_value": 0.0,
+                "market": market,
+                "currency": currency,
+                "configured": False,
+            }
+        
+        from web.backend.services.futu_async_wrapper import get_account_info_async
         
         # Use async wrapper to get account info
         account_info = await get_account_info_async(
@@ -986,6 +1018,7 @@ async def get_orders_endpoint(
     market: str = "US",
     filter_status: int = 0,  # 0=all, 1=filled, 2=pending, 3=cancelled
     current_user: User = Depends(require_intraday_access),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Get orders from Futu API using async wrapper.
@@ -997,6 +1030,18 @@ async def get_orders_endpoint(
     Requires authentication and Futu API configuration.
     """
     try:
+        from web.backend.models import UserConfig
+        
+        # Check if user has configured Futu API
+        result = await db.execute(
+            select(UserConfig).where(UserConfig.user_id == current_user.id)
+        )
+        user_config = result.scalar_one_or_none()
+        
+        if not user_config or not user_config.intraday_futu_api_url:
+            logger.info(f"User {current_user.id} has not configured Futu API")
+            return []
+        
         from web.backend.services.futu_async_wrapper import get_orders_async
         
         # Call async wrapper with user_id
@@ -1058,3 +1103,225 @@ async def cancel_order_endpoint(
             detail=f"撤单失败: {str(e)}"
         )
 
+
+
+# ============================================================================
+# Application Endpoints
+# ============================================================================
+
+@router.post("/apply")
+async def apply_intraday_access(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Apply for intraday trading access.
+    Sends an email to admin with user information.
+    
+    Requires authentication.
+    """
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        import os
+        from datetime import datetime, timedelta, timezone
+        from web.backend.models import UserConfig
+        
+        # Check if user already has access
+        if current_user.can_access_intraday_trading:
+            return {
+                "status": "info",
+                "message": "您已经拥有智能盯盘权限，无需重复申请"
+            }
+        
+        # Get or create user config
+        result = await db.execute(
+            select(UserConfig).where(UserConfig.user_id == current_user.id)
+        )
+        user_config = result.scalar_one_or_none()
+        
+        if not user_config:
+            user_config = UserConfig(user_id=current_user.id)
+            db.add(user_config)
+            await db.flush()
+        
+        # Check if user has applied recently (within 24 hours)
+        if user_config.intraday_application_sent_at:
+            now = datetime.now(timezone.utc)
+            # Ensure the stored datetime is timezone-aware
+            last_application = user_config.intraday_application_sent_at
+            if last_application.tzinfo is None:
+                last_application = last_application.replace(tzinfo=timezone.utc)
+            
+            time_since_last_application = now - last_application
+            
+            if time_since_last_application < timedelta(hours=24):
+                hours_remaining = 24 - int(time_since_last_application.total_seconds() / 3600)
+                return {
+                    "status": "info",
+                    "message": f"您已提交过申请，请等待 {hours_remaining} 小时后再试，或直接联系管理员"
+                }
+        
+        # Get SMTP configuration
+        smtp_host = os.getenv("SMTP_HOST")
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        smtp_username = os.getenv("SMTP_USERNAME")
+        smtp_password = os.getenv("SMTP_PASSWORD")
+        smtp_from_email = os.getenv("SMTP_FROM_EMAIL")
+        smtp_use_tls = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+        
+        # Validate SMTP configuration
+        if not all([smtp_host, smtp_username, smtp_password, smtp_from_email]):
+            raise HTTPException(
+                status_code=500,
+                detail="邮件服务未配置，请联系管理员"
+            )
+        
+        # Admin email
+        admin_email = "forpenn@foxmail.com"
+        
+        # Compose email
+        subject = f"智能盯盘功能开通申请 - {current_user.username}"
+        
+        # HTML email body
+        html_body = f"""
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+            <div style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden;">
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center;">
+                    <h1 style="margin: 0; font-size: 24px; font-weight: 600;">📋 智能盯盘功能开通申请</h1>
+                    <p style="margin: 10px 0 0 0; opacity: 0.9; font-size: 14px;">TradingAgentsWeb</p>
+                </div>
+                
+                <div style="padding: 30px;">
+                    <p style="color: #495057; font-size: 15px; margin: 0 0 20px 0;">
+                        您好，收到一个新的智能盯盘功能开通申请。
+                    </p>
+                    
+                    <div style="background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; margin: 20px 0; border-radius: 4px;">
+                        <h3 style="margin: 0 0 15px 0; color: #212529; font-size: 16px; font-weight: 600;">👤 用户信息</h3>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 8px 0; color: #6c757d; font-size: 14px; width: 100px;">用户名：</td>
+                                <td style="padding: 8px 0; color: #212529; font-size: 14px; font-weight: 500;">{current_user.username}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #6c757d; font-size: 14px;">邮箱：</td>
+                                <td style="padding: 8px 0; color: #212529; font-size: 14px; font-weight: 500;">{current_user.email}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #6c757d; font-size: 14px;">用户ID：</td>
+                                <td style="padding: 8px 0; color: #212529; font-size: 14px; font-weight: 500;">{current_user.id}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #6c757d; font-size: 14px;">注册时间：</td>
+                                <td style="padding: 8px 0; color: #212529; font-size: 14px; font-weight: 500;">{current_user.created_at}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    
+                    <div style="background-color: #e7f3ff; border-left: 4px solid #2196F3; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                        <p style="margin: 0; color: #1565C0; font-size: 14px; line-height: 1.6;">
+                            <strong>📝 申请说明：</strong><br>
+                            用户希望开通智能盯盘功能，以便参与实时排名和使用自动交易分析服务。
+                        </p>
+                    </div>
+                    
+                    <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                        <p style="margin: 0; color: #856404; font-size: 13px; line-height: 1.6;">
+                            <strong>⚡ 操作提示：</strong><br>
+                            请在管理后台为该用户开通相应权限，系统将自动发送开通成功通知邮件。
+                        </p>
+                    </div>
+                </div>
+                
+                <div style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e9ecef;">
+                    <p style="margin: 0; color: #6c757d; font-size: 12px;">
+                        此邮件由 TradingAgentsWeb 系统自动发送<br>
+                        回复此邮件将直接联系申请用户
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Plain text email body (fallback)
+        text_body = f"""
+您好，
+
+收到一个新的智能盯盘功能开通申请：
+
+用户信息：
+- 用户名：{current_user.username}
+- 邮箱：{current_user.email}
+- 用户ID：{current_user.id}
+- 注册时间：{current_user.created_at}
+
+申请说明：
+用户希望开通智能盯盘功能，以便参与实时排名和使用自动交易分析服务。
+
+请在管理后台为该用户开通相应权限。
+
+---
+此邮件由 TradingAgentsWeb 系统自动发送
+回复此邮件将直接联系申请用户
+        """
+        
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = f"TradingAgentsWeb <{smtp_from_email}>"
+        msg['To'] = admin_email
+        msg['Reply-To'] = current_user.email  # Reply will go to user
+        
+        # Attach both plain text and HTML versions
+        part1 = MIMEText(text_body, 'plain', 'utf-8')
+        part2 = MIMEText(html_body, 'html', 'utf-8')
+        msg.attach(part1)
+        msg.attach(part2)
+        
+        # Send email
+        try:
+            if smtp_use_tls:
+                server = smtplib.SMTP(smtp_host, smtp_port, timeout=30)
+                server.starttls()
+            else:
+                server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)
+            
+            server.login(smtp_username, smtp_password)
+            server.sendmail(smtp_from_email, admin_email, msg.as_string())
+            server.quit()
+            
+            # Update application sent time
+            from datetime import timezone
+            user_config.intraday_application_sent_at = datetime.now(timezone.utc)
+            await db.commit()
+            
+            logger.info(f"Intraday access application email sent for user {current_user.username} ({current_user.email})")
+            
+            return {
+                "status": "success",
+                "message": "申请已提交成功！我们将在1-2个工作日内处理您的申请，请留意邮箱通知。"
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to send application email: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"邮件发送失败：{str(e)}"
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing intraday access application: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"申请处理失败：{str(e)}"
+        )

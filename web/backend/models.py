@@ -77,6 +77,9 @@ class UserConfig(Base):
     intraday_llm_model = Column(String(100), nullable=True)  # LLM model for intraday trading (uses deep thinker options)
     intraday_backend_url = Column(String(255), nullable=True)  # Backend URL for intraday trading LLM
     
+    # Intraday access application tracking
+    intraday_application_sent_at = Column(DateTime(timezone=True), nullable=True)  # Last application email sent time
+    
     # API Key cache (single field for all LLM providers, should be encrypted in production)
     last_api_key = Column(String(1000), nullable=True)  # Last used API key (supports JWT tokens)
     
