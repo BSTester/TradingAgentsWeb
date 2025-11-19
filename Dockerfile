@@ -28,7 +28,7 @@ COPY requirements.txt pyproject.toml setup.py ./
 
 # 安装 Python 依赖
 RUN pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple && \
-    pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip install -U -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple && \
     pip install "uvicorn[standard]" "websockets" -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 复制项目文件
