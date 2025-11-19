@@ -682,7 +682,6 @@ async def get_positions_endpoint(
         user_config = result.scalar_one_or_none()
         
         if not user_config or not user_config.intraday_futu_api_url:
-            logger.info(f"User {current_user.id} has not configured Futu API")
             return []
         
         from web.backend.services.futu_async_wrapper import get_positions_async, get_account_info_async
@@ -874,7 +873,6 @@ async def get_account_info_endpoint(
         user_config = result.scalar_one_or_none()
         
         if not user_config or not user_config.intraday_futu_api_url:
-            logger.info(f"User {current_user.id} has not configured Futu API")
             return {
                 "total_assets": 0.0,
                 "cash": 0.0,
@@ -1039,7 +1037,6 @@ async def get_orders_endpoint(
         user_config = result.scalar_one_or_none()
         
         if not user_config or not user_config.intraday_futu_api_url:
-            logger.info(f"User {current_user.id} has not configured Futu API")
             return []
         
         from web.backend.services.futu_async_wrapper import get_orders_async
