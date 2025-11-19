@@ -77,9 +77,16 @@ export function PromptConfigTab({ onShowToast }: PromptConfigTabProps) {
     setSaving(true);
 
     try {
+      // Increment version number
+      const currentVersion = template?.version || '1.0';
+      const versionParts = currentVersion.split('.');
+      const majorVersion = parseInt(versionParts[0]) || 1;
+      const minorVersion = parseInt(versionParts[1]) || 0;
+      const newVersion = `${majorVersion}.${minorVersion + 1}`;
+      
       const updateData: any = {
         system_prompt: editedPrompt,
-        version: (template?.version || '1.0') + '_edited',
+        version: newVersion,
       };
       if (templateName) updateData.template_name = templateName;
       if (description) updateData.description = description;
