@@ -365,7 +365,7 @@ export default function IntradayTradingPage() {
               <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
                 {/* WebSocket Status Indicator - Icon only on all screens */}
                 <div 
-                  className={`flex items-center px-2 py-1 rounded-full ${
+                  className={`flex items-center justify-center w-6 h-6 rounded-full ${
                     isConnected
                       ? 'bg-success-500/20'
                       : wsStatus === 'connecting'
@@ -412,7 +412,7 @@ export default function IntradayTradingPage() {
                       }}
                     />
                     <div className="absolute bottom-full right-0 sm:left-1/2 sm:transform sm:-translate-x-1/2 mb-2 px-3 py-2 bg-dark-secondary border border-dark-border rounded-lg shadow-lg text-xs text-text-primary opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 w-56 sm:w-auto sm:whitespace-nowrap text-left">
-                      开启后，您的资产信息将展示在实时排名页面，供所有人查看对比（可随时关闭）
+                      开启后，您的账户将参与实时排名，资产信息将公开展示（可随时关闭）
                       <div className="absolute top-full right-4 sm:left-1/2 sm:transform sm:-translate-x-1/2">
                         <div className="w-2 h-2 bg-dark-secondary border-r border-b border-dark-border transform rotate-45 -translate-y-1"></div>
                       </div>
