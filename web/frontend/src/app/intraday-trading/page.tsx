@@ -411,7 +411,7 @@ export default function IntradayTradingPage() {
                         }
                       }}
                     />
-                    <div className="absolute bottom-full right-0 sm:left-1/2 sm:transform sm:-translate-x-1/2 mb-2 px-3 py-2 bg-dark-secondary border border-dark-border rounded-lg shadow-lg text-xs text-text-primary opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 w-56 sm:w-auto sm:whitespace-nowrap text-left">
+                    <div className="absolute bottom-full right-0 sm:left-1/2 sm:transform sm:-translate-x-1/2 mb-2 px-3 py-2 bg-dark-secondary border border-dark-border rounded-lg shadow-lg text-xs text-text-primary opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 w-64 sm:w-72 text-left whitespace-normal">
                       开启后，您的账户将参与实时排名，资产信息将公开展示（可随时关闭）
                       <div className="absolute top-full right-4 sm:left-1/2 sm:transform sm:-translate-x-1/2">
                         <div className="w-2 h-2 bg-dark-secondary border-r border-b border-dark-border transform rotate-45 -translate-y-1"></div>
