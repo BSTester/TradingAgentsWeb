@@ -58,7 +58,7 @@ export function ControlPanel({ onShowToast }: ControlPanelProps) {
   // Load config on mount
   useEffect(() => {
     if (config) {
-      setInterval(config.interval_minutes || 5);
+      setInterval(config.interval_minutes || 60);
       setFutuApiUrl(config.futu_api_url || '');
       setFutuApiKey(config.futu_api_key || '');
       setLlmProvider(config.llm_provider || '');
