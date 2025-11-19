@@ -575,11 +575,17 @@ class LLMProvider(Base):
         """Convert to dictionary, optionally masking API key"""
         # 获取实际值而不是Column对象
         api_key_value = self.api_key
-        masked_api_key = None
-        if api_key_value and include_api_key:
-            masked_api_key = api_key_value
-        elif api_key_value and len(str(api_key_value)) > 4:
-            masked_api_key = "***" + str(api_key_value)[-4:]
+        
+        # 根据include_api_key参数决定是否返回完整密钥
+        if include_api_key:
+            # 返回完整API密钥（用于编辑时显示）
+            masked_api_key = api_key_value if api_key_value else None
+        else:
+            # 返回脱敏的API密钥（用于列表显示）
+            if api_key_value and len(str(api_key_value)) > 4:
+                masked_api_key = "***" + str(api_key_value)[-4:]
+            else:
+                masked_api_key = None
         
         return {
             "id": self.id,
