@@ -59,6 +59,11 @@ class IntradayScheduler:
         self._next_run_time: Optional[datetime] = None  # Track actual next run time
         self._analysis_tasks: dict[str, asyncio.Task] = {}  # Track running analysis tasks by market
         
+        # Error tracking for auto-stop on consecutive failures
+        self._consecutive_failures: dict[str, int] = {}  # Track failures per market
+        self._max_consecutive_failures = 3  # Stop after 3 consecutive failures
+        self._last_error_messages: dict[str, str] = {}  # Store last error message per market
+        
         # Market timezones
         self.market_timezones = {
             "US": pytz.timezone("America/New_York"),
@@ -265,9 +270,13 @@ class IntradayScheduler:
             
             logger.info(f"✅ {market} analysis completed: {result.get('status', 'unknown')}")
             
-            # Create account snapshot after successful analysis
-            # This is done here (in the main event loop) to avoid event loop conflicts
+            # Handle analysis result and track failures
             if result.get('status') == 'success':
+                # Reset failure counter on success
+                self._consecutive_failures[market] = 0
+                self._last_error_messages[market] = ""
+                
+                # Create account snapshot after successful analysis
                 try:
                     from web.backend.services.snapshot_scheduler import create_account_snapshot
                     
@@ -283,11 +292,73 @@ class IntradayScheduler:
                 except Exception as snapshot_error:
                     logger.error(f"❌ Error creating account snapshot: {snapshot_error}", exc_info=True)
             
+            elif result.get('status') == 'error':
+                # Increment failure counter
+                self._consecutive_failures[market] = self._consecutive_failures.get(market, 0) + 1
+                error_msg = result.get('error', 'Unknown error')
+                self._last_error_messages[market] = error_msg
+                
+                failure_count = self._consecutive_failures[market]
+                logger.error(f"❌ {market} analysis failed ({failure_count}/{self._max_consecutive_failures}): {error_msg}")
+                
+                # Check if we've reached the failure threshold
+                if failure_count >= self._max_consecutive_failures:
+                    logger.error(f"🛑 {market} market has failed {failure_count} consecutive times. Stopping scheduler for user {self.user_id}...")
+                    
+                    # Send WebSocket notification about auto-stop
+                    try:
+                        from web.backend.app import manager as ws_manager
+                        
+                        channel_id = f"intraday_user_{self.user_id}"
+                        await ws_manager.send_message({
+                            'type': 'scheduler_auto_stopped',
+                            'timestamp': datetime.utcnow().isoformat(),
+                            'message': f'智能盯盘已自动停止：{market}市场连续失败{failure_count}次',
+                            'market_type': market,
+                            'failure_count': failure_count,
+                            'last_error': error_msg,
+                        }, channel_id)
+                    except Exception as ws_error:
+                        logger.warning(f"Failed to send auto-stop notification: {ws_error}")
+                    
+                    # Update database to disable auto_start
+                    try:
+                        from web.backend.database import AsyncSessionLocal
+                        from web.backend.models import UserConfig
+                        from sqlalchemy import select
+                        
+                        async with AsyncSessionLocal() as db:
+                            result_db = await db.execute(
+                                select(UserConfig).where(UserConfig.user_id == self.user_id)
+                            )
+                            user_config = result_db.scalar_one_or_none()
+                            
+                            if user_config:
+                                user_config.intraday_scheduler_auto_start = False
+                                await db.commit()
+                                logger.info(f"✅ Disabled auto_start for user {self.user_id} in database")
+                    except Exception as db_error:
+                        logger.error(f"Failed to update auto_start flag: {db_error}")
+                    
+                    # Stop the scheduler
+                    await self.stop()
+                    return
+            
         except asyncio.CancelledError:
             logger.info(f"🛑 {market} analysis was cancelled")
             raise  # Re-raise to properly handle cancellation
         except Exception as e:
-            logger.error(f"❌ Error triggering {market} analysis: {str(e)}", exc_info=True)
+            # Unexpected exception in trigger logic itself
+            logger.error(f"❌ Unexpected error in _trigger_analysis for {market}: {str(e)}", exc_info=True)
+            
+            # Treat unexpected exceptions as failures too
+            self._consecutive_failures[market] = self._consecutive_failures.get(market, 0) + 1
+            self._last_error_messages[market] = str(e)
+            
+            failure_count = self._consecutive_failures[market]
+            if failure_count >= self._max_consecutive_failures:
+                logger.error(f"🛑 Stopping scheduler due to {failure_count} consecutive unexpected errors")
+                await self.stop()
         finally:
             # Clean up task reference
             if market in self._analysis_tasks:
@@ -402,11 +473,17 @@ class IntradayScheduler:
             if existing_task and not existing_task.done():
                 task_running = True
             
+            # Include failure tracking info
+            failure_count = self._consecutive_failures.get(market, 0)
+            last_error = self._last_error_messages.get(market, "")
+            
             markets_status[market] = {
                 "is_open": is_open,
                 "status": status_msg,
                 "local_time": market_local_time.strftime("%Y-%m-%d %H:%M:%S %Z"),
-                "task_running": task_running
+                "task_running": task_running,
+                "consecutive_failures": failure_count,
+                "last_error": last_error if failure_count > 0 else "",
             }
         
         # Use tracked next run time
@@ -430,6 +507,16 @@ class IntradayScheduler:
             market_status = markets_status[single_market]["status"]
             market_is_open = markets_status[single_market]["is_open"]
         
+        # Check if any market is approaching failure threshold
+        max_failures = max([self._consecutive_failures.get(m, 0) for m in markets_to_check])
+        health_status = "healthy"
+        if max_failures >= self._max_consecutive_failures:
+            health_status = "stopped"  # Should have stopped already
+        elif max_failures >= 2:
+            health_status = "warning"  # One more failure will stop
+        elif max_failures >= 1:
+            health_status = "degraded"  # Has failures but not critical
+        
         return {
             "is_running": self.is_running,
             "interval_minutes": self.interval_minutes,
@@ -439,6 +526,8 @@ class IntradayScheduler:
             "markets_status": markets_status,  # Detailed status for each market
             "next_run_time": next_run,
             "current_time": datetime.now().isoformat(),
+            "health_status": health_status,
+            "max_consecutive_failures": self._max_consecutive_failures,
         }
     
     def update_interval(self, interval_minutes: int):
