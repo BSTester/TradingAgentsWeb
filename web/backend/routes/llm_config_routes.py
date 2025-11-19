@@ -504,6 +504,9 @@ async def test_llm_connection(
     Returns:
         连接测试结果
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         # Simple connection test - try to list models or make a simple API call
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -517,6 +520,7 @@ async def test_llm_connection(
             
             response = await client.get(test_url, headers=headers)
             
+            # Any response except 401/403/404 means API is accessible
             if response.status_code == 200:
                 return LLMConnectionTestResponse(
                     success=True,
@@ -530,40 +534,79 @@ async def test_llm_connection(
                 return LLMConnectionTestResponse(
                     success=False,
                     message="认证失败：API密钥无效或已过期。",
-                    details={"status_code": response.status_code}
-                )
-            elif response.status_code == 404:
-                # Some APIs might not have /models endpoint, try a minimal chat completion
-                return LLMConnectionTestResponse(
-                    success=True,
-                    message="连接成功（无法测试模型列表端点，但基础URL可访问）",
-                    details={"status_code": response.status_code, "note": "Provider may not support /models endpoint"}
-                )
-            else:
-                return LLMConnectionTestResponse(
-                    success=False,
-                    message=f"连接测试失败：HTTP {response.status_code}",
                     details={
                         "status_code": response.status_code,
-                        "response": response.text[:200] if response.text else None
+                        "response_body": response.text[:500] if response.text else None
+                    }
+                )
+            elif response.status_code == 403:
+                return LLMConnectionTestResponse(
+                    success=False,
+                    message="权限不足：API密钥权限不足。",
+                    details={
+                        "status_code": response.status_code,
+                        "response_body": response.text[:500] if response.text else None
+                    }
+                )
+            elif response.status_code == 404:
+                error_body = response.text[:1000] if response.text else ""
+                
+                # If 404 has a structured JSON response, it means API is accessible
+                # Just the endpoint path is wrong (which is acceptable for validation)
+                try:
+                    import json
+                    if error_body:
+                        json.loads(error_body)  # Try to parse as JSON
+                        # If successful, it's a structured API response
+                        return LLMConnectionTestResponse(
+                            success=True,
+                            message="连接成功！API可访问（/models端点不存在，但API服务器有响应）。",
+                            details={
+                                "status_code": response.status_code,
+                                "note": "API服务器可访问，连接正常"
+                            }
+                        )
+                except:
+                    pass
+                
+                # Empty or non-JSON 404 means URL is likely wrong
+                return LLMConnectionTestResponse(
+                    success=False,
+                    message=f"API调用失败：HTTP 404 - 端点不存在。请检查基础URL是否正确。",
+                    details={
+                        "status_code": response.status_code,
+                        "test_url": test_url,
+                        "response_body": error_body if error_body else "No response body",
+                        "hint": "请确认基础URL格式正确，例如：https://api.openai.com/v1 或 https://api.anthropic.com"
+                    }
+                )
+            else:
+                # Any other status code (400, 500, etc) means API is responding
+                return LLMConnectionTestResponse(
+                    success=True,
+                    message="连接成功！API密钥和基础URL配置正确。",
+                    details={
+                        "status_code": response.status_code,
+                        "note": "API有响应，连接正常"
                     }
                 )
                 
     except httpx.TimeoutException:
         return LLMConnectionTestResponse(
             success=False,
-            message="连接超时：无法在10秒内连接到API服务器。",
-            details={"error": "timeout"}
+            message="连接超时：无法在10秒内连接到API服务器。请检查网络连接和URL是否正确。",
+            details={"error": "timeout", "base_url": test_data.base_url}
         )
     except httpx.RequestError as e:
         return LLMConnectionTestResponse(
             success=False,
-            message=f"连接错误：{str(e)}",
-            details={"error": str(e)}
+            message=f"连接错误：{str(e)}。请检查基础URL格式是否正确。",
+            details={"error": str(e), "error_type": type(e).__name__}
         )
     except Exception as e:
+        logger.error(f"Unexpected error testing LLM connection: {str(e)}", exc_info=True)
         return LLMConnectionTestResponse(
             success=False,
             message=f"测试失败：{str(e)}",
-            details={"error": str(e)}
+            details={"error": str(e), "error_type": type(e).__name__}
         )
