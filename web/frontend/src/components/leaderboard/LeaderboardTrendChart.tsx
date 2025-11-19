@@ -25,6 +25,7 @@ interface LeaderboardTrendChartProps {
   selectedMarket: string;
   selectedUserId: number | null;
   onUserSelect: (userId: number, username: string) => void;
+  onJoinClick?: () => void; // 点击参加排名按钮的回调
   lastUpdate: string | null;
 }
 
@@ -34,6 +35,7 @@ export function LeaderboardTrendChart({
   selectedMarket,
   selectedUserId,
   onUserSelect,
+  onJoinClick,
   lastUpdate
 }: LeaderboardTrendChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -478,10 +480,22 @@ export function LeaderboardTrendChart({
 
       {/* 排名列表 */}
       <div className="w-full lg:w-80 bg-dark-secondary rounded-lg border border-dark-border p-3 sm:p-4 flex flex-col min-h-0">
-        <h3 className="text-lg font-bold text-text-primary mb-3 sm:mb-4 flex-shrink-0">
-          <i className="fas fa-list-ol mr-2" />
-          排名列表 ({allUsers.length})
-        </h3>
+        <div className="flex items-center justify-between mb-3 sm:mb-4 flex-shrink-0">
+          <h3 className="text-lg font-bold text-text-primary">
+            <i className="fas fa-list-ol mr-2" />
+            排名列表 ({allUsers.length})
+          </h3>
+          {onJoinClick && (
+            <button
+              onClick={onJoinClick}
+              className="px-3 py-1.5 bg-accent-primary/10 hover:bg-accent-primary/20 text-accent-primary rounded-lg transition-colors text-sm font-medium flex items-center gap-1.5"
+              title="了解如何参加排名"
+            >
+              <i className="fas fa-trophy text-xs" />
+              <span className="hidden sm:inline">参加排名</span>
+            </button>
+          )}
+        </div>
         <div className="space-y-2 overflow-y-auto flex-1 min-h-0">
           {allUsers
             .sort((a, b) => b.total_assets - a.total_assets)

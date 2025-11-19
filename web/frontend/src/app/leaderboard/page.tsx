@@ -11,6 +11,7 @@ import { buildApiUrl } from '@/utils/api';
 import { checkMarketStatus } from '@/utils/marketTime';
 import { LeaderboardTrendChart } from '@/components/leaderboard/LeaderboardTrendChart';
 import { UserDetailPanel } from '@/components/leaderboard/UserDetailPanel';
+import apiClient from '@/lib/apiClient';
 
 interface LeaderboardUser {
   user_id: number;
@@ -18,6 +19,80 @@ interface LeaderboardUser {
   market_type: string;
   total_assets: number;
   latest_snapshot_date: string;
+}
+
+// 申请开通智能盯盘按钮组件
+function ApplyIntradayButton({ user }: { user: any }) {
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleApply = async () => {
+    if (!user) {
+      router.push('/login?redirect=/leaderboard');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage(null);
+
+    try {
+      const response = await apiClient.post('/api/intraday/apply');
+      
+      if (response.data.status === 'success') {
+        setMessage({ type: 'success', text: response.data.message || '申请已提交，我们将在1-2个工作日内处理您的申请' });
+      } else if (response.data.status === 'info') {
+        setMessage({ type: 'success', text: response.data.message });
+      } else {
+        setMessage({ type: 'error', text: response.data.message || '申请提交失败，请稍后重试' });
+      }
+    } catch (error: any) {
+      console.error('申请失败:', error);
+      setMessage({ 
+        type: 'error', 
+        text: error.response?.data?.detail || '申请提交失败，请稍后重试' 
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="w-full">
+      <div className="flex justify-center">
+        <button
+          onClick={handleApply}
+          disabled={isSubmitting}
+          className="px-6 py-3 bg-accent-primary text-white rounded-lg hover:bg-accent-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+        >
+          {isSubmitting ? (
+            <>
+              <i className="fas fa-spinner fa-spin mr-2" />
+              提交中...
+            </>
+          ) : (
+            <>
+              <i className="fas fa-paper-plane mr-2" />
+              申请开通智能盯盘
+            </>
+          )}
+        </button>
+      </div>
+
+      {message && (
+        <div className={`mt-4 px-4 py-3 rounded-lg flex items-start ${
+          message.type === 'success' 
+            ? 'bg-success-500/10 border border-success-500/30' 
+            : 'bg-danger-500/10 border border-danger-500/30'
+        }`}>
+          <i className={`fas ${message.type === 'success' ? 'fa-check-circle text-success-400' : 'fa-exclamation-circle text-danger-400'} mr-2 mt-0.5 flex-shrink-0`} />
+          <span className={`text-sm ${message.type === 'success' ? 'text-success-400' : 'text-danger-400'}`}>
+            {message.text}
+          </span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function LeaderboardPage() {
@@ -31,6 +106,9 @@ export default function LeaderboardPage() {
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [selectedUsername, setSelectedUsername] = useState<string>('');
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  
+  // 参加排名弹窗
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
 
   // 客户端挂载后从localStorage恢复市场选择
   useEffect(() => {
@@ -211,6 +289,7 @@ export default function LeaderboardPage() {
                 selectedMarket={selectedMarket}
                 selectedUserId={selectedUserId}
                 onUserSelect={handleUserSelect}
+                onJoinClick={() => setIsJoinModalOpen(true)}
                 lastUpdate={lastUpdate}
               />
 
@@ -228,6 +307,92 @@ export default function LeaderboardPage() {
       </div>
 
       <Footer />
+
+      {/* 参加排名弹窗 */}
+      {isJoinModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsJoinModalOpen(false)}>
+          <div className="bg-dark-secondary rounded-xl border border-dark-border shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {/* 弹窗头部 */}
+            <div className="sticky top-0 bg-dark-secondary border-b border-dark-border px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-text-primary flex items-center">
+                <i className="fas fa-trophy mr-2 text-accent-primary" />
+                如何参加实时排名
+              </h2>
+              <button
+                onClick={() => setIsJoinModalOpen(false)}
+                className="w-8 h-8 rounded-lg hover:bg-dark-tertiary transition-colors flex items-center justify-center text-text-tertiary hover:text-text-primary"
+              >
+                <i className="fas fa-times" />
+              </button>
+            </div>
+
+            {/* 弹窗内容 */}
+            <div className="p-6">
+              <div className="space-y-5 text-text-secondary mb-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 bg-accent-primary/20 rounded-full flex items-center justify-center">
+                    <span className="text-accent-primary font-bold text-lg">1</span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-text-primary font-semibold mb-2 text-base">注册账号并申请开通智能盯盘功能</h3>
+                    <p className="text-sm leading-relaxed">点击下方"申请开通智能盯盘"按钮，我们将在1-2个工作日内为您开通权限。</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 bg-accent-primary/20 rounded-full flex items-center justify-center">
+                    <span className="text-accent-primary font-bold text-lg">2</span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-text-primary font-semibold mb-2 text-base">准备大模型 API</h3>
+                    <p className="text-sm leading-relaxed">
+                      分析功能需要使用大模型服务（如 OpenAI、Anthropic、Google Gemini 等），请自备大模型接口的 API Key。开通方式请参考对应大模型提供方的官网。
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 bg-accent-primary/20 rounded-full flex items-center justify-center">
+                    <span className="text-accent-primary font-bold text-lg">3</span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-text-primary font-semibold mb-2 text-base">部署富途虚拟交易 API</h3>
+                    <p className="text-sm leading-relaxed mb-3">
+                      需要自行部署富途虚拟交易 API 服务，参考项目：
+                      <a 
+                        href="https://github.com/BSTester/futu-paper-trade-api" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-accent-primary hover:text-accent-secondary ml-1 inline-flex items-center font-medium"
+                      >
+                        futu-paper-trade-api
+                        <i className="fas fa-external-link-alt ml-1.5 text-xs" />
+                      </a>
+                    </p>
+                    <div className="bg-accent-primary/10 border border-accent-primary/30 rounded-lg px-4 py-3">
+                      <p className="text-sm">
+                        💡 推荐部署到 <a 
+                          href="https://www.leapcell.io/" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-accent-primary hover:text-accent-secondary font-semibold"
+                        >
+                          Leapcell
+                        </a> 平台，快速便捷，免费额度充足。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 申请按钮 */}
+              <div className="flex justify-center pt-4 border-t border-dark-border">
+                <ApplyIntradayButton user={user} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
