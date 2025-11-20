@@ -448,7 +448,7 @@ async def _send_intraday_access_granted_email(user: User):
                 <div style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e9ecef;">
                     <p style="margin: 0; color: #6c757d; font-size: 13px;">
                         如有任何问题，请联系我们的支持团队<br>
-                        <a href="mailto:forpenn@foxmail.com" style="color: #667eea; text-decoration: none;">forpenn@foxmail.com</a>
+                        <a href="mailto:{smtp_from_email}" style="color: #667eea; text-decoration: none;">{smtp_from_email}</a>
                     </p>
                 </div>
             </div>
@@ -478,7 +478,7 @@ async def _send_intraday_access_granted_email(user: User):
 
 风险提示：虚拟交易仅供学习和测试使用，不代表真实交易结果。投资有风险，入市需谨慎。
 
-如有任何问题，请联系我们的支持团队：forpenn@foxmail.com
+如有任何问题，请联系我们的支持团队：{smtp_from_email}
         """
         
         # Create message
