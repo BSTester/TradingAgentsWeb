@@ -148,11 +148,12 @@ class SnapshotScheduler:
             
             async with AsyncSessionLocal() as db:
                 # Get all users with Futu API configured AND intraday scheduler enabled
+                # Check both intraday_futu_api_url and futu_api_base_url for backward compatibility
                 result = await db.execute(
                     select(User, UserConfig)
                     .join(UserConfig, User.id == UserConfig.user_id)
                     .where(
-                        UserConfig.futu_api_base_url.isnot(None),
+                        (UserConfig.intraday_futu_api_url.isnot(None)) | (UserConfig.futu_api_base_url.isnot(None)),
                         UserConfig.intraday_scheduler_auto_start == True  # Only users with scheduler enabled
                     )
                 )
@@ -161,10 +162,13 @@ class SnapshotScheduler:
                 snapshot_count = 0
                 error_count = 0
                 
+                logger.info(f"Found {len(users_with_config)} users with Futu API configured and scheduler enabled")
+                
                 for user, config in users_with_config:
                     try:
                         # Skip if user doesn't have intraday trading access
                         if user.role != 'admin' and not user.can_access_intraday_trading:
+                            logger.info(f"Skipping user {user.id} ({user.username}): no intraday trading access")
                             continue
                         
                         # Get account info for the market (user_id will be used to fetch user-specific config)
