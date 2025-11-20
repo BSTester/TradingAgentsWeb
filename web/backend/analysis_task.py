@@ -172,6 +172,9 @@ class HeartbeatMonitor:
     def stop(self):
         """停止心跳监控"""
         self.active.clear()
+        # Wait for thread to finish (with timeout to avoid blocking)
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=1.0)
         print("💓 心跳监控已停止")
 
 
@@ -1200,18 +1203,26 @@ def run_analysis_task(
                     pass
         
         # 发送错误消息到前端
-        print(f"📤 发送错误消息到前端: {user_friendly_error}")
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(manager.send_message({
-            'type': 'error',
-            'timestamp': datetime.utcnow().isoformat(),
-            'data': {
-                'status': 'error',
-                'error': user_friendly_error
+        print(f"📤 准备发送错误消息到前端: {user_friendly_error}")
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            error_message = {
+                'type': 'error',
+                'timestamp': datetime.utcnow().isoformat(),
+                'data': {
+                    'status': 'error',
+                    'error': user_friendly_error
+                }
             }
-        }, analysis_id))
-        loop.close()
+            print(f"📤 错误消息内容: {error_message}")
+            loop.run_until_complete(manager.send_message(error_message, analysis_id))
+            print(f"✅ 错误消息已发送到前端")
+            loop.close()
+        except Exception as send_error:
+            print(f"❌ 发送错误消息失败: {send_error}")
+            import traceback
+            traceback.print_exc()
         
     finally:
         # 清理内存集合（无论成功、中断还是失败）
