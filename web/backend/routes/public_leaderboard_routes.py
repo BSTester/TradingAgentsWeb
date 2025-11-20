@@ -275,70 +275,51 @@ async def get_user_positions(
             detail="User not found or not participating in leaderboard"
         )
 
-    # Get positions from all markets using async wrapper
+    # Get positions from all markets using async wrapper - parallel execution
     from web.backend.services.futu_async_wrapper import get_positions_async
+    from datetime import datetime
+    import asyncio
+    
+    # Fetch positions from all markets in parallel
+    markets = ['US', 'HK', 'CN']
+    positions_tasks = [
+        get_positions_async(market_type=market, user_id=user_id)
+        for market in markets
+    ]
+    
+    # Wait for all tasks to complete
+    positions_results = await asyncio.gather(*positions_tasks, return_exceptions=True)
     
     all_positions = []
     
-    for market in ['US', 'HK', 'CN']:
-        try:
-            # Use async wrapper to get positions (includes database enrichment)
-            positions = await get_positions_async(
-                market_type=market,
-                user_id=user_id
-            )
-            
-            if not positions:
-                continue
-            
-            # Format positions for leaderboard
-            for pos in positions:
-                stock_code = pos.get('stock_code', '')
-                stock_name = pos.get('stock_name', '')
-                quantity = float(pos.get('quantity', 0))
-                cost_price = float(pos.get('cost_price', 0))
-                current_price = float(pos.get('current_price', 0))
-                market_value = float(pos.get('market_value', 0))
-                profit_loss = float(pos.get('profit_loss', 0))
-                profit_loss_ratio = float(pos.get('profit_loss_ratio', 0))
-                
-                # Debug: Log the raw data from Futu API
-                print(f"[Leaderboard] {stock_code} ({market}) - Raw API data:")
-                print(f"  stock_name: {stock_name}")
-                print(f"  cost_price: {cost_price}, current_price: {current_price}")
-                print(f"  market_value: {market_value}, profit_loss: {profit_loss}")
-                print(f"  holding_days: {pos.get('holding_days', 0)}")
-                
-                # Get first open time and holding days from enriched position data
-                first_open_time = pos.get('first_open_time')
-                holding_days = pos.get('holding_days', 0)
-                
-                if first_open_time and isinstance(first_open_time, str):
-                    # Already in ISO format from tool method
-                    first_open_time_iso = first_open_time
-                else:
-                    # Fallback to current time
-                    from datetime import datetime
-                    first_open_time_iso = datetime.now().isoformat()
-                
-                all_positions.append({
-                    "stock_code": stock_code,
-                    "stock_name": stock_name,
-                    "market_type": market,
-                    "quantity": int(quantity),
-                    "cost_price": round(cost_price, 2),
-                    "current_price": round(current_price, 2),
-                    "market_value": round(market_value, 2),
-                    "unrealized_pnl": round(profit_loss, 2),
-                    "pnl_percentage": round(profit_loss_ratio * 100, 2),
-                    "first_open_price": round(cost_price, 2),
-                    "first_open_time": first_open_time_iso,
-                    "holding_days": holding_days,
-                })
-        
-        except Exception as e:
-            print(f"Error fetching positions for {market}: {e}")
+    # Process results from all markets
+    for market, positions in zip(markets, positions_results):
+        # Skip if error or no positions
+        if isinstance(positions, Exception) or not positions:
             continue
+        
+        # Format positions for leaderboard
+        for pos in positions:
+            first_open_time = pos.get('first_open_time')
+            if first_open_time and isinstance(first_open_time, str):
+                first_open_time_iso = first_open_time
+            else:
+                first_open_time_iso = datetime.now().isoformat()
+            
+            all_positions.append({
+                "stock_code": pos.get('stock_code', ''),
+                "stock_name": pos.get('stock_name', ''),
+                "market_type": market,
+                "quantity": int(float(pos.get('quantity', 0))),
+                "cost_price": round(float(pos.get('cost_price', 0)), 2),
+                "current_price": round(float(pos.get('current_price', 0)), 2),
+                "market_value": round(float(pos.get('market_value', 0)), 2),
+                "unrealized_pnl": round(float(pos.get('profit_loss', 0)), 2),
+                "pnl_percentage": round(float(pos.get('profit_loss_ratio', 0)) * 100, 2),
+                "first_open_price": round(float(pos.get('cost_price', 0)), 2),
+                "first_open_time": first_open_time_iso,
+                "holding_days": pos.get('holding_days', 0),
+            })
     
     return all_positions
 
