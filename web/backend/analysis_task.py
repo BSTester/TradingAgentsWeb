@@ -116,6 +116,25 @@ class HeartbeatMonitor:
         self.thread.start()
         print(f"💓 心跳监控已启动 (超时时间: {self.timeout_seconds}秒)")
     
+    def _send_ws_message(self, message_data):
+        """在心跳线程中发送 WebSocket 消息（使用线程本地事件循环）"""
+        if not self.manager:
+            return
+        try:
+            # 获取或创建当前线程的事件循环
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            loop.run_until_complete(self.manager.send_message(message_data, self.analysis_id))
+        except Exception as e:
+            print(f"⚠️  心跳监控发送消息失败: {e}")
+    
     def _heartbeat_worker(self):
         """心跳工作线程 - 每30秒检查一次"""
         heartbeat_count = 0
@@ -137,22 +156,15 @@ class HeartbeatMonitor:
                                 print(f"🛑 检测到任务 {self.analysis_id} 状态为 error，停止心跳监控")
                                 
                                 # 发送终止消息到前端
-                                if self.manager:
-                                    try:
-                                        loop = asyncio.new_event_loop()
-                                        asyncio.set_event_loop(loop)
-                                        loop.run_until_complete(self.manager.send_message({
-                                            'type': 'interrupted',
-                                            'timestamp': datetime.utcnow().isoformat(),
-                                            'data': {
-                                                'status': 'error',
-                                                'message': '任务执行失败，已终止'
-                                            }
-                                        }, self.analysis_id))
-                                        loop.close()
-                                        print(f"✅ 已发送任务终止消息到前端")
-                                    except Exception as send_error:
-                                        print(f"⚠️  发送终止消息失败: {send_error}")
+                                self._send_ws_message({
+                                    'type': 'interrupted',
+                                    'timestamp': datetime.utcnow().isoformat(),
+                                    'data': {
+                                        'status': 'error',
+                                        'message': '任务执行失败，已终止'
+                                    }
+                                })
+                                print(f"✅ 已发送任务终止消息到前端")
                                 
                                 self.stop_event.set()
                                 self.active.clear()
