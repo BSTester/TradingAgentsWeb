@@ -51,7 +51,11 @@ class IntradayScheduler:
             user_id: User ID for this scheduler (optional)
         """
         self.interval_minutes = interval_minutes
-        self.market_type = market_type
+        # Ensure market_type is a string (convert list to comma-separated string if needed)
+        if isinstance(market_type, list):
+            self.market_type = ",".join(market_type)
+        else:
+            self.market_type = market_type
         self.user_id = user_id
         self.is_running = False
         self._task: Optional[asyncio.Task] = None

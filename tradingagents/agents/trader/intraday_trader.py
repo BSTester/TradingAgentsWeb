@@ -27,6 +27,14 @@ def _parse_trades_from_response(content: str) -> tuple[List[Dict[str, Any]], str
         - clean_report: Report with trade details section removed
     """
     trades = []
+    
+    # Ensure content is a string
+    if isinstance(content, list):
+        # If content is a list, convert to string
+        content = str(content)
+    elif not isinstance(content, str):
+        content = str(content)
+    
     clean_report = content
     
     try:
@@ -815,7 +823,18 @@ If you executed ANY trades (called place_futu_order and it succeeded), you MUST 
             current_content = ""
             if hasattr(result, 'content') and result.content:
                 # Only get text content, check if it's actual text (not empty)
-                content = result.content.strip()
+                # Handle both string and list content
+                if isinstance(result.content, list):
+                    # If content is a list, join it or extract text parts
+                    content_parts = []
+                    for item in result.content:
+                        if isinstance(item, str):
+                            content_parts.append(item)
+                        elif isinstance(item, dict) and 'text' in item:
+                            content_parts.append(item['text'])
+                    content = ' '.join(content_parts).strip()
+                else:
+                    content = result.content.strip()
                 if content:
                     current_content = content
             
