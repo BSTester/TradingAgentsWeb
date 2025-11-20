@@ -758,11 +758,50 @@ class TaskManager:
             return func(stop_event, *args, **kwargs)
         except Exception as e:
             print(f"❌ 任务 {analysis_id} 执行失败: {e}")
+            # Ensure task status is set to "failed" in database (only if not already set to error/interrupted)
+            try:
+                from web.backend.database import SessionLocal
+                from web.backend.models import AnalysisRecord
+                db = SessionLocal()
+                try:
+                    record = db.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).first()
+                    if record and record.status not in ("error", "interrupted", "failed"):
+                        # Only update if status hasn't been set by the task itself
+                        record.status = "failed"
+                        db.commit()
+                        print(f"✅ 任务 {analysis_id} 状态已更新为 failed")
+                    elif record:
+                        print(f"ℹ️  任务 {analysis_id} 状态已是 {record.status}，跳过更新")
+                except Exception as db_error:
+                    print(f"⚠️  更新任务状态失败: {db_error}")
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass
+                finally:
+                    db.close()
+            except Exception as update_error:
+                print(f"⚠️  无法更新任务状态: {update_error}")
             raise
     
     def _task_completed(self, analysis_id: str, user_id: int):
         """Callback when task completes"""
         with self.lock:
+            # Check task status from database
+            task_status = "unknown"
+            try:
+                from web.backend.database import SessionLocal
+                from web.backend.models import AnalysisRecord
+                db = SessionLocal()
+                try:
+                    record = db.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).first()
+                    if record:
+                        task_status = record.status
+                finally:
+                    db.close()
+            except Exception:
+                pass
+            
             # 清理任务
             if analysis_id in self.active_tasks:
                 del self.active_tasks[analysis_id]
@@ -782,7 +821,22 @@ class TaskManager:
             self.running_count -= 1
             
             user_running_count = len(self.user_running_tasks.get(user_id, set()))
-            print(f"✅ 任务 {analysis_id} 完成 (全局: {self.running_count}/{self.max_workers}, 用户 {user_id}: {user_running_count}/{self.max_concurrent_tasks_per_user})")
+            
+            # Log with appropriate status indicator
+            if task_status == "completed":
+                status_icon = "✅"
+                status_text = "完成"
+            elif task_status in ("error", "failed"):
+                status_icon = "❌"
+                status_text = "失败"
+            elif task_status == "interrupted":
+                status_icon = "⚠️"
+                status_text = "中断"
+            else:
+                status_icon = "🔄"
+                status_text = "结束"
+            
+            print(f"{status_icon} 任务 {analysis_id} {status_text} (全局: {self.running_count}/{self.max_workers}, 用户 {user_id}: {user_running_count}/{self.max_concurrent_tasks_per_user})")
             
             # 处理该用户的队列（如果用户还有空闲槽位）
             if user_running_count < self.max_concurrent_tasks_per_user:
