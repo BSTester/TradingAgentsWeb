@@ -257,6 +257,23 @@ def run_analysis_task(
     # 创建新的数据库会话（同步，用于后台任务）
     db = SessionLocal()
     
+    # 线程本地事件循环（复用以避免频繁创建/销毁）
+    _thread_loop = None
+    
+    def get_or_create_loop():
+        """获取或创建当前线程的事件循环"""
+        nonlocal _thread_loop
+        if _thread_loop is None or _thread_loop.is_closed():
+            try:
+                _thread_loop = asyncio.get_event_loop()
+                if _thread_loop.is_closed():
+                    _thread_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(_thread_loop)
+            except RuntimeError:
+                _thread_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(_thread_loop)
+        return _thread_loop
+    
     try:
         # 获取分析记录
         analysis_record = db.query(AnalysisRecord).filter(
@@ -284,8 +301,7 @@ def run_analysis_task(
             truncated_message = truncate_message(message, max_length=200)
             
             try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
+                loop = get_or_create_loop()
                 loop.run_until_complete(manager.send_message({
                     'type': 'log',
                     'timestamp': now_beijing.isoformat(),
@@ -298,7 +314,6 @@ def run_analysis_task(
                         'phase': phase
                     }
                 }, analysis_id))
-                loop.close()
             except Exception as e:
                 print(f"⚠️  发送 WebSocket 消息失败: {e}")
         
@@ -377,8 +392,7 @@ def run_analysis_task(
         
         print(f"📋 发送配置消息: selected_analysts={analyst_types}, enable_trading_executor={config.get('auto_execute_trading', False)}")
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            loop = get_or_create_loop()
             loop.run_until_complete(manager.send_message({
                 'type': 'config',
                 'timestamp': datetime.utcnow().isoformat(),
@@ -388,7 +402,6 @@ def run_analysis_task(
                     'enable_trading_executor': config.get('auto_execute_trading', False)
                 }
             }, analysis_id))
-            loop.close()
             print(f"✅ 配置消息已发送")
         except Exception as e:
             print(f"⚠️  发送配置消息失败: {e}")
@@ -1054,8 +1067,7 @@ def run_analysis_task(
         # 发送完成消息
         send_log('info', f'分析完成!交易决 {decision}', 'system', '完成', 100.0, '完成阶段')
         
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        loop = get_or_create_loop()
         loop.run_until_complete(manager.send_message({
             'type': 'complete',
             'timestamp': datetime.utcnow().isoformat(),
@@ -1064,8 +1076,6 @@ def run_analysis_task(
                 'trading_decision': str(decision)
             }
         }, analysis_id))
-        
-        loop.close()
         
         # Trigger email sending if enabled (in background thread)
         if analysis_record.email_notification_enabled:
@@ -1130,8 +1140,7 @@ def run_analysis_task(
                     pass
         
         # 发送中断消息到前端
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        loop = get_or_create_loop()
         loop.run_until_complete(manager.send_message({
             'type': 'interrupted',
             'timestamp': datetime.utcnow().isoformat(),
@@ -1140,7 +1149,6 @@ def run_analysis_task(
                 'message': '分析任务已被中断'
             }
         }, analysis_id))
-        loop.close()
         
         print(f"✅ 中断消息已发送到前端")
         
@@ -1260,8 +1268,7 @@ def run_analysis_task(
         # 发送错误消息到前端
         print(f"📤 准备发送错误消息到前端: {user_friendly_error}")
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            loop = get_or_create_loop()
             error_message = {
                 'type': 'error',
                 'timestamp': datetime.utcnow().isoformat(),
@@ -1273,7 +1280,6 @@ def run_analysis_task(
             print(f"📤 错误消息内容: {error_message}")
             loop.run_until_complete(manager.send_message(error_message, analysis_id))
             print(f"✅ 错误消息已发送到前端")
-            loop.close()
         except Exception as send_error:
             print(f"❌ 发送错误消息失败: {send_error}")
             import traceback
