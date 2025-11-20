@@ -87,7 +87,7 @@ class HeartbeatMonitor:
     """
     心跳监控器 - 在长时间操作期间定期发送日志,并在超时时主动停止任务
     """
-    def __init__(self, send_log_func, analysis_record, stop_event, timeout_seconds=600):
+    def __init__(self, send_log_func, analysis_record, stop_event, manager=None, timeout_seconds=600):
         """
         初始化心跳监控器
         
@@ -95,16 +95,20 @@ class HeartbeatMonitor:
             send_log_func: 日志发送函数
             analysis_record: 分析记录对象
             stop_event: 任务停止事件
+            manager: WebSocket 连接管理器
             timeout_seconds: 超时时间(秒),默认 600 秒(10分钟)
         """
         self.send_log = send_log_func
         self.analysis_record = analysis_record
+        self.analysis_id = analysis_record.analysis_id
         self.stop_event = stop_event
+        self.manager = manager
         self.timeout_seconds = timeout_seconds
         self.last_activity = time.time()
         self.active = threading.Event()
         self.active.set()
         self.thread = None
+        self.cached_status = None  # 缓存任务状态
     
     def start(self):
         """启动心跳监控线程"""
@@ -119,6 +123,45 @@ class HeartbeatMonitor:
             time.sleep(30)  # 每 30 秒检查一次
             
             if self.active.is_set():
+                # 检查任务状态（从数据库）
+                try:
+                    db = SessionLocal()
+                    try:
+                        record = db.query(AnalysisRecord).filter(
+                            AnalysisRecord.analysis_id == self.analysis_id
+                        ).first()
+                        if record:
+                            self.cached_status = record.status
+                            # 如果状态变为 error，立即停止心跳并中断任务
+                            if self.cached_status == "error":
+                                print(f"🛑 检测到任务 {self.analysis_id} 状态为 error，停止心跳监控")
+                                
+                                # 发送终止消息到前端
+                                if self.manager:
+                                    try:
+                                        loop = asyncio.new_event_loop()
+                                        asyncio.set_event_loop(loop)
+                                        loop.run_until_complete(self.manager.send_message({
+                                            'type': 'interrupted',
+                                            'timestamp': datetime.utcnow().isoformat(),
+                                            'data': {
+                                                'status': 'error',
+                                                'message': '任务执行失败，已终止'
+                                            }
+                                        }, self.analysis_id))
+                                        loop.close()
+                                        print(f"✅ 已发送任务终止消息到前端")
+                                    except Exception as send_error:
+                                        print(f"⚠️  发送终止消息失败: {send_error}")
+                                
+                                self.stop_event.set()
+                                self.active.clear()
+                                break
+                    finally:
+                        db.close()
+                except Exception as e:
+                    print(f"⚠️  心跳监控检查状态失败: {e}")
+                
                 elapsed = time.time() - self.last_activity
                 
                 # 检查是否超时
@@ -553,7 +596,7 @@ def run_analysis_task(
             reader_thread.join(timeout=1.0)
         
         # 启动心跳监控(传入 stop_event 以支持超时停止)
-        heartbeat = HeartbeatMonitor(send_log, analysis_record, stop_event)
+        heartbeat = HeartbeatMonitor(send_log, analysis_record, stop_event, manager)
         heartbeat.start()
         
         try:

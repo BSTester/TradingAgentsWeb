@@ -758,18 +758,18 @@ class TaskManager:
             return func(stop_event, *args, **kwargs)
         except Exception as e:
             print(f"❌ 任务 {analysis_id} 执行失败: {e}")
-            # Ensure task status is set to "failed" in database (only if not already set to error/interrupted)
+            # Ensure task status is set to "error" in database (only if not already set)
             try:
                 from web.backend.database import SessionLocal
                 from web.backend.models import AnalysisRecord
                 db = SessionLocal()
                 try:
                     record = db.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).first()
-                    if record and record.status not in ("error", "interrupted", "failed"):
+                    if record and record.status not in ("error", "interrupted"):
                         # Only update if status hasn't been set by the task itself
-                        record.status = "failed"
+                        record.status = "error"
                         db.commit()
-                        print(f"✅ 任务 {analysis_id} 状态已更新为 failed")
+                        print(f"✅ 任务 {analysis_id} 状态已更新为 error")
                     elif record:
                         print(f"ℹ️  任务 {analysis_id} 状态已是 {record.status}，跳过更新")
                 except Exception as db_error:
@@ -826,7 +826,7 @@ class TaskManager:
             if task_status == "completed":
                 status_icon = "✅"
                 status_text = "完成"
-            elif task_status in ("error", "failed"):
+            elif task_status == "error":
                 status_icon = "❌"
                 status_text = "失败"
             elif task_status == "interrupted":
