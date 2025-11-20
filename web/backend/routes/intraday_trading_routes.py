@@ -1175,8 +1175,8 @@ async def apply_intraday_access(
                 detail="邮件服务未配置，请联系管理员"
             )
         
-        # Admin email
-        admin_email = "forpenn@foxmail.com"
+        # Admin email - use configured support email or fallback to SMTP from email
+        admin_email = os.getenv("SUPPORT_EMAIL") or smtp_from_email
         
         # Compose email
         subject = f"智能盯盘功能开通申请 - {current_user.username}"
