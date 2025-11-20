@@ -385,6 +385,9 @@ async def _send_intraday_access_granted_email(user: User):
         smtp_use_tls = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
         app_base_url = os.getenv("APP_BASE_URL", "http://localhost:3000")
         
+        # Support email - use configured support email or fallback to SMTP from email
+        support_email = os.getenv("SUPPORT_EMAIL") or smtp_from_email
+        
         # Validate SMTP configuration
         if not all([smtp_host, smtp_username, smtp_password, smtp_from_email]):
             logger.warning("SMTP not configured, skipping email notification")
@@ -448,7 +451,7 @@ async def _send_intraday_access_granted_email(user: User):
                 <div style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e9ecef;">
                     <p style="margin: 0; color: #6c757d; font-size: 13px;">
                         如有任何问题，请联系我们的支持团队<br>
-                        <a href="mailto:{smtp_from_email}" style="color: #667eea; text-decoration: none;">{smtp_from_email}</a>
+                        <a href="mailto:{support_email}" style="color: #667eea; text-decoration: none;">{support_email}</a>
                     </p>
                 </div>
             </div>
@@ -478,7 +481,7 @@ async def _send_intraday_access_granted_email(user: User):
 
 风险提示：虚拟交易仅供学习和测试使用，不代表真实交易结果。投资有风险，入市需谨慎。
 
-如有任何问题，请联系我们的支持团队：{smtp_from_email}
+如有任何问题，请联系我们的支持团队：{support_email}
         """
         
         # Create message
