@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: tradingagents-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-tradingagents123}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-tradingagents}
+      MYSQL_USER: ${MYSQL_USER:-tradingagents}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-tradingagents123}
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: unless-stopped
+    networks:
+      - tradingagents-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-tradingagents123}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 后端服务 (FastAPI)
+  backend:
+    image: registry.cn-shenzhen.aliyuncs.com/ai_creator/tradingagents-backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+    container_name: tradingagents-backend
+    # ports:
+    #   - "8080:8000"
+    env_file:
+      - ./.env
+    volumes:
+      - ./db:/app/db
+      - ./eval_results:/app/eval_results
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - tradingagents-network
+
+  # Nginx 静态文件服务器 + API 反向代理
+  # 使用静态导出的 Next.js 文件，不需要 Node.js 运行时
+  frontend:
+    image: registry.cn-shenzhen.aliyuncs.com/ai_creator/tradingagents-frontend-static
+    build:
+      context: ./web/frontend
+      dockerfile: Dockerfile.static
+    container_name: tradingagents-frontend
+    ports:
+      - "8000:80"
+    environment:
+      - BACKEND_URL=http://backend:8000
+      - FRONTEND_API_BASE_URL=http://backend:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - tradingagents-network
+
+networks:
+  tradingagents-network:
+    driver: bridge
+
+volumes:
+  mysql_data:

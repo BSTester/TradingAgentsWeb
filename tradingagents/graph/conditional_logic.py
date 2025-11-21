@@ -15,7 +15,7 @@ class ConditionalLogic:
         """Determine if market analysis should continue."""
         messages = state["messages"]
         last_message = messages[-1]
-        if last_message.tool_calls:
+        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
             return "tools_market"
         return "Msg Clear Market"
 
@@ -23,7 +23,7 @@ class ConditionalLogic:
         """Determine if social media analysis should continue."""
         messages = state["messages"]
         last_message = messages[-1]
-        if last_message.tool_calls:
+        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
             return "tools_social"
         return "Msg Clear Social"
 
@@ -31,7 +31,7 @@ class ConditionalLogic:
         """Determine if news analysis should continue."""
         messages = state["messages"]
         last_message = messages[-1]
-        if last_message.tool_calls:
+        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
             return "tools_news"
         return "Msg Clear News"
 
@@ -39,7 +39,7 @@ class ConditionalLogic:
         """Determine if fundamentals analysis should continue."""
         messages = state["messages"]
         last_message = messages[-1]
-        if last_message.tool_calls:
+        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
             return "tools_fundamentals"
         return "Msg Clear Fundamentals"
 
@@ -47,7 +47,7 @@ class ConditionalLogic:
         """Determine if trader should continue with tool calls."""
         messages = state["messages"]
         last_message = messages[-1]
-        if last_message.tool_calls:
+        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
             return "tools_trader"
         return "Msg Clear Trader"
 
@@ -73,3 +73,23 @@ class ConditionalLogic:
         if state["risk_debate_state"]["latest_speaker"].startswith("Safe"):
             return "Neutral Analyst"
         return "Risky Analyst"
+
+    def should_continue_trading_executor(self, state: AgentState):
+        """Determine if trading executor should continue with tool calls."""
+        messages = state["messages"]
+        
+        # Count how many times tools have been called
+        tool_call_count = 0
+        for msg in messages:
+            if hasattr(msg, "tool_calls") and msg.tool_calls:
+                tool_call_count += 1
+        
+        # Limit to maximum 2 tool call rounds (first batch + optional second batch)
+        if tool_call_count >= 20:
+            print(f"⚠️ Trading Executor: 已达到工具调用次数限制 ({tool_call_count}次)，强制生成报告")
+            return "Msg Clear Trading Executor"
+        
+        last_message = messages[-1]
+        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+            return "tools_trading_executor"
+        return "Msg Clear Trading Executor"

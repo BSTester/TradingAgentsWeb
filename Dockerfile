@@ -1,7 +1,7 @@
 # ============================================
 # 后端 (FastAPI) Dockerfile - 单阶段精简版
 # ============================================
-FROM python:3.10-slim AS backend
+FROM python:3.11-slim AS backend
 
 WORKDIR /app
 
@@ -27,9 +27,9 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt pyproject.toml setup.py ./
 
 # 安装 Python 依赖
-RUN pip install --upgrade pip -i https://mirrors.aliyun.com/pypi/simple && \
-    pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple && \
-    pip install "uvicorn[standard]" "websockets" -i https://mirrors.aliyun.com/pypi/simple
+RUN pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip install -U -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple && \
+    pip install "uvicorn[standard]" "websockets" -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 复制项目文件
 COPY tradingagents/ ./tradingagents/
@@ -40,7 +40,7 @@ COPY main.py ./
 COPY .env.example ./.env
 
 # 安装项目
-RUN pip install -e .
+RUN pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 创建必要的目录
 RUN mkdir -p eval_results assets web/static web/templates

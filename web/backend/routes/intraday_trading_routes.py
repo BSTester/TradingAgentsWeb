@@ -1,0 +1,1324 @@
+#!/usr/bin/env python3
+"""
+Intraday Trading API Routes
+短线交易系统相关�?API 路由
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, desc
+from typing import List, Optional
+from datetime import datetime, timedelta
+import logging
+
+from web.backend.database import get_db
+from web.backend.models import User, IntradayDecisionRecord, PositionRecord, TradingHistory
+from web.backend.auth_routes import get_current_active_user, require_intraday_access
+from pydantic import BaseModel, Field
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
+
+
+router = APIRouter(prefix="/api/intraday", tags=["intraday-trading"])
+
+
+# ============================================================================
+# Pydantic Models for Request/Response
+# ============================================================================
+
+class SchedulerControlRequest(BaseModel):
+    """Request to control scheduler"""
+    action: str  # "start" or "stop"
+
+
+class SchedulerConfigRequest(BaseModel):
+    """Request to configure scheduler"""
+    interval_minutes: int = Field(..., ge=5, le=120, description="分析间隔（分钟），范围：5-120，默认60")
+    market_type: Optional[str] = "US,HK,CN"  # Single market (US/HK/CN) or comma-separated (US,HK,CN)
+
+
+class SchedulerStatusResponse(BaseModel):
+    """Scheduler status response"""
+    is_running: bool
+    interval_minutes: int
+    market_type: str
+    market_status: str
+    market_is_open: bool
+    next_run_time: Optional[str]
+    current_time: str
+
+
+class DecisionRecordResponse(BaseModel):
+    """Decision record response"""
+    id: int
+    session_id: str
+    start_time: datetime
+    end_time: Optional[datetime]
+    status: str
+    market_type: str
+    positions_analyzed: list
+    account_snapshot: Optional[dict] = None
+    decision_report: Optional[str] = None
+    trades_executed: Optional[list] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class PositionRecordResponse(BaseModel):
+    """Position record response"""
+    id: int
+    stock_code: str
+    market_type: str
+    first_open_time: datetime
+    first_open_price: float
+    initial_quantity: int
+    current_quantity: int
+    last_update_time: datetime
+    is_closed: bool
+    holding_days: Optional[int] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class TradingHistoryResponse(BaseModel):
+    """Trading history response"""
+    id: int
+    position_record_id: int
+    trade_time: datetime
+    trade_type: str
+    quantity: int
+    price: float
+    order_id: Optional[str]
+    decision_reason: Optional[str]
+    
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+async def sync_positions_to_db(
+    db: AsyncSession,
+    user_id: int,
+    futu_positions: list,
+    market: str
+):
+    """
+    Sync Futu API positions to database.
+    
+    - Creates new position records for new positions
+    - Updates existing position records if quantity changed
+    - Marks positions as closed if they no longer exist in Futu API
+    """
+    from sqlalchemy import select
+    
+    # Get current positions from database for this market
+    result = await db.execute(
+        select(PositionRecord).where(
+            PositionRecord.user_id == user_id,
+            PositionRecord.market_type == market,
+            PositionRecord.is_closed == False
+        )
+    )
+    db_positions = {pos.stock_code: pos for pos in result.scalars().all()}
+    
+    # Get stock codes from Futu API
+    futu_stock_codes = {pos.get('stock_code', '') for pos in futu_positions}
+    
+    # Process each Futu position
+    for futu_pos in futu_positions:
+        stock_code = futu_pos.get('stock_code', '')
+        if not stock_code:
+            continue
+        
+        quantity = int(float(futu_pos.get('quantity', 0)))
+        cost_price = float(futu_pos.get('cost_price', 0))
+        
+        if stock_code in db_positions:
+            # Update existing position
+            db_pos = db_positions[stock_code]
+            
+            # Check if quantity changed
+            if db_pos.current_quantity != quantity:
+                db_pos.current_quantity = quantity
+                db_pos.last_update_time = datetime.now()
+                
+                # If quantity is 0, mark as closed
+                if quantity == 0:
+                    db_pos.is_closed = True
+        else:
+            # Create new position record
+            if quantity > 0:  # Only create if there's actual quantity
+                new_position = PositionRecord(
+                    user_id=user_id,
+                    stock_code=stock_code,
+                    market_type=market,
+                    first_open_time=datetime.now(),
+                    first_open_price=cost_price,
+                    initial_quantity=quantity,
+                    current_quantity=quantity,
+                    last_update_time=datetime.now(),
+                    is_closed=False
+                )
+                db.add(new_position)
+    
+    # Mark positions as closed if they no longer exist in Futu API
+    for stock_code, db_pos in db_positions.items():
+        if stock_code not in futu_stock_codes and not db_pos.is_closed:
+            db_pos.is_closed = True
+            db_pos.current_quantity = 0
+            db_pos.last_update_time = datetime.now()
+    
+    # Commit all changes
+    await db.commit()
+
+
+# ============================================================================
+# Scheduler Control Endpoints
+# ============================================================================
+
+@router.post("/scheduler/control")
+async def control_scheduler(
+    request: SchedulerControlRequest,
+    current_user: User = Depends(require_intraday_access),
+    app_request: Request = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Start or stop the intraday trading scheduler for current user.
+    
+    Requires authentication and Futu API configuration.
+    """
+    try:
+        from web.backend.services.user_intraday_scheduler import get_manager
+        from web.backend.models import UserConfig
+        from sqlalchemy import select
+        
+        manager = get_manager()
+        user_id = current_user.id
+        
+        # Get user config
+        result = await db.execute(
+            select(UserConfig).where(UserConfig.user_id == user_id)
+        )
+        user_config = result.scalar_one_or_none()
+        
+        if request.action == "start":
+            logger.info(f"Starting scheduler for user {user_id}")
+            
+            # Get or create user config
+            if not user_config:
+                user_config = UserConfig(user_id=user_id)
+                db.add(user_config)
+                await db.commit()
+                await db.refresh(user_config)
+            
+            # Check if Futu API is configured (fallback to analysis config)
+            futu_api_url = user_config.intraday_futu_api_url or user_config.futu_api_base_url
+            
+            if not futu_api_url:
+                logger.error(f"No Futu API URL configured for user {user_id}")
+                raise HTTPException(
+                    status_code=400,
+                    detail="请先配置富途API地址"
+                )
+            
+            # Create scheduler if doesn't exist
+            if not manager.has_scheduler(user_id):
+                # Get market type, default to all markets if not set
+                market_type = user_config.intraday_market_type
+                if not market_type:
+                    market_type = "US,HK,CN"
+                    user_config.intraday_market_type = "US,HK,CN"
+                    await db.commit()
+                    # Invalidate cache after setting default market type
+                    from web.backend.services.user_config_cache import invalidate_user_config_cache
+                    invalidate_user_config_cache(user_id)
+                
+                await manager.create_scheduler(
+                    user_id=user_id,
+                    interval_minutes=user_config.intraday_interval_minutes or 60,
+                    market_type=market_type,
+                    futu_api_url=futu_api_url,
+                )
+            
+            # Start scheduler
+            success = await manager.start_scheduler(user_id)
+            if not success:
+                raise HTTPException(status_code=500, detail="Failed to start scheduler")
+            
+            # Update user config
+            user_config.intraday_scheduler_enabled = True
+            user_config.intraday_scheduler_auto_start = True  # Mark for auto-restart on service restart
+            await db.commit()
+            
+            # Invalidate cache after updating scheduler status
+            from web.backend.services.user_config_cache import invalidate_user_config_cache
+            invalidate_user_config_cache(user_id)
+            
+            # Broadcast status update via WebSocket
+            try:
+                status = manager.get_scheduler_status(user_id)
+                if status:
+                    from web.backend.app import manager as ws_manager
+                    import asyncio
+                    channel_id = f"intraday_user_{user_id}"
+                    
+                    # Send action confirmation message
+                    asyncio.create_task(ws_manager.send_message({
+                        'type': 'scheduler_started',
+                        'timestamp': status.get('current_time'),
+                        'status': status,
+                        'message': 'Scheduler started successfully',
+                    }, channel_id))
+                    
+    
+            except Exception as ws_error:
+                logger.warning(f"Failed to broadcast scheduler status: {ws_error}")
+            
+            return {"status": "success", "message": "Scheduler started"}
+        
+        elif request.action == "stop":
+            # Stop scheduler
+            success = await manager.stop_scheduler(user_id)
+            if not success:
+                raise HTTPException(status_code=500, detail="Failed to stop scheduler")
+            
+            # Update user config
+            if user_config:
+                user_config.intraday_scheduler_enabled = False
+                user_config.intraday_scheduler_auto_start = False  # Clear auto-restart flag (manual stop)
+                await db.commit()
+                
+                # Invalidate cache after updating scheduler status
+                from web.backend.services.user_config_cache import invalidate_user_config_cache
+                invalidate_user_config_cache(user_id)
+            
+            # Broadcast stopped status via WebSocket
+            try:
+                # Get stopped status
+                status = manager.get_scheduler_status(user_id)
+                
+                # If scheduler was removed, create stopped status
+                if not status:
+                    status = {
+                        "is_running": False,
+                        "interval_minutes": user_config.intraday_interval_minutes if user_config else 60,
+                        "market_type": user_config.intraday_market_type if user_config else "US,HK,CN",
+                        "market_status": "Scheduler stopped",
+                        "market_is_open": False,
+                        "markets_status": {},
+                        "next_run_time": None,
+                        "current_time": datetime.now().isoformat(),
+                    }
+                
+                from web.backend.app import manager as ws_manager
+                import asyncio
+                channel_id = f"intraday_user_{user_id}"
+                
+                # Send action confirmation message
+                asyncio.create_task(ws_manager.send_message({
+                    'type': 'scheduler_stopped',
+                    'timestamp': status.get('current_time'),
+                    'status': status,
+                    'message': 'Scheduler stopped successfully',
+                }, channel_id))
+                
+
+            except Exception as ws_error:
+                logger.warning(f"Failed to broadcast scheduler stopped status: {ws_error}")
+            
+            return {"status": "success", "message": "Scheduler stopped"}
+        
+        else:
+            raise HTTPException(status_code=400, detail="Invalid action. Use 'start' or 'stop'")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# DEPRECATED: This endpoint has been replaced by WebSocket 'scheduler_status_sync' message
+# The status is now pushed via WebSocket on connection and updates
+# Keeping this commented for reference only
+#
+# @router.get("/scheduler/status", response_model=SchedulerStatusResponse)
+# async def get_scheduler_status(
+#     current_user: User = Depends(get_current_active_user),
+#     db: AsyncSession = Depends(get_db),
+# ):
+#     """
+#     DEPRECATED: Use WebSocket 'scheduler_status_sync' message instead.
+#     This endpoint is no longer used by the frontend.
+#     """
+#     pass
+
+
+class IntradayConfigRequest(BaseModel):
+    """Request to configure intraday trading"""
+    futu_api_url: Optional[str] = None
+    futu_api_key: Optional[str] = None
+    interval_minutes: Optional[int] = None
+    market_type: Optional[str] = None
+    llm_provider: Optional[str] = None
+    api_key: Optional[str] = None
+    llm_model: Optional[str] = None  # Single model (uses deep thinker options from analysis config)
+    backend_url: Optional[str] = None
+
+
+@router.get("/scheduler/config")
+async def get_scheduler_config(
+    current_user: User = Depends(require_intraday_access),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get intraday trading configuration for current user.
+    
+    If no separate intraday config exists, falls back to analysis config.
+    
+    Requires authentication.
+    """
+    try:
+        from web.backend.models import UserConfig
+        from sqlalchemy import select
+        
+        # Get user config
+        result = await db.execute(
+            select(UserConfig).where(UserConfig.user_id == current_user.id)
+        )
+        user_config = result.scalar_one_or_none()
+        
+        if not user_config:
+            # Return default config
+            return {
+                "futu_api_url": None,
+                "futu_api_key": None,
+                "interval_minutes": 60,
+                "market_type": "US,HK,CN",  # Default to all markets (comma-separated)
+                "llm_provider": None,
+                "api_key": None,
+                "backend_url": None,
+                "is_using_analysis_config": False,
+            }
+        
+        # Priority: Use saved intraday config first, fallback to analysis config
+        # For each field, check if intraday config exists, if not use analysis config
+        futu_api_url = user_config.intraday_futu_api_url or user_config.futu_api_base_url
+        futu_api_key = user_config.intraday_futu_api_key or user_config.futu_api_key
+        llm_provider = user_config.intraday_llm_provider or user_config.last_llm_provider
+        api_key = user_config.intraday_api_key or user_config.last_api_key
+        llm_model = user_config.intraday_llm_model or user_config.last_deep_thinker
+        backend_url = user_config.intraday_backend_url or user_config.last_backend_url
+        
+        # Determine if using analysis config (all intraday fields are empty)
+        is_using_analysis_config = not any([
+            user_config.intraday_futu_api_url,
+            user_config.intraday_futu_api_key,
+            user_config.intraday_llm_provider,
+            user_config.intraday_api_key,
+            user_config.intraday_llm_model,
+            user_config.intraday_backend_url
+        ])
+        
+        return {
+            "futu_api_url": futu_api_url,
+            "futu_api_key": futu_api_key,  # Return actual key for validation
+            "has_futu_api_key": bool(futu_api_key),  # Indicate if key exists
+            "interval_minutes": user_config.intraday_interval_minutes if user_config.intraday_interval_minutes is not None else 60,
+            "market_type": user_config.intraday_market_type or "US,HK,CN",  # Default to all markets (comma-separated)
+            "llm_provider": llm_provider,
+            "api_key": api_key,
+            "has_api_key": bool(api_key),
+            "llm_model": llm_model,  # Single model (deep thinker options)
+            "backend_url": backend_url,
+            "is_using_analysis_config": is_using_analysis_config,  # Indicates if using fallback config
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/scheduler/config")
+async def configure_scheduler(
+    config: IntradayConfigRequest,
+    current_user: User = Depends(require_intraday_access),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Configure intraday trading settings for current user.
+    
+    Requires authentication.
+    """
+    try:
+        from web.backend.services.user_intraday_scheduler import get_manager
+        from web.backend.models import UserConfig
+        from sqlalchemy import select
+        
+        manager = get_manager()
+        user_id = current_user.id
+        
+        # Get or create user config
+        result = await db.execute(
+            select(UserConfig).where(UserConfig.user_id == user_id)
+        )
+        user_config = result.scalar_one_or_none()
+        
+        if not user_config:
+            user_config = UserConfig(user_id=user_id)
+            db.add(user_config)
+        
+        # Validate and update configuration
+        if config.interval_minutes is not None:
+            if config.interval_minutes < 5 or config.interval_minutes > 120:
+                raise HTTPException(
+                    status_code=400,
+                    detail="分析间隔必须在5-120分钟之间"
+                )
+            user_config.intraday_interval_minutes = config.interval_minutes
+        
+        if config.market_type is not None:
+            # Validate market type: single market or comma-separated markets
+            if "," in config.market_type:
+                # Validate comma-separated markets
+                markets = [m.strip() for m in config.market_type.split(",")]
+                invalid_markets = [m for m in markets if m not in ["US", "HK", "CN"]]
+                if invalid_markets:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid market(s): {', '.join(invalid_markets)}. Must be US, HK, or CN"
+                    )
+                user_config.intraday_market_type = config.market_type
+            elif config.market_type in ["US", "HK", "CN"]:
+                user_config.intraday_market_type = config.market_type
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Market type must be US, HK, CN, or comma-separated markets (e.g., US,HK,CN)"
+                )
+        
+        if config.futu_api_url is not None:
+            user_config.intraday_futu_api_url = config.futu_api_url
+        
+        if config.futu_api_key is not None:
+            user_config.intraday_futu_api_key = config.futu_api_key
+        
+        # Update LLM configuration
+        if config.llm_provider is not None:
+            user_config.intraday_llm_provider = config.llm_provider
+        
+        if config.api_key is not None:
+            user_config.intraday_api_key = config.api_key
+        
+        if config.llm_model is not None:
+            user_config.intraday_llm_model = config.llm_model
+        
+        if config.backend_url is not None:
+            user_config.intraday_backend_url = config.backend_url
+        
+        await db.commit()
+        
+        # Invalidate user config cache to force reload on next execution
+        from web.backend.services.user_config_cache import invalidate_user_config_cache
+        invalidate_user_config_cache(user_id)
+        
+        # Update scheduler if exists
+        if manager.has_scheduler(user_id):
+            manager.update_scheduler_config(
+                user_id=user_id,
+                interval_minutes=config.interval_minutes,
+                market_type=config.market_type,
+                futu_api_url=config.futu_api_url,
+            )
+        
+        return {
+            "status": "success",
+            "message": "Configuration saved",
+            "futu_api_url": user_config.intraday_futu_api_url,
+            "futu_api_key": "***" if user_config.intraday_futu_api_key else None,  # Masked for security
+            "interval_minutes": user_config.intraday_interval_minutes,
+            "market_type": user_config.intraday_market_type,
+            "llm_provider": user_config.intraday_llm_provider,
+            "api_key": "***" if user_config.intraday_api_key else None,  # Masked for security
+            "llm_model": user_config.intraday_llm_model,
+            "backend_url": user_config.intraday_backend_url,
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Decision History Endpoints
+# ============================================================================
+
+# DEPRECATED: This endpoint has been replaced by WebSocket 'decisions_initial' message
+# The decisions list is now pushed via WebSocket on connection and updated via 'intraday_session_complete'
+# Keeping this commented for reference only
+#
+# @router.get("/decisions", response_model=List[DecisionRecordResponse])
+# async def get_decision_records(
+#     limit: int = 20,
+#     offset: int = 0,
+#     status: Optional[str] = None,
+#     market_type: Optional[str] = None,
+#     current_user: User = Depends(get_current_active_user),
+#     db: AsyncSession = Depends(get_db),
+# ):
+#     """
+#     DEPRECATED: Use WebSocket 'decisions_initial' message instead.
+#     This endpoint is no longer used by the frontend.
+#     """
+#     pass
+
+
+@router.get("/decisions/{decision_id}", response_model=DecisionRecordResponse)
+async def get_decision_record(
+    decision_id: int,
+    current_user: User = Depends(require_intraday_access),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get detailed information for a specific decision record.
+    
+    Requires authentication.
+    """
+    try:
+        logger.info(f"Fetching decision record: id={decision_id}, user_id={current_user.id}")
+        
+        # First check if record exists at all
+        check_result = await db.execute(
+            select(IntradayDecisionRecord).where(
+                IntradayDecisionRecord.id == decision_id
+            )
+        )
+        any_record = check_result.scalar_one_or_none()
+        
+        if not any_record:
+            logger.warning(f"Decision record {decision_id} does not exist in database")
+            raise HTTPException(status_code=404, detail=f"Decision record {decision_id} not found")
+        
+        # Check if it belongs to current user
+        if any_record.user_id != current_user.id:
+            logger.warning(f"Decision record {decision_id} belongs to user {any_record.user_id}, not {current_user.id}")
+            raise HTTPException(status_code=404, detail="Decision record not found")
+        
+        logger.info(f"Successfully found decision record {decision_id}")
+        return any_record
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching decision record {decision_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/decisions/by-date-range")
+async def get_decisions_by_date_range(
+    start_date: str,  # YYYY-MM-DD format
+    end_date: str,  # YYYY-MM-DD format
+    current_user: User = Depends(require_intraday_access),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get decision records within a date range.
+    
+    Requires authentication.
+    """
+    try:
+        # Parse dates
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+        
+        # Query
+        result = await db.execute(
+            select(IntradayDecisionRecord).where(
+                IntradayDecisionRecord.user_id == current_user.id,
+                IntradayDecisionRecord.start_time >= start_dt,
+                IntradayDecisionRecord.start_time < end_dt,
+            ).order_by(desc(IntradayDecisionRecord.start_time))
+        )
+        records = result.scalars().all()
+        
+        return records
+    
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Position Information Endpoints
+# ============================================================================
+
+@router.get("/positions")
+async def get_positions_endpoint(
+    market: str = "US",  # Market parameter for Futu API
+    include_closed: bool = False,
+    current_user: User = Depends(require_intraday_access),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get current positions from Futu API and sync to database.
+    
+    Requires authentication and Futu API configuration.
+    """
+    try:
+        from web.backend.models import UserConfig
+        
+        # Check if user has configured Futu API
+        result = await db.execute(
+            select(UserConfig).where(UserConfig.user_id == current_user.id)
+        )
+        user_config = result.scalar_one_or_none()
+        
+        if not user_config or not user_config.intraday_futu_api_url:
+            return []
+        
+        from web.backend.services.futu_async_wrapper import get_positions_async, get_account_info_async
+        
+        # Use async wrapper to get positions (includes database enrichment)
+        positions = await get_positions_async(
+            market_type=market,
+            user_id=current_user.id
+        )
+        
+        if not positions:
+            return []
+        
+        # Sync positions to database
+        await sync_positions_to_db(
+            db=db,
+            user_id=current_user.id,
+            futu_positions=positions,
+            market=market
+        )
+        
+        # Get account info to calculate position ratios
+        account_info = await get_account_info_async(
+            market_type=market,
+            user_id=current_user.id
+        )
+        total_assets = account_info.get("net_asset", 0.0) if account_info else 0.0
+        
+        # Determine currency symbol based on market
+        currency_map = {
+            "US": "$",      # US Dollar
+            "HK": "HK$",    # Hong Kong Dollar
+            "CN": "¥"       # Chinese Yuan
+        }
+        currency = currency_map.get(market, "$")
+        
+        # Build result with additional fields
+        result_positions = []
+        for pos in positions:
+            market_value = float(pos.get('market_value', 0))
+            profit_loss = float(pos.get('profit_loss', 0))
+            profit_loss_ratio = float(pos.get('profit_loss_ratio', 0))
+            
+            # Calculate position ratio
+            position_ratio = (market_value / total_assets * 100) if total_assets > 0 else 0
+            
+            result_positions.append({
+                "stock_code": pos.get('stock_code', ''),
+                "stock_name": pos.get('stock_name', ''),
+                "market_type": pos.get('market_type', market),
+                "quantity": int(float(pos.get('quantity', 0))),
+                "cost_price": float(pos.get('cost_price', 0)),
+                "current_price": float(pos.get('current_price', 0)),
+                "pnl": profit_loss,
+                "pnl_percent": profit_loss_ratio * 100,
+                "position_value": market_value,
+                "position_ratio": round(position_ratio, 2),
+                "holding_days": pos.get('holding_days', 0),  # From tool method
+                "first_open_time": pos.get('first_open_time'),  # From tool method
+                "currency": currency,
+            })
+        
+        return result_positions
+    
+    except Exception as e:
+        logger.error(f"Error fetching positions: {e}")
+        return []
+
+
+@router.get("/positions/{stock_code}/history", response_model=List[TradingHistoryResponse])
+async def get_position_history(
+    stock_code: str,
+    current_user: User = Depends(require_intraday_access),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get trading history for a specific stock.
+    
+    Requires authentication.
+    """
+    try:
+        # Find position
+        result = await db.execute(
+            select(PositionRecord).where(
+                PositionRecord.user_id == current_user.id,
+                PositionRecord.stock_code == stock_code,
+            )
+        )
+        position = result.scalar_one_or_none()
+        
+        if not position:
+            raise HTTPException(status_code=404, detail="Position not found")
+        
+        # Get trading history
+        result = await db.execute(
+            select(TradingHistory).where(
+                TradingHistory.position_record_id == position.id
+            ).order_by(desc(TradingHistory.trade_time))
+        )
+        history = result.scalars().all()
+        
+        return history
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/trading-history", response_model=List[TradingHistoryResponse])
+async def get_all_trading_history(
+    limit: int = 50,
+    offset: int = 0,
+    trade_type: Optional[str] = None,
+    current_user: User = Depends(require_intraday_access),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get all trading history for the user with pagination.
+    
+    Requires authentication.
+    """
+    try:
+        # Get user's position IDs
+        result = await db.execute(
+            select(PositionRecord.id).where(
+                PositionRecord.user_id == current_user.id
+            )
+        )
+        position_ids = [row[0] for row in result.all()]
+        
+        if not position_ids:
+            return []
+        
+        # Build query
+        query = select(TradingHistory).where(
+            TradingHistory.position_record_id.in_(position_ids)
+        )
+        
+        # Filter by trade type
+        if trade_type:
+            query = query.where(TradingHistory.trade_type == trade_type)
+        
+        # Order and paginate
+        query = query.order_by(desc(TradingHistory.trade_time)).limit(limit).offset(offset)
+        
+        # Execute query
+        result = await db.execute(query)
+        history = result.scalars().all()
+        
+        return history
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+# ============================================================================
+# Account Endpoint
+# ============================================================================
+
+@router.get("/account")
+async def get_account_info_endpoint(
+    market: str = "US",  # Default to US market
+    current_user: User = Depends(require_intraday_access),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get account information for current user by market.
+    
+    Requires authentication and Futu API configuration.
+    """
+    try:
+        from web.backend.models import UserConfig
+        
+        # Determine currency symbol based on market
+        currency_map = {
+            "US": "$",      # US Dollar
+            "HK": "HK$",    # Hong Kong Dollar
+            "CN": "¥"       # Chinese Yuan
+        }
+        currency = currency_map.get(market, "$")
+        
+        # Check if user has configured Futu API
+        result = await db.execute(
+            select(UserConfig).where(UserConfig.user_id == current_user.id)
+        )
+        user_config = result.scalar_one_or_none()
+        
+        if not user_config or not user_config.intraday_futu_api_url:
+            return {
+                "total_assets": 0.0,
+                "cash": 0.0,
+                "position_value": 0.0,
+                "market": market,
+                "currency": currency,
+                "configured": False,
+            }
+        
+        from web.backend.services.futu_async_wrapper import get_account_info_async
+        
+        # Use async wrapper to get account info
+        account_info = await get_account_info_async(
+            market_type=market,
+            user_id=current_user.id
+        )
+        
+        if not account_info:
+            # Return empty account info if not configured or error
+            return {
+                "total_assets": 0.0,
+                "cash": 0.0,
+                "position_value": 0.0,
+                "market": market,
+                "currency": currency,
+                "configured": False,
+            }
+        
+        # Map response fields to our format
+        return {
+            "total_assets": account_info.get("net_asset", 0.0),
+            "cash": account_info.get("cash", 0.0),
+            "position_value": account_info.get("market_value", 0.0),
+            "today_profit_loss": account_info.get("today_profit_loss", 0.0),
+            "today_profit_loss_ratio": account_info.get("today_profit_loss_ratio", 0.0),
+            "market": market,
+            "currency": currency,
+            "configured": True,
+        }
+    
+    except Exception as e:
+        logger.error(f"Error fetching account info: {e}")
+        currency_map = {"US": "$", "HK": "HK$", "CN": "¥"}
+        return {
+            "total_assets": 0.0,
+            "cash": 0.0,
+            "position_value": 0.0,
+            "market": market,
+            "currency": currency_map.get(market, "$"),
+            "configured": True,
+            "error": str(e)
+        }
+
+
+@router.post("/scheduler/validate-config")
+async def validate_futu_config(
+    config: IntradayConfigRequest,
+    current_user: User = Depends(require_intraday_access),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Validate Futu API configuration by testing connection.
+    
+    Requires authentication.
+    """
+    try:
+        from web.backend.services.futu_async_wrapper import get_hot_news_async
+        from web.backend.models import UserConfig
+        from sqlalchemy import select
+        
+        if not config.futu_api_url:
+            raise HTTPException(
+                status_code=400,
+                detail="请提供富途API地址"
+            )
+        
+        # Temporarily update user config for validation
+        result = await db.execute(
+            select(UserConfig).where(UserConfig.user_id == current_user.id)
+        )
+        user_config = result.scalar_one_or_none()
+        
+        if not user_config:
+            user_config = UserConfig(user_id=current_user.id)
+            db.add(user_config)
+        
+        # Store original values
+        original_url = user_config.intraday_futu_api_url
+        original_key = user_config.intraday_futu_api_key
+        
+        # Temporarily set new values for testing
+        user_config.intraday_futu_api_url = config.futu_api_url
+        if config.futu_api_key:
+            user_config.intraday_futu_api_key = config.futu_api_key
+        
+        await db.commit()
+        
+        try:
+            # Test connection using async wrapper
+            news = await get_hot_news_async(
+                lang="en-us",
+                user_id=current_user.id
+            )
+            
+            if news is not None:
+                return {
+                    "valid": True,
+                    "message": "富途API配置验证成功"
+                }
+            else:
+                return {
+                    "valid": False,
+                    "message": "富途API验证失败"
+                }
+        
+        finally:
+            # Restore original values
+            user_config.intraday_futu_api_url = original_url
+            user_config.intraday_futu_api_key = original_key
+            await db.commit()
+            
+            # Invalidate cache after restoring values
+            from web.backend.services.user_config_cache import invalidate_user_config_cache
+            invalidate_user_config_cache(current_user.id)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {
+            "valid": False,
+            "message": f"验证失败: {str(e)}"
+        }
+
+
+# ============================================================================
+# Orders Endpoints
+# ============================================================================
+
+@router.get("/orders")
+async def get_orders_endpoint(
+    market: str = "US",
+    filter_status: int = 0,  # 0=all, 1=filled, 2=pending, 3=cancelled
+    current_user: User = Depends(require_intraday_access),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get orders from Futu API using async wrapper.
+    
+    Args:
+        market: Market type (US/HK/CN)
+        filter_status: Filter by status (0=all, 1=filled, 2=pending, 3=cancelled)
+    
+    Requires authentication and Futu API configuration.
+    """
+    try:
+        from web.backend.models import UserConfig
+        
+        # Check if user has configured Futu API
+        result = await db.execute(
+            select(UserConfig).where(UserConfig.user_id == current_user.id)
+        )
+        user_config = result.scalar_one_or_none()
+        
+        if not user_config or not user_config.intraday_futu_api_url:
+            return []
+        
+        from web.backend.services.futu_async_wrapper import get_orders_async
+        
+        # Call async wrapper with user_id
+        orders = await get_orders_async(
+            market_type=market,
+            filter_status=filter_status,
+            user_id=current_user.id
+        )
+        
+        # Return empty list if None
+        return orders if orders is not None else []
+    
+    except Exception as e:
+        logger.error(f"Error fetching orders: {e}")
+        return []
+
+
+class CancelOrderRequest(BaseModel):
+    """Request to cancel an order"""
+    order_id: str
+    stock_code: str
+
+
+@router.post("/cancel-order")
+async def cancel_order_endpoint(
+    request: CancelOrderRequest,
+    current_user: User = Depends(require_intraday_access),
+):
+    """
+    Cancel an order via Futu API using async wrapper.
+    
+    Requires authentication and Futu API configuration.
+    """
+    try:
+        from web.backend.services.futu_async_wrapper import cancel_order_async
+        
+        # Call async wrapper with user_id
+        result = await cancel_order_async(
+            order_id=request.order_id,
+            stock_code=request.stock_code,
+            user_id=current_user.id
+        )
+        
+        # Check if result is None (error occurred)
+        if result is None:
+            raise HTTPException(
+                status_code=500,
+                detail="撤单失败，请稍后重试"
+            )
+        
+        return result
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error cancelling order: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"撤单失败: {str(e)}"
+        )
+
+
+
+# ============================================================================
+# Application Endpoints
+# ============================================================================
+
+@router.post("/apply")
+async def apply_intraday_access(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Apply for intraday trading access.
+    Sends an email to admin with user information.
+    
+    Requires authentication.
+    """
+    try:
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        import os
+        from datetime import datetime, timedelta, timezone
+        from web.backend.models import UserConfig
+        
+        # Check if user already has access
+        if current_user.can_access_intraday_trading:
+            return {
+                "status": "info",
+                "message": "您已经拥有智能盯盘权限，无需重复申请"
+            }
+        
+        # Get or create user config
+        result = await db.execute(
+            select(UserConfig).where(UserConfig.user_id == current_user.id)
+        )
+        user_config = result.scalar_one_or_none()
+        
+        if not user_config:
+            user_config = UserConfig(user_id=current_user.id)
+            db.add(user_config)
+            await db.flush()
+        
+        # Check if user has applied recently (within 24 hours)
+        if user_config.intraday_application_sent_at:
+            now = datetime.now(timezone.utc)
+            # Ensure the stored datetime is timezone-aware
+            last_application = user_config.intraday_application_sent_at
+            if last_application.tzinfo is None:
+                last_application = last_application.replace(tzinfo=timezone.utc)
+            
+            time_since_last_application = now - last_application
+            
+            if time_since_last_application < timedelta(hours=24):
+                hours_remaining = 24 - int(time_since_last_application.total_seconds() / 3600)
+                return {
+                    "status": "info",
+                    "message": f"您已提交过申请，请等待 {hours_remaining} 小时后再试，或直接联系管理员"
+                }
+        
+        # Get SMTP configuration
+        smtp_host = os.getenv("SMTP_HOST")
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        smtp_username = os.getenv("SMTP_USERNAME")
+        smtp_password = os.getenv("SMTP_PASSWORD")
+        smtp_from_email = os.getenv("SMTP_FROM_EMAIL")
+        smtp_use_tls = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+        
+        # Validate SMTP configuration
+        if not all([smtp_host, smtp_username, smtp_password, smtp_from_email]):
+            raise HTTPException(
+                status_code=500,
+                detail="邮件服务未配置，请联系管理员"
+            )
+        
+        # Admin email - use configured support email or fallback to SMTP from email
+        admin_email = os.getenv("SUPPORT_EMAIL") or smtp_from_email
+        
+        # Compose email
+        subject = f"智能盯盘功能开通申请 - {current_user.username}"
+        
+        # HTML email body
+        html_body = f"""
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+            <div style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden;">
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center;">
+                    <h1 style="margin: 0; font-size: 24px; font-weight: 600;">📋 智能盯盘功能开通申请</h1>
+                    <p style="margin: 10px 0 0 0; opacity: 0.9; font-size: 14px;">TradingAgentsWeb</p>
+                </div>
+                
+                <div style="padding: 30px;">
+                    <p style="color: #495057; font-size: 15px; margin: 0 0 20px 0;">
+                        您好，收到一个新的智能盯盘功能开通申请。
+                    </p>
+                    
+                    <div style="background-color: #f8f9fa; border-left: 4px solid #667eea; padding: 20px; margin: 20px 0; border-radius: 4px;">
+                        <h3 style="margin: 0 0 15px 0; color: #212529; font-size: 16px; font-weight: 600;">👤 用户信息</h3>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 8px 0; color: #6c757d; font-size: 14px; width: 100px;">用户名：</td>
+                                <td style="padding: 8px 0; color: #212529; font-size: 14px; font-weight: 500;">{current_user.username}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #6c757d; font-size: 14px;">邮箱：</td>
+                                <td style="padding: 8px 0; color: #212529; font-size: 14px; font-weight: 500;">{current_user.email}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #6c757d; font-size: 14px;">用户ID：</td>
+                                <td style="padding: 8px 0; color: #212529; font-size: 14px; font-weight: 500;">{current_user.id}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #6c757d; font-size: 14px;">注册时间：</td>
+                                <td style="padding: 8px 0; color: #212529; font-size: 14px; font-weight: 500;">{current_user.created_at}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    
+                    <div style="background-color: #e7f3ff; border-left: 4px solid #2196F3; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                        <p style="margin: 0; color: #1565C0; font-size: 14px; line-height: 1.6;">
+                            <strong>📝 申请说明：</strong><br>
+                            用户希望开通智能盯盘功能，以便参与实时排名和使用自动交易分析服务。
+                        </p>
+                    </div>
+                    
+                    <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                        <p style="margin: 0; color: #856404; font-size: 13px; line-height: 1.6;">
+                            <strong>⚡ 操作提示：</strong><br>
+                            请在管理后台为该用户开通相应权限，系统将自动发送开通成功通知邮件。
+                        </p>
+                    </div>
+                </div>
+                
+                <div style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e9ecef;">
+                    <p style="margin: 0; color: #6c757d; font-size: 12px;">
+                        此邮件由 TradingAgentsWeb 系统自动发送<br>
+                        回复此邮件将直接联系申请用户
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Plain text email body (fallback)
+        text_body = f"""
+您好，
+
+收到一个新的智能盯盘功能开通申请：
+
+用户信息：
+- 用户名：{current_user.username}
+- 邮箱：{current_user.email}
+- 用户ID：{current_user.id}
+- 注册时间：{current_user.created_at}
+
+申请说明：
+用户希望开通智能盯盘功能，以便参与实时排名和使用自动交易分析服务。
+
+请在管理后台为该用户开通相应权限。
+
+---
+此邮件由 TradingAgentsWeb 系统自动发送
+回复此邮件将直接联系申请用户
+        """
+        
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = f"TradingAgentsWeb <{smtp_from_email}>"
+        msg['To'] = admin_email
+        msg['Reply-To'] = current_user.email  # Reply will go to user
+        
+        # Attach both plain text and HTML versions
+        part1 = MIMEText(text_body, 'plain', 'utf-8')
+        part2 = MIMEText(html_body, 'html', 'utf-8')
+        msg.attach(part1)
+        msg.attach(part2)
+        
+        # Send email
+        try:
+            if smtp_use_tls:
+                server = smtplib.SMTP(smtp_host, smtp_port, timeout=30)
+                server.starttls()
+            else:
+                server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)
+            
+            server.login(smtp_username, smtp_password)
+            server.sendmail(smtp_from_email, admin_email, msg.as_string())
+            server.quit()
+            
+            # Update application sent time
+            from datetime import timezone
+            user_config.intraday_application_sent_at = datetime.now(timezone.utc)
+            await db.commit()
+            
+            logger.info(f"Intraday access application email sent for user {current_user.username} ({current_user.email})")
+            
+            return {
+                "status": "success",
+                "message": "申请已提交成功！我们将在1-2个工作日内处理您的申请，请留意邮箱通知。"
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to send application email: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"邮件发送失败：{str(e)}"
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing intraday access application: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"申请处理失败：{str(e)}"
+        )

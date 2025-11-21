@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# Database URL - use SQLite by default
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./tradingagents.db")
+# Database URL - use SQLite by default (db/tradingagents.db in project root)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./db/tradingagents.db")
 
 # Create Base class for models
 Base = declarative_base()
@@ -24,8 +24,10 @@ if DATABASE_URL.startswith("mysql+aiomysql"):
         DATABASE_URL,
         echo=False,
         pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=20,
+        pool_size=100,
+        max_overflow=50,
+        pool_recycle=3600,  # Recycle connections after 1 hour
+        pool_timeout=30,     # Wait up to 30 seconds for a connection
     )
     
     AsyncSessionLocal = async_sessionmaker(
@@ -42,8 +44,10 @@ if DATABASE_URL.startswith("mysql+aiomysql"):
         sync_database_url,
         echo=False,
         pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=20,
+        pool_size=100,
+        max_overflow=50,
+        pool_recycle=3600,  # Recycle connections after 1 hour
+        pool_timeout=30,     # Wait up to 30 seconds for a connection
     )
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
     
@@ -111,12 +115,31 @@ def get_sync_db():
         db.close()
 
 
-async def init_db():
+def init_db_sync():
     """
-    Initialize database tables (async operation)
+    Initialize database tables (sync operation for scripts)
     """
     # Import all models to ensure they are registered with Base
-    from web.backend.models import User, AnalysisRecord, AnalysisLog, ExportRecord
+    from web.backend.models import (
+        User, UserConfig, AnalysisRecord, AnalysisLog, ExportRecord, ScheduledTask,
+        PositionRecord, TradingHistory, IntradayDecisionRecord
+    )
+    
+    # Create all tables using sync engine
+    Base.metadata.create_all(bind=sync_engine)
+    
+    print("✅ Database tables created successfully")
+
+
+async def init_db():
+    """
+    Initialize database tables (async operation for app startup)
+    """
+    # Import all models to ensure they are registered with Base
+    from web.backend.models import (
+        User, UserConfig, AnalysisRecord, AnalysisLog, ExportRecord, ScheduledTask,
+        PositionRecord, TradingHistory, IntradayDecisionRecord
+    )
     
     # Create all tables using async engine
     async with async_engine.begin() as conn:

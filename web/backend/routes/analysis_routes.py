@@ -37,22 +37,66 @@ async def start_analysis(
 ):
     """Start a new trading analysis (requires authentication)"""
     
-    # 检查用户是否已有运行中的任务
+    # 检查用户是否已有相同股票的运行中任务（允许不同股票并行）
+    # 先规范化股票代码以便比较
+    from web.backend.utils.market_detector import normalize_ticker, normalize_ticker_with_suffix
+    normalized_ticker = normalize_ticker_with_suffix(normalize_ticker(request.ticker))
+    
     stmt = select(AnalysisRecord).filter(
         AnalysisRecord.user_id == current_user.id,
-        AnalysisRecord.status.in_(["initializing", "running"])
+        AnalysisRecord.ticker == normalized_ticker,  # 只检查相同股票
+        AnalysisRecord.status.in_(["initializing", "running", "queued"])  # 包括排队中的任务
     )
     result = await db.execute(stmt)
     running_analysis = result.scalars().first()
     
     if running_analysis:
         # 返回运行中的任务，前端会自动跳转到进度页面
-        print(f"⚠️  用户 {current_user.id} 已有运行中的任务: {running_analysis.analysis_id}")
+        print(f"⚠️  用户 {current_user.id} 已有 {normalized_ticker} 的运行中任务: {running_analysis.analysis_id}")
         return AnalysisResponse(
             analysis_id=running_analysis.analysis_id,
             status=running_analysis.status,
-            message=f"您已有运行中的分析任务，已自动连接"
+            message=f"该股票的分析任务已在进行中，已自动连接"
         )
+    
+    # Load and save user configuration
+    from web.backend.models import UserConfig
+    stmt = select(UserConfig).filter(UserConfig.user_id == current_user.id)
+    result = await db.execute(stmt)
+    user_config = result.scalars().first()
+    
+    if not user_config:
+        user_config = UserConfig(user_id=current_user.id)
+        db.add(user_config)
+    
+    # Update configuration cache with current request
+    user_config.last_ticker = request.ticker  # 保存股票代码
+    user_config.last_analysts = request.analysts
+    user_config.last_research_depth = request.research_depth
+    user_config.last_llm_provider = request.llm_provider
+    user_config.last_shallow_thinker = request.shallow_thinker
+    user_config.last_deep_thinker = request.deep_thinker
+    user_config.last_backend_url = request.backend_url
+    user_config.enable_trading_executor = request.enable_trading_executor
+    
+    # Update Futu API config if provided
+    if request.futu_api_base_url:
+        user_config.futu_api_base_url = request.futu_api_base_url
+    if request.futu_api_key:
+        user_config.futu_api_key = request.futu_api_key
+    
+    # Update API key if provided (single field for all providers)
+    if request.api_key:
+        user_config.last_api_key = request.api_key
+    
+    await db.commit()
+    
+    # Invalidate cache after updating user config
+    from web.backend.services.user_config_cache import invalidate_user_config_cache
+    invalidate_user_config_cache(current_user.id)
+    
+    # Use cached API key if not provided in request
+    api_key = request.api_key or user_config.last_api_key
     
     # Normalize and validate ticker
     ticker = normalize_ticker(request.ticker)
@@ -77,8 +121,18 @@ async def start_analysis(
     # Detect market
     market = detect_market(ticker)
     
-    # Generate analysis ID
-    analysis_id = f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{ticker}_{current_user.id}"
+    # Generate analysis ID (use Beijing time)
+    from pytz import timezone as pytz_timezone
+    beijing_tz = pytz_timezone('Asia/Shanghai')
+    now_beijing = datetime.now(beijing_tz)
+    analysis_id = f"analysis_{now_beijing.strftime('%Y%m%d_%H%M%S')}_{ticker}_{current_user.id}"
+    
+    # Validate email notification request
+    if request.email_notification and not current_user.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="无法启用邮件通知：您的账户未绑定邮箱地址。请先在账户设置中添加邮箱。"
+        )
     
     # Create analysis record
     analysis_record = AnalysisRecord(
@@ -93,7 +147,12 @@ async def start_analysis(
         shallow_thinker=request.shallow_thinker,
         deep_thinker=request.deep_thinker,
         backend_url=request.backend_url,
+        api_key=api_key,  # Save API key with the task
         is_public=request.is_public,  # Save privacy setting
+        enable_trading_executor=request.enable_trading_executor,  # Save trading executor setting
+        futu_api_base_url=request.futu_api_base_url,  # Save Futu API config
+        futu_api_key=request.futu_api_key,  # Save Futu API key
+        email_notification_enabled=request.email_notification,  # Save email notification preference
         status="queued",
         current_step="Analysis queued",
         progress_percentage=0.0
@@ -103,7 +162,7 @@ async def start_analysis(
     await db.commit()
     await db.refresh(analysis_record)
     
-    # Convert request to dict (use normalized ticker)
+    # Convert request to dict (use normalized ticker and cached API key)
     request_data = {
         'ticker': ticker,
         'analysis_date': request.analysis_date,
@@ -113,10 +172,10 @@ async def start_analysis(
         'shallow_thinker': request.shallow_thinker,
         'deep_thinker': request.deep_thinker,
         'backend_url': request.backend_url,
-        'openai_api_key': request.openai_api_key,
-        'anthropic_api_key': request.anthropic_api_key,
-        'google_api_key': request.google_api_key,
-        'openrouter_api_key': request.openrouter_api_key,
+        'enable_trading_executor': request.enable_trading_executor,
+        'futu_api_base_url': request.futu_api_base_url or user_config.futu_api_base_url,
+        'futu_api_key': request.futu_api_key or user_config.futu_api_key,
+        'api_key': api_key,  # Single API key field
     }
     
     # Submit task to task manager
@@ -131,13 +190,18 @@ async def start_analysis(
         task_manager
     )
     
-    if not submitted:
+    if submitted:
+        # Task started immediately
+        analysis_record.status = "running"
+        analysis_record.current_step = "分析开始..."
+        await db.commit()
+        return AnalysisResponse(analysis_id=analysis_id, status="running")
+    else:
         # Task queued
         analysis_record.status = "queued"
         analysis_record.current_step = "等待队列中..."
         await db.commit()
-    
-    return AnalysisResponse(analysis_id=analysis_id, status="queued")
+        return AnalysisResponse(analysis_id=analysis_id, status="queued")
 
 
 @router.post("/analysis/{analysis_id}/stop")
@@ -169,9 +233,14 @@ async def stop_analysis(
     if stopped:
         # 发送中断消息到 WebSocket
         import asyncio
+        # Use Beijing time for timestamp
+        from pytz import timezone as pytz_timezone
+        beijing_tz = pytz_timezone('Asia/Shanghai')
+        now_beijing = datetime.now(beijing_tz)
+        
         asyncio.create_task(manager.send_message({
             "type": "interrupted",
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": now_beijing.isoformat(),
             "data": {
                 "message": "分析已被用户中断"
             }
@@ -202,13 +271,21 @@ async def get_analysis_status(
     if not analysis:
         raise HTTPException(status_code=404, detail="分析未找到")
     
+    # Get selected_analysts from analysts field (JSON)
+    selected_analysts = analysis.analysts if analysis.analysts else []
+    
+    # Get enable_trading_executor (need to add this field to model if not exists)
+    enable_trading_executor = getattr(analysis, 'enable_trading_executor', False)
+    
     return AnalysisStatus(
         analysis_id=analysis.analysis_id,
         status=analysis.status,
         current_step=analysis.current_step,
         progress_percentage=analysis.progress_percentage,
         started_at=analysis.started_at,
-        updated_at=analysis.updated_at
+        updated_at=analysis.updated_at,
+        selected_analysts=selected_analysts,
+        enable_trading_executor=enable_trading_executor
     )
 
 
@@ -287,16 +364,21 @@ async def get_analysis_results(
             "agents": research_agents
         })
     
-    # 阶段3：交易团队
+    # 阶段3：交易团队（包含交易员和执行交易员）
     if final_state.get("trader_investment_plan"):
+        trading_agents = [
+            {"name": "交易员", "result": final_state["trader_investment_plan"]}
+        ]
+        # 如果有执行交易报告，添加到交易团队
+        if final_state.get("execution_report"):
+            trading_agents.append({"name": "执行交易员", "result": final_state["execution_report"]})
+        
         phases.append({
             "id": 3,
             "name": "交易团队",
             "icon": "fa-chart-line",
             "color": "purple",
-            "agents": [
-                {"name": "交易员", "result": final_state["trader_investment_plan"]}
-            ]
+            "agents": trading_agents
         })
     
     # 阶段4：风险管理
@@ -501,11 +583,16 @@ async def get_analysis_markdown(
             markdown_parts.append("## 投资评审\n")
             markdown_parts.append(debate_state["judge_decision"] + "\n")
     
-    # 阶段3：交易团队
+    # 阶段3：交易团队（包含交易员和执行交易员）
     if final_state.get("trader_investment_plan"):
         markdown_parts.append("\n---\n\n# 📈 交易团队\n")
         markdown_parts.append("## 交易员\n")
         markdown_parts.append(final_state["trader_investment_plan"] + "\n")
+        
+        # 如果有执行交易报告，添加到交易团队
+        if final_state.get("execution_report"):
+            markdown_parts.append("## 执行交易员\n")
+            markdown_parts.append(final_state["execution_report"] + "\n")
     
     # 阶段4：风险管理
     if final_state.get("risk_debate_state"):
@@ -666,15 +753,17 @@ async def get_public_analysis_results(
         })
     
     # 阶段3：交易团队
+    trading_agents = []
     if final_state.get("trader_investment_plan"):
+        trading_agents.append({"name": "交易员", "result": final_state["trader_investment_plan"]})
+    
+    if trading_agents:
         phases.append({
             "id": 3,
             "name": "交易团队",
             "icon": "fa-chart-line",
             "color": "purple",
-            "agents": [
-                {"name": "交易员", "result": final_state["trader_investment_plan"]}
-            ]
+            "agents": trading_agents
         })
     
     # 阶段4：风险管理

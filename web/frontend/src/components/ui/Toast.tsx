@@ -19,7 +19,6 @@ export function Toast({ message, type, isVisible, onClose, duration = 5000 }: To
 
       return () => clearTimeout(timer);
     }
-    // 显式返回undefined以满足TypeScript要求
     return undefined;
   }, [isVisible, duration, onClose]);
 
@@ -42,21 +41,21 @@ export function Toast({ message, type, isVisible, onClose, duration = 5000 }: To
   const getTypeClass = () => {
     switch (type) {
       case 'success':
-        return 'text-green-600 bg-green-50 border-green-200';
+        return 'text-success-500 bg-success-500/10 border-success-500/30';
       case 'error':
-        return 'text-red-600 bg-red-50 border-red-200';
+        return 'text-danger-500 bg-danger-500/10 border-danger-500/30';
       case 'warning':
-        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+        return 'text-warning-500 bg-warning-500/10 border-warning-500/30';
       case 'info':
       default:
-        return 'text-blue-600 bg-blue-50 border-blue-200';
+        return 'text-accent-primary bg-accent-primary/10 border-accent-primary/30';
     }
   };
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
       <div
-        className={`max-w-md w-full min-w-80 border rounded-lg p-5 shadow-xl transform transition-all duration-300 ${
+        className={`max-w-md w-full min-w-80 border rounded-xl p-5 shadow-glow-cyan backdrop-blur-lg bg-dark-secondary/90 transform transition-all duration-300 ${
           isVisible ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
         } ${getTypeClass()}`}
       >
@@ -69,7 +68,7 @@ export function Toast({ message, type, isVisible, onClose, duration = 5000 }: To
           </div>
           <div className="ml-4 flex-shrink-0 flex">
             <button
-              className="inline-flex text-gray-400 hover:text-gray-600 focus:outline-none p-1"
+              className="inline-flex text-text-tertiary hover:text-text-primary focus:outline-none p-1 transition-colors"
               onClick={onClose}
             >
               <i className="fas fa-times text-sm" />

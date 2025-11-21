@@ -9,8 +9,10 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (username: string, password: string, captcha?: { id: string; answer: string }) => Promise<void>;
-  register: (username: string, email: string, password: string, captcha?: { id: string; answer: string }) => Promise<void>;
+  loginWithEmailCode: (email: string, code: string, captcha?: { id: string; answer: string }) => Promise<void>;
+  register: (username: string, email: string, password?: string, captcha?: { id: string; answer: string }, emailCode?: string) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   token: string | null;
 }
 
@@ -66,9 +68,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (username: string, email: string, password: string, captcha?: { id: string; answer: string }) => {
+  const loginWithEmailCode = async (email: string, code: string, captcha?: { id: string; answer: string }) => {
     try {
-      const response: AuthResponse = await authAPI.register(username, email, password, captcha);
+      const response: AuthResponse = await authAPI.loginWithEmailCode(email, code, captcha);
+      
+      // 立即设置用户状态和token
+      setUser(response.user);
+      setToken(response.access_token);
+      localStorage.setItem('access_token', response.access_token);
+      
+      // 同时设置cookie供middleware使用
+      document.cookie = `access_token=${response.access_token}; path=/; max-age=${7 * 24 * 60 * 60}`; // 7天过期
+      
+      // 确保状态已经同步更新
+      return Promise.resolve();
+    } catch (error: any) {
+      // 传递详细的错误信息
+      throw new Error(error.message || '登录失败，请检查验证码');
+    }
+  };
+
+  const register = async (username: string, email: string, password?: string, captcha?: { id: string; answer: string }, emailCode?: string) => {
+    try {
+      const response: AuthResponse = await authAPI.register(username, email, password, captcha, emailCode);
       
       // 立即设置用户状态和token
       setUser(response.user);
@@ -97,14 +119,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     queryClient.clear();
   };
 
+  const refreshUser = async () => {
+    const currentToken = token || localStorage.getItem('access_token');
+    if (currentToken) {
+      try {
+        const userData = await authAPI.getCurrentUser();
+        setUser(userData);
+      } catch (error) {
+        console.error('Failed to refresh user data:', error);
+      }
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoading,
         login,
+        loginWithEmailCode,
         register,
         logout,
+        refreshUser,
         token,
       }}
     >

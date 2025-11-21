@@ -38,7 +38,7 @@ class GraphSetup:
         self.conditional_logic = conditional_logic
 
     def setup_graph(
-        self, selected_analysts=["market", "social", "news", "fundamentals"]
+        self, selected_analysts=["market", "social", "news", "fundamentals"], auto_execute_trading=False
     ):
         """Set up and compile the agent workflow graph.
 
@@ -48,6 +48,7 @@ class GraphSetup:
                 - "social": Social media analyst
                 - "news": News analyst
                 - "fundamentals": Fundamentals analyst
+            auto_execute_trading (bool): Whether to enable automatic trading execution
         """
         if len(selected_analysts) == 0:
             raise ValueError("Trading Agents Graph Setup Error: no analysts selected!")
@@ -95,8 +96,20 @@ class GraphSetup:
         research_manager_node = create_research_manager(
             self.deep_thinking_llm, self.invest_judge_memory
         )
+        
+        # Create trading team nodes (trader + trading executor)
         trader_node = create_trader(self.quick_thinking_llm, self.trader_memory)
         trader_msg_delete = create_msg_delete()
+        
+        # Trading executor is part of trading team, created only if auto-execute trading is enabled
+        trading_executor_node = None
+        trading_executor_msg_delete = None
+        if auto_execute_trading:
+            from tradingagents.agents.trader.trading_executor import create_trading_executor
+            trading_executor_node = create_trading_executor(
+                self.deep_thinking_llm, self.trader_memory
+            )
+            trading_executor_msg_delete = create_msg_delete()
 
         # Create risk analysis nodes
         risky_analyst = create_risky_debator(self.quick_thinking_llm)
@@ -121,9 +134,19 @@ class GraphSetup:
         workflow.add_node("Bull Researcher", bull_researcher_node)
         workflow.add_node("Bear Researcher", bear_researcher_node)
         workflow.add_node("Research Manager", research_manager_node)
+        
+        # Add Trading Team nodes (trader is always present)
         workflow.add_node("Trader", trader_node)
         workflow.add_node("tools_trader", self.tool_nodes["trader"])
         workflow.add_node("Msg Clear Trader", trader_msg_delete)
+        
+        # Add Trading Executor as part of Trading Team (only if auto-execute trading is enabled)
+        if auto_execute_trading:
+            workflow.add_node("Trading Executor", trading_executor_node)
+            workflow.add_node("tools_trading_executor", self.tool_nodes["trading_executor"])
+            workflow.add_node("Msg Clear Trading Executor", trading_executor_msg_delete)
+        
+        # Add Risk Management Team nodes
         workflow.add_node("Risky Analyst", risky_analyst)
         workflow.add_node("Neutral Analyst", neutral_analyst)
         workflow.add_node("Safe Analyst", safe_analyst)
@@ -172,6 +195,7 @@ class GraphSetup:
                 "Research Manager": "Research Manager",
             },
         )
+        # Trading Team workflow: Research Manager -> Trader -> (Trading Executor if enabled) -> Risk Team
         workflow.add_edge("Research Manager", "Trader")
         workflow.add_conditional_edges(
             "Trader",
@@ -179,6 +203,8 @@ class GraphSetup:
             ["tools_trader", "Msg Clear Trader"],
         )
         workflow.add_edge("tools_trader", "Trader")
+        
+        # After Trader completes, go to Risk Team
         workflow.add_edge("Msg Clear Trader", "Risky Analyst")
         workflow.add_conditional_edges(
             "Risky Analyst",
@@ -205,7 +231,20 @@ class GraphSetup:
             },
         )
 
-        workflow.add_edge("Risk Judge", END)
+        # After Risk Judge, go to Trading Executor (if enabled) or END
+        if auto_execute_trading:
+            # Add Trading Executor after Risk Management
+            workflow.add_edge("Risk Judge", "Trading Executor")
+            workflow.add_conditional_edges(
+                "Trading Executor",
+                self.conditional_logic.should_continue_trading_executor,
+                ["tools_trading_executor", "Msg Clear Trading Executor"],
+            )
+            workflow.add_edge("tools_trading_executor", "Trading Executor")
+            workflow.add_edge("Msg Clear Trading Executor", END)
+        else:
+            # If no Trading Executor, go directly to END
+            workflow.add_edge("Risk Judge", END)
 
         # Compile and return
         return workflow.compile()

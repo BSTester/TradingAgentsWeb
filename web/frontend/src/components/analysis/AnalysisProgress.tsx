@@ -41,6 +41,7 @@ interface WebSocketMessage {
     error?: string;
     selected_analysts?: string[];
     research_depth?: number;
+    enable_trading_executor?: boolean;
   };
 }
 
@@ -136,11 +137,103 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
       ]
     }
   ]);
+  
+  const [enableTradingExecutor, setEnableTradingExecutor] = useState(false);
+  const [configInitialized, setConfigInitialized] = useState(false);
+
+  // Fetch analysis status to get configuration on mount
+  useEffect(() => {
+    const fetchAnalysisConfig = async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch(buildApiUrl(`/api/analysis/${analysisId}/status`), {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const status = await response.json();
+          console.log('📋 Fetched analysis config:', status);
+
+          // Update phases based on configuration
+          if (status.selected_analysts && Array.isArray(status.selected_analysts)) {
+            setPhases(prevPhases => {
+              const newPhases = [...prevPhases];
+
+              // Update analyst team
+              const analystPhase = newPhases[0];
+              if (analystPhase) {
+                const analystMap: { [key: string]: string } = {
+                  'market': '市场分析师',
+                  'social': '社交媒体分析师',
+                  'news': '新闻分析师',
+                  'fundamentals': '基本面分析师'
+                };
+
+                const newAgents: PhaseAgent[] = status.selected_analysts
+                  .filter((a: string) => !!analystMap[a])
+                  .map((a: string) => ({
+                    name: analystMap[a]!,
+                    status: 'pending' as const,
+                    logs: []
+                  }));
+
+                analystPhase.agents = newAgents;
+                console.log(`✅ Initialized analyst team with ${newAgents.length} analysts`);
+              }
+
+              return newPhases;
+            });
+          }
+
+          // Add trading executor phase if enabled
+          if (status.enable_trading_executor) {
+            setEnableTradingExecutor(true);
+            setPhases(prevPhases => {
+              const hasTradingExecutorPhase = prevPhases.some(p => p.id === 5);
+              if (!hasTradingExecutorPhase) {
+                console.log('✅ Adding trading executor phase from status');
+                return [
+                  ...prevPhases,
+                  {
+                    id: 5,
+                    name: '交易执行',
+                    description: '执行交易操作',
+                    icon: 'fa-robot',
+                    status: 'pending',
+                    agents: [
+                      { name: '执行交易员', status: 'pending', logs: [] }
+                    ]
+                  }
+                ];
+              }
+              return prevPhases;
+            });
+          }
+
+          setConfigInitialized(true);
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch analysis config:', error);
+        // Continue anyway, will rely on config message from WebSocket
+        setConfigInitialized(true);
+      }
+    };
+
+    fetchAnalysisConfig();
+  }, [analysisId]);
 
   // WebSocket 连接和消息处理
   useEffect(() => {
     console.log('=== AnalysisProgress mounted ===');
     console.log('Analysis ID:', analysisId);
+
+    // Wait for config initialization before connecting WebSocket
+    if (!configInitialized) {
+      console.log('⏳ Waiting for config initialization...');
+      return;
+    }
 
     // 防止重复连接
     if (wsRef.current && (wsRef.current.readyState === WebSocket.CONNECTING || wsRef.current.readyState === WebSocket.OPEN)) {
@@ -189,15 +282,21 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
 
             if (message.type === 'config') {
               // 接收配置信息，更新显示的智能体
-              const { selected_analysts } = message.data;
+              const { selected_analysts, enable_trading_executor } = message.data;
               console.log('📋 Received config message');
               console.log('Selected analysts:', selected_analysts);
+              console.log('Enable trading executor:', enable_trading_executor);
+
+              // 更新执行交易状态
+              if (enable_trading_executor !== undefined) {
+                setEnableTradingExecutor(enable_trading_executor);
+              }
 
               if (selected_analysts && Array.isArray(selected_analysts)) {
                 console.log(`🔄 Updating analyst team with ${selected_analysts.length} analysts`);
 
                 setPhases(prevPhases => {
-                  const newPhases = [...prevPhases];
+                  let newPhases = [...prevPhases];
 
                   // 更新分析师团队，只显示选中的分析师
                   const analystPhase = newPhases[0];
@@ -234,6 +333,27 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                     console.warn('⚠️ Analyst phase not found!');
                   }
 
+                  // 如果启用了执行交易，添加第5个阶段（交易执行）
+                  if (enable_trading_executor) {
+                    const hasTradingExecutorPhase = newPhases.some(p => p.id === 5);
+                    if (!hasTradingExecutorPhase) {
+                      console.log('✅ 添加交易执行阶段');
+                      newPhases.push({
+                        id: 5,
+                        name: '交易执行',
+                        description: '执行交易操作',
+                        icon: 'fa-robot',
+                        status: 'pending',
+                        agents: [
+                          { name: '执行交易员', status: 'pending', logs: [] }
+                        ]
+                      });
+                    }
+                  } else {
+                    // 如果未启用，移除交易执行阶段
+                    newPhases = newPhases.filter(p => p.id !== 5);
+                  }
+
                   return newPhases;
                 });
               } else {
@@ -268,7 +388,8 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                     'risky': 3,
                     'neutral': 3,
                     'safe': 3,
-                    'risk_manager': 3
+                    'risk_manager': 3,
+                    'trading_executor': 4,  // 执行交易员在风险管理之后（阶段索引4，对应id=5）
                   };
 
                   // 阶段名称到索引的映射（兼容旧格式）
@@ -287,7 +408,8 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                     '交易团队': 2,
                     '风险评估': 3,
                     '风险管理': 3,
-                    '完成阶段': 3
+                    '完成阶段': 4,
+                    'Trading Executor': 4  // 执行交易员在风险管理之后
                   };
 
                   // 优先使用智能体映射，其次使用阶段映射
@@ -322,7 +444,8 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                         'risky': '激进风险分析师',
                         'neutral': '中性风险分析师',
                         'safe': '保守风险分析师',
-                        'risk_manager': '风险管理评审及投资组合分析'
+                        'risk_manager': '风险管理评审及投资组合分析',
+                        'trading_executor': '执行交易员'
                       };
 
                       const displayName = agentNameMap[agent] || agent;
@@ -540,7 +663,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
         wsRef.current.close();
       }
     };
-  }, [analysisId]);
+  }, [analysisId, configInitialized]);
 
   // 当分析完成时调用 onComplete
   useEffect(() => {
@@ -558,20 +681,20 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
       case 'error':
         return 'fa-times-circle text-red-500';
       default:
-        return 'fa-circle text-gray-300';
+        return 'fa-circle text-text-muted';
     }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
+    <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-4 md:p-6">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">
+        <h3 className="text-lg font-semibold text-text-primary">
           <i className="fas fa-chart-line mr-2 text-blue-600" />
           分析进度
         </h3>
         <button
           onClick={onBackToConfig}
-          className="text-gray-500 hover:text-gray-700"
+          className="text-text-muted hover:text-text-secondary"
         >
           <i className="fas fa-times" />
         </button>
@@ -580,7 +703,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
       <div className="space-y-6">
         {/* 总体进度条 */}
         <div>
-          <div className="flex justify-between text-sm text-gray-600 mb-2">
+          <div className="flex justify-between text-sm text-text-secondary mb-2">
             <span>总体进度</span>
             <span>{Math.round(progress)}%</span>
           </div>
@@ -604,23 +727,23 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                 }`}
             >
               {/* 阶段头部 */}
-              <div className={`p-4 ${phase.status === 'running' ? 'bg-blue-50' :
-                  phase.status === 'completed' ? 'bg-green-50' :
-                    phase.status === 'error' ? 'bg-red-50' :
-                      'bg-gray-50'
+              <div className={`p-4 border-b border-dark-border ${phase.status === 'running' ? 'bg-gradient-to-r from-accent-primary/20 to-accent-primary/10' :
+                  phase.status === 'completed' ? 'bg-gradient-to-r from-success-500/20 to-success-500/10' :
+                    phase.status === 'error' ? 'bg-gradient-to-r from-danger-500/20 to-danger-500/10' :
+                      'bg-dark-tertiary/50'
                 }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${phase.status === 'running' ? 'bg-blue-500' :
-                        phase.status === 'completed' ? 'bg-green-500' :
-                          phase.status === 'error' ? 'bg-red-500' :
-                            'bg-gray-300'
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${phase.status === 'running' ? 'bg-accent-primary' :
+                        phase.status === 'completed' ? 'bg-success-500' :
+                          phase.status === 'error' ? 'bg-danger-500' :
+                            'bg-text-muted'
                       }`}>
                       <i className={`fas ${phase.icon} text-white`} />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">{phase.name}</h4>
-                      <p className="text-sm text-gray-600">{phase.description}</p>
+                      <h4 className="font-semibold text-text-primary">{phase.name}</h4>
+                      <p className="text-sm text-text-secondary">{phase.description}</p>
                     </div>
                   </div>
                   <i className={`fas ${getStatusIcon(phase.status)} text-xl`} />
@@ -629,7 +752,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
 
               {/* 智能体列表 */}
               {(phase.status === 'running' || phase.status === 'completed' || phaseIdx === currentPhaseIndex) && (
-                <div className="p-4 bg-white space-y-3">
+                <div className="p-4 bg-dark-primary space-y-3">
                   {phase.agents.map((agent, agentIdx) => (
                     <div key={agentIdx} className="border-l-4 pl-4 py-2" style={{
                       borderColor: agent.status === 'completed' ? '#10b981' :
@@ -640,10 +763,10 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center space-x-2">
                           <i className={`fas ${getStatusIcon(agent.status)}`} />
-                          <span className="font-medium text-gray-900">{agent.name}</span>
+                          <span className="font-medium text-text-primary">{agent.name}</span>
                         </div>
                         {agent.status === 'running' && (
-                          <span className="text-xs text-blue-600 font-medium">执行中...</span>
+                          <span className="text-xs text-accent-primary font-medium">执行中...</span>
                         )}
                         {agent.status === 'completed' && (
                           <span className="text-xs text-green-600 font-medium">已完成</span>
@@ -655,9 +778,9 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
 
                       {/* 智能体日志 */}
                       {agent.logs.length > 0 && (
-                        <div className="mt-2 max-h-32 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                        <div className="mt-2 max-h-32 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-dark-border scrollbar-track-dark-tertiary">
                           {agent.logs.slice(-10).map((log, logIdx) => (
-                            <div key={logIdx} className="text-xs text-gray-600 pl-6 break-words">
+                            <div key={logIdx} className="text-xs text-text-secondary pl-6 break-words">
                               {log}
                             </div>
                           ))}
@@ -694,7 +817,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
           )}
           <button
             onClick={onBackToConfig}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+            className="px-4 py-2 text-text-primary bg-dark-tertiary rounded-md hover:bg-dark-primary border border-dark-border transition-colors"
           >
             <i className="fas fa-arrow-left mr-2" />
             返回

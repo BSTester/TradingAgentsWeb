@@ -50,9 +50,16 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // Clear auth data
       localStorage.removeItem('access_token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      
+      // Don't redirect to login for /api/auth/me endpoint
+      // This allows the app to show logged-out state without redirecting
+      const requestUrl = error.config?.url || '';
+      if (!requestUrl.includes('/api/auth/me')) {
+        window.location.href = '/login';
+      }
     } else if (!error.response) {
       // 网络错误（无响应）
       error.message = '网络连接失败，请检查网络连接后重试';
@@ -98,12 +105,18 @@ export const authAPI = {
     }
   },
 
-  register: async (username: string, email: string, password: string, captcha?: { id: string; answer: string }) => {
+  register: async (username: string, email: string, password?: string, captcha?: { id: string; answer: string }, emailCode?: string) => {
     try {
-      const payload: any = { username, email, password };
+      const payload: any = { username, email };
+      if (password) {
+        payload.password = password;
+      }
       if (captcha?.id && captcha?.answer) {
         payload.captcha_id = captcha.id;
         payload.captcha_answer = captcha.answer;
+      }
+      if (emailCode) {
+        payload.email_code = emailCode;
       }
       const response = await publicApiClient.post('/api/auth/register', payload);
       return response.data;
@@ -119,9 +132,87 @@ export const authAPI = {
     }
   },
 
+  setPassword: async (password: string, oldPassword?: string) => {
+    try {
+      const payload: any = { password };
+      if (oldPassword) {
+        payload.old_password = oldPassword;
+      }
+      const response = await apiClient.post('/api/auth/set-password', payload);
+      return response.data;
+    } catch (error: any) {
+      let errorMessage = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         error.message || 
+                         '设置密码失败，请稍后重试';
+      throw new Error(errorMessage);
+    }
+  },
+
   getCurrentUser: async () => {
     const response = await apiClient.get('/api/auth/me');
     return response.data;
+  },
+
+  sendEmailCode: async (email: string, captcha: { id: string; answer: string }) => {
+    try {
+      const response = await publicApiClient.post('/api/auth/email-code/send', {
+        email,
+        captcha_id: captcha.id,
+        captcha_answer: captcha.answer,
+      });
+      return response.data;
+    } catch (error: any) {
+      let errorMessage = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         error.message || 
+                         '发送验证码失败，请稍后重试';
+      if (typeof errorMessage === 'string' && /Invalid or expired captcha/i.test(errorMessage)) {
+        errorMessage = '验证码无效或已过期';
+      }
+      throw new Error(errorMessage);
+    }
+  },
+
+  sendEmailCodeForRegister: async (email: string, captcha: { id: string; answer: string }) => {
+    try {
+      const response = await publicApiClient.post('/api/auth/email-code/send-for-register', {
+        email,
+        captcha_id: captcha.id,
+        captcha_answer: captcha.answer,
+      });
+      return response.data;
+    } catch (error: any) {
+      let errorMessage = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         error.message || 
+                         '发送验证码失败，请稍后重试';
+      if (typeof errorMessage === 'string' && /Invalid or expired captcha/i.test(errorMessage)) {
+        errorMessage = '验证码无效或已过期';
+      }
+      throw new Error(errorMessage);
+    }
+  },
+
+  loginWithEmailCode: async (email: string, code: string, captcha: { id: string; answer: string }) => {
+    try {
+      const response = await publicApiClient.post('/api/auth/email-code/login', {
+        email,
+        code,
+        captcha_id: captcha.id,
+        captcha_answer: captcha.answer,
+      });
+      return response.data;
+    } catch (error: any) {
+      let errorMessage = error.response?.data?.detail || 
+                         error.response?.data?.message || 
+                         error.message || 
+                         '登录失败，请稍后重试';
+      if (typeof errorMessage === 'string' && /Invalid or expired captcha/i.test(errorMessage)) {
+        errorMessage = '验证码无效或已过期';
+      }
+      throw new Error(errorMessage);
+    }
   },
 };
 
@@ -233,6 +324,279 @@ export const analysisAPI = {
                           error.response?.data?.message || 
                           error.message || 
                           '导出PDF失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  // Reuse configAPI's validateAPIKey
+  validateKey: async (data: { provider: string; api_key: string }) => {
+    return configAPI.validateAPIKey(data.provider, data.api_key);
+  },
+};
+
+// User Config API (需要认证)
+export const userConfigAPI = {
+  getConfig: async () => {
+    try {
+      const response = await apiClient.get('/api/user/config');
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取用户配置失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  updateConfig: async (data: any) => {
+    try {
+      const response = await apiClient.put('/api/user/config', data);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '更新用户配置失败';
+      throw new Error(errorMessage);
+    }
+  },
+};
+
+// Scheduled Tasks API (需要认证)
+export const scheduledTasksAPI = {
+  create: async (data: any) => {
+    try {
+      const response = await apiClient.post('/api/scheduled-tasks', data);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '创建定时任务失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  list: async (params: { page?: number; limit?: number } = {}) => {
+    try {
+      const { page = 1, limit = 10 } = params;
+      const response = await apiClient.get(`/api/scheduled-tasks?page=${page}&limit=${limit}`);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取定时任务列表失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  get: async (taskId: number) => {
+    try {
+      const response = await apiClient.get(`/api/scheduled-tasks/${taskId}`);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取定时任务详情失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  update: async (taskId: number, data: any) => {
+    try {
+      const response = await apiClient.patch(`/api/scheduled-tasks/${taskId}`, data);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '更新定时任务失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  delete: async (taskId: number) => {
+    try {
+      const response = await apiClient.delete(`/api/scheduled-tasks/${taskId}`);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '删除定时任务失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  // Legacy aliases for backward compatibility
+  createTask: async (data: any) => scheduledTasksAPI.create(data),
+  getTasks: async (page = 1, limit = 10) => scheduledTasksAPI.list({ page, limit }),
+  updateTask: async (taskId: number, data: any) => scheduledTasksAPI.update(taskId, data),
+  deleteTask: async (taskId: number) => scheduledTasksAPI.delete(taskId),
+};
+
+// Intraday Trading API (需要认证)
+export const intradayTradingAPI = {
+  // DEPRECATED: Scheduler status is now pushed via WebSocket 'scheduler_status_sync' message
+  // This method is kept for backward compatibility but should not be used
+  // getSchedulerStatus: async () => {
+  //   throw new Error('DEPRECATED: Use WebSocket scheduler_status_sync message instead');
+  // },
+
+  getConfig: async () => {
+    try {
+      const response = await apiClient.get('/api/intraday/scheduler/config');
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取配置失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  startScheduler: async () => {
+    try {
+      const response = await apiClient.post('/api/intraday/scheduler/control', {
+        action: 'start'
+      });
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '启动调度器失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  stopScheduler: async () => {
+    try {
+      const response = await apiClient.post('/api/intraday/scheduler/control', {
+        action: 'stop'
+      });
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '停止调度器失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  updateConfig: async (config: {
+    futu_api_url?: string;
+    futu_api_key?: string;
+    interval_minutes?: number;
+    market_type?: string;
+    llm_provider?: string;
+    llm_api_key?: string;
+  }) => {
+    try {
+      const response = await apiClient.post('/api/intraday/scheduler/config', config);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '更新配置失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  validateConfig: async (config: {
+    futu_api_url: string;
+    futu_api_key?: string;
+  }) => {
+    try {
+      const response = await apiClient.post('/api/intraday/scheduler/validate-config', config);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '验证配置失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  // Account and positions
+  getAccountInfo: async (market: string = 'US') => {
+    try {
+      const response = await apiClient.get(`/api/intraday/account?market=${market}`);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取账户信息失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  getPositions: async (market: string = 'US') => {
+    try {
+      const response = await apiClient.get(`/api/intraday/positions?market=${market}`);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取持仓信息失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  // DEPRECATED: Decisions list is now pushed via WebSocket 'decisions_initial' message
+  // This method is kept for backward compatibility but should not be used
+  // getDecisions: async (params?: { page?: number; limit?: number }) => {
+  //   throw new Error('DEPRECATED: Use WebSocket decisions_initial message instead');
+  // },
+
+  getDecision: async (id: number) => {
+    try {
+      const response = await apiClient.get(`/api/intraday/decisions/${id}`);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取决策详情失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  // Orders
+  getOrders: async (market: string = 'US', filterStatus: number = 0) => {
+    try {
+      const response = await apiClient.get(`/api/intraday/orders?market=${market}&filter_status=${filterStatus}`);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '获取订单列表失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  cancelOrder: async (orderId: string, stockCode: string) => {
+    try {
+      const response = await apiClient.post('/api/intraday/cancel-order', {
+        order_id: orderId,
+        stock_code: stockCode,
+      });
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          '撤销订单失败';
       throw new Error(errorMessage);
     }
   },

@@ -7,6 +7,20 @@
     box-sizing: border-box;
   }
   
+  :root {
+    /* Dark Fintech Theme CSS Variables */
+    --bg-primary: #0a0e1a;
+    --bg-secondary: #141824;
+    --bg-tertiary: #1a1f2e;
+    --bg-elevated: #1f2937;
+    --border-default: #2d3748;
+    --accent-primary: #00d4ff;
+    --accent-secondary: #0066ff;
+    --text-primary: #ffffff;
+    --text-secondary: #a0aec0;
+    --text-tertiary: #718096;
+  }
+  
   body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -14,117 +28,181 @@
       sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
   }
 }
 
 @layer components {
-  /* Bootstrap 5 compatible styles */
+  /* Dark Fintech Theme Components */
+  
+  /* Responsive Typography */
+  .text-responsive-h1 {
+    @apply text-[1.75rem] leading-tight font-bold md:text-4xl md:leading-tight;
+  }
+
+  .text-responsive-h2 {
+    @apply text-2xl leading-snug font-bold md:text-3xl md:leading-snug;
+  }
+
+  .text-responsive-h3 {
+    @apply text-xl leading-normal font-semibold md:text-2xl md:leading-normal;
+  }
+
+  .text-responsive-h4 {
+    @apply text-lg leading-normal font-semibold md:text-xl md:leading-normal;
+  }
+
+  .text-responsive-body {
+    @apply text-base leading-relaxed;
+  }
+
+  .text-responsive-small {
+    @apply text-sm leading-normal;
+  }
+  
+  /* Buttons */
   .btn {
-    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors px-4 py-2 border border-transparent;
+    @apply inline-flex items-center justify-center rounded-lg text-sm md:text-base font-medium transition-all duration-200 px-4 py-2 border border-transparent;
   }
 
   .btn-primary {
-    @apply bg-blue-600 text-white hover:bg-blue-700;
+    @apply bg-gradient-to-r from-accent-primary to-accent-secondary text-white hover:shadow-glow-cyan hover:scale-105 active:scale-95;
   }
 
   .btn-secondary {
-    @apply bg-gray-600 text-white hover:bg-gray-700;
+    @apply bg-transparent border-2 border-accent-primary text-accent-primary hover:bg-accent-primary hover:text-dark-primary;
   }
 
   .btn-outline {
-    @apply border border-gray-300 text-gray-700 hover:bg-gray-50;
+    @apply bg-dark-tertiary border border-dark-border text-text-secondary hover:border-accent-primary hover:text-accent-primary;
   }
 
   .btn-danger {
-    @apply bg-red-600 text-white hover:bg-red-700;
+    @apply bg-danger-500 text-white hover:bg-danger-600;
   }
 
+  /* Forms */
   .form-control {
-    @apply flex h-10 w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm;
+    @apply flex h-10 w-full rounded-lg border border-dark-border bg-dark-tertiary text-white placeholder-text-tertiary px-4 py-3 text-sm focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 transition-all duration-200;
   }
 
   .form-label {
-    @apply text-sm font-medium leading-none;
+    @apply text-sm font-medium leading-none text-text-secondary;
   }
 
+  /* Cards */
   .card {
-    @apply rounded-lg border border-gray-200 bg-white shadow-sm;
+    @apply rounded-xl border border-dark-border bg-dark-secondary shadow-card-dark;
   }
 
   .card-header {
-    @apply flex flex-col space-y-1.5 p-6;
+    @apply flex flex-col space-y-1.5 p-6 border-b border-dark-border;
   }
 
   .card-title {
-    @apply text-2xl font-semibold leading-none tracking-tight;
+    @apply text-responsive-h3 font-semibold leading-none tracking-tight text-text-primary;
   }
 
   .card-body {
-    @apply p-6 pt-0;
+    @apply p-6;
   }
 
+  /* Alerts */
   .alert {
     @apply relative w-full rounded-lg border p-4;
   }
 
   .alert-info {
-    @apply border-blue-200 bg-blue-50 text-blue-900;
+    @apply border-accent-primary/30 bg-accent-primary/10 text-accent-primary;
   }
 
   .alert-success {
-    @apply border-green-200 bg-green-50 text-green-900;
+    @apply border-success-500/30 bg-success-500/10 text-success-500;
   }
 
   .alert-warning {
-    @apply border-yellow-200 bg-yellow-50 text-yellow-900;
+    @apply border-warning-500/30 bg-warning-500/10 text-warning-500;
   }
 
   .alert-danger {
-    @apply border-red-200 bg-red-50 text-red-900;
+    @apply border-danger-500/30 bg-danger-500/10 text-danger-500;
   }
 
+  /* Progress */
   .progress {
-    @apply relative h-4 w-full overflow-hidden rounded-full bg-gray-200;
+    @apply relative h-4 w-full overflow-hidden rounded-full bg-dark-tertiary;
   }
 
   .progress-bar {
-    @apply h-full bg-blue-600 transition-all;
+    @apply h-full bg-gradient-to-r from-accent-primary to-accent-secondary transition-all;
   }
 
+  /* Tables */
   .table {
     @apply w-full caption-bottom text-sm;
   }
 
   .table th {
-    @apply border-b px-4 py-3 text-left align-middle font-medium text-gray-500;
+    @apply border-b border-dark-border px-4 py-3 text-left align-middle font-medium text-text-secondary;
   }
 
   .table td {
-    @apply border-b px-4 py-3 align-middle;
+    @apply border-b border-dark-border px-4 py-3 align-middle text-text-primary;
   }
 
+  /* Spinner */
   .spinner-border {
-    @apply inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-current border-r-transparent;
+    @apply inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-accent-primary border-r-transparent;
+  }
+
+  /* Hero Section Gradients */
+  .hero-gradient {
+    background: linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 50%, #0f1419 100%);
+  }
+
+  .card-gradient {
+    background: linear-gradient(145deg, #141824 0%, #1a1f2e 100%);
+  }
+
+  /* Shimmer Effect for Loading */
+  .shimmer-bg {
+    background: linear-gradient(
+      90deg,
+      #141824 0%,
+      #1a1f2e 50%,
+      #141824 100%
+    );
+    background-size: 1000px 100%;
   }
 }
 
 @layer base {
-  /* Custom scrollbar */
+  /* Custom scrollbar for dark theme */
   ::-webkit-scrollbar {
-    width: 8px;
+    width: 10px;
+    height: 10px;
   }
 
   ::-webkit-scrollbar-track {
-    background: #f1f1f1;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
+    background: var(--bg-secondary);
     border-radius: 6px;
   }
 
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 6px;
+    border: 2px solid var(--bg-secondary);
+  }
+
   ::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+    background: var(--accent-primary);
+  }
+
+  /* Firefox scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-default) var(--bg-secondary);
   }
 }
 
@@ -144,31 +222,43 @@
   }
 }
 
-/* 自定义动画 */
+@layer utilities {
+  /* 隐藏滚动条但保持滚动功能 */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Dark Fintech Theme Animations */
 @keyframes shimmer {
   0% {
-    transform: translateX(-100%);
+    background-position: -1000px 0;
   }
   100% {
-    transform: translateX(100%);
+    background-position: 1000px 0;
   }
 }
 
-@keyframes pulse-glow {
+@keyframes glow-pulse {
   0%, 100% {
-    box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.3), 0 0 40px rgba(0, 212, 255, 0.1);
   }
   50% {
-    box-shadow: 0 0 40px rgba(34, 197, 94, 0.8);
+    box-shadow: 0 0 30px rgba(0, 212, 255, 0.5), 0 0 60px rgba(0, 212, 255, 0.2);
   }
 }
 
-.animate-shimmer {
-  animation: shimmer 1.5s infinite;
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 @keyframes spin-reverse {
@@ -180,6 +270,44 @@
   }
 }
 
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
 .animate-spin-reverse {
   animation: spin-reverse 1s linear infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

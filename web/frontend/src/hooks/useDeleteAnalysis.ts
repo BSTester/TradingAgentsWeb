@@ -32,11 +32,17 @@ export function useDeleteAnalysis() {
 
       return response.json();
     },
-    // 删除成功后的处理
-    onSuccess: (data, analysisId) => {
-      console.log('✅ Delete successful, updating cache for:', analysisId);
+    // 乐观更新：在删除请求发送前立即更新 UI
+    onMutate: async (analysisId) => {
+      console.log('🚀 Starting optimistic delete for:', analysisId);
       
-      // 1. 先手动从所有列表缓存中移除该项
+      // 取消所有正在进行的查询，避免覆盖我们的乐观更新
+      await queryClient.cancelQueries({ queryKey: queryKeys.analysis.all });
+
+      // 保存之前的数据快照，以便出错时回滚
+      const previousLists = queryClient.getQueriesData({ queryKey: queryKeys.analysis.all });
+
+      // 乐观更新：立即从所有列表缓存中移除该项
       queryClient.setQueriesData<AnalysisListResponse>(
         { queryKey: queryKeys.analysis.all },
         (old) => {
@@ -45,7 +51,7 @@ export function useDeleteAnalysis() {
           }
           
           const filteredAnalyses = old.analyses.filter(a => a.id !== analysisId);
-          console.log(`🗑️ Removed from cache: ${old.analyses.length} → ${filteredAnalyses.length}`);
+          console.log(`🗑️ Optimistically removed from cache: ${old.analyses.length} → ${filteredAnalyses.length}`);
           
           return {
             ...old,
@@ -54,14 +60,29 @@ export function useDeleteAnalysis() {
           };
         }
       );
+
+      // 返回上下文对象，包含快照数据
+      return { previousLists };
+    },
+    // 如果删除失败，回滚到之前的状态
+    onError: (_err, _analysisId, context) => {
+      console.error('❌ Delete failed, rolling back optimistic update');
       
-      // 2. 然后使缓存失效并重新获取（确保与服务器同步）
+      // 恢复之前的数据
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+    },
+    // 无论成功还是失败，都重新获取数据以确保与服务器同步
+    onSettled: () => {
+      console.log('🔄 Refetching analysis list to sync with server');
+      
       queryClient.invalidateQueries({
         queryKey: queryKeys.analysis.all,
         refetchType: 'active'
       });
-      
-      console.log('🔄 Cache updated and queries invalidated');
     },
   });
 }
