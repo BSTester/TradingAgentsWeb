@@ -7,15 +7,39 @@ module.exports = {
   ],
   theme: {
     extend: {
-      // Bootstrap-compatible colors
+      // Dark Fintech Theme Colors
       colors: {
+        // Dark backgrounds (not pure black for reduced eye strain)
+        dark: {
+          primary: '#0a0e1a',    // Main background
+          secondary: '#141824',  // Card backgrounds
+          tertiary: '#1a1f2e',   // Input backgrounds
+          elevated: '#1f2937',   // Elevated surfaces
+          border: '#2d3748',     // Default borders
+        },
+        // Fintech accent colors (blue/cyan)
+        accent: {
+          primary: '#00d4ff',    // Primary cyan
+          secondary: '#0066ff',  // Secondary blue
+          tertiary: '#00a8e8',   // Tertiary blue
+          hover: '#00d4ff',      // Hover state
+          focus: '#0066ff',      // Focus state
+        },
+        // Text colors for dark theme
+        text: {
+          primary: '#ffffff',    // Primary text
+          secondary: '#a0aec0',  // Secondary text
+          tertiary: '#718096',   // Tertiary text
+          muted: '#4a5568',      // Muted text
+        },
+        // Keep existing color schemes for compatibility
         primary: {
           50: '#eff6ff',
           100: '#dbeafe',
           200: '#bfdbfe',
           300: '#93c5fd',
           400: '#60a5fa',
-          500: '#3b82f6', // Bootstrap primary blue
+          500: '#3b82f6',
           600: '#2563eb',
           700: '#1d4ed8',
           800: '#1e40af',
@@ -27,7 +51,7 @@ module.exports = {
           200: '#e2e8f0',
           300: '#cbd5e1',
           400: '#94a3b8',
-          500: '#64748b', // Bootstrap secondary gray
+          500: '#64748b',
           600: '#475569',
           700: '#334155',
           800: '#1e293b',
@@ -39,7 +63,7 @@ module.exports = {
           200: '#bbf7d0',
           300: '#86efac',
           400: '#4ade80',
-          500: '#22c55e', // Bootstrap success green
+          500: '#00ff88',      // Updated for dark theme
           600: '#16a34a',
           700: '#15803d',
           800: '#166534',
@@ -51,7 +75,7 @@ module.exports = {
           200: '#fecaca',
           300: '#fca5a5',
           400: '#f87171',
-          500: '#ef4444', // Bootstrap danger red
+          500: '#ff3366',      // Updated for dark theme
           600: '#dc2626',
           700: '#b91c1c',
           800: '#991b1b',
@@ -63,7 +87,7 @@ module.exports = {
           200: '#fde68a',
           300: '#fcd34d',
           400: '#fbbf24',
-          500: '#f59e0b', // Bootstrap warning yellow
+          500: '#ffaa00',      // Updated for dark theme
           600: '#d97706',
           700: '#b45309',
           800: '#92400e',
@@ -75,7 +99,7 @@ module.exports = {
           200: '#bae6fd',
           300: '#7dd3fc',
           400: '#38bdf8',
-          500: '#0ea5e9', // Bootstrap info cyan
+          500: '#00d4ff',      // Updated for dark theme
           600: '#0284c7',
           700: '#0369a1',
           800: '#075985',
@@ -100,6 +124,12 @@ module.exports = {
         '10': '2.5rem',    // 40px
         '11': '2.75rem',   // 44px
         '12': '3rem',      // 48px
+        // Mobile-specific spacing
+        'safe-top': 'env(safe-area-inset-top)',
+        'safe-bottom': 'env(safe-area-inset-bottom)',
+        'safe-left': 'env(safe-area-inset-left)',
+        'safe-right': 'env(safe-area-inset-right)',
+        'touch': '2.75rem', // 44px - minimum touch target
       },
       // Bootstrap-compatible font sizes
       fontSize: {
@@ -125,6 +155,77 @@ module.exports = {
         '2xl': '1rem',
         '3xl': '1.5rem',
         'full': '9999px',
+      },
+      // Custom box shadows for dark theme
+      boxShadow: {
+        'glow-cyan': '0 0 20px rgba(0, 212, 255, 0.3), 0 0 40px rgba(0, 212, 255, 0.1)',
+        'glow-cyan-lg': '0 0 30px rgba(0, 212, 255, 0.5), 0 0 60px rgba(0, 212, 255, 0.2)',
+        'card-dark': '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
+        'elevated-dark': '0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
+      },
+      // Custom background images for gradients
+      backgroundImage: {
+        'gradient-hero': 'linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 50%, #0f1419 100%)',
+        'gradient-card': 'linear-gradient(145deg, #141824 0%, #1a1f2e 100%)',
+        'gradient-button': 'linear-gradient(90deg, #00d4ff 0%, #0066ff 100%)',
+        'gradient-radial': 'radial-gradient(circle at center, var(--tw-gradient-stops))',
+      },
+      // Custom animations
+      animation: {
+        'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
+        'shimmer': 'shimmer 2s infinite',
+        'float': 'float 3s ease-in-out infinite',
+        'spin-reverse': 'spin-reverse 1s linear infinite',
+      },
+      keyframes: {
+        'glow-pulse': {
+          '0%, 100%': {
+            boxShadow: '0 0 20px rgba(0, 212, 255, 0.3), 0 0 40px rgba(0, 212, 255, 0.1)',
+          },
+          '50%': {
+            boxShadow: '0 0 30px rgba(0, 212, 255, 0.5), 0 0 60px rgba(0, 212, 255, 0.2)',
+          },
+        },
+        'shimmer': {
+          '0%': {
+            backgroundPosition: '-1000px 0',
+          },
+          '100%': {
+            backgroundPosition: '1000px 0',
+          },
+        },
+        'float': {
+          '0%, 100%': {
+            transform: 'translateY(0px)',
+          },
+          '50%': {
+            transform: 'translateY(-10px)',
+          },
+        },
+        'spin-reverse': {
+          'from': {
+            transform: 'rotate(360deg)',
+          },
+          'to': {
+            transform: 'rotate(0deg)',
+          },
+        },
+      },
+      // Custom backdrop blur
+      backdropBlur: {
+        'xs': '2px',
+      },
+      // Mobile-specific utilities
+      minHeight: {
+        'touch': '44px',
+        'screen-safe': 'calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom))',
+      },
+      minWidth: {
+        'touch': '44px',
+      },
+      maxWidth: {
+        'mobile': '640px',
+        'tablet': '1024px',
       },
     },
   },

@@ -1,51 +1,73 @@
-# 数据库迁移说明
+# Database Migrations
 
-## 添加公司名称字段
+This directory contains database migration scripts for the TradingAgentsWeb backend.
 
-### 迁移文件
-- `add_company_name.sql` - 添加 `company_name` 字段到 `analysis_records` 表
+## Available Migrations
 
-### 应用迁移
+### 001 - Increase version column length
+**File**: `001_increase_version_column_length.sql`  
+**Date**: 2025-11-14  
+**Description**: Increases the `version` column in `agent_prompt_templates` table from VARCHAR(20) to VARCHAR(50) to support longer version strings.
 
-#### 方法1：使用 psql 命令行
+**Issue**: The application was generating version strings longer than 20 characters, causing database errors:
+```
+sqlalchemy.exc.DataError: (pymysql.err.DataError) (1406, "Data too long for column 'version' at row 1")
+```
+
+### 002 - Fix corrupted version strings
+**File**: `002_fix_version_strings.py`  
+**Date**: 2025-11-14  
+**Description**: Cleans up corrupted version strings like "1.0_edited_edited_edited" by extracting the numeric part or resetting to "1.0".
+
+**Issue**: A bug in the version increment logic was appending strings instead of incrementing numbers, resulting in versions like "1.0_edited_edited_edited".
+
+**Fix**: The version increment logic in `prompt_routes.py` has been corrected to properly parse and increment numeric versions (1.0 → 1.1 → 1.2, etc.)
+
+## How to Apply Migrations
+
+### Migration 001 - Increase version column length
+
+#### Option 1: Using Python Script (Recommended)
 ```bash
-psql -U your_username -d tradingagents_db -f add_company_name.sql
+cd web/backend/migrations
+python apply_migration_001.py
 ```
 
-#### 方法2：使用 Python 脚本
-```python
-from web.backend.database import engine
-from sqlalchemy import text
-
-with engine.connect() as conn:
-    with open('web/backend/migrations/add_company_name.sql', 'r') as f:
-        sql = f.read()
-    conn.execute(text(sql))
-    conn.commit()
+#### Option 2: Using MySQL CLI
+```bash
+mysql -u your_username -p your_database < 001_increase_version_column_length.sql
 ```
 
-#### 方法3：手动执行 SQL
-连接到数据库后执行：
+#### Option 3: Using Docker
+If running in Docker, execute inside the MySQL container:
+```bash
+docker exec -i tradingagents-mysql mysql -u root -p your_database < 001_increase_version_column_length.sql
+```
+
+### Migration 002 - Fix corrupted version strings
+
+**Run this AFTER applying migration 001:**
+
+```bash
+cd web/backend/migrations
+python 002_fix_version_strings.py
+```
+
+This will scan all templates and clean up any corrupted version strings.
+
+## Verification
+
+After applying the migration, verify the change:
 ```sql
-ALTER TABLE analysis_records 
-ADD COLUMN IF NOT EXISTS company_name VARCHAR(100);
-
-CREATE INDEX IF NOT EXISTS idx_analysis_records_company_name 
-ON analysis_records(company_name);
+SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
+FROM INFORMATION_SCHEMA.COLUMNS 
+WHERE TABLE_NAME = 'agent_prompt_templates' AND COLUMN_NAME = 'version';
 ```
 
-### 功能说明
-添加此字段后，系统会自动：
-1. 在 trader 节点完成后，通过 LLM 从股票代码提取中文公司名称
-2. 将公司名称保存到数据库
-3. 在前端历史记录和结果详情页面显示公司名称
+Expected result: `CHARACTER_MAXIMUM_LENGTH` should be `50`.
 
-### 显示格式
-- **历史记录页面**: `TSLA (特斯拉)`
-- **结果详情页面**: `US | 英伟达` (在市场类别后面)
-- **排行榜页面**: 保持原有显示格式
+## Notes
 
-### 注意事项
-- 此迁移是向后兼容的，不会影响现有数据
-- 现有记录的 `company_name` 字段将为 NULL
-- 新的分析会自动填充公司名称
+- The model definition in `web/backend/models.py` has been updated to reflect this change
+- Existing data will not be affected, only the column constraint is modified
+- This migration is backward compatible (shorter strings still work)

@@ -1,100 +1,107 @@
 'use client';
 
-import React from 'react';
-import { useRouter } from 'next/navigation';
-
-interface User {
-  id: number;
-  username: string;
-  email: string;
-  role?: string;
-}
+import React, { useState } from 'react';
+import { useAuth } from '@/lib/auth';
 
 interface HeaderProps {
-  user: User | null;
-  onLogout?: () => void;
+  onNavigate: (path: string) => void;
 }
 
-export function Header({ user, onLogout }: HeaderProps) {
-  const router = useRouter();
-
-  const handleLogin = () => {
-    router.push('/login');
-  };
-
-  const handleRegister = () => {
-    router.push('/register');
-  };
-
-  const handleDashboard = () => {
-    router.push('/dashboard');
-  };
+export function Header({ onNavigate }: HeaderProps) {
+  const { user, logout, isLoading } = useAuth();
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   return (
-    <nav className="bg-gray-900 shadow-lg">
+    <nav className="fixed top-0 w-full z-50 bg-dark-primary/80 backdrop-blur-lg border-b border-dark-border shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+        <div className="flex justify-between h-14 md:h-16">
           <div className="flex items-center">
-            <div className="flex-shrink-0 cursor-pointer" onClick={() => router.push('/')}>
-              <h1 className="text-white text-xl font-bold">
-                <i className="fas fa-chart-line mr-2" />
-                TradingAgents
+            <div
+              className="flex-shrink-0 cursor-pointer group"
+              onClick={() => onNavigate('/')}
+            >
+              <h1 className="text-text-primary text-base md:text-xl font-bold flex items-center space-x-2">
+                <i className="fas fa-chart-line text-accent-primary group-hover:text-accent-secondary transition-colors" />
+                <span className="group-hover:text-accent-primary transition-colors">
+                  TradingAgentsWeb
+                </span>
               </h1>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
-            {user ? (
+
+          <div className="flex items-center space-x-2">
+            {!isLoading && !user && (
               <>
                 <button
-                  onClick={handleDashboard}
-                  className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                  onClick={() => onNavigate('/login')}
+                  className="px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary transition-all"
                 >
-                  <i className="fas fa-plus-circle mr-1" />
-                  新建分析
-                </button>
-                <button
-                  onClick={() => router.push('/history')}
-                  className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-                >
-                  <i className="fas fa-history mr-1" />
-                  分析历史
-                </button>
-                <div className="text-gray-300 flex items-center">
-                  <i className={`fas ${user.role === 'admin' ? 'fa-crown' : 'fa-user-circle'} mr-2`} />
-                  {user.username}
-                  {user.role === 'admin' && (
-                    <span className="ml-2 px-2 py-0.5 bg-yellow-500 text-gray-900 text-xs font-bold rounded">
-                      管理员
-                    </span>
-                  )}
-                </div>
-                {onLogout && (
-                  <button
-                    onClick={onLogout}
-                    className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-                  >
-                    <i className="fas fa-power-off mr-1" />
-                    退出
-                  </button>
-                )}
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={handleLogin}
-                  className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
-                >
-                  <i className="fas fa-user-check mr-1" />
                   登录
                 </button>
                 <button
-                  onClick={handleRegister}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
+                  onClick={() => onNavigate('/register')}
+                  className="px-3 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-accent-primary to-accent-secondary text-white hover:shadow-glow-cyan transition-all"
                 >
-                  <i className="fas fa-user-plus mr-1" />
                   注册
                 </button>
               </>
+            )}
+
+            {user && (
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowUserMenu(!showUserMenu);
+                  }}
+                  className="px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary"
+                >
+                  <i className="fas fa-user-circle mr-2" />
+                  {user.username}
+                  <i className={`fas fa-chevron-down ml-2 text-xs transition-transform ${
+                    showUserMenu ? 'rotate-180' : ''
+                  }`} />
+                </button>
+
+                {showUserMenu && (
+                  <div className="absolute top-full right-0 mt-1 w-48 bg-dark-secondary border border-dark-border rounded-lg shadow-lg py-2 z-50">
+                    <button
+                      onClick={() => {
+                        onNavigate('/profile');
+                        setShowUserMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary transition-all flex items-center"
+                    >
+                      <i className="fas fa-user-circle w-4 mr-3" />
+                      个人中心
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        onNavigate('/intraday-trading');
+                        setShowUserMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-text-secondary hover:text-success-500 hover:bg-dark-tertiary transition-all flex items-center"
+                    >
+                      <i className="fas fa-chart-line w-4 mr-3" />
+                      智能盯盘
+                    </button>
+
+                    <div className="border-t border-dark-border my-1"></div>
+
+                    <button
+                      onClick={() => {
+                        logout();
+                        setShowUserMenu(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-danger-500 hover:bg-danger-500/10 transition-all flex items-center"
+                    >
+                      <i className="fas fa-power-off w-4 mr-3" />
+                      退出登录
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>

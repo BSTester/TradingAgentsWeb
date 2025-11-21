@@ -45,6 +45,7 @@ alembic>=1.7.0           # Database migrations
 aiomysql>=0.2.0          # Async MySQL driver (for API routes)
 pymysql>=1.0.0           # Sync MySQL driver (for background tasks)
 aiosqlite>=0.19.0        # Async SQLite driver (for development/testing)
+apscheduler>=3.10.0      # Task scheduling for scheduled analysis tasks
 
 # Web framework and authentication
 fastapi>=0.68.0          # Web framework
@@ -55,6 +56,7 @@ python-jose[cryptography]>=3.3.0  # JWT token handling
 passlib[bcrypt]==1.7.4   # Password hashing
 bcrypt==4.0.1            # Compatible bcrypt version
 python-dotenv>=0.19.0    # Environment variables
+markdown>=3.4.0          # Markdown to HTML conversion for email reports
 
 # File handling
 openpyxl>=3.0.0          # Excel file support

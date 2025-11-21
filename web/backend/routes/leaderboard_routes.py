@@ -67,11 +67,6 @@ async def get_leaderboard(db: AsyncSession = Depends(get_db)) -> Dict[str, List[
         query_result = await db.execute(stmt)
         rows = query_result.all()
         
-        # 调试日志
-        print(f"📊 排行榜查询 - 市场: {market}, 记录数: {len(rows)}")
-        for row in rows:
-            print(f"  - {row.ticker} ({row.analysis_date}): {row.trading_decision} @ {row.completed_at}")
-        
         # Convert to dict format
         result[market] = [
             {

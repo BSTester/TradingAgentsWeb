@@ -1,0 +1,42 @@
+# Static Export Dockerfile - Build Next.js as static files and serve with Nginx only
+# ============================================
+# deps stage
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+
+# ============================================
+# build stage - Build static export
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Set environment variables for build
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV SKIP_LINT=true
+
+# Build Next.js application as static export
+# The 'output: export' in next.config.ts will generate static files in 'out' directory
+RUN npm run build
+
+# ============================================
+# Nginx static file server
+FROM nginx:alpine AS production
+RUN apk add --no-cache gettext
+
+# Copy static files from Next.js build
+COPY --from=builder /app/out /usr/share/nginx/html
+
+# Copy Nginx config template for static + API proxy
+COPY nginx.conf.template /etc/nginx/nginx.conf.template
+COPY start.sh /usr/local/bin/start.sh
+RUN sed -i 's/\r$//' /usr/local/bin/start.sh && chmod +x /usr/local/bin/start.sh
+
+# Environment variables for backend URL
+ENV BACKEND_URL="http://backend:8000"
+
+EXPOSE 80
+CMD ["/usr/local/bin/start.sh"]

@@ -60,7 +60,7 @@ TradingAgentsWeb 是原版 TradingAgents 的 Web 化改造与扩展：
 - 架构升级为前后端分离：
   - 原版多为 CLI/脚本驱动；Web 版提供完整的 REST API + WebSocket 推送 + 前端 UI
 - 任务调度与实时监控：
-  - `web/backend/app_v2.py` 内置线程池与队列（TaskManager），支持用户级排队、全局并发控制、停滞任务自动中断与 WebSocket 实时日志
+  - `web/backend/app.py` 内置线程池与队列（TaskManager），支持用户级排队、全局并发控制、停滞任务自动中断与 WebSocket 实时日志
 - 用户认证与持久化：
   - `web/backend/README_v2.md` 与后端模型 `web/backend/models.py` 支持用户注册/登录、JWT 认证、分析记录/日志与导出记录持久化到 SQLite（默认，也可换成 PostgreSQL）
 - 部署与工程化：
@@ -143,7 +143,7 @@ TASK_MONITOR_LEADER_PORT=8001
 - 启动后端（带认证与数据库集成）：
 ```bash
 # 在仓库根目录
-python web/backend/app_v2.py
+python web/backend/app.py
 # 默认监听 8000 端口
 ```
 - 启动前端（开发服务器）：
@@ -173,7 +173,7 @@ docker-compose up --build -d
 
 ### 4.1 项目启动与运行
 - 开发模式：
-  - 后端：`python web/backend/app_v2.py`
+  - 后端：`python web/backend/app.py`
   - 前端：`npm run dev`（在 web/frontend）
 - 生产或容器模式：
   - `docker-compose up -d` 后即可通过浏览器访问前端与接口
@@ -184,7 +184,7 @@ docker-compose up --build -d
   - 组件：UI 表单、WebSocket 实时日志、结果 Markdown 渲染与导出（PDF/Markdown/JSON）
   - 脚本：`npm run dev | build | start | export | lint`
 - 后端（web/backend）
-  - FastAPI 应用：`app_v2.py`（含 lifespan、CORS、LoggingMiddleware）
+  - FastAPI 应用：`app.py`（含 lifespan、CORS、LoggingMiddleware）
   - 路由模块：`routes/analysis_routes.py, config_routes.py, task_routes.py, page_routes.py, websocket_routes.py, export_routes.py`
   - 认证模块：`auth_routes.py`（注册、登录、JWT 刷新）
   - 数据库模块：`database.py, models.py`（SQLite 默认，应用启动时自动初始化）
@@ -235,39 +235,12 @@ docker-compose up --build -d
 
 ---
 
-## 5. 文档
-
-详细文档请查看 [docs](docs/) 目录：
-
-### 核心功能
-- [公司名称显示功能](docs/COMPANY_NAME_FEATURE.md) - 中文公司名称提取和显示
-
-### 数据库
-- [数据库初始化说明](docs/DATABASE_INIT_SUMMARY.md) - 应用启动时自动初始化
-- [数据库设置指南](docs/DATABASE_SETUP.md) - 完整的数据库配置说明
-- [数据库配置](docs/DATABASE_CONFIG.md) - 数据库连接配置
-
-### 部署
-- [部署检查清单](docs/DEPLOYMENT_CHECKLIST.md) - 完整的部署步骤和验证
-- [Docker 部署](docs/DOCKER_DEPLOYMENT.md) - 容器化部署指南
-- [Nginx 配置](docs/NGINX_CONFIG_GUIDE.md) - 反向代理和 SSL 配置
-
-### 开发
-- [本地开发指南](docs/LOCAL_DEVELOPMENT.md) - 开发环境搭建
-- [环境配置](docs/ENV_SETUP.md) - 环境变量和 API 密钥配置
-
-### 其他
-- [股票代码编码规则](docs/股票代码编码规则详解.md) - 美股、港股、A股编码规则
-- [股票代码验证升级](docs/股票代码验证升级说明.md) - 验证规则说明
-
----
-
-## 6. 许可证
+## 5. 许可证
 本项目基于仓库内 LICENSE 文件所述条款发布，请遵循相关许可。
 
 ---
 
-## 7. 参考与致谢
+## 6. 参考与致谢
 - TradingAgents 原版框架与多智能体设计
 - FastAPI / SQLAlchemy / Jinja2 / Uvicorn
 - Next.js / React / Tailwind

@@ -27,31 +27,31 @@ export function MarketTabs({ activeMarket, onMarketChange, marketLabels }: Marke
   };
 
   return (
-    <div className="mb-8">
-      <div className="grid grid-cols-3 gap-4">
+    <div className="mb-6 md:mb-8">
+      <div className="grid grid-cols-3 gap-2 md:gap-4">
         {markets.map((market) => (
           <button
             key={market}
             onClick={() => onMarketChange(market)}
             className={`
-              relative px-6 py-4 font-semibold text-base rounded-xl transition-all duration-300 shadow-md hover:shadow-lg
+              relative px-3 md:px-6 py-3 md:py-4 font-semibold text-sm md:text-base rounded-xl transition-all duration-300 min-h-touch
               ${activeMarket === market
-                ? 'bg-gradient-to-br from-green-500 to-green-600 text-white transform scale-105'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                ? 'bg-gradient-to-br from-accent-primary to-accent-secondary text-white transform scale-105 shadow-glow-cyan'
+                : 'bg-dark-secondary text-text-secondary hover:bg-dark-tertiary border border-dark-border hover:border-accent-primary'
               }
             `}
           >
-            <div className="flex flex-col items-center space-y-2">
+            <div className="flex flex-col items-center space-y-1 md:space-y-2">
               <div className={`
-                w-12 h-12 rounded-full flex items-center justify-center transition-all
+                w-8 h-8 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all
                 ${activeMarket === market
                   ? 'bg-white/20 text-white'
-                  : 'bg-gradient-to-br from-green-400 to-green-500 text-white'
+                  : 'bg-gradient-to-br from-accent-primary to-accent-secondary text-white'
                 }
               `}>
-                <i className={`fas ${getMarketIcon(market)} text-xl`} />
+                <i className={`fas ${getMarketIcon(market)} text-sm md:text-xl`} />
               </div>
-              <span>{marketLabels[market]}</span>
+              <span className="text-xs md:text-base">{marketLabels[market]}</span>
             </div>
           </button>
         ))}

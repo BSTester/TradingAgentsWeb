@@ -48,7 +48,8 @@ def get_alpha_vantage_indicator(symbol: str, indicator: str, curr_date: str, loo
 from .alpha_vantage_common import AlphaVantageRateLimitError
 from .akshare import (
     get_stock as get_akshare_stock,
-    get_indicators as get_akshare_indicators,
+    get_stock_realtime_quote as get_akshare_realtime_quote,
+    get_indicator as get_akshare_indicators,
     get_fundamentals as get_akshare_fundamentals,
     get_balance_sheet as get_akshare_balance_sheet,
     get_cashflow as get_akshare_cashflow,
@@ -67,7 +68,8 @@ TOOLS_CATEGORIES = {
     "core_stock_apis": {
         "description": "OHLCV stock price data",
         "tools": [
-            "get_stock_data"
+            "get_stock_data",
+            "get_realtime_quote"
         ]
     },
     "technical_indicators": {
@@ -111,14 +113,20 @@ VENDOR_METHODS = {
         "akshare": get_akshare_stock,
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
-        "local": get_YFin_data,
+        # "local": get_YFin_data,
+    },
+    "get_realtime_quote": {
+        "akshare": get_akshare_realtime_quote,
+        # Future: Add other vendors as they become available
+        # "yfinance": get_yfinance_realtime_quote,
+        # "alpha_vantage": get_alpha_vantage_realtime_quote,
     },
     # technical_indicators
     "get_indicators": {
         "akshare": get_akshare_indicators,
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
-        "local": get_stock_stats_indicators_window
+        # "local": get_stock_stats_indicators_window
     },
     # fundamental_data
     "get_fundamentals": {
@@ -130,19 +138,19 @@ VENDOR_METHODS = {
         "akshare": get_akshare_balance_sheet,
         "alpha_vantage": get_alpha_vantage_balance_sheet,
         "yfinance": get_yfinance_balance_sheet,
-        "local": get_simfin_balance_sheet,
+        # "local": get_simfin_balance_sheet,
     },
     "get_cashflow": {
         "akshare": get_akshare_cashflow,
         "alpha_vantage": get_alpha_vantage_cashflow,
         "yfinance": get_yfinance_cashflow,
-        "local": get_simfin_cashflow,
+        # "local": get_simfin_cashflow,
     },
     "get_income_statement": {
         "akshare": get_akshare_income_statement,
         "alpha_vantage": get_alpha_vantage_income_statement,
         "yfinance": get_yfinance_income_statement,
-        "local": get_simfin_income_statements,
+        # "local": get_simfin_income_statements,
     },
     # news_data
     "get_news": {
@@ -150,22 +158,22 @@ VENDOR_METHODS = {
         "alpha_vantage": get_alpha_vantage_news,
         "openai": get_stock_news_openai,
         "google": get_google_news,
-        "local": [get_finnhub_news, get_reddit_company_news, get_google_news],
+        # "local": [get_finnhub_news, get_reddit_company_news, get_google_news],
     },
     "get_global_news": {
         "akshare": get_akshare_global_news,
         "openai": get_global_news_openai,
-        "local": get_reddit_global_news
+        # "local": get_reddit_global_news
     },
     "get_insider_sentiment": {
         "akshare": get_akshare_insider_sentiment,
-        "local": get_finnhub_company_insider_sentiment
+        # "local": get_finnhub_company_insider_sentiment
     },
     "get_insider_transactions": {
         "akshare": get_akshare_insider_transactions,
         "alpha_vantage": get_alpha_vantage_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
-        "local": get_finnhub_company_insider_transactions,
+        # "local": get_finnhub_company_insider_transactions,
     },
 }
 
@@ -287,7 +295,6 @@ def route_to_vendor(method: str, *args, **kwargs):
     if symbol:
         market = identify_market(symbol)
         fallback_vendors = get_market_preferred_vendors(market, method)
-        print(f"DEBUG: Symbol '{symbol}' identified as {market} market")
     else:
         # No symbol provided, use default configuration
         vendor_config = get_vendor(category, method)
@@ -300,19 +307,14 @@ def route_to_vendor(method: str, *args, **kwargs):
                 fallback_vendors.append(vendor)
         
         market = 'UNKNOWN'
-        print(f"DEBUG: No symbol provided, using default vendor configuration")
-
-    # Debug: Print market-aware routing information
-    fallback_str = " → ".join(fallback_vendors)
-    if symbol:
-        print(f"DEBUG: {method} for {market} market ('{symbol}') - Vendor order: [{fallback_str}]")
-    else:
-        print(f"DEBUG: {method} - Default vendor order: [{fallback_str}]")
 
     # Track results and execution state
     results = []
     vendor_attempt_count = 0
     successful_vendor = None
+    
+    # Determine if this method should collect from all vendors (news methods only)
+    should_collect_all = method in ['get_news', 'get_global_news']
     
     # Determine primary vendors based on market preferences
     if symbol:
@@ -337,15 +339,9 @@ def route_to_vendor(method: str, *args, **kwargs):
         is_primary_vendor = vendor in primary_vendors
         vendor_attempt_count += 1
 
-        # Debug: Print current attempt with market context
-        vendor_type = "PRIMARY" if is_primary_vendor else "FALLBACK"
-        market_info = f" ({market})" if symbol else ""
-        print(f"DEBUG: Attempting {vendor_type} vendor '{vendor}' for {method}{market_info} (attempt #{vendor_attempt_count})")
-
         # Handle list of methods for a vendor
         if isinstance(vendor_impl, list):
             vendor_methods = [(impl, vendor) for impl in vendor_impl]
-            print(f"DEBUG: Vendor '{vendor}' has multiple implementations: {len(vendor_methods)} functions")
         else:
             vendor_methods = [(vendor_impl, vendor)]
 
@@ -353,7 +349,6 @@ def route_to_vendor(method: str, *args, **kwargs):
         vendor_results = []
         for impl_func, vendor_name in vendor_methods:
             try:
-                print(f"DEBUG: Calling {impl_func.__name__} from vendor '{vendor_name}'...")
                 result = impl_func(*args, **kwargs)
                 vendor_results.append(result)
                 print(f"SUCCESS: {impl_func.__name__} from vendor '{vendor_name}' completed successfully")
@@ -361,7 +356,6 @@ def route_to_vendor(method: str, *args, **kwargs):
             except AlphaVantageRateLimitError as e:
                 if vendor == "alpha_vantage":
                     print(f"RATE_LIMIT: Alpha Vantage rate limit exceeded, falling back to next available vendor")
-                    print(f"DEBUG: Rate limit details: {e}")
                 # Continue to next vendor for fallback
                 continue
             except Exception as e:
@@ -376,10 +370,10 @@ def route_to_vendor(method: str, *args, **kwargs):
             result_summary = f"Got {len(vendor_results)} result(s)"
             print(f"SUCCESS: Vendor '{vendor}' succeeded - {result_summary}")
             
-            # Stopping logic: Stop after first successful vendor for single-vendor configs
-            # Multiple vendor configs (comma-separated) may want to collect from multiple sources
-            if len(primary_vendors) == 1:
-                print(f"DEBUG: Stopping after successful vendor '{vendor}' (single-vendor config)")
+            # Stopping logic: 
+            # - News methods (get_news, get_global_news): Collect from ALL vendors
+            # - Other methods: Stop after first successful vendor
+            if not should_collect_all:
                 break
         else:
             print(f"FAILED: Vendor '{vendor}' produced no results")

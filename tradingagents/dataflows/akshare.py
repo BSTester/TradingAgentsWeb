@@ -4,8 +4,8 @@ Imports all functions from specialized modules following alpha_vantage.py patter
 """
 
 # Import from specialized modules
-from .akshare_stock import get_stock
-from .akshare_indicator import get_indicators
+from .akshare_stock import get_stock, get_stock_realtime_quote
+from .akshare_indicator import get_indicator
 from .akshare_fundamentals import (
     get_fundamentals,
     get_balance_sheet,
@@ -33,6 +33,7 @@ from .akshare_common import (
 __all__ = [
     # Stock data
     'get_stock',
+    'get_stock_realtime_quote',
     # Technical indicators
     'get_indicators',
     # Fundamentals

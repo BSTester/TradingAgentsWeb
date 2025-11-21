@@ -63,6 +63,8 @@ class MessageBuffer:
             "Safe Analyst": "pending",
             # Portfolio Management Team
             "Portfolio Manager": "pending",
+            # Trading Execution Team (after Risk Management)
+            "Trading Executor": "pending",
         }
         self.current_agent = None
         self.report_sections = {
@@ -73,6 +75,7 @@ class MessageBuffer:
             "investment_plan": None,
             "trader_investment_plan": None,
             "final_trade_decision": None,
+            "execution_report": None,
         }
 
     def add_message(self, message_type, content):
@@ -114,6 +117,7 @@ class MessageBuffer:
                 "investment_plan": "Research Team Decision",
                 "trader_investment_plan": "Trading Team Plan",
                 "final_trade_decision": "Portfolio Management Decision",
+                "execution_report": "Trading Execution Result",
             }
             self.current_report = (
                 f"### {section_titles[latest_section]}\n{latest_content}"
@@ -168,6 +172,11 @@ class MessageBuffer:
             report_parts.append("## Portfolio Management Decision")
             report_parts.append(f"{self.report_sections['final_trade_decision']}")
 
+        # Trading Execution Result
+        if self.report_sections["execution_report"]:
+            report_parts.append("## Trading Execution Result")
+            report_parts.append(f"{self.report_sections['execution_report']}")
+
         self.final_report = "\n\n".join(report_parts) if report_parts else None
 
 
@@ -182,7 +191,7 @@ def create_layout():
         Layout(name="footer", size=3),
     )
     layout["main"].split_column(
-        Layout(name="upper", ratio=3), Layout(name="analysis", ratio=5)
+        Layout(name="upper", ratio=4), Layout(name="analysis", ratio=4)  # 增加upper的比例
     )
     layout["upper"].split_row(
         Layout(name="progress", ratio=2), Layout(name="messages", ratio=3)
@@ -210,12 +219,13 @@ def update_display(layout, spinner_text=None):
         show_footer=False,
         box=box.SIMPLE_HEAD,  # Use simple header with horizontal lines
         title=None,  # Remove the redundant Progress title
-        padding=(0, 2),  # Add horizontal padding
+        padding=(0, 1),  # Reduce padding for more compact display
         expand=True,  # Make table expand to fill available space
+        collapse_padding=True,  # Collapse padding between rows
     )
-    progress_table.add_column("Team", style="cyan", justify="center", width=20)
-    progress_table.add_column("Agent", style="green", justify="center", width=20)
-    progress_table.add_column("Status", style="yellow", justify="center", width=20)
+    progress_table.add_column("Team", style="cyan", justify="center", width=18)  # 稍微减小宽度
+    progress_table.add_column("Agent", style="green", justify="center", width=18)
+    progress_table.add_column("Status", style="yellow", justify="center", width=15)
 
     # Group agents by team
     teams = {
@@ -229,6 +239,7 @@ def update_display(layout, spinner_text=None):
         "Trading Team": ["Trader"],
         "Risk Management": ["Risky Analyst", "Neutral Analyst", "Safe Analyst"],
         "Portfolio Management": ["Portfolio Manager"],
+        "Trading Execution": ["Trading Executor"],  # Trading Executor is after Risk Management
     }
 
     for team, agents in teams.items():
@@ -245,6 +256,7 @@ def update_display(layout, spinner_text=None):
                 "pending": "yellow",
                 "completed": "green",
                 "error": "red",
+                "skipped": "dim",
             }.get(status, "white")
             status_cell = f"[{status_color}]{status}[/{status_color}]"
         progress_table.add_row(team, first_agent, status_cell)
@@ -262,12 +274,14 @@ def update_display(layout, spinner_text=None):
                     "pending": "yellow",
                     "completed": "green",
                     "error": "red",
+                    "skipped": "dim",
                 }.get(status, "white")
                 status_cell = f"[{status_color}]{status}[/{status_color}]"
             progress_table.add_row("", agent, status_cell)
-
-        # Add horizontal line after each team
-        progress_table.add_row("─" * 20, "─" * 20, "─" * 20, style="dim")
+        
+        # Add separator line after each team (except the last one)
+        if team != list(teams.keys())[-1]:
+            progress_table.add_row("", "", "", end_section=True)
 
     layout["progress"].update(
         Panel(progress_table, title="Progress", border_style="cyan", padding=(1, 2))
@@ -405,7 +419,7 @@ def get_user_selections():
     welcome_content = f"{welcome_ascii}\n"
     welcome_content += "[bold green]TradingAgents: Multi-Agents LLM Financial Trading Framework - CLI[/bold green]\n\n"
     welcome_content += "[bold]Workflow Steps:[/bold]\n"
-    welcome_content += "I. Analyst Team → II. Research Team → III. Trader → IV. Risk Management → V. Portfolio Management\n\n"
+    welcome_content += "I. Analyst Team → II. Research Team → III. Trading Team → IV. Risk Management → V. Portfolio Management → VI. Trading Execution (if enabled)\n\n"
     welcome_content += (
         "[dim]Built by [Tauric Research](https://github.com/TauricResearch)[/dim]"
     )
@@ -484,6 +498,24 @@ def get_user_selections():
     selected_shallow_thinker = select_shallow_thinking_agent(selected_llm_provider)
     selected_deep_thinker = select_deep_thinking_agent(selected_llm_provider)
 
+    # Step 7: Auto-execute trading
+    console.print(
+        create_question_box(
+            "Step 7: Auto-Execute Trading",
+            "Enable automatic trade execution? (Trading Executor will run after Risk Management)",
+            "No"
+        )
+    )
+    auto_execute_trading = typer.confirm(
+        "Enable auto-execute trading?",
+        default=False
+    )
+    
+    if auto_execute_trading:
+        console.print("[yellow]⚠️  Auto-execute trading is enabled. Trading Executor will run after Risk Management.[/yellow]")
+    else:
+        console.print("[green]✓ Auto-execute trading is disabled. Only analysis will be performed.[/green]")
+
     return {
         "ticker": selected_ticker,
         "analysis_date": analysis_date,
@@ -493,6 +525,7 @@ def get_user_selections():
         "backend_url": backend_url,
         "shallow_thinker": selected_shallow_thinker,
         "deep_thinker": selected_deep_thinker,
+        "auto_execute_trading": auto_execute_trading,
     }
 
 
@@ -709,12 +742,30 @@ def display_complete_report(final_state):
                 )
             )
 
+    # VI. Trading Execution Result (if enabled)
+    if final_state.get("execution_report"):
+        console.print(
+            Panel(
+                Panel(
+                    Markdown(final_state["execution_report"]),
+                    title="Trading Executor",
+                    border_style="blue",
+                    padding=(1, 2),
+                ),
+                title="VI. Trading Execution Result",
+                border_style="cyan",
+                padding=(1, 2),
+            )
+        )
+
 
 def update_research_team_status(status):
-    """Update status for all research team members and trader."""
-    research_team = ["Bull Researcher", "Bear Researcher", "Research Manager", "Trader"]
+    """Update status for all research team members."""
+    research_team = ["Bull Researcher", "Bear Researcher", "Research Manager"]
     for agent in research_team:
         message_buffer.update_agent_status(agent, status)
+
+
 
 def extract_content_string(content):
     """Extract string content from various message formats."""
@@ -739,7 +790,7 @@ def run_analysis():
     # First get all user selections
     selections = get_user_selections()
 
-    # Create config with selected research depth
+    # Create config with selected research depth and auto-execute trading
     config = DEFAULT_CONFIG.copy()
     config["max_debate_rounds"] = selections["research_depth"]
     config["max_risk_discuss_rounds"] = selections["research_depth"]
@@ -747,6 +798,7 @@ def run_analysis():
     config["deep_think_llm"] = selections["deep_thinker"]
     config["backend_url"] = selections["backend_url"]
     config["llm_provider"] = selections["llm_provider"].lower()
+    config["auto_execute_trading"] = selections.get("auto_execute_trading", False)
 
     # Initialize the graph
     graph = TradingAgentsGraph(
@@ -821,6 +873,10 @@ def run_analysis():
         # Reset agent statuses
         for agent in message_buffer.agent_status:
             message_buffer.update_agent_status(agent, "pending")
+        
+        # Mark Trading Executor as skipped if auto-execute is disabled
+        if not config.get("auto_execute_trading", False):
+            message_buffer.update_agent_status("Trading Executor", "skipped")
 
         # Reset report sections
         for section in message_buffer.report_sections:
@@ -848,9 +904,35 @@ def run_analysis():
         # Stream the analysis
         trace = []
         for chunk in graph.graph.stream(init_agent_state, **args):
-            if len(chunk["messages"]) > 0:
+            # Debug: Print all chunk info to understand structure
+            chunk_node_name = list(chunk.keys())[0] if chunk else "unknown"
+            if "Trading Executor" in chunk_node_name or "tools_trading_executor" in chunk_node_name:
+                print(f"\n[CLI DEBUG] Chunk from node: {chunk_node_name}")
+                print(f"  - Chunk keys: {list(chunk.keys())}")
+                chunk_data = chunk.get(chunk_node_name, chunk)
+                if isinstance(chunk_data, dict):
+                    print(f"  - Data keys: {list(chunk_data.keys())}")
+                    print(f"  - Has messages: {len(chunk_data.get('messages', []))}")
+                    print(f"  - Has sender: {chunk_data.get('sender')}")
+                    if chunk_data.get("messages"):
+                        last_msg = chunk_data["messages"][-1]
+                        print(f"  - Last message type: {type(last_msg).__name__}")
+                        print(f"  - Last message has tool_calls: {hasattr(last_msg, 'tool_calls')}")
+                        if hasattr(last_msg, 'tool_calls'):
+                            print(f"  - Tool calls count: {len(last_msg.tool_calls)}")
+            
+            # Extract messages from chunk (handle both formats)
+            messages = chunk.get("messages", [])
+            if not messages and len(chunk) > 0:
+                # Try to get messages from nested structure
+                for key, value in chunk.items():
+                    if isinstance(value, dict) and "messages" in value:
+                        messages = value["messages"]
+                        break
+            
+            if len(messages) > 0:
                 # Get the last message from the chunk
-                last_message = chunk["messages"][-1]
+                last_message = messages[-1]
 
                 # Extract message content and type
                 if hasattr(last_message, "content"):
@@ -873,12 +955,24 @@ def run_analysis():
                             )
                         else:
                             message_buffer.add_tool_call(tool_call.name, tool_call.args)
+                        
+                        # Debug: Log tool calls from Trading Executor
+                        if chunk.get("sender") == "TradingExecutor":
+                            tool_name = tool_call.get("name") if isinstance(tool_call, dict) else tool_call.name
+                            print(f"[CLI DEBUG] Trading Executor tool call: {tool_name}")
 
+                # Extract chunk data (handle nested structure)
+                chunk_data = chunk
+                if len(chunk) > 0:
+                    first_key = list(chunk.keys())[0]
+                    if isinstance(chunk[first_key], dict):
+                        chunk_data = chunk[first_key]
+                
                 # Update reports and agent status based on chunk content
                 # Analyst Team Reports
-                if "market_report" in chunk and chunk["market_report"]:
+                if "market_report" in chunk_data and chunk_data["market_report"]:
                     message_buffer.update_report_section(
-                        "market_report", chunk["market_report"]
+                        "market_report", chunk_data["market_report"]
                     )
                     message_buffer.update_agent_status("Market Analyst", "completed")
                     # Set next analyst to in_progress
@@ -887,9 +981,9 @@ def run_analysis():
                             "Social Analyst", "in_progress"
                         )
 
-                if "sentiment_report" in chunk and chunk["sentiment_report"]:
+                if "sentiment_report" in chunk_data and chunk_data["sentiment_report"]:
                     message_buffer.update_report_section(
-                        "sentiment_report", chunk["sentiment_report"]
+                        "sentiment_report", chunk_data["sentiment_report"]
                     )
                     message_buffer.update_agent_status("Social Analyst", "completed")
                     # Set next analyst to in_progress
@@ -898,9 +992,9 @@ def run_analysis():
                             "News Analyst", "in_progress"
                         )
 
-                if "news_report" in chunk and chunk["news_report"]:
+                if "news_report" in chunk_data and chunk_data["news_report"]:
                     message_buffer.update_report_section(
-                        "news_report", chunk["news_report"]
+                        "news_report", chunk_data["news_report"]
                     )
                     message_buffer.update_agent_status("News Analyst", "completed")
                     # Set next analyst to in_progress
@@ -909,9 +1003,9 @@ def run_analysis():
                             "Fundamentals Analyst", "in_progress"
                         )
 
-                if "fundamentals_report" in chunk and chunk["fundamentals_report"]:
+                if "fundamentals_report" in chunk_data and chunk_data["fundamentals_report"]:
                     message_buffer.update_report_section(
-                        "fundamentals_report", chunk["fundamentals_report"]
+                        "fundamentals_report", chunk_data["fundamentals_report"]
                     )
                     message_buffer.update_agent_status(
                         "Fundamentals Analyst", "completed"
@@ -921,10 +1015,10 @@ def run_analysis():
 
                 # Research Team - Handle Investment Debate State
                 if (
-                    "investment_debate_state" in chunk
-                    and chunk["investment_debate_state"]
+                    "investment_debate_state" in chunk_data
+                    and chunk_data["investment_debate_state"]
                 ):
-                    debate_state = chunk["investment_debate_state"]
+                    debate_state = chunk_data["investment_debate_state"]
 
                     # Update Bull Researcher status and report
                     if "bull_history" in debate_state and debate_state["bull_history"]:
@@ -974,34 +1068,44 @@ def run_analysis():
                         )
                         # Mark all research team members as completed
                         update_research_team_status("completed")
-                        # Set first risk analyst to in_progress
-                        message_buffer.update_agent_status(
-                            "Risky Analyst", "in_progress"
-                        )
+                        # Set Trader to in_progress
+                        message_buffer.update_agent_status("Trader", "in_progress")
 
                 # Trading Team
                 if (
-                    "trader_investment_plan" in chunk
-                    and chunk["trader_investment_plan"]
+                    "trader_investment_plan" in chunk_data
+                    and chunk_data["trader_investment_plan"]
                 ):
-                    message_buffer.update_report_section(
-                        "trader_investment_plan", chunk["trader_investment_plan"]
+                    # Update Trader status
+                    message_buffer.update_agent_status("Trader", "in_progress")
+                    message_buffer.add_message(
+                        "Reasoning",
+                        f"Trader: {chunk_data['trader_investment_plan'][:200]}...",
                     )
+                    message_buffer.update_report_section(
+                        "trader_investment_plan", chunk_data["trader_investment_plan"]
+                    )
+                    # Mark Trader as completed
+                    message_buffer.update_agent_status("Trader", "completed")
                     # Set first risk analyst to in_progress
                     message_buffer.update_agent_status("Risky Analyst", "in_progress")
 
                 # Risk Management Team - Handle Risk Debate State
-                if "risk_debate_state" in chunk and chunk["risk_debate_state"]:
-                    risk_state = chunk["risk_debate_state"]
+                if "risk_debate_state" in chunk_data and chunk_data["risk_debate_state"]:
+                    risk_state = chunk_data["risk_debate_state"]
+                    latest_speaker = risk_state.get("latest_speaker", "")
 
                     # Update Risky Analyst status and report
                     if (
                         "current_risky_response" in risk_state
                         and risk_state["current_risky_response"]
                     ):
-                        message_buffer.update_agent_status(
-                            "Risky Analyst", "in_progress"
-                        )
+                        # Set to in_progress if currently pending
+                        if message_buffer.agent_status["Risky Analyst"] == "pending":
+                            message_buffer.update_agent_status(
+                                "Risky Analyst", "in_progress"
+                            )
+                        
                         message_buffer.add_message(
                             "Reasoning",
                             f"Risky Analyst: {risk_state['current_risky_response']}",
@@ -1011,15 +1115,26 @@ def run_analysis():
                             "final_trade_decision",
                             f"### Risky Analyst Analysis\n{risk_state['current_risky_response']}",
                         )
+                        
+                        # Mark as completed only if another analyst has started speaking
+                        if latest_speaker in ["Safe", "Neutral", "Judge"]:
+                            message_buffer.update_agent_status("Risky Analyst", "completed")
 
                     # Update Safe Analyst status and report
                     if (
                         "current_safe_response" in risk_state
                         and risk_state["current_safe_response"]
                     ):
-                        message_buffer.update_agent_status(
-                            "Safe Analyst", "in_progress"
-                        )
+                        # Complete Risky Analyst if it was in progress
+                        if message_buffer.agent_status["Risky Analyst"] == "in_progress":
+                            message_buffer.update_agent_status("Risky Analyst", "completed")
+                        
+                        # Set to in_progress if currently pending
+                        if message_buffer.agent_status["Safe Analyst"] == "pending":
+                            message_buffer.update_agent_status(
+                                "Safe Analyst", "in_progress"
+                            )
+                        
                         message_buffer.add_message(
                             "Reasoning",
                             f"Safe Analyst: {risk_state['current_safe_response']}",
@@ -1029,15 +1144,26 @@ def run_analysis():
                             "final_trade_decision",
                             f"### Safe Analyst Analysis\n{risk_state['current_safe_response']}",
                         )
+                        
+                        # Mark as completed only if another analyst has started speaking
+                        if latest_speaker in ["Neutral", "Judge"]:
+                            message_buffer.update_agent_status("Safe Analyst", "completed")
 
                     # Update Neutral Analyst status and report
                     if (
                         "current_neutral_response" in risk_state
                         and risk_state["current_neutral_response"]
                     ):
-                        message_buffer.update_agent_status(
-                            "Neutral Analyst", "in_progress"
-                        )
+                        # Complete Safe Analyst if it was in progress
+                        if message_buffer.agent_status["Safe Analyst"] == "in_progress":
+                            message_buffer.update_agent_status("Safe Analyst", "completed")
+                        
+                        # Set to in_progress if currently pending
+                        if message_buffer.agent_status["Neutral Analyst"] == "pending":
+                            message_buffer.update_agent_status(
+                                "Neutral Analyst", "in_progress"
+                            )
+                        
                         message_buffer.add_message(
                             "Reasoning",
                             f"Neutral Analyst: {risk_state['current_neutral_response']}",
@@ -1047,9 +1173,21 @@ def run_analysis():
                             "final_trade_decision",
                             f"### Neutral Analyst Analysis\n{risk_state['current_neutral_response']}",
                         )
+                        
+                        # Mark as completed only if Portfolio Manager has started
+                        if latest_speaker == "Judge":
+                            message_buffer.update_agent_status("Neutral Analyst", "completed")
 
                     # Update Portfolio Manager status and final decision
                     if "judge_decision" in risk_state and risk_state["judge_decision"]:
+                        # Complete all risk analysts if they were in progress
+                        if message_buffer.agent_status["Risky Analyst"] == "in_progress":
+                            message_buffer.update_agent_status("Risky Analyst", "completed")
+                        if message_buffer.agent_status["Safe Analyst"] == "in_progress":
+                            message_buffer.update_agent_status("Safe Analyst", "completed")
+                        if message_buffer.agent_status["Neutral Analyst"] == "in_progress":
+                            message_buffer.update_agent_status("Neutral Analyst", "completed")
+                        
                         message_buffer.update_agent_status(
                             "Portfolio Manager", "in_progress"
                         )
@@ -1062,15 +1200,46 @@ def run_analysis():
                             "final_trade_decision",
                             f"### Portfolio Manager Decision\n{risk_state['judge_decision']}",
                         )
-                        # Mark risk analysts as completed
-                        message_buffer.update_agent_status("Risky Analyst", "completed")
-                        message_buffer.update_agent_status("Safe Analyst", "completed")
-                        message_buffer.update_agent_status(
-                            "Neutral Analyst", "completed"
-                        )
+                        # Mark Portfolio Manager as completed
                         message_buffer.update_agent_status(
                             "Portfolio Manager", "completed"
                         )
+                        # Set Trading Executor to in_progress if auto-execute is enabled
+                        if config.get("auto_execute_trading", False):
+                            message_buffer.update_agent_status(
+                                "Trading Executor", "in_progress"
+                            )
+
+                # Trading Execution Team - Handle execution report
+                # Check if this chunk is from Trading Executor
+                if chunk_data.get("sender") == "TradingExecutor":
+                    execution_report = chunk_data.get("execution_report", "")
+                    
+                    print(f"[CLI DEBUG] Processing Trading Executor chunk:")
+                    print(f"  - execution_report length: {len(execution_report) if execution_report else 0}")
+                    print(f"  - execution_report preview: {execution_report[:100] if execution_report else 'None'}")
+                    
+                    # If execution_report is not empty, agent has completed
+                    if execution_report:
+                        message_buffer.update_agent_status(
+                            "Trading Executor", "completed"
+                        )
+                        # Display execution summary
+                        message_buffer.add_message(
+                            "Reasoning",
+                            f"Trading Executor: {execution_report[:200]}..."  # Truncate for display
+                        )
+                        # Update report section with full execution result
+                        message_buffer.update_report_section(
+                            "execution_report",
+                            execution_report,
+                        )
+                    else:
+                        # Still in progress (has tool calls)
+                        message_buffer.update_agent_status(
+                            "Trading Executor", "in_progress"
+                        )
+                        print(f"[CLI DEBUG] Trading Executor still in progress (has tool calls)")
 
                 # Update the display
                 update_display(layout)
@@ -1079,10 +1248,18 @@ def run_analysis():
 
         # Get final state and decision
         final_state = trace[-1]
-        decision = graph.process_signal(final_state["final_trade_decision"])
+        
+        # Merge execution_report from message_buffer if not in final_state
+        if "execution_report" not in final_state or not final_state.get("execution_report"):
+            if message_buffer.report_sections.get("execution_report"):
+                final_state["execution_report"] = message_buffer.report_sections["execution_report"]
+        
+        decision = graph.process_signal(final_state.get("final_trade_decision", ""))
 
-        # Update all agent statuses to completed
+        # Update all agent statuses to completed (except Trading Executor if it failed)
         for agent in message_buffer.agent_status:
+            if agent == "Trading Executor" and message_buffer.agent_status[agent] == "error":
+                continue  # Keep error status
             message_buffer.update_agent_status(agent, "completed")
 
         message_buffer.add_message(
@@ -1098,6 +1275,33 @@ def run_analysis():
         display_complete_report(final_state)
 
         update_display(layout)
+        
+        # Display trading execution summary if enabled
+        if selections.get("auto_execute_trading", False):
+            console.print("\n")
+            # Check if execution was completed
+            if final_state.get("execution_report"):
+                console.print(Panel(
+                    "[bold green]✓ Trading Execution Completed[/bold green]\n"
+                    "[dim]Trade execution has been completed. See detailed report above.[/dim]",
+                    border_style="green",
+                    padding=(1, 2)
+                ))
+            else:
+                console.print(Panel(
+                    "[bold yellow]⚠ Trading Execution Incomplete[/bold yellow]\n"
+                    "[dim]Trading executor did not complete. Check logs for details.[/dim]",
+                    border_style="yellow",
+                    padding=(1, 2)
+                ))
+        else:
+            console.print("\n")
+            console.print(Panel(
+                "[bold blue]Auto-Execute Trading Disabled[/bold blue]\n"
+                "[dim]Analysis completed. No trades were executed.[/dim]",
+                border_style="blue",
+                padding=(1, 2)
+            ))
 
 
 @app.command()

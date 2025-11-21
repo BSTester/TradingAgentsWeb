@@ -13,7 +13,7 @@ export function HeroSection({ onNewAnalysis }: HeroSectionProps) {
         <div className="text-center">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
             <i className="fas fa-robot mr-3" />
-            TradingAgents
+            TradingAgentsWeb
           </h1>
           <p className="text-xl md:text-2xl mb-3">多智能体大语言模型金融交易框架</p>
           <p className="text-lg md:text-xl mb-6">

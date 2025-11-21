@@ -5,7 +5,7 @@ Pydantic schemas for TradingAgents Web Interface
 
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, Field, validator
 
 # User schemas
 class UserBase(BaseModel):
@@ -13,10 +13,12 @@ class UserBase(BaseModel):
     email: EmailStr
 
 class UserCreate(UserBase):
-    password: str
+    password: Optional[str] = None  # Password is now optional
     # 服务端验证码（防绕过前端）
     captcha_id: Optional[str] = None
     captcha_answer: Optional[str] = None
+    # 邮箱验证码
+    email_code: Optional[str] = None
     
     @validator('username')
     def validate_username(cls, v):
@@ -25,6 +27,23 @@ class UserCreate(UserBase):
         if not v.replace('_', '').replace('-', '').isalnum():
             raise ValueError('Username can only contain letters, numbers, underscores, and hyphens')
         return v
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if v and len(v) < 6:
+            raise ValueError('Password must be at least 6 characters long')
+        return v
+    
+    @validator('email_code')
+    def validate_email_code(cls, v):
+        if v and (not v.isdigit() or len(v) != 6):
+            raise ValueError('Email verification code must be exactly 6 digits')
+        return v
+
+class PasswordSetRequest(BaseModel):
+    """Request schema for setting password"""
+    password: str
+    old_password: Optional[str] = None  # Required when updating existing password
     
     @validator('password')
     def validate_password(cls, v):
@@ -43,6 +62,9 @@ class User(UserBase):
     id: int
     role: str
     is_active: bool
+    can_access_intraday_trading: bool
+    participate_in_leaderboard: bool
+    has_set_password: bool
     created_at: datetime
     
     class Config:
@@ -55,6 +77,31 @@ class UserInDB(User):
 class CaptchaResponse(BaseModel):
     captcha_id: str
     seed: str
+
+# Email verification code schemas
+class EmailCodeSendRequest(BaseModel):
+    """Request schema for sending verification code"""
+    email: EmailStr
+    captcha_id: str
+    captcha_answer: str
+
+class EmailCodeSendResponse(BaseModel):
+    """Response schema for send verification code"""
+    message: str
+    expires_in: int  # seconds
+
+class EmailCodeLoginRequest(BaseModel):
+    """Request schema for email code login"""
+    email: EmailStr
+    code: str
+    captcha_id: str
+    captcha_answer: str
+    
+    @validator('code')
+    def validate_code(cls, v):
+        if not v.isdigit() or len(v) != 6:
+            raise ValueError('Verification code must be exactly 6 digits')
+        return v
 
 # Token schemas
 class Token(BaseModel):
@@ -82,11 +129,14 @@ class AnalysisRequest(BaseModel):
     deep_thinker: str
     # Privacy settings
     is_public: bool = False  # Whether to show in public leaderboard
-    # API Keys
-    openai_api_key: Optional[str] = None
-    anthropic_api_key: Optional[str] = None
-    google_api_key: Optional[str] = None
-    openrouter_api_key: Optional[str] = None
+    # Trading executor settings
+    enable_trading_executor: bool = False  # Whether to enable trading executor
+    futu_api_base_url: Optional[str] = None  # Futu API base URL
+    futu_api_key: Optional[str] = None  # Futu API key
+    # API Key (single field for all LLM providers)
+    api_key: Optional[str] = None  # API key for the selected LLM provider
+    # Email notification settings
+    email_notification: bool = False  # Whether to send email notification when analysis completes
     
     @validator('analysis_date')
     def validate_date(cls, v):
@@ -119,6 +169,10 @@ class AnalysisStatus(BaseModel):
     progress_percentage: float = 0.0
     started_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    # Configuration info for UI initialization
+    selected_analysts: Optional[List[str]] = None
+    enable_trading_executor: bool = False
+    email_notification_enabled: bool = False
 
 class AnalysisRecord(BaseModel):
     id: int
@@ -131,6 +185,9 @@ class AnalysisRecord(BaseModel):
     updated_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    email_notification_enabled: bool = False
+    email_sent: bool = False
+    email_sent_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True
@@ -151,6 +208,10 @@ class AnalysisResults(BaseModel):
     created_at: datetime
     updated_at: datetime
     completed_at: Optional[datetime] = None
+    email_notification_enabled: bool = False
+    email_sent: bool = False
+    email_sent_at: Optional[datetime] = None
+    email_error: Optional[str] = None
     
     class Config:
         from_attributes = True
@@ -220,3 +281,391 @@ class PaginatedResponse(BaseModel):
     limit: int
     has_next: bool
     has_prev: bool
+
+# Scheduled Task schemas
+class ScheduledTaskCreate(BaseModel):
+    """Schema for creating a scheduled task"""
+    task_name: str
+    ticker: str
+    analysts: List[str]
+    research_depth: int
+    llm_provider: str
+    backend_url: str
+    shallow_thinker: str
+    deep_thinker: str
+    is_public: bool = False
+    
+    # Trading executor configuration
+    enable_trading_executor: bool = False
+    futu_api_base_url: Optional[str] = None
+    futu_api_key: Optional[str] = None
+    
+    # Email notification settings
+    email_notification: bool = False  # Whether to send email notification when task completes
+    
+    # API Key (single field for all LLM providers)
+    api_key: Optional[str] = None  # API key for the selected LLM provider
+    
+    # Schedule configuration (optional for immediate execution)
+    execution_cycle: Optional[str] = None  # daily, weekly, every_n_days, workdays
+    execution_time: Optional[str] = None  # HH:MM format (Beijing time)
+    interval_days: Optional[int] = None  # Required if execution_cycle is every_n_days
+    day_of_week: Optional[str] = None  # Required if execution_cycle is weekly (0-6, 0=Sunday)
+    end_date: Optional[str] = None  # Optional end date in YYYY-MM-DD format
+    
+    @validator('task_name')
+    def validate_task_name(cls, v):
+        if not v or len(v.strip()) == 0:
+            raise ValueError('Task name cannot be empty')
+        if len(v) > 255:
+            raise ValueError('Task name must be less than 255 characters')
+        return v.strip()
+    
+    @validator('execution_cycle')
+    def validate_execution_cycle(cls, v):
+        if v and v not in ['daily', 'weekly', 'every_n_days', 'workdays']:
+            raise ValueError('Invalid execution cycle. Must be one of: daily, weekly, every_n_days, workdays')
+        return v
+    
+    @validator('execution_time')
+    def validate_execution_time(cls, v):
+        if v:
+            import re
+            if not re.match(r'^([01]\d|2[0-3]):([0-5]\d)$', v):
+                raise ValueError('Invalid time format. Use HH:MM (24-hour format)')
+        return v
+    
+    @validator('interval_days')
+    def validate_interval_days(cls, v, values):
+        if values.get('execution_cycle') == 'every_n_days':
+            if not v or v < 1 or v > 365:
+                raise ValueError('interval_days must be between 1 and 365 when execution_cycle is every_n_days')
+        return v
+    
+    @validator('day_of_week')
+    def validate_day_of_week(cls, v, values):
+        if values.get('execution_cycle') == 'weekly':
+            if not v or v not in ['0', '1', '2', '3', '4', '5', '6']:
+                raise ValueError('day_of_week must be specified for weekly cycle (0-6, 0=Sunday)')
+        return v
+    
+    @validator('end_date')
+    def validate_end_date(cls, v):
+        if v:
+            from datetime import datetime, date
+            try:
+                end_date = datetime.strptime(v, '%Y-%m-%d').date()
+                if end_date < date.today():
+                    raise ValueError('End date cannot be in the past')
+            except ValueError as e:
+                if 'End date cannot be in the past' in str(e):
+                    raise
+                raise ValueError('Invalid date format. Use YYYY-MM-DD')
+        return v
+    
+    @validator('analysts')
+    def validate_analysts(cls, v):
+        if not v:
+            raise ValueError('At least one analyst must be selected')
+        return v
+
+class ScheduledTaskResponse(BaseModel):
+    """Schema for scheduled task response"""
+    id: int
+    user_id: int
+    task_name: str
+    ticker: str
+    market: Optional[str]
+    analysts: List[str]
+    research_depth: int
+    llm_provider: str
+    shallow_thinker: str
+    deep_thinker: str
+    backend_url: str
+    is_public: bool
+    enable_trading_executor: bool
+    futu_api_base_url: Optional[str]
+    futu_api_key: Optional[str]
+    email_notification_enabled: bool
+    execution_cycle: str
+    execution_time: str
+    interval_days: Optional[int]
+    day_of_week: Optional[str]
+    end_date: Optional[datetime]
+    is_enabled: bool
+    status: str
+    next_run_time: Optional[datetime]
+    last_run_time: Optional[datetime]
+    total_executions: int
+    created_at: datetime
+    updated_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True
+
+class ScheduledTaskUpdate(BaseModel):
+    """Schema for updating task status"""
+    is_enabled: Optional[bool] = None
+    task_name: Optional[str] = None
+    
+    @validator('task_name')
+    def validate_task_name(cls, v):
+        if v is not None:
+            if len(v.strip()) == 0:
+                raise ValueError('Task name cannot be empty')
+            if len(v) > 255:
+                raise ValueError('Task name must be less than 255 characters')
+            return v.strip()
+        return v
+
+class ScheduledTaskListResponse(BaseModel):
+    """Schema for paginated scheduled task list"""
+    items: List[ScheduledTaskResponse]
+    total: int
+    page: int
+    limit: int
+    has_next: bool
+    has_prev: bool
+    # Statistics for all tasks (not just current page)
+    stats: Optional[dict] = None  # {"enabled": int, "paused": int, "completed": int}
+
+# User Status Update schemas
+class UserStatusUpdate(BaseModel):
+    """Schema for updating user status"""
+    is_active: bool
+
+class UserIntradayAccessUpdate(BaseModel):
+    """Schema for updating user intraday trading access"""
+    can_access_intraday_trading: bool
+
+# User Configuration schemas
+class UserConfigUpdate(BaseModel):
+    """Schema for updating user configuration - all analysis settings"""
+    # Analysis configuration cache (previously stored in frontend localStorage)
+    last_ticker: Optional[str] = None  # 最后分析的股票代码
+    last_analysts: Optional[List[str]] = None
+    last_research_depth: Optional[int] = None
+    last_llm_provider: Optional[str] = None
+    last_shallow_thinker: Optional[str] = None
+    last_deep_thinker: Optional[str] = None
+    last_backend_url: Optional[str] = None
+    
+    # Trading executor configuration
+    enable_trading_executor: Optional[bool] = None
+    futu_api_base_url: Optional[str] = None
+    futu_api_key: Optional[str] = None
+    
+    # API Key (single field for all LLM providers)
+    last_api_key: Optional[str] = None  # Last used API key (matches last_llm_provider)
+
+class UserConfigResponse(BaseModel):
+    """Schema for user configuration response - returns all cached settings"""
+    # Analysis configuration cache
+    last_ticker: Optional[str] = None  # 最后分析的股票代码
+    last_analysts: Optional[List[str]] = None
+    last_research_depth: Optional[int] = None
+    last_llm_provider: Optional[str] = None
+    last_shallow_thinker: Optional[str] = None
+    last_deep_thinker: Optional[str] = None
+    last_backend_url: Optional[str] = None
+    
+    # Trading executor configuration
+    enable_trading_executor: bool = False
+    futu_api_base_url: Optional[str] = None
+    futu_api_key: Optional[str] = None
+    
+    # API Key (returns actual key for frontend to use)
+    last_api_key: Optional[str] = None  # Last used API key (matches last_llm_provider)
+    
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
+# Prompt Template Management Schemas
+# ============================================================================
+
+class PromptTemplateBase(BaseModel):
+    template_name: Optional[str] = Field(None, max_length=200, description="策略标题，最多200个字符")
+    description: Optional[str] = Field(None, max_length=500, description="策略描述，最多500个字符")
+    system_prompt: str = Field(..., max_length=20000, description="系统提示词，最多20000个字符")
+    version: Optional[str] = Field("1.0", max_length=50)
+
+
+class PromptTemplateCreate(PromptTemplateBase):
+    agent_type: str = "intraday_trader"
+
+
+class PromptTemplateUpdate(BaseModel):
+    template_name: Optional[str] = Field(None, max_length=200, description="策略标题，最多200个字符")
+    description: Optional[str] = Field(None, max_length=500, description="策略描述，最多500个字符")
+    system_prompt: Optional[str] = Field(None, max_length=20000, description="系统提示词，最多20000个字符")
+    version: Optional[str] = Field(None, max_length=50)
+    is_active: Optional[bool] = None
+
+
+class PromptTemplateResponse(BaseModel):
+    id: int
+    agent_type: str
+    user_id: int
+    system_prompt: str
+    template_name: Optional[str]
+    description: Optional[str]
+    version: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    enabled_tools: List[str] = []
+    
+    class Config:
+        from_attributes = True
+
+
+class ToolResponse(BaseModel):
+    id: int
+    tool_name: str
+    tool_description: str
+    tool_parameters: Dict[str, Any]
+    category: Optional[str]
+    is_available: bool
+    
+    class Config:
+        from_attributes = True
+
+
+class ToolSelectionUpdate(BaseModel):
+    tool_name: str
+    is_enabled: bool
+
+
+class BulkToolSelectionUpdate(BaseModel):
+    tools: List[ToolSelectionUpdate]
+
+
+# ============================================================================
+# LLM Provider and Model Management Schemas
+# ============================================================================
+
+class LLMProviderBase(BaseModel):
+    provider_name: str = Field(..., max_length=100, description="供应商唯一标识")
+    display_name: str = Field(..., max_length=200, description="显示名称")
+    api_key: Optional[str] = Field(None, max_length=1000, description="API密钥 - 支持长密钥如JWT")
+    base_url: Optional[str] = Field(None, max_length=500, description="API基础URL")
+    description: Optional[str] = Field(None, description="供应商描述")
+    is_active: bool = Field(True, description="是否启用")
+    config_json: Optional[Dict[str, Any]] = Field(None, description="额外配置参数")
+    
+    @validator('provider_name')
+    def validate_provider_name(cls, v):
+        if not v or len(v.strip()) == 0:
+            raise ValueError('Provider name cannot be empty')
+        # Only allow alphanumeric, underscore, and hyphen
+        import re
+        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+            raise ValueError('Provider name can only contain letters, numbers, underscores, and hyphens')
+        return v.strip().lower()
+
+
+class LLMProviderCreate(LLMProviderBase):
+    pass
+
+
+class LLMProviderUpdate(BaseModel):
+    display_name: Optional[str] = Field(None, max_length=200)
+    api_key: Optional[str] = Field(None, max_length=1000)
+    base_url: Optional[str] = Field(None, max_length=500)
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    config_json: Optional[Dict[str, Any]] = None
+
+
+class LLMProviderResponse(BaseModel):
+    model_config = {"from_attributes": True}
+    
+    id: int
+    provider_name: str
+    display_name: str
+    api_key: Optional[str]  # Will be masked in response
+    base_url: Optional[str]
+    description: Optional[str]
+    is_active: bool
+    config_json: Optional[Dict[str, Any]]
+    created_at: datetime
+    updated_at: datetime
+    models_count: Optional[int] = 0  # Number of models under this provider
+
+
+class LLMModelBase(BaseModel):
+    model_config = {"protected_namespaces": ()}  # Disable model_ namespace protection
+    
+    model_name: str = Field(..., max_length=200, description="模型名称")
+    model_type: str = Field(..., max_length=50, description="模型类型：shallow_thinker/deep_thinker")
+    display_name: str = Field(..., max_length=200, description="显示名称")
+    description: Optional[str] = Field(None, description="模型描述")
+    is_active: bool = Field(True, description="是否启用")
+    config_json: Optional[Dict[str, Any]] = Field(None, description="模型配置参数")
+    
+    @validator('model_type')
+    def validate_model_type(cls, v):
+        if v not in ['shallow_thinker', 'deep_thinker']:
+            raise ValueError('Model type must be either shallow_thinker or deep_thinker')
+        return v
+
+
+class LLMModelCreate(LLMModelBase):
+    provider_id: int = Field(..., description="所属供应商ID")
+
+
+class LLMModelUpdate(BaseModel):
+    model_config = {"protected_namespaces": ()}  # Disable model_ namespace protection
+    
+    model_name: Optional[str] = Field(None, max_length=200)
+    model_type: Optional[str] = Field(None, max_length=50)
+    display_name: Optional[str] = Field(None, max_length=200)
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    config_json: Optional[Dict[str, Any]] = None
+    
+    @validator('model_type')
+    def validate_model_type(cls, v):
+        if v is not None and v not in ['shallow_thinker', 'deep_thinker']:
+            raise ValueError('Model type must be either shallow_thinker or deep_thinker')
+        return v
+
+
+class LLMModelResponse(BaseModel):
+    model_config = {
+        "protected_namespaces": (),  # Disable model_ namespace protection
+        "from_attributes": True
+    }
+    
+    id: int
+    provider_id: int
+    model_name: str
+    model_type: str
+    display_name: str
+    description: Optional[str]
+    is_active: bool
+    config_json: Optional[Dict[str, Any]]
+    created_at: datetime
+    updated_at: datetime
+    provider_name: Optional[str] = None  # Include provider name for convenience
+    provider_display_name: Optional[str] = None
+
+
+class LLMConnectionTest(BaseModel):
+    """Schema for testing LLM provider connection"""
+    model_config = {"protected_namespaces": ()}  # Disable model_ namespace protection
+    
+    provider_id: Optional[int] = None
+    provider_name: Optional[str] = None
+    api_key: str
+    base_url: str
+    model_name: Optional[str] = None  # Optional: test with specific model
+
+
+class LLMConnectionTestResponse(BaseModel):
+    success: bool
+    message: str
+    details: Optional[Dict[str, Any]] = None
+

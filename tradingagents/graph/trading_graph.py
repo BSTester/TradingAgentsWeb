@@ -26,6 +26,7 @@ from tradingagents.dataflows.config import set_config
 from tradingagents.agents.utils.agent_utils import (
     get_stock_data,
     get_indicators,
+    get_realtime_quote,
     get_fundamentals,
     get_balance_sheet,
     get_cashflow,
@@ -72,17 +73,15 @@ class TradingAgentsGraph:
         )
 
         # Initialize LLMs
-        if self.config["llm_provider"].lower() in ("openai", "ollama", "openrouter", "oneai", "deepseek", "qwen"):
-            self.deep_thinking_llm = ChatOpenAI(model=self.config["deep_think_llm"], base_url=self.config["backend_url"])
-            self.quick_thinking_llm = ChatOpenAI(model=self.config["quick_think_llm"], base_url=self.config["backend_url"])
-        elif self.config["llm_provider"].lower() == "anthropic":
-            self.deep_thinking_llm = ChatAnthropic(model=self.config["deep_think_llm"], base_url=self.config["backend_url"])
-            self.quick_thinking_llm = ChatAnthropic(model=self.config["quick_think_llm"], base_url=self.config["backend_url"])
+        if self.config["llm_provider"].lower() == "anthropic":
+            self.deep_thinking_llm = ChatAnthropic(model_name=self.config["deep_think_llm"], base_url=self.config["backend_url"])
+            self.quick_thinking_llm = ChatAnthropic(model_name=self.config["quick_think_llm"], base_url=self.config["backend_url"])
         elif self.config["llm_provider"].lower() == "google":
             self.deep_thinking_llm = ChatGoogleGenerativeAI(model=self.config["deep_think_llm"])
             self.quick_thinking_llm = ChatGoogleGenerativeAI(model=self.config["quick_think_llm"])
         else:
-            raise ValueError(f"Unsupported LLM provider: {self.config['llm_provider']}")
+            self.deep_thinking_llm = ChatOpenAI(model=self.config["deep_think_llm"], base_url=self.config["backend_url"])
+            self.quick_thinking_llm = ChatOpenAI(model=self.config["quick_think_llm"], base_url=self.config["backend_url"])
         
         # Initialize memories with unique names per analysis to avoid conflicts in multi-user scenarios
         # Use analysis_id from config if available, otherwise use timestamp-based unique ID
@@ -119,16 +118,41 @@ class TradingAgentsGraph:
         self.ticker = None
         self.log_states_dict = {}  # date to full state dict
 
-        # Set up the graph
-        self.graph = self.graph_setup.setup_graph(selected_analysts)
+        # Set up the graph with auto-execute trading configuration
+        auto_execute_trading = self.config.get("auto_execute_trading", False)
+        futu_api_base_url = self.config.get("futu_api_base_url")
+        futu_api_key = self.config.get("futu_api_key")
+        
+        # Set Futu API environment variables if provided
+        if auto_execute_trading and futu_api_base_url:
+            os.environ["FUTU_API_BASE_URL"] = futu_api_base_url
+        if auto_execute_trading and futu_api_key:
+            os.environ["FUTU_API_KEY"] = futu_api_key
+        
+        self.graph = self.graph_setup.setup_graph(selected_analysts, auto_execute_trading)
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
         """Create tool nodes for different data sources using abstract methods."""
+        # Import Futu trading tools
+        from tradingagents.agents.utils.futu_trading_tools import (
+            get_futu_account_info,
+            get_futu_positions,
+            get_futu_quote,
+            place_futu_order,
+            cancel_futu_order,
+            get_futu_orders,
+            get_futu_kline,
+            get_futu_hot_stocks,
+            get_futu_hot_news,
+            get_futu_technical_analysis
+        )
+        
         return {
             "market": ToolNode(
                 [
                     # Core stock data tools
                     get_stock_data,
+                    get_realtime_quote,
                     # Technical indicators
                     get_indicators,
                 ]
@@ -161,7 +185,23 @@ class TradingAgentsGraph:
                 [
                     # Trader tools for final decision making
                     get_stock_data,
+                    get_realtime_quote,
                     get_indicators,
+                ]
+            ),
+            "trading_executor": ToolNode(
+                [
+                    # Futu trading tools for order execution
+                    get_futu_account_info,
+                    get_futu_positions,
+                    get_futu_quote,
+                    place_futu_order,
+                    cancel_futu_order,
+                    get_futu_orders,
+                    get_futu_kline,
+                    get_futu_hot_stocks,
+                    get_futu_hot_news,
+                    get_futu_technical_analysis,
                 ]
             ),
         }
@@ -231,6 +271,7 @@ class TradingAgentsGraph:
             },
             "investment_plan": final_state["investment_plan"],
             "final_trade_decision": final_state["final_trade_decision"],
+            "execution_report": final_state.get("execution_report"),
         }
 
         # Save to file
