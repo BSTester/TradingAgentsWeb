@@ -182,6 +182,9 @@ async def _trigger_analysis(db: AsyncSession, user: User, session: ConversationS
         },
     ]
     await db.flush()
+    # Commit before submit_task: the worker uses an independent SessionLocal and
+    # cannot see this AnalysisRecord while the route transaction is uncommitted.
+    await db.commit()
 
     request_data = {
         "ticker": ticker,
