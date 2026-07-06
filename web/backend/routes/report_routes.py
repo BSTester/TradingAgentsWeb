@@ -7,14 +7,20 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 from sqlalchemy import desc, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from web.backend.auth_routes import get_current_active_user
 from web.backend.database import get_db
 from web.backend.models import AnalysisRecord, ConversationMessage, User
-from web.backend.services.report_formatter import report_detail, report_json_bytes, report_markdown, report_preview
+from web.backend.services.report_formatter import (
+    report_detail,
+    report_json_bytes,
+    report_markdown,
+    report_pdf_bytes,
+    report_preview,
+)
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -128,8 +134,8 @@ async def export_report(
             media_type="text/markdown; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
-    # PDF generation will be completed in M6; provide explicit JSON fallback instead of fake binary.
-    return JSONResponse(
-        {"data": {"download_url": None, "expires_at": None, "message": "PDF export pending M6 implementation"}},
+    return Response(
+        report_pdf_bytes(record),
+        media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
