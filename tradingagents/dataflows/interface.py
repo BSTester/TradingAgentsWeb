@@ -59,6 +59,16 @@ from .akshare import (
     get_global_news as get_akshare_global_news,
     get_insider_sentiment as get_akshare_insider_sentiment
 )
+from .baostock import (
+    get_baostock_stock,
+    get_baostock_indicator,
+    get_baostock_fundamentals,
+    get_baostock_balance_sheet,
+    get_baostock_cashflow,
+    get_baostock_income_statement,
+    get_baostock_news,
+    get_baostock_insider_transactions,
+)
 
 # Configuration and routing logic
 from .config import get_config
@@ -103,7 +113,8 @@ VENDOR_LIST = [
     "yfinance", 
     "openai",
     "google",
-    "akshare"
+    "akshare",
+    "baostock",
 ]
 
 # Mapping of methods to their vendor-specific implementations
@@ -112,6 +123,7 @@ VENDOR_METHODS = {
     "get_stock_data": {
         "akshare": get_akshare_stock,
         "alpha_vantage": get_alpha_vantage_stock,
+        "baostock": get_baostock_stock,
         "yfinance": get_YFin_data_online,
         # "local": get_YFin_data,
     },
@@ -125,6 +137,7 @@ VENDOR_METHODS = {
     "get_indicators": {
         "akshare": get_akshare_indicators,
         "alpha_vantage": get_alpha_vantage_indicator,
+        "baostock": get_baostock_indicator,
         "yfinance": get_stock_stats_indicators_window,
         # "local": get_stock_stats_indicators_window
     },
@@ -132,23 +145,27 @@ VENDOR_METHODS = {
     "get_fundamentals": {
         "akshare": get_akshare_fundamentals,
         "alpha_vantage": get_alpha_vantage_fundamentals,
+        "baostock": get_baostock_fundamentals,
         "openai": get_fundamentals_openai,
     },
     "get_balance_sheet": {
         "akshare": get_akshare_balance_sheet,
         "alpha_vantage": get_alpha_vantage_balance_sheet,
+        "baostock": get_baostock_balance_sheet,
         "yfinance": get_yfinance_balance_sheet,
         # "local": get_simfin_balance_sheet,
     },
     "get_cashflow": {
         "akshare": get_akshare_cashflow,
         "alpha_vantage": get_alpha_vantage_cashflow,
+        "baostock": get_baostock_cashflow,
         "yfinance": get_yfinance_cashflow,
         # "local": get_simfin_cashflow,
     },
     "get_income_statement": {
         "akshare": get_akshare_income_statement,
         "alpha_vantage": get_alpha_vantage_income_statement,
+        "baostock": get_baostock_income_statement,
         "yfinance": get_yfinance_income_statement,
         # "local": get_simfin_income_statements,
     },
@@ -156,6 +173,7 @@ VENDOR_METHODS = {
     "get_news": {
         "akshare": get_akshare_news,
         "alpha_vantage": get_alpha_vantage_news,
+        "baostock": get_baostock_news,
         "openai": get_stock_news_openai,
         "google": get_google_news,
         # "local": [get_finnhub_news, get_reddit_company_news, get_google_news],
@@ -172,6 +190,7 @@ VENDOR_METHODS = {
     "get_insider_transactions": {
         "akshare": get_akshare_insider_transactions,
         "alpha_vantage": get_alpha_vantage_insider_transactions,
+        "baostock": get_baostock_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
         # "local": get_finnhub_company_insider_transactions,
     },
@@ -232,10 +251,11 @@ def get_market_preferred_vendors(market: str, method: str) -> list:
     unified_order = [
         'akshare',           # 1st priority: AKShare (best for A-shares, good coverage)
         'yfinance',          # 2nd priority: yfinance (good for US/HK stocks, free)
-        'alpha_vantage',     # 3rd priority: Alpha Vantage (comprehensive but rate-limited)
-        'local',             # 4th priority: Local/cached data
-        'openai',            # 5th priority: OpenAI-based data
-        'google',            # 6th priority: Google-based data
+        'baostock',          # 3rd priority: BaoStock (A-share fallback)
+        'alpha_vantage',     # 4th priority: Alpha Vantage (comprehensive but rate-limited)
+        'local',             # 5th priority: Local/cached data
+        'openai',            # 6th priority: OpenAI-based data
+        'google',            # 7th priority: Google-based data
     ]
     
     # Filter to only include vendors that support this method
@@ -319,7 +339,7 @@ def route_to_vendor(method: str, *args, **kwargs):
     # Determine primary vendors based on market preferences
     if symbol:
         market_prefs = {
-            'A_STOCK': ['akshare'],
+            'A_STOCK': ['akshare', 'baostock'],
             'US_STOCK': ['yfinance', 'alpha_vantage'],
             'HK_STOCK': ['yfinance', 'alpha_vantage'],
             'UNKNOWN': ['yfinance', 'alpha_vantage', 'akshare']

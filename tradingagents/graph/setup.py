@@ -178,7 +178,7 @@ class GraphSetup:
                 "Research Manager": "Research Manager",
             },
         )
-        # Trading Team workflow: Research Manager -> Trader -> (Trading Executor if enabled) -> Risk Team
+        # Recommendation workflow: Research Manager -> Trader recommendation -> Risk Team
         workflow.add_edge("Research Manager", "Trader")
         workflow.add_conditional_edges(
             "Trader",

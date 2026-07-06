@@ -294,7 +294,7 @@ class AgentPromptTemplate(Base):
     __tablename__ = "agent_prompt_templates"
     
     id = Column(Integer, primary_key=True, index=True)
-    agent_type = Column(String(50), nullable=False, index=True)  # intraday_trader, analyst, etc.
+    agent_type = Column(String(50), nullable=False, index=True)  # analysis_agent, analyst, etc.
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     
     # User-editable prompt
