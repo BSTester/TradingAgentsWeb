@@ -4,6 +4,7 @@ Middleware for TradingAgents Web Interface
 """
 
 import time
+import uuid
 from typing import Optional
 from fastapi import Request, Response, HTTPException, status
 from fastapi.security.utils import get_authorization_scheme_param
@@ -88,18 +89,47 @@ class LoggingMiddleware(BaseHTTPMiddleware):
     
     async def dispatch(self, request: Request, call_next):
         start_time = time.time()
-        
-        # Process request
-        response = await call_next(request)
-        
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        request.state.request_id = request_id
+
+        try:
+            response = await call_next(request)
+        except HTTPException as exc:
+            process_time = time.time() - start_time
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={
+                    "error": {
+                        "code": f"HTTP_{exc.status_code}",
+                        "message": exc.detail if isinstance(exc.detail, str) else "请求处理失败",
+                        "request_id": request_id,
+                    }
+                },
+                headers={"X-Request-ID": request_id, "X-Process-Time": f"{process_time:.3f}"},
+            )
+        except Exception:
+            process_time = time.time() - start_time
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": {
+                        "code": "INTERNAL_SERVER_ERROR",
+                        "message": "服务器内部错误，请稍后重试",
+                        "request_id": request_id,
+                    }
+                },
+                headers={"X-Request-ID": request_id, "X-Process-Time": f"{process_time:.3f}"},
+            )
+
         # Calculate processing time
         process_time = time.time() - start_time
         
         # Log request (in production, use proper logging)
-        print(f"{request.method} {request.url.path} - {response.status_code} - {process_time:.3f}s")
+        print(f"{request_id} {request.method} {request.url.path} - {response.status_code} - {process_time:.3f}s")
         
         # Add processing time header
-        response.headers["X-Process-Time"] = str(process_time)
+        response.headers["X-Request-ID"] = request_id
+        response.headers["X-Process-Time"] = f"{process_time:.3f}"
         
         return response
 

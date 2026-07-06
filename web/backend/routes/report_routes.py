@@ -87,6 +87,20 @@ async def list_reports(
     return {"data": items, "meta": {"page": page, "limit": limit, "total": total, "has_next": page * limit < total}}
 
 
+@router.get("/public")
+async def public_reports(
+    limit: int = Query(6, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+):
+    """Public report feed for the home/conversation entry experience."""
+    result = await db.execute(select(AnalysisRecord).where(
+        AnalysisRecord.is_public == True,
+        AnalysisRecord.status == "completed",
+    ).order_by(desc(AnalysisRecord.created_at)).limit(limit))
+    records = result.scalars().all()
+    return {"data": [report_preview(record) for record in records], "meta": {"limit": limit, "total": len(records), "has_next": False}}
+
+
 @router.get("/{report_id}")
 async def get_report(report_id: str, current_user: User = Depends(get_current_active_user), db: AsyncSession = Depends(get_db)):
     record = await _record_or_404(report_id, current_user, db)

@@ -77,7 +77,7 @@ from web.backend.auth_routes import router as auth_router, get_current_active_us
 from web.backend.middleware import LoggingMiddleware
 
 # Import API routes
-from web.backend.routes import analysis_routes, config_routes, task_routes, page_routes, websocket_routes, export_routes, user_management_routes, scheduled_task_routes, user_config_routes, skills_routes, conversation_routes, report_routes
+from web.backend.routes import analysis_routes, config_routes, task_routes, page_routes, websocket_routes, export_routes, user_management_routes, scheduled_task_routes, user_config_routes, skills_routes, conversation_routes, report_routes, home_routes
 
 
 @asynccontextmanager
@@ -763,6 +763,7 @@ app.include_router(config_routes.router)
 app.include_router(task_routes.router)
 app.include_router(export_routes.router)
 app.include_router(report_routes.router)
+app.include_router(home_routes.router)
 app.include_router(user_management_routes.router)
 app.include_router(scheduled_task_routes.router)
 app.include_router(skills_routes.router)
