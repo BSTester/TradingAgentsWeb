@@ -17,14 +17,13 @@ templates = Jinja2Templates(directory="web/backend/templates")
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Render the main interface"""
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 
 @router.get("/results/{analysis_id}", response_class=HTMLResponse)
 async def results_page(request: Request, analysis_id: str):
     """Render the results page for a specific analysis"""
-    return templates.TemplateResponse("results.html", {
-        "request": request, 
+    return templates.TemplateResponse(request, "results.html", {
         "analysis_id": analysis_id
     })
 
