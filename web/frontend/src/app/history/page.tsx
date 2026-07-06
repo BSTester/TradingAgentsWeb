@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { AnalysisHistory } from '@/components/analysis/AnalysisHistory';
 import { useToast, Toast } from '@/components/ui/Toast';
-import { Footer } from '@/components/leaderboard/Footer';
+import { Footer } from '@/components/common/Footer';
 import { AppNavbar } from '@/components/common/AppNavbar';
 
 export default function HistoryPage() {
@@ -64,7 +64,7 @@ export default function HistoryPage() {
       {/* 主要内容区域 */}
       <div className="flex-1 max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 w-full">
         <AnalysisHistory
-          onBackToConfig={() => router.push('/dashboard')}
+          onBackToConfig={() => router.push('/')}
           onViewResults={(analysisId: string) => {
             router.push(`/history/detail?id=${analysisId}`);
           }}

@@ -7,7 +7,7 @@ import { useScheduledTasks, useDeleteScheduledTask, useUpdateScheduledTask } fro
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { AppNavbar } from '@/components/common/AppNavbar';
-import { Footer } from '@/components/leaderboard/Footer';
+import { Footer } from '@/components/common/Footer';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { ResponsiveTaskCard } from '@/components/scheduled-tasks/ResponsiveTaskCard';
 import { useIsMobile } from '@/hooks/useMediaQuery';
@@ -250,7 +250,7 @@ export default function ScheduledTasksPage() {
                 您还没有创建任何定期报告
               </p>
               <a
-                href="/dashboard"
+                href="/"
                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-accent-primary to-accent-secondary hover:shadow-glow-cyan hover:scale-105 transition-all"
               >
                 <i className="fas fa-plus mr-2" />
