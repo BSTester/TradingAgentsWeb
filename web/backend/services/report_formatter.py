@@ -148,9 +148,122 @@ def report_json_bytes(record: Any) -> bytes:
     return json.dumps(report_detail(record), ensure_ascii=False, indent=2, default=str).encode("utf-8")
 
 
+def report_pdf_bytes(record: Any) -> bytes:
+    """Generate a simple multi-page PDF from the report markdown."""
+    lines = _wrapped_pdf_lines(report_markdown(record))
+    if not lines:
+        lines = ["Report is empty."]
+
+    lines_per_page = 45
+    pages = [lines[index:index + lines_per_page] for index in range(0, len(lines), lines_per_page)]
+    total_pages = len(pages)
+    font_id = 3 + total_pages * 2
+    cid_font_id = font_id + 1
+    descriptor_id = font_id + 2
+    max_object_id = descriptor_id
+    objects: Dict[int, bytes] = {}
+
+    page_ids = [3 + index * 2 for index in range(total_pages)]
+    content_ids = [4 + index * 2 for index in range(total_pages)]
+    objects[1] = b"<< /Type /Catalog /Pages 2 0 R >>"
+    objects[2] = (
+        f"<< /Type /Pages /Kids [{' '.join(f'{page_id} 0 R' for page_id in page_ids)}] "
+        f"/Count {total_pages} >>"
+    ).encode("ascii")
+
+    for index, page_lines in enumerate(pages):
+        content = _pdf_page_content(page_lines, page_number=index + 1, total_pages=total_pages)
+        content_id = content_ids[index]
+        page_id = page_ids[index]
+        objects[content_id] = (
+            f"<< /Length {len(content)} >>\nstream\n".encode("ascii")
+            + content
+            + b"\nendstream"
+        )
+        objects[page_id] = (
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+            f"/Resources << /Font << /F1 {font_id} 0 R >> >> "
+            f"/Contents {content_id} 0 R >>"
+        ).encode("ascii")
+
+    objects[font_id] = (
+        f"<< /Type /Font /Subtype /Type0 /BaseFont /STSong-Light "
+        f"/Encoding /UniGB-UCS2-H /DescendantFonts [{cid_font_id} 0 R] >>"
+    ).encode("ascii")
+    objects[cid_font_id] = (
+        f"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /STSong-Light "
+        f"/CIDSystemInfo << /Registry (Adobe) /Ordering (GB1) /Supplement 2 >> "
+        f"/FontDescriptor {descriptor_id} 0 R /DW 1000 >>"
+    ).encode("ascii")
+    objects[descriptor_id] = (
+        b"<< /Type /FontDescriptor /FontName /STSong-Light /Flags 4 "
+        b"/FontBBox [0 -120 1000 880] /ItalicAngle 0 /Ascent 880 "
+        b"/Descent -120 /CapHeight 700 /StemV 80 >>"
+    )
+
+    return _build_pdf(objects, max_object_id)
+
+
 def _status(status: str) -> str:
     if status == "completed":
         return "completed"
     if status in {"error", "interrupted"}:
         return "failed"
     return "partial"
+
+
+def _wrapped_pdf_lines(markdown: str, width: int = 52) -> List[str]:
+    wrapped: List[str] = []
+    for raw_line in markdown.splitlines():
+        line = raw_line.replace("\t", "    ").strip()
+        if not line:
+            wrapped.append("")
+            continue
+        while len(line) > width:
+            wrapped.append(line[:width])
+            line = line[width:]
+        wrapped.append(line)
+    return wrapped
+
+
+def _pdf_text_hex(text: str) -> str:
+    return "FEFF" + text.encode("utf-16-be", errors="replace").hex().upper()
+
+
+def _pdf_page_content(lines: List[str], *, page_number: int, total_pages: int) -> bytes:
+    commands = ["BT", "/F1 11 Tf", "50 790 Td", "16 TL"]
+    for index, line in enumerate(lines):
+        if index:
+            commands.append("T*")
+        commands.append(f"<{_pdf_text_hex(line)}> Tj")
+    commands.extend([
+        "ET",
+        "BT",
+        "/F1 9 Tf",
+        "50 32 Td",
+        f"<{_pdf_text_hex(f'Page {page_number} / {total_pages}')}> Tj",
+        "ET",
+    ])
+    return "\n".join(commands).encode("ascii")
+
+
+def _build_pdf(objects: Dict[int, bytes], max_object_id: int) -> bytes:
+    output = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0]
+    for object_id in range(1, max_object_id + 1):
+        offsets.append(len(output))
+        output.extend(f"{object_id} 0 obj\n".encode("ascii"))
+        output.extend(objects[object_id])
+        output.extend(b"\nendobj\n")
+
+    xref_offset = len(output)
+    output.extend(f"xref\n0 {max_object_id + 1}\n".encode("ascii"))
+    output.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        output.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+    output.extend(
+        f"trailer\n<< /Size {max_object_id + 1} /Root 1 0 R >>\n"
+        f"startxref\n{xref_offset}\n%%EOF\n"
+        .encode("ascii")
+    )
+    return bytes(output)
