@@ -113,33 +113,20 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
 
               {/* Desktop navigation - hidden on mobile */}
               <div className="hidden md:flex items-center space-x-2">
-              {/* Only show real-time ranking for non-logged in users */}
-              <button
-                onClick={() => handleNavigation('/leaderboard')}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                  isActive('/leaderboard')
-                    ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white shadow-glow-cyan'
-                    : 'text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary'
-                }`}
-              >
-                <i className="fas fa-trophy mr-1" />
-                实时排名
-              </button>
-
               {/* Show user-specific navigation only when logged in */}
               {user && (
                 <>
                   {showNewAnalysis && (
                     <button
-                      onClick={() => handleNavigation('/dashboard')}
+                      onClick={() => handleNavigation('/')}
                       className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                        isActive('/dashboard')
+                        isActive('/')
                           ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white shadow-glow-cyan'
                           : 'text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary'
                       }`}
                     >
                       <i className="fas fa-plus-circle mr-1" />
-                      新建分析
+                      新建对话
                     </button>
                   )}
                   <button
@@ -164,19 +151,6 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
                     <i className="fas fa-clock mr-1" />
                     定期报告
                   </button>
-                  {(user?.role === 'admin' || user?.can_access_intraday_trading) && (
-                    <button
-                      onClick={() => handleNavigation('/intraday-trading')}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                        isActive('/intraday-trading')
-                          ? 'bg-gradient-to-r from-success-500 to-success-600 text-white'
-                          : 'text-text-secondary hover:text-success-500 hover:bg-dark-tertiary'
-                      }`}
-                    >
-                      <i className="fas fa-chart-line mr-1" />
-                      智能盯盘
-                    </button>
-                  )}
 
                   {/* User dropdown menu */}
                   <div className="relative">
@@ -320,32 +294,20 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
             {/* Navigation Items */}
             <nav className="flex-1 overflow-y-auto py-4" aria-label="主导航">
               <div className="space-y-1 px-3">
-                <button
-                  onClick={() => handleNavigation('/leaderboard')}
-                  className={`w-full flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all min-h-touch ${
-                    isActive('/leaderboard')
-                      ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white shadow-glow-cyan'
-                      : 'text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary'
-                  }`}
-                >
-                  <i className="fas fa-trophy w-6 text-lg" />
-                  <span className="ml-3">实时排名</span>
-                </button>
-
                 {/* Show user-specific navigation only when logged in */}
                 {user && (
                   <>
                     {showNewAnalysis && (
                       <button
-                        onClick={() => handleNavigation('/dashboard')}
+                        onClick={() => handleNavigation('/')}
                         className={`w-full flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all min-h-touch ${
-                          isActive('/dashboard')
+                          isActive('/')
                             ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white shadow-glow-cyan'
                             : 'text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary'
                         }`}
                       >
                         <i className="fas fa-plus-circle w-6 text-lg" />
-                        <span className="ml-3">新建分析</span>
+                        <span className="ml-3">新建对话</span>
                       </button>
                     )}
 
@@ -372,20 +334,6 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
                       <i className="fas fa-clock w-6 text-lg" />
                       <span className="ml-3">定期报告</span>
                     </button>
-
-                {(user?.role === 'admin' || user?.can_access_intraday_trading) && (
-                  <button
-                    onClick={() => handleNavigation('/intraday-trading')}
-                    className={`w-full flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all min-h-touch ${
-                      isActive('/intraday-trading')
-                        ? 'bg-gradient-to-r from-success-500 to-success-600 text-white'
-                        : 'text-text-secondary hover:text-success-500 hover:bg-dark-tertiary'
-                    }`}
-                  >
-                    <i className="fas fa-chart-line w-6 text-lg" />
-                    <span className="ml-3">智能盯盘</span>
-                  </button>
-                )}
 
                 {/* Mobile User Menu */}
                 {user && (
