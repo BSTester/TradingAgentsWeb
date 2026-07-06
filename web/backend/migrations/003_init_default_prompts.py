@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 from web.backend.database import SessionLocal
 from web.backend.models import User, AgentPromptTemplate, TemplateTools, AgentTool
-from web.backend.services.prompt_loader import get_default_intraday_prompt
+from web.backend.services.prompt_loader import DEFAULT_AGENT_TYPE, get_default_analysis_prompt
 
 
 def migrate():
@@ -36,7 +36,7 @@ def migrate():
             return True
         
         # Get default prompt
-        default_prompt = get_default_intraday_prompt()
+        default_prompt = get_default_analysis_prompt()
         
         # Get all available tools
         all_tools = db.query(AgentTool).filter(AgentTool.is_available == True).all()
@@ -49,7 +49,7 @@ def migrate():
         for user in users:
             # Check if user already has a template
             existing = db.query(AgentPromptTemplate).filter(
-                AgentPromptTemplate.agent_type == "intraday_trader",
+                AgentPromptTemplate.agent_type == DEFAULT_AGENT_TYPE,
                 AgentPromptTemplate.user_id == user.id
             ).first()
             
@@ -60,11 +60,11 @@ def migrate():
             
             # Create template
             template = AgentPromptTemplate(
-                agent_type="intraday_trader",
+                agent_type=DEFAULT_AGENT_TYPE,
                 user_id=user.id,
                 system_prompt=default_prompt,
-                template_name="默认日内交易策略",
-                description="系统默认的日内交易 Agent 提示词",
+                template_name="默认分析报告策略",
+                description="系统默认的分析 Agent 提示词",
                 version="1.0",
                 is_active=True
             )

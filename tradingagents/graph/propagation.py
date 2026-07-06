@@ -16,7 +16,11 @@ class Propagator:
         self.max_recur_limit = max_recur_limit
 
     def create_initial_state(
-        self, company_name: str, trade_date: str, user_id: Optional[int] = None
+        self,
+        company_name: str,
+        trade_date: str,
+        user_id: Optional[int] = None,
+        previous_decision_reflection: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Create the initial state for the agent graph.
         
@@ -46,6 +50,11 @@ class Propagator:
             "fundamentals_report": "",
             "sentiment_report": "",
             "news_report": "",
+            "grounded_evidence": [],
+            "stage_log": [],
+            "structured_report": {},
+            "reflection": {},
+            "previous_decision_reflection": previous_decision_reflection,
         }
         
         # Add user_id to state if provided

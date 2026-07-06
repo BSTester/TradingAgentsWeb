@@ -24,6 +24,12 @@ from cli.models import AnalystType
 
 from web.backend.database import SessionLocal, AsyncSessionLocal
 from web.backend.models import AnalysisRecord, User
+from tradingagents.utils.checkpoints import load_checkpoint, save_checkpoint
+from tradingagents.utils.security import safe_join, safe_path_component
+from tradingagents.utils.structured_outputs import (
+    build_structured_report,
+    previous_decision_reflection,
+)
 
 
 def serialize_state(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -81,6 +87,18 @@ def safe_commit(db, operation_name="operation"):
             pass
         # Re-raise to let caller handle
         raise
+
+
+def _provider_api_key(provider: str, request_api_key: str | None, config: Dict[str, Any]) -> str:
+    """Resolve API key from request, TRADINGAGENTS_* config, then legacy env."""
+    if request_api_key:
+        return request_api_key
+    provider = (provider or "openai").lower()
+    if provider == "anthropic":
+        return config.get("anthropic_api_key") or os.getenv("TRADINGAGENTS_ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY", "")
+    if provider == "google":
+        return config.get("google_api_key") or os.getenv("TRADINGAGENTS_GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
+    return config.get("openai_api_key") or os.getenv("TRADINGAGENTS_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY", "")
 
 
 class HeartbeatMonitor:
@@ -345,8 +363,8 @@ def run_analysis_task(
         send_log('info', '🔑 配置 API 密钥...', 'system', '配置', 2.0, '准备阶段')
         check_stop()
         
-        api_key = request_data.get('api_key')
         llm_provider = request_data.get('llm_provider', '').lower()
+        api_key = _provider_api_key(llm_provider, request_data.get('api_key'), DEFAULT_CONFIG)
         
         if api_key:
             if llm_provider == "anthropic":
@@ -369,6 +387,22 @@ def run_analysis_task(
         config["max_risk_discuss_rounds"] = request_data.get('research_depth', 1)
         # Pass analysis_id to ensure unique memory collections per analysis (multi-user safety)
         config["analysis_id"] = analysis_id
+        config["checkpoint_dir"] = os.getenv("TRADINGAGENTS_CHECKPOINT_DIR", "eval_results")
+        if config["llm_provider"] == "anthropic":
+            config["anthropic_api_key"] = api_key
+        elif config["llm_provider"] == "google":
+            config["google_api_key"] = api_key
+        else:
+            config["openai_api_key"] = api_key
+
+        previous_record = db.query(AnalysisRecord).filter(
+            AnalysisRecord.user_id == user_id,
+            AnalysisRecord.ticker == request_data.get("ticker"),
+            AnalysisRecord.status == "completed",
+            AnalysisRecord.analysis_id != analysis_id,
+        ).order_by(AnalysisRecord.completed_at.desc()).first()
+        previous_reflection = previous_decision_reflection(previous_record)
+        config["previous_decision_reflection"] = previous_reflection
         
         # 转换分析师类型
         analyst_types = []
@@ -395,6 +429,7 @@ def run_analysis_task(
                 'data': {
                     'selected_analysts': analyst_types,
                     'research_depth': request_data.get('research_depth', 1),
+                    'previous_decision_reflection': previous_reflection,
                 }
             }, analysis_id))
             print(f"✅ 配置消息已发送")
@@ -426,7 +461,8 @@ def run_analysis_task(
         init_agent_state = graph.propagator.create_initial_state(
             request_data.get('ticker'),
             request_data.get('analysis_date'),
-            user_id=analysis_record.user_id
+            user_id=analysis_record.user_id,
+            previous_decision_reflection=previous_reflection,
         )
         # Pass user_id to graph args for tools to access
         args = graph.propagator.get_graph_args(user_id=analysis_record.user_id)
@@ -517,7 +553,32 @@ def run_analysis_task(
             "risk_debate_state": None,
             "investment_plan": None,
             "final_trade_decision": None,
+            "grounded_evidence": [],
+            "stage_log": [],
+            "structured_report": None,
+            "reflection": previous_reflection or {},
         }
+        checkpoint_payload = load_checkpoint(
+            config["checkpoint_dir"],
+            user_id,
+            request_data.get('ticker', 'UNKNOWN'),
+            analysis_id,
+        )
+        if checkpoint_payload.get("report_sections"):
+            report_sections.update(checkpoint_payload["report_sections"])
+            init_agent_state.update({
+                key: value
+                for key, value in report_sections.items()
+                if value is not None and key in init_agent_state
+            })
+            send_log(
+                'info',
+                f"已从 checkpoint 恢复到阶段: {checkpoint_payload.get('last_successful_stage', 'unknown')}",
+                'system',
+                '续跑',
+                9.0,
+                '准备阶段',
+            )
         
         # 预定义节点执行顺序（用于追踪智能体切换）
         # 使用与图构建时相同的顺序（analyst_types 就是图的执行顺序）
@@ -788,6 +849,19 @@ def run_analysis_task(
                                         next_agent = agent_execution_order[next_agent_index]
                                         detected_agent = next_agent
                                         print(f"  🔄 触发切换: {current_agent} -> {next_agent} (收集到报告)")
+
+                            if "grounded_evidence" in state_update and state_update["grounded_evidence"]:
+                                existing = report_sections.get("grounded_evidence") or []
+                                report_sections["grounded_evidence"] = existing + list(state_update["grounded_evidence"])
+                                print(f"  📊 收集到 grounded_evidence")
+
+                            if "structured_report" in state_update and state_update["structured_report"]:
+                                report_sections["structured_report"] = state_update["structured_report"]
+                                print(f"  📊 收集到 structured_report")
+
+                            if "reflection" in state_update and state_update["reflection"]:
+                                report_sections["reflection"] = state_update["reflection"]
+                                print(f"  📊 收集到 reflection")
                 
                 # 获取消息列表（从 state_update 或 chunk 中）
                 messages = []
@@ -807,6 +881,24 @@ def run_analysis_task(
                         agent_display_name = agent_name_map.get(last_agent, last_agent)
                         progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent))
                         send_log('info', f'✅ {agent_display_name} 完成分析', last_agent, '完成', progress, '分析阶段')
+                        report_sections.setdefault("stage_log", []).append({
+                            "id": last_agent,
+                            "name": agent_display_name,
+                            "status": "completed",
+                            "completed_at": datetime.utcnow().isoformat(),
+                            "summary": f"{agent_display_name} 完成分析",
+                        })
+                        try:
+                            save_checkpoint(
+                                config["checkpoint_dir"],
+                                user_id,
+                                request_data.get('ticker', 'UNKNOWN'),
+                                analysis_id,
+                                last_agent,
+                                report_sections,
+                            )
+                        except Exception as checkpoint_error:
+                            print(f"⚠️ 保存 checkpoint 失败: {checkpoint_error}")
                         current_analyst_index += 1
                     
                     # 新智能体开始
@@ -914,6 +1006,8 @@ def run_analysis_task(
             decision = '买入'
         elif decision.upper() == 'UNKNOWN':
             decision = '未明确'
+
+        structured_report = report_sections.get("structured_report") or build_structured_report(report_sections, decision_raw)
         
         # 获取基本信息（从收集的字段中）- use Beijing time
         from pytz import timezone as pytz_timezone
@@ -940,14 +1034,24 @@ def run_analysis_task(
             "risk_debate_state": report_sections.get("risk_debate_state", {}),
             "investment_plan": report_sections.get("investment_plan", ""),
             "final_trade_decision": decision_raw,
+            "risk_assessment": decision_raw,
+            "grounded_evidence": report_sections.get("grounded_evidence", []),
+            "stage_log": report_sections.get("stage_log", []),
+            "reflection": structured_report.get("reflection", report_sections.get("reflection", {})),
+            "structured_report": structured_report,
         }
         
         # 保存状态到文件(按用户、股票代码和分析ID分开，避免覆盖)
-        user_ticker_dir = Path(f"eval_results/user_{user_id}/{ticker}/TradingAgentsStrategy_logs/")
+        user_ticker_dir = safe_join(
+            "eval_results",
+            f"user_{user_id}",
+            ticker,
+            "TradingAgentsStrategy_logs",
+        )
         user_ticker_dir.mkdir(parents=True, exist_ok=True)
         
         # 使用 analysis_id 作为文件名的一部分，确保每次分析都有唯一的文件
-        log_file = user_ticker_dir / f"full_states_log_{analysis_date}_{analysis_id}.json"
+        log_file = user_ticker_dir / f"full_states_log_{safe_path_component(analysis_date)}_{safe_path_component(analysis_id)}.json"
         
         # 构建完整的日志数据
         log_data = {
@@ -966,6 +1070,10 @@ def run_analysis_task(
                 "risk_debate_state": report_sections.get("risk_debate_state", {}),
                 "investment_plan": report_sections.get("investment_plan", ""),
                 "final_trade_decision": decision_raw,
+                "grounded_evidence": report_sections.get("grounded_evidence", []),
+                "stage_log": report_sections.get("stage_log", []),
+                "reflection": structured_report.get("reflection", report_sections.get("reflection", {})),
+                "structured_report": structured_report,
             }
         }
         

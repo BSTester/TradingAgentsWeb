@@ -52,6 +52,11 @@ class AgentState(MessagesState):
     ticker: Annotated[Optional[str], "Stock ticker symbol (e.g., AAPL, 00700, 600519)"]
     trade_date: Annotated[str, "What date we are trading at"]
     user_id: Annotated[Optional[int], "User ID for accessing user-specific configurations"]
+    grounded_evidence: Annotated[list, "Grounded source/evidence snapshots"]
+    stage_log: Annotated[list, "Successful agent stage log"]
+    structured_report: Annotated[dict, "Contract-shaped report summary"]
+    reflection: Annotated[dict, "Decision reflection and previous-analysis context"]
+    previous_decision_reflection: Annotated[Optional[dict], "Previous same-ticker decision context"]
 
     sender: Annotated[str, "Agent that sent this message"]
 

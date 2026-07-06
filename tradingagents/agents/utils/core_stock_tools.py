@@ -1,6 +1,7 @@
 from langchain_core.tools import tool
 from typing import Annotated
-from tradingagents.dataflows.interface import route_to_vendor
+from datetime import datetime
+from web.backend.services.skills import get_skill_registry
 
 
 @tool
@@ -19,4 +20,10 @@ def get_stock_data(
     Returns:
         str: A formatted dataframe containing the stock price data for the specified ticker symbol in the specified date range.
     """
-    return route_to_vendor("get_stock_data", symbol, start_date, end_date)
+    return get_skill_registry().execute(
+        "market-data",
+        "historical",
+        symbol=symbol,
+        curr_date=end_date,
+        look_back_days=max(1, (datetime.strptime(end_date, "%Y-%m-%d").date() - datetime.strptime(start_date, "%Y-%m-%d").date()).days),
+    )
