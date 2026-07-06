@@ -15,8 +15,8 @@ router = APIRouter(prefix="/api", tags=["config"])
 
 
 @router.get("/config")
-async def get_config(current_user: User = Depends(get_current_active_user), db: AsyncSession = Depends(get_db)):
-    """Get configuration options for the frontend (requires authentication)"""
+async def get_config(db: AsyncSession = Depends(get_db)):
+    """Get public configuration options for the frontend."""
     
     # 获取LLM供应商和模型配置（从数据库动态获取）
     from sqlalchemy import select

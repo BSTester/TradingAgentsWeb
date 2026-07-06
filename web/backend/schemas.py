@@ -121,10 +121,10 @@ class AnalysisRequest(BaseModel):
     analysis_date: str
     analysts: List[str]
     research_depth: int
-    llm_provider: str
-    backend_url: str
-    shallow_thinker: str
-    deep_thinker: str
+    llm_provider: str = "openai"
+    backend_url: str = "https://api.oneinfinityai.com/v1"
+    shallow_thinker: str = "gpt-5.5"
+    deep_thinker: str = "gpt-5.5"
     # Privacy settings
     is_public: bool = False  # Whether to make the generated report public
     # API Key (single field for all LLM providers)
@@ -295,7 +295,7 @@ class ScheduledTaskCreate(BaseModel):
     api_key: Optional[str] = None  # API key for the selected LLM provider
     
     # Schedule configuration (optional for immediate execution)
-    execution_cycle: Optional[str] = None  # daily, weekly, every_n_days, workdays
+    execution_cycle: Optional[str] = None  # daily, weekly, monthly, interval, every_n_days, workdays
     execution_time: Optional[str] = None  # HH:MM format (Beijing time)
     interval_days: Optional[int] = None  # Required if execution_cycle is every_n_days
     day_of_week: Optional[str] = None  # Required if execution_cycle is weekly (0-6, 0=Sunday)
@@ -311,8 +311,8 @@ class ScheduledTaskCreate(BaseModel):
     
     @validator('execution_cycle')
     def validate_execution_cycle(cls, v):
-        if v and v not in ['daily', 'weekly', 'every_n_days', 'workdays']:
-            raise ValueError('Invalid execution cycle. Must be one of: daily, weekly, every_n_days, workdays')
+        if v and v not in ['daily', 'weekly', 'monthly', 'interval', 'every_n_days', 'workdays']:
+            raise ValueError('Invalid execution cycle. Must be one of: daily, weekly, monthly, interval, every_n_days, workdays')
         return v
     
     @validator('execution_time')
@@ -325,7 +325,7 @@ class ScheduledTaskCreate(BaseModel):
     
     @validator('interval_days')
     def validate_interval_days(cls, v, values):
-        if values.get('execution_cycle') == 'every_n_days':
+        if values.get('execution_cycle') in ('every_n_days', 'interval'):
             if not v or v < 1 or v > 365:
                 raise ValueError('interval_days must be between 1 and 365 when execution_cycle is every_n_days')
         return v
@@ -390,8 +390,13 @@ class ScheduledTaskResponse(BaseModel):
 
 class ScheduledTaskUpdate(BaseModel):
     """Schema for updating task status"""
-    is_enabled: Optional[bool] = None
     task_name: Optional[str] = None
+    ticker: Optional[str] = None
+    is_enabled: Optional[bool] = None
+    execution_cycle: Optional[str] = None
+    execution_time: Optional[str] = None
+    interval_days: Optional[int] = None
+    end_date: Optional[str] = None
     
     @validator('task_name')
     def validate_task_name(cls, v):
