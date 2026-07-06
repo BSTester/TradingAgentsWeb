@@ -3,8 +3,8 @@
 **Issue**: WS-4 (`dd0da1e3-a687-480f-8738-97dde85a2295`)
 **Stage**: 6 (DevOps)
 **QA Gate**: Go-With-Risk (conditional) — see [Known Risks](#known-risks)
-**Integrated code**: `ws-4-devops-stage6` (`78948d8`) = `ws-4-m5-m6-backend-hardening` ⊕ `ws-4-m3-frontend` ⊕ `devops/`, **plus** `ws-4-qa-rework` (`c80d9de`, BUG-005 PDF + BUG-006 skill-timeout/degradation + BUG-007 template signature) merged in for Part 2 verification
-**Date**: 2026-07-06 (Part 1), 2026-07-06 (Part 2)
+**Integrated code**: `ws-4-devops-stage6` = `ws-4-m5-m6-backend-hardening` ⊕ `ws-4-m3-frontend` ⊕ `devops/`, **plus** `ws-4-qa-rework` (`1e40081`) — BUG-005 PDF + BUG-006 skill-timeout/degradation + BUG-006 dispatch-race fix + BUG-007 template signature
+**Date**: 2026-07-06 (Part 1, Part 2, final verification)
 
 ---
 
@@ -283,14 +283,50 @@ prevents a real one; this exercises the export code paths BUG-005 changed):
 (was a placeholder JSON). Report-card detail (`/api/reports/{id}`) renders with
 sections / stage_log / reflection.
 
+### 5.5 Final verification on official dispatch-fix build (`ws-4-qa-rework` `1e40081`)
+
+Backend landed the dispatch race fix as commit `1e40081`
+(`flush → commit → submit_task`, with AST test
+`tests/test_conversation_dispatch_commit.py`). Re-merged into
+`ws-4-devops-stage6`, rebuilt backend, and re-ran the full chain on the
+**official** fix (not the DevOps local patch):
+
+| Ticker | Market | Stage events | Progress reached | Terminal | `report_ready` |
+|---|---|---|---|---|---|
+| `AAPL` | US | full chain (task start → graph init → `stage_start` → market → skills) | **10%** (market data stage) | `stage_error` (LLM network) | ❌ env only |
+| `00700.HK` | HK | full chain (HK market detected, skills executed) | **10%** | `stage_error` (LLM network) | ❌ env only |
+
+**No 0% silent hang.** DB confirms the before/after contrast directly:
+
+| Run | Build | `status` | `progress` |
+|---|---|---|---|
+| pre-fix (`conv_...142705_AAPL`) | no dispatch fix | `interrupted` | **0.0%** |
+| post-fix (4 runs, US + HK) | `1e40081` | `error` | **10.0%** |
+
+Post-fix, the analysis **actually executes** (reaches the market-data stage at
+10%, streams the full event chain) and **terminates gracefully** with
+`status=error` when the LLM call fails — exactly the resilient behavior QA gate 2
+requires. The skill-timeout/degradation (original BUG-006 scope) and the dispatch
+race (BUG-006 root cause) are both fixed and verified.
+
+Exports re-verified on the final build: PDF `%PDF-1.4` (200), MD (200), JSON
+(200). BUG-007 `GET /` → 200.
+
+**BUG-006 is closed at the code level.** The sole reason `report_ready` is not
+reached is the LLM endpoint (`api.oneinfinityai.com`) returning 403 / Cloudflare
+1010 from **this deployment's egress** (confirmed again this run, <2 s). Per Dev
+Lead + user: the endpoint is a standard OpenAI-compatible base URL, the code
+calls it correctly, and a production server with normal egress should reach it —
+so this is an **environment limitation, not a code blocker**.
+
 ---
 
 ## 6. Known Risks
 
 | Risk | Severity | Notes |
 |---|---|---|
-| **BUG-006 (P1) — root cause found in Part 2** | High → mitigated (pending 1-line commit) | Silent 0% hang was **not** the skill layer. Root cause: `submit_task` dispatched before `db.commit()`, so the worker's separate session could not see the `AnalysisRecord` → `❌ 分析记录未找到` → abort → 0% forever. **Verified fix:** commit before submit (`conversation_routes.py:184+`). DevOps confirmed the fix ends the hang (full stage events flow). Backend to land the commit on `ws-4-qa-rework`. The BUG-006 skill-timeout fix (`ws-4-qa-rework`) is still valuable and now demonstrably works (failed runs terminate with `stage_error`/`status=failed`, not 0% hang). |
-| **LLM endpoint blocked from egress (NEW, environment)** | High (this env) | `api.oneinfinityai.com` returns 403 / Cloudflare 1010 from this egress, capping the chain before `report_ready`. Not a code bug (graceful `stage_error`). Must verify from production egress; if it reproduces, supply a server-accessible OpenAI-compatible endpoint/key. |
+| **BUG-006 (P1) — CLOSED at code level** | Resolved | Root cause (dispatch race: `submit_task` before `db.commit`) fixed in `ws-4-qa-rework` `1e40081`; skill-timeout/degradation in `683d35f`. **Verified on official build (§5.5):** no 0% hang — analysis runs to 10% (market stage), streams full event chain, terminates gracefully `status=error` on LLM failure. Pre-fix run stayed `0.0%/interrupted`; post-fix runs reach `10.0%/error`. Both fix layers confirmed working. |
+| **LLM endpoint blocked from this egress (environment)** | High (this env only) | `api.oneinfinityai.com` returns 403 / Cloudflare 1010 from this deployment's egress, so `report_ready` is not reached here. Per Dev Lead + user: endpoint is a standard OpenAI-compatible base URL, code calls it correctly, production egress should reach it. **Environment limitation, not a code blocker.** |
 | **BUG-007 (P2) — FIXED** | Resolved | `page_routes.py:20/:26` Starlette 1.x `TemplateResponse` signature. Fixed on `ws-4-qa-rework` (`c80d9de`); backend `GET /` now returns 200 (was 500). Verified live in the rebuilt container. |
 | **BUG-005 PDF — FIXED** | Resolved | PDF export now returns a real `%PDF-1.4` (was placeholder JSON). Verified: `/api/reports/{id}/export?format=pdf` → 200 `application/pdf`. |
 | Docker Hub unreachable | Medium | This environment cannot reach `registry-1.docker.io`. DaoCloud mirror (`docker.m.daocloud.io`) configured in `/etc/docker/daemon.json` as a workaround. Production deployments in unrestricted networks don't need this. |
