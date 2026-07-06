@@ -301,6 +301,23 @@ def run_analysis_task(
         if not analysis_record:
             print(f"❌ 分析记录未找到: {analysis_id}")
             return
+
+        conversation_session_id = request_data.get("conversation_session_id")
+        conversation_message_id = request_data.get("conversation_message_id")
+        conversation_channel_id = f"conversation_{conversation_session_id}" if conversation_session_id else None
+
+        def send_conversation_event(event_type: str, data: dict):
+            if not conversation_channel_id:
+                return
+            try:
+                loop = get_or_create_loop()
+                loop.run_until_complete(manager.send_message({
+                    "type": event_type,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "data": data,
+                }, conversation_channel_id))
+            except Exception as e:
+                print(f"⚠️  发送对话 WebSocket 事件失败: {e}")
         
         def send_log(level: str, message: str, agent: str = 'system', step: str = '', progress: float = 0.0, phase: str = ''):
             """发送日志到控制台和 WebSocket"""
@@ -332,6 +349,29 @@ def run_analysis_task(
                         'phase': phase
                     }
                 }, analysis_id))
+                stage_id = agent or step or phase or "analysis"
+                if "开始" in message:
+                    send_conversation_event("stage_start", {
+                        "stage_id": stage_id,
+                        "stage_name": step or phase or stage_id,
+                        "display_name": step or phase or stage_id,
+                    })
+                elif "完成" in message:
+                    send_conversation_event("stage_complete", {
+                        "stage_id": stage_id,
+                        "completed_at": now_beijing.isoformat(),
+                        "duration_ms": None,
+                    })
+                else:
+                    send_conversation_event("stage_update", {
+                        "stage_id": stage_id,
+                        "summary": truncated_message,
+                    })
+                    if agent != "system" and truncated_message:
+                        send_conversation_event("token", {
+                            "content": truncated_message,
+                            "message_id": conversation_message_id,
+                        })
             except Exception as e:
                 print(f"⚠️  发送 WebSocket 消息失败: {e}")
         
@@ -1146,6 +1186,43 @@ def run_analysis_task(
                 db2.close()
             except Exception:
                 pass
+
+        if conversation_message_id:
+            try:
+                from web.backend.models import ConversationMessage
+                from web.backend.services.report_formatter import report_detail, report_preview
+
+                db3 = SessionLocal()
+                try:
+                    conv_msg = db3.query(ConversationMessage).filter(ConversationMessage.id == conversation_message_id).first()
+                    saved_record = db3.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).first()
+                    if conv_msg and saved_record:
+                        conv_msg.status = "completed"
+                        conv_msg.content = structured_report.get("summary") or str(decision)
+                        conv_msg.content_blocks = [
+                            {"type": "text", "content": conv_msg.content},
+                            {
+                                "type": "report",
+                                "report_id": analysis_id,
+                                "report_preview": report_preview(saved_record, conversation_session_id),
+                            },
+                        ]
+                        safe_commit(db3, "update conversation assistant message")
+                        send_conversation_event("analysis_complete", {
+                            "message_id": conversation_message_id,
+                            "duration_ms": None,
+                            "stages_completed": len(report_sections.get("stage_log", [])),
+                            "stages_total": 9,
+                        })
+                        send_conversation_event("report_ready", {
+                            "report_id": analysis_id,
+                            "message_id": conversation_message_id,
+                            "report": report_detail(saved_record, conversation_session_id),
+                        })
+                finally:
+                    db3.close()
+            except Exception as conv_error:
+                print(f"⚠️ 更新对话消息失败: {conv_error}")
         
         # 发送完成消息
         send_log('info', f'分析完成!交易决 {decision}', 'system', '完成', 100.0, '完成阶段')
@@ -1232,6 +1309,26 @@ def run_analysis_task(
                 'message': '分析任务已被中断'
             }
         }, analysis_id))
+        if conversation_message_id:
+            send_conversation_event("stop_ack", {
+                "message_id": conversation_message_id,
+                "stopped_at": datetime.utcnow().isoformat(),
+                "completed_stages": [item.get("id") for item in report_sections.get("stage_log", []) if isinstance(item, dict)],
+                "partial_content": "分析任务已被中断",
+            })
+            try:
+                from web.backend.models import ConversationMessage
+                db_stop = SessionLocal()
+                try:
+                    msg = db_stop.query(ConversationMessage).filter(ConversationMessage.id == conversation_message_id).first()
+                    if msg:
+                        msg.status = "stopped"
+                        msg.content = "分析任务已被中断"
+                        safe_commit(db_stop, "mark conversation message stopped")
+                finally:
+                    db_stop.close()
+            except Exception as conv_error:
+                print(f"⚠️ 更新对话中断状态失败: {conv_error}")
         
         print(f"✅ 中断消息已发送到前端")
         
@@ -1362,6 +1459,39 @@ def run_analysis_task(
             }
             print(f"📤 错误消息内容: {error_message}")
             loop.run_until_complete(manager.send_message(error_message, analysis_id))
+            if conversation_message_id:
+                send_conversation_event("stage_error", {
+                    "stage_id": analysis_record.current_step or "analysis",
+                    "message": user_friendly_error,
+                    "retryable": True,
+                })
+                send_conversation_event("error", {
+                    "code": error_type,
+                    "message": user_friendly_error,
+                    "stage_id": analysis_record.current_step,
+                })
+                try:
+                    from web.backend.models import ConversationMessage
+                    db_err = SessionLocal()
+                    try:
+                        msg = db_err.query(ConversationMessage).filter(ConversationMessage.id == conversation_message_id).first()
+                        if msg:
+                            msg.status = "error"
+                            msg.content = user_friendly_error
+                            msg.content_blocks = [{
+                                "type": "stage_progress",
+                                "stage_id": "analysis",
+                                "stage_name": "分析",
+                                "status": "error",
+                                "summary": user_friendly_error,
+                                "started_at": None,
+                                "completed_at": datetime.utcnow().isoformat(),
+                            }]
+                            safe_commit(db_err, "mark conversation message error")
+                    finally:
+                        db_err.close()
+                except Exception as conv_error:
+                    print(f"⚠️ 更新对话错误状态失败: {conv_error}")
             print(f"✅ 错误消息已发送到前端")
         except Exception as send_error:
             print(f"❌ 发送错误消息失败: {send_error}")
