@@ -140,6 +140,8 @@ class SkillRegistry:
                         "market": detect_market(symbol),
                     },
                 },
+                timeout_seconds=1.0,
+                fallback_message=None,
             ),
         }
 

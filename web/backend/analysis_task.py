@@ -30,6 +30,7 @@ from tradingagents.utils.structured_outputs import (
     build_structured_report,
     previous_decision_reflection,
 )
+from web.backend.services.skills.base import clear_skill_event_sink, set_skill_event_sink
 
 
 def serialize_state(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -374,6 +375,27 @@ def run_analysis_task(
                         })
             except Exception as e:
                 print(f"⚠️  发送 WebSocket 消息失败: {e}")
+
+        def handle_skill_event(event: dict):
+            severity = event.get("severity", "warning")
+            message = truncate_message(event.get("message") or "数据源调用降级", max_length=200)
+            stage_id = event.get("skill") or "data-source"
+            progress = max(float(analysis_record.progress_percentage or 12.0), 12.0)
+            level = "error" if severity == "error" else "warning"
+            send_log(level, message, 'system', '数据源', progress, '分析阶段')
+            if severity == "error":
+                send_conversation_event("stage_error", {
+                    "stage_id": stage_id,
+                    "message": message,
+                    "retryable": event.get("retryable", True),
+                })
+            else:
+                send_conversation_event("stage_warning", {
+                    "stage_id": stage_id,
+                    "message": message,
+                    "partial": event.get("partial", True),
+                    "retryable": event.get("retryable", True),
+                })
         
         def check_stop():
             """检查是否应该停止"""
@@ -657,6 +679,7 @@ def run_analysis_task(
             
             def stream_reader():
                 """在后台线程中读取 stream"""
+                set_skill_event_sink(lambda event: chunk_queue.put(('skill_event', event, analysis_id)))
                 try:
                     for chunk in stream_iterator:
                         chunk_queue.put(('chunk', chunk, analysis_id))
@@ -668,6 +691,7 @@ def run_analysis_task(
                     exception_holder[0] = e
                     chunk_queue.put(('error', e, analysis_id))
                 finally:
+                    clear_skill_event_sink()
                     finished.set()
             
             # 启动后台读取线程
@@ -695,6 +719,8 @@ def run_analysis_task(
                     
                     if msg_type == 'chunk':
                         yield data
+                    elif msg_type == 'skill_event':
+                        handle_skill_event(data)
                     elif msg_type == 'done':
                         break
                     elif msg_type == 'error':
