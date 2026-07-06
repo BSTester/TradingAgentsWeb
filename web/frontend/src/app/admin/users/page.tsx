@@ -8,7 +8,7 @@ import { buildApiUrl } from '@/utils/api';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { AppNavbar } from '@/components/common/AppNavbar';
-import { Footer } from '@/components/leaderboard/Footer';
+import { Footer } from '@/components/common/Footer';
 import { ResponsiveUserCard } from '@/components/admin/ResponsiveUserCard';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 

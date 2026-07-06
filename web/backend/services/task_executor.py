@@ -91,13 +91,6 @@ def execute_scheduled_task(scheduled_task_id: int):
         user_config.last_shallow_thinker = task.shallow_thinker
         user_config.last_deep_thinker = task.deep_thinker
         user_config.last_backend_url = task.backend_url
-        user_config.enable_trading_executor = task.enable_trading_executor
-        
-        # Update Futu API config if available
-        if task.futu_api_base_url:
-            user_config.futu_api_base_url = task.futu_api_base_url
-        if task.futu_api_key:
-            user_config.futu_api_key = task.futu_api_key
         
         db.commit()
         print(f"✅ Updated user configuration cache for user {task.user_id}")
@@ -129,9 +122,6 @@ def execute_scheduled_task(scheduled_task_id: int):
             backend_url=task.backend_url,
             api_key=task.api_key,  # Copy API key from scheduled task
             is_public=task.is_public,
-            enable_trading_executor=task.enable_trading_executor,  # Copy from scheduled task
-            futu_api_base_url=task.futu_api_base_url,  # Copy Futu API config
-            futu_api_key=task.futu_api_key,  # Copy Futu API key
             email_notification_enabled=task.email_notification_enabled,  # Copy email notification setting
             status="queued"
         )
@@ -156,9 +146,6 @@ def execute_scheduled_task(scheduled_task_id: int):
             'deep_thinker': task.deep_thinker,
             'analysis_date': now_beijing.strftime('%Y-%m-%d'),
             'api_key': api_key,  # Use task's API key, fallback to user config
-            'enable_trading_executor': task.enable_trading_executor,
-            'futu_api_base_url': task.futu_api_base_url,
-            'futu_api_key': task.futu_api_key
         }
         
         # Submit task (task_manager handles user-level queuing)

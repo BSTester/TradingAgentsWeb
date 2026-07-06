@@ -29,9 +29,6 @@ TOOL_DESCRIPTIONS_CN = {
     'get_futu_kline': '获取股票K线数据，支持多种时间周期（1分钟/5分钟/日线/周线等）',
     'get_futu_technical_analysis': '获取技术分析指标，支持MACD、RSI、布林带等常用指标',
     
-    # Trading tools
-    'place_futu_order': '下单交易，支持买入/卖出，市价单/限价单',
-    
     # News tools
     'get_futu_hot_news': '获取富途热门财经新闻，支持中英文',
     'get_futu_hot_stocks': '获取富途热门股票榜单，发现市场热点',

@@ -7,7 +7,11 @@ __pycache__/
 eval_results/
 eval_data/
 *.egg-info/
+# Local environment files
 .env
+.env.local
+.env.*
+!.env.example
 node_modules
 .kiro
 .vscode

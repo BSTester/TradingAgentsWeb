@@ -1,0 +1,105 @@
+# ============================================
+# TradingAgents Web — full stack docker-compose
+# Frontend (Next.js static export + Nginx) + Backend (FastAPI/uvicorn).
+# Default DB: SQLite (file-based, no DB service required).
+# Scheduler: runs in-process inside the backend (APScheduler via app lifespan).
+# ============================================
+#
+# Quick start:
+#   1. cp .env.example .env   # then edit .env to set OPENAI_API_KEY
+#   2. docker compose up --build -d
+#   3. open http://localhost:8000   (frontend served by nginx)
+#          or http://localhost:8080 (backend direct, for debugging)
+#
+# Old trading/leaderboard services are NOT included — those code paths were
+# removed in M0 and the routes 308-redirect to /.
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: devops/Dockerfile.backend
+    container_name: tagents-backend
+    environment:
+      # AI provider — defaults already resolve to gpt-5.5 + oneinfinityai via
+      # tradingagents/default_config.py, but we pass them through explicitly
+      # so .env is the single source of truth.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY must be set in .env}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.oneinfinityai.com/v1}
+      DEEP_THINK_LLM: ${DEEP_THINK_LLM:-gpt-5.5}
+      QUICK_THINK_LLM: ${QUICK_THINK_LLM:-gpt-5.5}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-${OPENAI_API_KEY}}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-${OPENAI_BASE_URL}}
+      EMBEDDING_LLM: ${EMBEDDING_LLM:-text-embedding-3-small}
+      # Database — SQLite default (file in the mounted volume).
+      # To use MySQL instead, set DATABASE_URL=mysql+aiomysql://user:pwd@mysql:3306/tradingagents
+      # and uncomment the mysql service below.
+      DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:///./db/tradingagents.db}
+      NODE_ENV: production
+      PYTHONUNBUFFERED: "1"
+      # Optional data-source keys (skills layer falls back gracefully if unset)
+      ALPHA_VANTAGE_API_KEY: ${ALPHA_VANTAGE_API_KEY:-}
+      XUEQIU_TOKEN: ${XUEQIU_TOKEN:-}
+    volumes:
+      - db_data:/app/db
+      - eval_results:/app/eval_results
+      - results_data:/app/results
+    ports:
+      - "8080:8000"   # backend direct access (debug / API probing)
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/config"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+  frontend:
+    build:
+      context: ../web/frontend
+      dockerfile: ../../devops/Dockerfile.frontend
+    container_name: tagents-frontend
+    environment:
+      FRONTEND_API_BASE_URL: http://backend:8000
+    ports:
+      - "8000:80"     # public entry point (nginx serves static + proxies /api and /ws)
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+
+  # ---------- Optional: MySQL (production-grade DB) ----------
+  # Uncomment to use MySQL instead of SQLite. Set DATABASE_URL on the backend
+  # service to: mysql+aiomysql://tradingagents:tradingagents123@mysql:3306/tradingagents?charset=utf8mb4
+  #
+  # mysql:
+  #   image: mysql:8.0
+  #   container_name: tagents-mysql
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-tradingagents123}
+  #     MYSQL_DATABASE: ${MYSQL_DATABASE:-tradingagents}
+  #     MYSQL_USER: ${MYSQL_USER:-tradingagents}
+  #     MYSQL_PASSWORD: ${MYSQL_PASSWORD:-tradingagents123}
+  #     TZ: Asia/Shanghai
+  #   volumes:
+  #     - mysql_data:/var/lib/mysql
+  #   command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  db_data:
+  eval_results:
+  results_data:
+  # mysql_data:

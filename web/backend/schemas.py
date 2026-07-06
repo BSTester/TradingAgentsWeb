@@ -62,8 +62,6 @@ class User(UserBase):
     id: int
     role: str
     is_active: bool
-    can_access_intraday_trading: bool
-    participate_in_leaderboard: bool
     has_set_password: bool
     created_at: datetime
     
@@ -123,16 +121,12 @@ class AnalysisRequest(BaseModel):
     analysis_date: str
     analysts: List[str]
     research_depth: int
-    llm_provider: str
-    backend_url: str
-    shallow_thinker: str
-    deep_thinker: str
+    llm_provider: str = "openai"
+    backend_url: str = "https://api.oneinfinityai.com/v1"
+    shallow_thinker: str = "gpt-5.5"
+    deep_thinker: str = "gpt-5.5"
     # Privacy settings
-    is_public: bool = False  # Whether to show in public leaderboard
-    # Trading executor settings
-    enable_trading_executor: bool = False  # Whether to enable trading executor
-    futu_api_base_url: Optional[str] = None  # Futu API base URL
-    futu_api_key: Optional[str] = None  # Futu API key
+    is_public: bool = False  # Whether to make the generated report public
     # API Key (single field for all LLM providers)
     api_key: Optional[str] = None  # API key for the selected LLM provider
     # Email notification settings
@@ -171,7 +165,6 @@ class AnalysisStatus(BaseModel):
     updated_at: Optional[datetime] = None
     # Configuration info for UI initialization
     selected_analysts: Optional[List[str]] = None
-    enable_trading_executor: bool = False
     email_notification_enabled: bool = False
 
 class AnalysisRecord(BaseModel):
@@ -295,11 +288,6 @@ class ScheduledTaskCreate(BaseModel):
     deep_thinker: str
     is_public: bool = False
     
-    # Trading executor configuration
-    enable_trading_executor: bool = False
-    futu_api_base_url: Optional[str] = None
-    futu_api_key: Optional[str] = None
-    
     # Email notification settings
     email_notification: bool = False  # Whether to send email notification when task completes
     
@@ -307,7 +295,7 @@ class ScheduledTaskCreate(BaseModel):
     api_key: Optional[str] = None  # API key for the selected LLM provider
     
     # Schedule configuration (optional for immediate execution)
-    execution_cycle: Optional[str] = None  # daily, weekly, every_n_days, workdays
+    execution_cycle: Optional[str] = None  # daily, weekly, monthly, interval, every_n_days, workdays
     execution_time: Optional[str] = None  # HH:MM format (Beijing time)
     interval_days: Optional[int] = None  # Required if execution_cycle is every_n_days
     day_of_week: Optional[str] = None  # Required if execution_cycle is weekly (0-6, 0=Sunday)
@@ -323,8 +311,8 @@ class ScheduledTaskCreate(BaseModel):
     
     @validator('execution_cycle')
     def validate_execution_cycle(cls, v):
-        if v and v not in ['daily', 'weekly', 'every_n_days', 'workdays']:
-            raise ValueError('Invalid execution cycle. Must be one of: daily, weekly, every_n_days, workdays')
+        if v and v not in ['daily', 'weekly', 'monthly', 'interval', 'every_n_days', 'workdays']:
+            raise ValueError('Invalid execution cycle. Must be one of: daily, weekly, monthly, interval, every_n_days, workdays')
         return v
     
     @validator('execution_time')
@@ -337,7 +325,7 @@ class ScheduledTaskCreate(BaseModel):
     
     @validator('interval_days')
     def validate_interval_days(cls, v, values):
-        if values.get('execution_cycle') == 'every_n_days':
+        if values.get('execution_cycle') in ('every_n_days', 'interval'):
             if not v or v < 1 or v > 365:
                 raise ValueError('interval_days must be between 1 and 365 when execution_cycle is every_n_days')
         return v
@@ -383,9 +371,6 @@ class ScheduledTaskResponse(BaseModel):
     deep_thinker: str
     backend_url: str
     is_public: bool
-    enable_trading_executor: bool
-    futu_api_base_url: Optional[str]
-    futu_api_key: Optional[str]
     email_notification_enabled: bool
     execution_cycle: str
     execution_time: str
@@ -405,8 +390,13 @@ class ScheduledTaskResponse(BaseModel):
 
 class ScheduledTaskUpdate(BaseModel):
     """Schema for updating task status"""
-    is_enabled: Optional[bool] = None
     task_name: Optional[str] = None
+    ticker: Optional[str] = None
+    is_enabled: Optional[bool] = None
+    execution_cycle: Optional[str] = None
+    execution_time: Optional[str] = None
+    interval_days: Optional[int] = None
+    end_date: Optional[str] = None
     
     @validator('task_name')
     def validate_task_name(cls, v):
@@ -434,10 +424,6 @@ class UserStatusUpdate(BaseModel):
     """Schema for updating user status"""
     is_active: bool
 
-class UserIntradayAccessUpdate(BaseModel):
-    """Schema for updating user intraday trading access"""
-    can_access_intraday_trading: bool
-
 # User Configuration schemas
 class UserConfigUpdate(BaseModel):
     """Schema for updating user configuration - all analysis settings"""
@@ -449,11 +435,6 @@ class UserConfigUpdate(BaseModel):
     last_shallow_thinker: Optional[str] = None
     last_deep_thinker: Optional[str] = None
     last_backend_url: Optional[str] = None
-    
-    # Trading executor configuration
-    enable_trading_executor: Optional[bool] = None
-    futu_api_base_url: Optional[str] = None
-    futu_api_key: Optional[str] = None
     
     # API Key (single field for all LLM providers)
     last_api_key: Optional[str] = None  # Last used API key (matches last_llm_provider)
@@ -468,11 +449,6 @@ class UserConfigResponse(BaseModel):
     last_shallow_thinker: Optional[str] = None
     last_deep_thinker: Optional[str] = None
     last_backend_url: Optional[str] = None
-    
-    # Trading executor configuration
-    enable_trading_executor: bool = False
-    futu_api_base_url: Optional[str] = None
-    futu_api_key: Optional[str] = None
     
     # API Key (returns actual key for frontend to use)
     last_api_key: Optional[str] = None  # Last used API key (matches last_llm_provider)
@@ -493,7 +469,7 @@ class PromptTemplateBase(BaseModel):
 
 
 class PromptTemplateCreate(PromptTemplateBase):
-    agent_type: str = "intraday_trader"
+    agent_type: str = "analysis_agent"
 
 
 class PromptTemplateUpdate(BaseModel):
@@ -668,4 +644,3 @@ class LLMConnectionTestResponse(BaseModel):
     success: bool
     message: str
     details: Optional[Dict[str, Any]] = None
-

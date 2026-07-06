@@ -9,6 +9,7 @@ def create_research_manager(llm, memory):
         sentiment_report = state["sentiment_report"]
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
+        previous_reflection = state.get("previous_decision_reflection") or {}
 
         investment_debate_state = state["investment_debate_state"]
 
@@ -29,6 +30,16 @@ Your Recommendation: A decisive stance supported by the most convincing argument
 Rationale: An explanation of why these arguments lead to your conclusion.
 Strategic Actions: Concrete steps for implementing the recommendation.
 Take into account your past mistakes on similar situations. Use these insights to refine your decision-making and ensure you are learning and improving. Present your analysis conversationally, as if speaking naturally, without special formatting. 
+
+Use this previous same-ticker reflection if present and explicitly state whether the new evidence changes the prior decision:
+{json.dumps(previous_reflection, ensure_ascii=False)}
+
+At the end include a structured block:
+STRUCTURED_OUTPUT:
+- recommendation: BUY/HOLD/SELL
+- rating: 1-5
+- rationale: one sentence
+- evidence: 3 bullet points tied to analyst reports
 
 Here are your past reflections on mistakes:
 \"{past_memory_str}\"
@@ -52,6 +63,11 @@ Always respond in Chinese. All reasoning and analytical conclusions must be grou
         return {
             "investment_debate_state": new_investment_debate_state,
             "investment_plan": response.content,
+            "reflection": {
+                "decision_log": response.content,
+                "alpha": previous_reflection.get("alpha", "首次分析或暂无可计算 alpha。"),
+                "lessons": previous_reflection.get("lessons", []),
+            },
         }
 
     return research_manager_node

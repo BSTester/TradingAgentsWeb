@@ -1,5 +1,14 @@
 import os
 
+
+def _env(primary: str, legacy: str | None, default: str) -> str:
+    """Read TRADINGAGENTS_* first, then legacy env names for compatibility."""
+    if primary in os.environ:
+        return os.environ[primary]
+    if legacy and legacy in os.environ:
+        return os.environ[legacy]
+    return default
+
 DEFAULT_CONFIG = {
     "project_dir": os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
     "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", "./results"),
@@ -12,13 +21,16 @@ DEFAULT_CONFIG = {
         "dataflows/data_cache",
     ),
     # LLM settings
-    "llm_provider": os.getenv("LLM_PROVIDER", "openai"),
-    "deep_think_llm": os.getenv("DEEP_THINK_LLM", "o4-mini"),
-    "quick_think_llm": os.getenv("QUICK_THINK_LLM", "gpt-4o-mini"),
-    "embedding_llm": os.getenv("EMBEDDING_LLM", "text-embedding-3-small"),
-    "backend_url": os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-    "embedding_backend_url": os.getenv("EMBEDDING_BASE_URL", os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")),
-    "embedding_api_key": os.getenv("EMBEDDING_API_KEY", os.getenv("OPENAI_API_KEY", "")),
+    "llm_provider": _env("TRADINGAGENTS_LLM_PROVIDER", "LLM_PROVIDER", "openai"),
+    "deep_think_llm": _env("TRADINGAGENTS_DEEP_LLM", "DEEP_THINK_LLM", "gpt-5.5"),
+    "quick_think_llm": _env("TRADINGAGENTS_QUICK_LLM", "QUICK_THINK_LLM", "gpt-5.5"),
+    "embedding_llm": _env("TRADINGAGENTS_EMBEDDING_LLM", "EMBEDDING_LLM", "text-embedding-3-small"),
+    "backend_url": _env("TRADINGAGENTS_OPENAI_BASE_URL", "OPENAI_BASE_URL", "https://api.oneinfinityai.com/v1"),
+    "embedding_backend_url": _env("TRADINGAGENTS_EMBEDDING_BASE_URL", "EMBEDDING_BASE_URL", _env("TRADINGAGENTS_OPENAI_BASE_URL", "OPENAI_BASE_URL", "https://api.oneinfinityai.com/v1")),
+    "openai_api_key": _env("TRADINGAGENTS_OPENAI_API_KEY", "OPENAI_API_KEY", ""),
+    "anthropic_api_key": _env("TRADINGAGENTS_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY", ""),
+    "google_api_key": _env("TRADINGAGENTS_GOOGLE_API_KEY", "GOOGLE_API_KEY", ""),
+    "embedding_api_key": _env("TRADINGAGENTS_EMBEDDING_API_KEY", "EMBEDDING_API_KEY", _env("TRADINGAGENTS_OPENAI_API_KEY", "OPENAI_API_KEY", "")),
     # Debate and discussion settings
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,
@@ -36,9 +48,4 @@ DEFAULT_CONFIG = {
         # Example: "get_stock_data": "alpha_vantage",  # Override category default
         # Example: "get_news": "openai",               # Override category default
     },
-    # Futu Trading API configuration
-    "futu_api_base_url": os.getenv("FUTU_API_BASE_URL", "http://localhost:8000"),
-    "futu_api_timeout": int(os.getenv("FUTU_API_TIMEOUT", "30")),
-    # Auto-execute trading configuration
-    "auto_execute_trading": os.getenv("AUTO_EXECUTE_TRADING", "false").lower() == "true",
 }
