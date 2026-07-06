@@ -122,6 +122,7 @@ def init_db_sync():
     # Import all models to ensure they are registered with Base
     from web.backend.models import (
         User, UserConfig, AnalysisRecord, AnalysisLog, ExportRecord, ScheduledTask,
+        ConversationSession, ConversationMessage,
         AgentTool, AgentPromptTemplate, TemplateTools, LLMProvider, LLMModel
     )
     
@@ -138,6 +139,7 @@ async def init_db():
     # Import all models to ensure they are registered with Base
     from web.backend.models import (
         User, UserConfig, AnalysisRecord, AnalysisLog, ExportRecord, ScheduledTask,
+        ConversationSession, ConversationMessage,
         AgentTool, AgentPromptTemplate, TemplateTools, LLMProvider, LLMModel
     )
     

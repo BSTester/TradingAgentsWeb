@@ -30,6 +30,7 @@ class User(Base):
     analysis_records = relationship("AnalysisRecord", back_populates="user", cascade="all, delete-orphan")
     export_records = relationship("ExportRecord", back_populates="user", cascade="all, delete-orphan")
     scheduled_tasks = relationship("ScheduledTask", back_populates="user", cascade="all, delete-orphan")
+    conversation_sessions = relationship("ConversationSession", back_populates="user", cascade="all, delete-orphan")
     user_config = relationship("UserConfig", back_populates="user", uselist=False, cascade="all, delete-orphan")
     
     def __repr__(self):
@@ -122,6 +123,47 @@ class ScheduledTask(Base):
     
     def __repr__(self):
         return f"<ScheduledTask(id={self.id}, task_name='{self.task_name}', ticker='{self.ticker}', status='{self.status}')>"
+
+
+class ConversationSession(Base):
+    """Conversation session for the ChatGPT-style agent entrypoint."""
+    __tablename__ = "conversation_sessions"
+
+    id = Column(String(36), primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    title = Column(String(200), default="新对话", nullable=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="conversation_sessions")
+    messages = relationship("ConversationMessage", back_populates="session", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<ConversationSession(id='{self.id}', user_id={self.user_id}, title='{self.title}')>"
+
+
+class ConversationMessage(Base):
+    """Message within a conversation session."""
+    __tablename__ = "conversation_messages"
+
+    id = Column(String(36), primary_key=True, index=True)
+    session_id = Column(String(36), ForeignKey("conversation_sessions.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    role = Column(String(20), nullable=False, index=True)  # user, assistant, system
+    content = Column(Text, nullable=False)
+    content_blocks = Column(JSON, nullable=True)
+    client_message_id = Column(String(100), nullable=True, index=True)
+    analysis_id = Column(String(255), nullable=True, index=True)
+    status = Column(String(20), default="completed", nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    session = relationship("ConversationSession", back_populates="messages")
+    user = relationship("User")
+
+    def __repr__(self):
+        return f"<ConversationMessage(id='{self.id}', role='{self.role}', session_id='{self.session_id}')>"
 
 class AnalysisRecord(Base):
     """
