@@ -1,0 +1,93 @@
+# ============================================
+# TradingAgents Backend Dockerfile (FastAPI / uvicorn)
+# Multi-stage, non-root, with healthcheck.
+# Context: repo root (so tradingagents/, web/backend/, cli/, etc. are COPYable).
+# ============================================
+
+# ---------- Stage 1: builder ----------
+FROM python:3.11-slim AS builder
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Build deps: gcc/g++ for C extensions, curl for healthcheck probe in runtime.
+# Use debian mirrors (no aliyun override — keeps image portable across regions).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gcc \
+        g++ \
+        build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Install Python dependencies first (layer cache friendly).
+# `ta-lib` is listed in requirements.txt but is OPTIONAL at runtime —
+# akshare_indicator.py imports it inside try/except with a pandas fallback.
+# The TA-Lib C library is painful to build in a slim image and brings no
+# functional value over the pandas fallback for this app, so we filter it out.
+COPY requirements.txt pyproject.toml setup.py ./
+RUN grep -v -E '^(ta-lib|\s*ta-lib)\b' requirements.txt > /tmp/requirements.filtered.txt \
+    && pip install --upgrade pip \
+    && pip install -r /tmp/requirements.filtered.txt \
+    && pip install "uvicorn[standard]" websockets
+
+# ---------- Stage 2: runtime ----------
+FROM python:3.11-slim AS runtime
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    NODE_ENV=production \
+    TZ=Asia/Shanghai
+
+# Runtime system deps: curl for healthcheck, tzdata for Asia/Shanghai,
+# libstdc++6 / libgomp1 for numpy/pandas/etc.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        ca-certificates \
+        tzdata \
+        libstdc++6 \
+        libgomp1 \
+    && ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && rm -rf /var/lib/apt/lists/*
+
+# Non-root user
+RUN groupadd --system app && useradd --system --gid app --create-home --home-dir /home/app app
+
+WORKDIR /app
+
+# Copy installed Python packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application source (matches what app.py expects on sys.path)
+COPY tradingagents/ ./tradingagents/
+COPY web/backend/ ./web/backend/
+COPY web/__init__.py ./web/
+COPY cli/ ./cli/
+COPY main.py ./
+COPY .env.example ./.env.example
+
+# Create writable dirs for SQLite db, eval results, results, and web static/templates
+RUN mkdir -p /app/db /app/eval_results /app/results /app/web/static /app/web/templates \
+    && chown -R app:app /app
+
+USER app
+
+EXPOSE 8000
+
+# Healthcheck: hit /api/config (unauthenticated public config endpoint,
+# returns 200 JSON). The root `/` route renders a Jinja template via an old
+# Starlette API (TemplateResponse(name, context)) that breaks on Starlette
+# 1.x — that's a backend bug, not a Docker issue, and doesn't affect the
+# real frontend (nginx serves the static export). /api/config is the
+# cheapest unauthenticated liveness probe that actually works.
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \
+    CMD curl -fsS http://127.0.0.1:8000/api/config || exit 1
+
+# Run via uvicorn module form (matches `python web/backend/app.py` behaviour
+# but gives cleaner signal handling under container runtimes).
+CMD ["uvicorn", "web.backend.app:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
