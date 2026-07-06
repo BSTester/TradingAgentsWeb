@@ -89,9 +89,9 @@ def insert_default_data():
         providers_data = [
             {
                 'provider_name': 'openai',
-                'display_name': 'OpenAI',
-                'base_url': 'https://api.openai.com/v1',
-                'description': 'OpenAI GPT系列模型',
+                'display_name': 'OneInfinity OpenAI Compatible',
+                'base_url': 'https://api.oneinfinityai.com/v1',
+                'description': 'OneInfinity OpenAI兼容模型',
                 'is_active': True,
             },
             {
@@ -134,11 +134,9 @@ def insert_default_data():
         
         # 插入默认模型
         models_data = [
-            # OpenAI models
-            {'provider': 'openai', 'model_name': 'gpt-4o', 'type': 'deep_thinker', 'display_name': 'GPT-4o', 'description': 'OpenAI最新多模态模型'},
-            {'provider': 'openai', 'model_name': 'gpt-4o-mini', 'type': 'shallow_thinker', 'display_name': 'GPT-4o Mini', 'description': 'OpenAI轻量级快速模型'},
-            {'provider': 'openai', 'model_name': 'gpt-4-turbo', 'type': 'deep_thinker', 'display_name': 'GPT-4 Turbo', 'description': 'OpenAI GPT-4 Turbo'},
-            {'provider': 'openai', 'model_name': 'gpt-3.5-turbo', 'type': 'shallow_thinker', 'display_name': 'GPT-3.5 Turbo', 'description': 'OpenAI经典模型'},
+            # OneInfinity OpenAI-compatible models
+            {'provider': 'openai', 'model_name': 'gpt-5.5', 'type': 'deep_thinker', 'display_name': 'GPT-5.5', 'description': 'OneInfinity deep档默认模型'},
+            {'provider': 'openai', 'model_name': 'gpt-5.5', 'type': 'shallow_thinker', 'display_name': 'GPT-5.5', 'description': 'OneInfinity quick档默认模型；若提供方确认轻量档再切换'},
             
             # Anthropic models
             {'provider': 'anthropic', 'model_name': 'claude-3-5-sonnet-20241022', 'type': 'deep_thinker', 'display_name': 'Claude 3.5 Sonnet', 'description': 'Anthropic最强推理模型'},

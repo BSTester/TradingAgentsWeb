@@ -28,9 +28,9 @@ from web.backend.models import Base, LLMProvider, LLMModel
 LLM_PROVIDERS_CONFIG = [
     {
         "provider_name": "openai",
-        "display_name": "OpenAI",
-        "description": "GPT系列模型",
-        "base_url": "https://api.openai.com/v1",
+        "display_name": "OneInfinity OpenAI Compatible",
+        "description": "OneInfinity OpenAI兼容模型",
+        "base_url": "https://api.oneinfinityai.com/v1",
         "is_active": True
     },
     {
@@ -88,19 +88,10 @@ LLM_PROVIDERS_CONFIG = [
 MODELS_CONFIG = {
     "openai": {
         "shallow_thinker": [
-            {"model_name": "gpt-4o-mini", "display_name": "GPT-4o-mini", "description": "快速高效，适合快速任务"},
-            {"model_name": "gpt-4.1-nano", "display_name": "GPT-4.1-nano", "description": "超轻量模型，适合基本操作"},
-            {"model_name": "gpt-4.1-mini", "display_name": "GPT-4.1-mini", "description": "紧凑模型，性能良好"},
-            {"model_name": "gpt-4o", "display_name": "GPT-4o", "description": "标准模型，能力稳定"},
+            {"model_name": "gpt-5.5", "display_name": "GPT-5.5", "description": "OneInfinity quick档默认模型；若提供方确认轻量档再切换"},
         ],
         "deep_thinker": [
-            {"model_name": "gpt-4.1-nano", "display_name": "GPT-4.1-nano", "description": "超轻量模型，适合基本操作"},
-            {"model_name": "gpt-4.1-mini", "display_name": "GPT-4.1-mini", "description": "紧凑模型，性能良好"},
-            {"model_name": "gpt-4o", "display_name": "GPT-4o", "description": "标准模型，能力稳定"},
-            {"model_name": "o4-mini", "display_name": "o4-mini", "description": "专业推理模型（紧凑版）"},
-            {"model_name": "o3-mini", "display_name": "o3-mini", "description": "高级推理模型（轻量级）"},
-            {"model_name": "o3", "display_name": "o3", "description": "完整高级推理模型"},
-            {"model_name": "o1", "display_name": "o1", "description": "首屈一指的推理和问题解决模型"},
+            {"model_name": "gpt-5.5", "display_name": "GPT-5.5", "description": "OneInfinity deep档默认模型"},
         ]
     },
     "oneai": {

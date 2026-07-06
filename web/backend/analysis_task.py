@@ -362,17 +362,13 @@ def run_analysis_task(
         
         config = DEFAULT_CONFIG.copy()
         config["llm_provider"] = request_data.get('llm_provider', 'openai').lower()
-        config["deep_think_llm"] = request_data.get('deep_thinker', 'gpt-4o')
-        config["quick_think_llm"] = request_data.get('shallow_thinker', 'gpt-4o-mini')
-        config["backend_url"] = request_data.get('backend_url', '')
+        config["deep_think_llm"] = request_data.get('deep_thinker', DEFAULT_CONFIG["deep_think_llm"])
+        config["quick_think_llm"] = request_data.get('shallow_thinker', DEFAULT_CONFIG["quick_think_llm"])
+        config["backend_url"] = request_data.get('backend_url') or DEFAULT_CONFIG["backend_url"]
         config["max_debate_rounds"] = request_data.get('research_depth', 1)
         config["max_risk_discuss_rounds"] = request_data.get('research_depth', 1)
         # Pass analysis_id to ensure unique memory collections per analysis (multi-user safety)
         config["analysis_id"] = analysis_id
-        # Trading executor configuration
-        config["auto_execute_trading"] = request_data.get('enable_trading_executor', False)
-        config["futu_api_base_url"] = request_data.get('futu_api_base_url')
-        config["futu_api_key"] = request_data.get('futu_api_key')
         
         # 转换分析师类型
         analyst_types = []
@@ -390,7 +386,7 @@ def run_analysis_task(
         import time
         time.sleep(0.5)
         
-        print(f"📋 发送配置消息: selected_analysts={analyst_types}, enable_trading_executor={config.get('auto_execute_trading', False)}")
+        print(f"📋 发送配置消息: selected_analysts={analyst_types}")
         try:
             loop = get_or_create_loop()
             loop.run_until_complete(manager.send_message({
@@ -399,7 +395,6 @@ def run_analysis_task(
                 'data': {
                     'selected_analysts': analyst_types,
                     'research_depth': request_data.get('research_depth', 1),
-                    'enable_trading_executor': config.get('auto_execute_trading', False)
                 }
             }, analysis_id))
             print(f"✅ 配置消息已发送")
@@ -440,7 +435,7 @@ def run_analysis_task(
         
         # 计算进度分配
         # 总进度: 10% -> 90%, 共 80% 的进度空间
-        # 估算总智能体数量: 分析师 + 研究员(2-3个) + 投资评审(1个) + 交易员(1个) + 风险分析(3-4个) + 风险管理(1个) + 交易执行(可选)
+        # 估算总智能体数量: 分析师 + 研究员(2-3个) + 投资评审(1个) + 交易员(1个) + 风险分析(3-4个) + 风险管理(1个)
         num_analysts = len(analyst_types)
         # 固定的其他智能体: 研究员(bull+bear) + 投资评审 + 交易员 + 风险分析(risky+neutral+safe) + 风险管理
         # 根据配置的辩论轮数估算
@@ -449,10 +444,8 @@ def run_analysis_task(
         num_trader = 1
         num_risk_analysts = 3  # risky + neutral + safe
         num_risk_manager = 1
-        num_trading_executor = 1 if config.get("auto_execute_trading", False) else 0  # 执行交易员（可选）
-        
         # 总智能体数量
-        total_agents = num_analysts + num_researchers + num_invest_judge + num_trader + num_risk_analysts + num_risk_manager + num_trading_executor
+        total_agents = num_analysts + num_researchers + num_invest_judge + num_trader + num_risk_analysts + num_risk_manager
         
         progress_per_agent = 80.0 / max(total_agents, 1)  # 每个智能体分配的进度
         base_progress = 10.0
@@ -475,7 +468,6 @@ def run_analysis_task(
             'safe': '保守风险分析师',
             'neutral': '中性风险分析师',
             'risk_manager': '风险管理评审及投资组合分析',
-            'trading_executor': '执行交易员'
         }
         
         # LangGraph 节点名称到内部智能体代码的映射
@@ -493,7 +485,6 @@ def run_analysis_task(
             'Neutral Analyst': 'neutral',
             'Portfolio Manager': 'risk_manager',
             'Risk Judge': 'risk_manager',
-            'Trading Executor': 'trading_executor',
         }
         
         # 智能体对应的报告字段（用于判断节点完成）
@@ -510,7 +501,6 @@ def run_analysis_task(
             'safe': 'risk_debate_state',
             'neutral': 'risk_debate_state',
             'risk_manager': 'investment_plan',
-            'trading_executor': 'execution_report',
         }
         
         # 报告字段收集器
@@ -527,7 +517,6 @@ def run_analysis_task(
             "risk_debate_state": None,
             "investment_plan": None,
             "final_trade_decision": None,
-            "execution_report": None,
         }
         
         # 预定义节点执行顺序（用于追踪智能体切换）
@@ -536,9 +525,6 @@ def run_analysis_task(
         
         # 后面的固定顺序（按 node_to_agent_map 的顺序）
         fixed_order = ['bull', 'bear', 'invest_judge', 'trader', 'risky', 'safe', 'neutral', 'risk_manager']
-        # Add trading executor if enabled
-        if request_data.get('enable_trading_executor', False):
-            fixed_order.append('trading_executor')
         agent_execution_order.extend(fixed_order)
         
         print(f"📋 预定义智能体执行顺序: {agent_execution_order}")
@@ -791,21 +777,12 @@ def run_analysis_task(
                                 print(f"  📊 收集到 investment_plan")
                                 # investment_plan 是由 research_manager 生成的，不是 risk_manager
                             
-                            if "execution_report" in state_update and state_update["execution_report"]:
-                                report_sections["execution_report"] = state_update["execution_report"]
-                                print(f"  📊 收集到 execution_report")
-                                if current_agent == 'trading_executor' and not agent_completed:
-                                    agent_completed = True
-                                    print(f"  ✅ trading_executor 节点完成（收集到报告）")
-                                    # 交易执行是最后一个节点，不需要触发切换
-                            
                             if "final_trade_decision" in state_update and state_update["final_trade_decision"]:
                                 report_sections["final_trade_decision"] = state_update["final_trade_decision"]
                                 print(f"  📊 收集到 final_trade_decision")
                                 if current_agent == 'risk_manager' and not agent_completed:
                                     agent_completed = True
                                     print(f"  ✅ risk_manager 节点完成（收集到报告）")
-                                    # 立即触发切换到下一个智能体（如果启用了交易执行）
                                     if current_agent_index < len(agent_execution_order) - 1:
                                         next_agent_index = current_agent_index + 1
                                         next_agent = agent_execution_order[next_agent_index]
@@ -963,7 +940,6 @@ def run_analysis_task(
             "risk_debate_state": report_sections.get("risk_debate_state", {}),
             "investment_plan": report_sections.get("investment_plan", ""),
             "final_trade_decision": decision_raw,
-            "execution_report": report_sections.get("execution_report", ""),  # 添加交易执行报告
         }
         
         # 保存状态到文件(按用户、股票代码和分析ID分开，避免覆盖)
@@ -990,7 +966,6 @@ def run_analysis_task(
                 "risk_debate_state": report_sections.get("risk_debate_state", {}),
                 "investment_plan": report_sections.get("investment_plan", ""),
                 "final_trade_decision": decision_raw,
-                "execution_report": report_sections.get("execution_report", ""),  # 添加交易执行报告
             }
         }
         

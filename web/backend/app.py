@@ -77,106 +77,7 @@ from web.backend.auth_routes import router as auth_router, get_current_active_us
 from web.backend.middleware import LoggingMiddleware
 
 # Import API routes
-from web.backend.routes import analysis_routes, config_routes, task_routes, page_routes, websocket_routes, export_routes, leaderboard_routes, user_management_routes, scheduled_task_routes, user_config_routes, intraday_trading_routes, user_leaderboard_routes, public_leaderboard_routes
-
-
-async def leaderboard_update_task():
-    """Background task to periodically update leaderboard data via WebSocket"""
-    from web.backend.routes.websocket_routes import broadcast_leaderboard_update
-    from web.backend.database import get_db
-    from web.backend.models import User, AccountSnapshot, UserConfig
-    from sqlalchemy import select, desc
-
-    print("🚀 Leaderboard update task started")
-
-    while True:
-        try:
-            await asyncio.sleep(60)  # Update every minute
-
-            # Check if there are any leaderboard WebSocket connections
-            if "leaderboard_public" in manager.active_connections:
-                print(f"📡 Broadcasting leaderboard update to {len(manager.active_connections['leaderboard_public'])} clients")
-
-                try:
-                    # Fetch latest leaderboard data with better error handling
-                    async with AsyncSessionLocal() as db:
-                        # Get participating users first
-                        users_query = select(User).where(User.participate_in_leaderboard == True)
-                        users_result = await db.execute(users_query)
-                        participating_users = users_result.scalars().all()
-
-                        users_list = []
-                        
-                        # Get user configs for model information
-                        user_ids = [user.id for user in participating_users]
-                        configs = {}
-                        if user_ids:
-                            config_query = select(UserConfig).where(UserConfig.user_id.in_(user_ids))
-                            config_result = await db.execute(config_query)
-                            configs = {config.user_id: config for config in config_result.scalars().all()}
-
-                        if participating_users:
-                            # For each participating user, get their latest snapshot for each market
-                            for user in participating_users:
-                                # Get model name from config
-                                model_name = None
-                                if user.id in configs:
-                                    config = configs[user.id]
-                                    model_name = config.intraday_llm_model if config.intraday_llm_model else None
-                                
-                                # Get all snapshots for this user
-                                snapshot_query = select(AccountSnapshot).where(
-                                    AccountSnapshot.user_id == user.id
-                                ).order_by(AccountSnapshot.snapshot_date.desc())
-
-                                snapshot_result = await db.execute(snapshot_query)
-                                all_snapshots = snapshot_result.scalars().all()
-
-                                if all_snapshots:
-                                    # Group by market_type and get the latest for each market
-                                    market_snapshots = {}
-                                    for snapshot in all_snapshots:
-                                        market = snapshot.market_type or 'US'
-                                        if market not in market_snapshots:
-                                            market_snapshots[market] = snapshot
-                                    
-                                    # Add one entry per market
-                                    for market, snapshot in market_snapshots.items():
-                                        users_list.append({
-                                            'user_id': user.id,
-                                            'username': user.username,
-                                            'market_type': market,
-                                            'total_assets': float(snapshot.total_assets) if snapshot.total_assets else 100000.0,
-                                            'latest_snapshot_date': snapshot.snapshot_date.strftime('%Y-%m-%d') if snapshot.snapshot_date else datetime.now().strftime('%Y-%m-%d'),
-                                            'model_name': model_name
-                                        })
-                                else:
-                                    # Create default snapshots for all markets if no data exists
-                                    for market in ['US', 'HK', 'CN']:
-                                        users_list.append({
-                                            'user_id': user.id,
-                                            'username': user.username,
-                                            'market_type': market,
-                                            'total_assets': 100000.0,
-                                            'latest_snapshot_date': datetime.now().strftime('%Y-%m-%d'),
-                                            'model_name': model_name
-                                        })
-
-                        # Sort by total_assets descending
-                        users_list.sort(key=lambda x: x['total_assets'], reverse=True)
-
-                    # Broadcast updates to all leaderboard clients
-                    await broadcast_leaderboard_update(users_data=users_list)
-                    print(f"📤 Leaderboard update broadcasted with {len(users_list)} users")
-
-                except Exception as db_error:
-                    print(f"❌ Database error in leaderboard update: {db_error}")
-                    # Broadcast empty data if database query fails
-                    await broadcast_leaderboard_update(users_data=[])
-
-        except Exception as e:
-            print(f"⚠️ Leaderboard update task error: {e}")
-            await asyncio.sleep(60)  # Wait before retrying
+from web.backend.routes import analysis_routes, config_routes, task_routes, page_routes, websocket_routes, export_routes, user_management_routes, scheduled_task_routes, user_config_routes
 
 
 @asynccontextmanager
@@ -239,27 +140,6 @@ async def lifespan(app: FastAPI):
             email_service = init_email_service()
             app.state.email_service = email_service
             
-            # Initialize intraday trading scheduler manager (multi-user)
-            # Note: Individual user schedulers are created on-demand via API
-            # No global scheduler needed - each user has their own scheduler instance
-            print("✅ Intraday trading scheduler manager ready (user schedulers created on-demand)")
-            
-            # Restore schedulers that were running before service restart
-            from web.backend.services.user_intraday_scheduler import get_manager as get_intraday_manager
-            intraday_manager = get_intraday_manager()
-            await intraday_manager.restore_schedulers_from_db()
-            print("✅ Intraday trading schedulers restored from database")
-            
-            # Initialize and start snapshot scheduler for daily account snapshots
-            from web.backend.services.snapshot_scheduler import init_snapshot_scheduler
-            snapshot_scheduler = init_snapshot_scheduler()
-            app.state.snapshot_scheduler = snapshot_scheduler
-            print("✅ Snapshot scheduler started (daily account snapshots)")
-
-            # Start leaderboard WebSocket update task
-            asyncio.create_task(leaderboard_update_task())
-            print("✅ Leaderboard real-time update task started")
-            
             # Preload user configurations into cache
             from web.backend.services.user_config_cache import preload_user_configs
             config_count = preload_user_configs()
@@ -284,21 +164,6 @@ async def lifespan(app: FastAPI):
     # Shutdown (cleanup if needed)
     print("🔌 Shutting down...")
     if getattr(app.state, "is_leader", False):
-        # Stop all user intraday schedulers (but keep auto_start flags for restart)
-        try:
-            from web.backend.services.user_intraday_scheduler import get_manager as get_intraday_manager
-            intraday_manager = get_intraday_manager()
-            await intraday_manager.stop_all_schedulers()
-            print("✅ All intraday trading schedulers stopped")
-        except Exception as e:
-            print(f"⚠️  Error stopping intraday schedulers: {e}")
-        
-        # Stop snapshot scheduler
-        snapshot_scheduler = getattr(app.state, "snapshot_scheduler", None)
-        if snapshot_scheduler:
-            snapshot_scheduler.shutdown(wait=True)
-            print("✅ Snapshot scheduler stopped")
-        
         # Stop scheduler
         scheduler = getattr(app.state, "scheduler", None)
         if scheduler:
@@ -387,9 +252,6 @@ async def cleanup_running_tasks():
                             'shallow_thinker': task.shallow_thinker or 'gpt-4o-mini',
                             'api_key': api_key,  # 优先任务配置，兜底用户配置
                             'backend_url': task.backend_url or '',
-                            'enable_trading_executor': task.enable_trading_executor or False,
-                            'futu_api_base_url': task.futu_api_base_url,
-                            'futu_api_key': task.futu_api_key,
                         }
                         
                         # 提交任务到任务管理器
@@ -556,7 +418,7 @@ async def task_monitor():
 # Initialize FastAPI app with lifespan
 app = FastAPI(
     title="TradingAgents Web Interface v2",
-    description="Multi-Agents LLM Financial Trading Framework - Web Interface with Authentication",
+    description="Multi-agent financial analysis reports without automated trading execution",
     version="2.0.0",
     lifespan=lifespan
 )
@@ -898,21 +760,12 @@ app.include_router(analysis_routes.router)
 app.include_router(config_routes.router)
 app.include_router(task_routes.router)
 app.include_router(export_routes.router)
-app.include_router(leaderboard_routes.router)
 app.include_router(user_management_routes.router)
 app.include_router(scheduled_task_routes.router)
 
-# Include intraday trading routes
-from web.backend.routes import intraday_trading_routes
-app.include_router(intraday_trading_routes.router)
-
 # Include user config routes
 from web.backend.routes import user_config_routes
-from web.backend.routes import user_leaderboard_routes
-from web.backend.routes import public_leaderboard_routes
 app.include_router(user_config_routes.router)
-app.include_router(user_leaderboard_routes.router)
-app.include_router(public_leaderboard_routes.router)
 
 # Include prompt management routes
 from web.backend.routes import prompt_routes
@@ -921,10 +774,6 @@ app.include_router(prompt_routes.router)
 # Include WebSocket routes
 websocket_routes.init_websocket_routes(manager)
 app.include_router(websocket_routes.router)
-
-# Include account snapshot routes
-from web.backend.routes import account_snapshot_routes
-app.include_router(account_snapshot_routes.router)
 
 # Include LLM configuration routes
 from web.backend.routes import llm_config_routes

@@ -124,23 +124,6 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
         )
     return current_user
 
-def require_intraday_access(current_user: User = Depends(get_current_active_user)) -> User:
-    """
-    Dependency to require intraday trading access permission
-    Admin users always have access
-    """
-    # Admin always has access
-    if current_user.role == "admin":
-        return current_user
-    
-    # Check specific permission
-    if not current_user.can_access_intraday_trading:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="您没有访问短线交易功能的权限"
-        )
-    return current_user
-
 @router.post("/register", response_model=AuthResponse)
 async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db), request: Request = None):
     """

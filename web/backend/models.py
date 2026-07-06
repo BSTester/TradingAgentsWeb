@@ -23,8 +23,6 @@ class User(Base):
     has_set_password = Column(Boolean, default=False, nullable=False)  # Whether user has explicitly set a password
     role = Column(String(20), default="user", nullable=False, index=True)  # admin, user
     is_active = Column(Boolean, default=True, nullable=False)
-    can_access_intraday_trading = Column(Boolean, default=False, nullable=False, index=True)  # Whether user can access intraday trading features
-    participate_in_leaderboard = Column(Boolean, default=False, nullable=False, index=True)  # Whether user participates in public ranking
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     
@@ -33,8 +31,6 @@ class User(Base):
     export_records = relationship("ExportRecord", back_populates="user", cascade="all, delete-orphan")
     scheduled_tasks = relationship("ScheduledTask", back_populates="user", cascade="all, delete-orphan")
     user_config = relationship("UserConfig", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    position_records = relationship("PositionRecord", back_populates="user", cascade="all, delete-orphan")
-    intraday_decisions = relationship("IntradayDecisionRecord", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"
@@ -57,28 +53,6 @@ class UserConfig(Base):
     last_shallow_thinker = Column(String(100), nullable=True)  # Last shallow thinker model
     last_deep_thinker = Column(String(100), nullable=True)  # Last deep thinker model
     last_backend_url = Column(String(255), nullable=True)  # Last backend URL
-    
-    # Trading executor configuration
-    enable_trading_executor = Column(Boolean, default=False, nullable=False)  # Whether to enable trading executor
-    futu_api_base_url = Column(String(255), nullable=True)  # Futu API base URL
-    futu_api_key = Column(String(1000), nullable=True)  # Futu API key (supports JWT tokens)
-    
-    # Intraday trading configuration
-    intraday_futu_api_url = Column(String(255), nullable=True)  # Intraday trading Futu API URL
-    intraday_futu_api_key = Column(String(1000), nullable=True)  # Intraday trading Futu API key (supports JWT tokens)
-    intraday_scheduler_enabled = Column(Boolean, default=False, nullable=False)  # Whether intraday scheduler is running
-    intraday_scheduler_auto_start = Column(Boolean, default=False, nullable=False)  # Whether to auto-start scheduler on service restart
-    intraday_interval_minutes = Column(Integer, default=60, nullable=False)  # Analysis interval in minutes
-    intraday_market_type = Column(String(10), default='US', nullable=False)  # Market type: US/HK/CN
-    
-    # Intraday trading LLM configuration
-    intraday_llm_provider = Column(String(50), nullable=True)  # LLM provider for intraday trading
-    intraday_api_key = Column(String(1000), nullable=True)  # API key for intraday trading LLM (supports JWT tokens)
-    intraday_llm_model = Column(String(100), nullable=True)  # LLM model for intraday trading (uses deep thinker options)
-    intraday_backend_url = Column(String(255), nullable=True)  # Backend URL for intraday trading LLM
-    
-    # Intraday access application tracking
-    intraday_application_sent_at = Column(DateTime(timezone=True), nullable=True)  # Last application email sent time
     
     # API Key cache (single field for all LLM providers, should be encrypted in production)
     last_api_key = Column(String(1000), nullable=True)  # Last used API key (supports JWT tokens)
@@ -116,11 +90,6 @@ class ScheduledTask(Base):
     backend_url = Column(String(255), nullable=False)
     api_key = Column(String(1000), nullable=True)  # LLM API key for this scheduled task (supports JWT tokens)
     is_public = Column(Boolean, default=False)
-    
-    # Trading executor configuration
-    enable_trading_executor = Column(Boolean, default=False, nullable=False)
-    futu_api_base_url = Column(String(255), nullable=True)
-    futu_api_key = Column(String(1000), nullable=True)  # Futu API key (supports JWT tokens)
     
     # Email notification settings
     email_notification_enabled = Column(Boolean, default=False, nullable=False)  # Whether to send email notification
@@ -178,12 +147,7 @@ class AnalysisRecord(Base):
     api_key = Column(String(1000), nullable=True)  # LLM API key for this specific task (supports JWT tokens)
     
     # Privacy settings
-    is_public = Column(Boolean, default=False, nullable=False, index=True)  # Whether to show in public leaderboard
-    
-    # Trading executor configuration
-    enable_trading_executor = Column(Boolean, default=False, nullable=False)  # Whether to enable trading executor
-    futu_api_base_url = Column(String(255), nullable=True)  # Futu API base URL
-    futu_api_key = Column(String(1000), nullable=True)  # Futu API key (supports JWT tokens)
+    is_public = Column(Boolean, default=False, nullable=False, index=True)  # Whether report can be viewed without login
     
     # Email notification settings
     email_notification_enabled = Column(Boolean, default=False, nullable=False)  # Whether to send email notification
@@ -290,109 +254,6 @@ class ExportRecord(Base):
         return f"<ExportRecord(id={self.id}, format='{self.export_format}', status='{self.status}')>"
 
 
-class PositionRecord(Base):
-    """
-    Position record model to track stock positions for intraday trading
-    Records the first opening time and tracks position changes over time
-    """
-    __tablename__ = "position_records"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    stock_code = Column(String(20), nullable=False, index=True)
-    market_type = Column(String(10), nullable=False)  # US/HK/CN
-    
-    # Position info
-    first_open_time = Column(DateTime(timezone=True), nullable=False)
-    first_open_price = Column(Float, nullable=False)
-    initial_quantity = Column(Integer, nullable=False)
-    
-    # Current status
-    current_quantity = Column(Integer, nullable=False)
-    last_update_time = Column(DateTime(timezone=True), nullable=False)
-    is_closed = Column(Boolean, default=False, nullable=False)
-    
-    # Metadata
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-    
-    # Relationships
-    user = relationship("User", back_populates="position_records")
-    trading_history = relationship("TradingHistory", back_populates="position_record", cascade="all, delete-orphan")
-    
-    def __repr__(self):
-        return f"<PositionRecord(id={self.id}, user_id={self.user_id}, stock_code='{self.stock_code}', market='{self.market_type}')>"
-
-
-class TradingHistory(Base):
-    """
-    Trading history model to track all trades for each position
-    Records buy/sell actions with decision context
-    """
-    __tablename__ = "trading_history"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    position_record_id = Column(Integer, ForeignKey("position_records.id"), nullable=False)
-    
-    # Trade info
-    trade_time = Column(DateTime(timezone=True), nullable=False)
-    trade_type = Column(String(10), nullable=False)  # BUY/SELL
-    quantity = Column(Integer, nullable=False)
-    price = Column(Float, nullable=False)
-    order_id = Column(String(50), nullable=True)
-    
-    # Decision context
-    decision_reason = Column(Text, nullable=True)
-    technical_signals = Column(JSON, nullable=True)
-    news_sentiment = Column(String(20), nullable=True)
-    
-    # Metadata
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    
-    # Relationships
-    position_record = relationship("PositionRecord", back_populates="trading_history")
-    
-    def __repr__(self):
-        return f"<TradingHistory(id={self.id}, position_id={self.position_record_id}, type='{self.trade_type}', quantity={self.quantity})>"
-
-
-class IntradayDecisionRecord(Base):
-    """
-    Intraday decision record model to store complete analysis sessions
-    Records the full decision-making process including tool calls and reasoning
-    """
-    __tablename__ = "intraday_decision_records"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    
-    # Session info
-    session_id = Column(String(255), unique=True, nullable=False, index=True)
-    start_time = Column(DateTime(timezone=True), nullable=False)
-    end_time = Column(DateTime(timezone=True), nullable=True)
-    status = Column(String(20), nullable=False)  # running/completed/failed
-    
-    # Analysis context
-    market_type = Column(String(10), nullable=False)
-    positions_analyzed = Column(JSON, nullable=False)  # List of stock codes
-    account_snapshot = Column(JSON, nullable=False)  # Account info at start
-    
-    # Decision output
-    decision_report = Column(Text, nullable=True)
-    trades_executed = Column(JSON, nullable=True)  # List of trade details
-    tool_calls = Column(JSON, nullable=True)  # Complete tool call sequence
-    
-    # Metadata
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-    
-    # Relationships
-    user = relationship("User", back_populates="intraday_decisions")
-    
-    def __repr__(self):
-        return f"<IntradayDecisionRecord(id={self.id}, session_id='{self.session_id}', status='{self.status}')>"
-
-
 class AgentTool(Base):
     """
     Agent tool definition model (system-maintained)
@@ -491,64 +352,6 @@ class TemplateTools(Base):
     
     def __repr__(self):
         return f"<TemplateTools(id={self.id}, template_id={self.template_id}, tool='{self.tool_name}', enabled={self.is_enabled})>"
-
-
-class AccountSnapshot(Base):
-    """
-    Account snapshot model to track daily account balance and positions
-    Captures end-of-day account state for historical tracking and trend analysis
-    
-    Unique Constraint: Each user can only have ONE snapshot per market per day
-    - Enforced by database index: uq_user_market_date (user_id, market_type, DATE(snapshot_date))
-    - Prevents duplicate snapshots for the same trading day
-    """
-    __tablename__ = "account_snapshots"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    market_type = Column(String(10), nullable=False, index=True)  # US, HK, CN
-    snapshot_date = Column(DateTime(timezone=True), nullable=False, index=True)  # Date of snapshot (end of trading day)
-    
-    # Note: Unique constraint on (user_id, market_type, DATE(snapshot_date)) is created via migration
-    # This ensures only one snapshot per user per market per day
-    
-    # Account balance information
-    total_assets = Column(Float, nullable=False)  # Total account value
-    cash = Column(Float, nullable=False)  # Available cash
-    market_value = Column(Float, nullable=False)  # Total market value of positions
-    
-    # Additional metrics
-    unrealized_pnl = Column(Float, default=0.0)  # Unrealized profit/loss
-    realized_pnl = Column(Float, default=0.0)  # Realized profit/loss for the day
-    
-    # Raw account data (JSON)
-    account_data = Column(JSON, nullable=True)  # Full account snapshot data
-    positions_data = Column(JSON, nullable=True)  # Positions snapshot data
-    
-    # Metadata
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    
-    # Relationships
-    user = relationship("User", backref="account_snapshots")
-    
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "user_id": self.user_id,
-            "market_type": self.market_type,
-            "snapshot_date": self.snapshot_date.isoformat() if self.snapshot_date else None,
-            "total_assets": self.total_assets,
-            "cash": self.cash,
-            "market_value": self.market_value,
-            "unrealized_pnl": self.unrealized_pnl,
-            "realized_pnl": self.realized_pnl,
-            "account_data": self.account_data,
-            "positions_data": self.positions_data,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-        }
-    
-    def __repr__(self):
-        return f"<AccountSnapshot(id={self.id}, user_id={self.user_id}, market='{self.market_type}', date='{self.snapshot_date}', total={self.total_assets})>"
 
 
 class LLMProvider(Base):

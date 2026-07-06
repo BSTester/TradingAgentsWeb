@@ -77,6 +77,5 @@ class AgentState(MessagesState):
     ]
     final_trade_decision: Annotated[str, "Final decision made by the Risk Analysts"]
     
-    # trading execution fields
+    # report context fields
     market_type: Annotated[Optional[str], "Market classification (US/HK/CN)"]
-    execution_report: Annotated[Optional[str], "Trading execution report"]
