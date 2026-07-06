@@ -18,7 +18,11 @@ from web.backend.schemas import (
     BulkToolSelectionUpdate,
 )
 from web.backend.auth_routes import get_current_user
-from web.backend.services.prompt_loader import get_default_intraday_prompt, create_default_template_for_user
+from web.backend.services.prompt_loader import (
+    create_default_template_for_user,
+    generate_variable_documentation,
+    get_default_intraday_prompt,
+)
 
 router = APIRouter(prefix="/api/prompts", tags=["prompts"])
 
@@ -527,20 +531,7 @@ async def validate_prompt_template(
                 "message": "提示词内容过长，请精简至50000字符以内"
             }
         
-        # Load workflow documentation (same as agent does)
-        workflow_file = os.path.join(
-            os.path.dirname(__file__),
-            '../../../tradingagents/agents/trader/intraday_trader_workflow.txt'
-        )
-        
-        try:
-            with open(workflow_file, 'r', encoding='utf-8') as f:
-                workflow_documentation = f.read()
-        except Exception as e:
-            return {
-                "valid": False,
-                "message": f"无法加载工作流文档: {str(e)}"
-            }
+        workflow_documentation = generate_variable_documentation()
         
         # Generate test context (same as agent does)
         context_info = f"""## Current Context

@@ -15,6 +15,7 @@ def create_trader(llm, memory):
         sentiment_report = state["sentiment_report"]
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
+        previous_reflection = state.get("previous_decision_reflection") or {}
 
         curr_situation = f"{market_research_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
         past_memories = memory.get_memories(curr_situation, n_matches=2)
@@ -83,6 +84,8 @@ get_indicators(symbol="{ticker}", indicator="macd", curr_date="{current_date}", 
 
 **Historical Experience Reference**: {past_memory_str}
 
+**Previous same-ticker decision reflection**: {json.dumps(previous_reflection, ensure_ascii=False)}
+
 # Trading Recommendation Requirements
 Based on the above analysis, provide a clear trading recommendation including:
 
@@ -116,10 +119,18 @@ Based on the above analysis, provide a clear trading recommendation including:
 Must end with standardized format:
 FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** | PRICE RANGE: <min>-<max> <currency>/share | POSITION: <percent>%
 
+Then include:
+STRUCTURED_OUTPUT:
+- recommendation: BUY/HOLD/SELL
+- rating: 1-5
+- price_basis: cite exact quote/data source or state unavailable
+- risk_budget: percentage and reason
+
 # Important Notes
 - Always respond in Chinese
 - All reasoning and analytical conclusions must be grounded in facts; do not fabricate analysis results
 - Demonstrate aggressive trader characteristics: decisive, opinionated, willing to take calculated risks
+- Do not place orders or suggest automated execution. Your output is a recommendation only.
 - Do not mention this instruction in your output"""
 
         prompt = ChatPromptTemplate.from_messages(

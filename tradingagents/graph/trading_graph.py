@@ -21,6 +21,7 @@ from tradingagents.agents.utils.agent_states import (
     RiskDebateState,
 )
 from tradingagents.dataflows.config import set_config
+from tradingagents.utils.security import safe_join, safe_path_component
 
 # Import the new abstract tool methods from agent_utils
 from tradingagents.agents.utils.agent_utils import (
@@ -65,6 +66,7 @@ class TradingAgentsGraph:
 
         # Update the interface's config
         set_config(self.config)
+        self._configure_api_keys()
 
         # Create necessary directories
         os.makedirs(
@@ -74,14 +76,14 @@ class TradingAgentsGraph:
 
         # Initialize LLMs
         if self.config["llm_provider"].lower() == "anthropic":
-            self.deep_thinking_llm = ChatAnthropic(model_name=self.config["deep_think_llm"], base_url=self.config["backend_url"])
-            self.quick_thinking_llm = ChatAnthropic(model_name=self.config["quick_think_llm"], base_url=self.config["backend_url"])
+            self.deep_thinking_llm = ChatAnthropic(model_name=self.config["deep_think_llm"], base_url=self.config["backend_url"], api_key=self.config.get("anthropic_api_key") or None)
+            self.quick_thinking_llm = ChatAnthropic(model_name=self.config["quick_think_llm"], base_url=self.config["backend_url"], api_key=self.config.get("anthropic_api_key") or None)
         elif self.config["llm_provider"].lower() == "google":
-            self.deep_thinking_llm = ChatGoogleGenerativeAI(model=self.config["deep_think_llm"])
-            self.quick_thinking_llm = ChatGoogleGenerativeAI(model=self.config["quick_think_llm"])
+            self.deep_thinking_llm = ChatGoogleGenerativeAI(model=self.config["deep_think_llm"], google_api_key=self.config.get("google_api_key") or None)
+            self.quick_thinking_llm = ChatGoogleGenerativeAI(model=self.config["quick_think_llm"], google_api_key=self.config.get("google_api_key") or None)
         else:
-            self.deep_thinking_llm = ChatOpenAI(model=self.config["deep_think_llm"], base_url=self.config["backend_url"])
-            self.quick_thinking_llm = ChatOpenAI(model=self.config["quick_think_llm"], base_url=self.config["backend_url"])
+            self.deep_thinking_llm = ChatOpenAI(model=self.config["deep_think_llm"], base_url=self.config["backend_url"], api_key=self.config.get("openai_api_key") or None)
+            self.quick_thinking_llm = ChatOpenAI(model=self.config["quick_think_llm"], base_url=self.config["backend_url"], api_key=self.config.get("openai_api_key") or None)
         
         # Initialize memories with unique names per analysis to avoid conflicts in multi-user scenarios
         # Use analysis_id from config if available, otherwise use timestamp-based unique ID
@@ -96,7 +98,10 @@ class TradingAgentsGraph:
         self.tool_nodes = self._create_tool_nodes()
 
         # Initialize components
-        self.conditional_logic = ConditionalLogic()
+        self.conditional_logic = ConditionalLogic(
+            max_debate_rounds=self.config.get("max_debate_rounds", 1),
+            max_risk_discuss_rounds=self.config.get("max_risk_discuss_rounds", 1),
+        )
         self.graph_setup = GraphSetup(
             self.quick_thinking_llm,
             self.deep_thinking_llm,
@@ -118,35 +123,21 @@ class TradingAgentsGraph:
         self.ticker = None
         self.log_states_dict = {}  # date to full state dict
 
-        # Set up the graph with auto-execute trading configuration
-        auto_execute_trading = self.config.get("auto_execute_trading", False)
-        futu_api_base_url = self.config.get("futu_api_base_url")
-        futu_api_key = self.config.get("futu_api_key")
-        
-        # Set Futu API environment variables if provided
-        if auto_execute_trading and futu_api_base_url:
-            os.environ["FUTU_API_BASE_URL"] = futu_api_base_url
-        if auto_execute_trading and futu_api_key:
-            os.environ["FUTU_API_KEY"] = futu_api_key
-        
-        self.graph = self.graph_setup.setup_graph(selected_analysts, auto_execute_trading)
+        self.graph = self.graph_setup.setup_graph(selected_analysts)
+
+    def _configure_api_keys(self) -> None:
+        """Populate provider environment variables from TRADINGAGENTS_* aware config."""
+        provider_key_map = {
+            "openai": ("OPENAI_API_KEY", self.config.get("openai_api_key")),
+            "anthropic": ("ANTHROPIC_API_KEY", self.config.get("anthropic_api_key")),
+            "google": ("GOOGLE_API_KEY", self.config.get("google_api_key")),
+        }
+        for _, (env_name, value) in provider_key_map.items():
+            if value and not os.getenv(env_name):
+                os.environ[env_name] = value
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
         """Create tool nodes for different data sources using abstract methods."""
-        # Import Futu trading tools
-        from tradingagents.agents.utils.futu_trading_tools import (
-            get_futu_account_info,
-            get_futu_positions,
-            get_futu_quote,
-            place_futu_order,
-            cancel_futu_order,
-            get_futu_orders,
-            get_futu_kline,
-            get_futu_hot_stocks,
-            get_futu_hot_news,
-            get_futu_technical_analysis
-        )
-        
         return {
             "market": ToolNode(
                 [
@@ -187,21 +178,6 @@ class TradingAgentsGraph:
                     get_stock_data,
                     get_realtime_quote,
                     get_indicators,
-                ]
-            ),
-            "trading_executor": ToolNode(
-                [
-                    # Futu trading tools for order execution
-                    get_futu_account_info,
-                    get_futu_positions,
-                    get_futu_quote,
-                    place_futu_order,
-                    cancel_futu_order,
-                    get_futu_orders,
-                    get_futu_kline,
-                    get_futu_hot_stocks,
-                    get_futu_hot_news,
-                    get_futu_technical_analysis,
                 ]
             ),
         }
@@ -271,18 +247,14 @@ class TradingAgentsGraph:
             },
             "investment_plan": final_state["investment_plan"],
             "final_trade_decision": final_state["final_trade_decision"],
-            "execution_report": final_state.get("execution_report"),
         }
 
         # Save to file
-        directory = Path(f"eval_results/{self.ticker}/TradingAgentsStrategy_logs/")
+        directory = safe_join("eval_results", self.ticker, "TradingAgentsStrategy_logs")
         directory.mkdir(parents=True, exist_ok=True)
 
-        with open(
-            f"eval_results/{self.ticker}/TradingAgentsStrategy_logs/full_states_log_{trade_date}.json",
-            "w",
-            encoding="utf-8"
-        ) as f:
+        log_path = directory / f"full_states_log_{safe_path_component(trade_date)}.json"
+        with open(log_path, "w", encoding="utf-8") as f:
             json.dump(self.log_states_dict, f, indent=4)
 
     def reflect_and_remember(self, returns_losses):

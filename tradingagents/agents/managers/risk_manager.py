@@ -2,6 +2,7 @@ import time
 import json
 import re
 from tradingagents.agents.utils.market_utils import detect_market_type
+from tradingagents.utils.structured_outputs import build_structured_report
 
 
 def create_risk_manager(llm, memory):
@@ -15,6 +16,7 @@ def create_risk_manager(llm, memory):
         fundamentals_report = state["news_report"]
         sentiment_report = state["sentiment_report"]
         trader_plan = state["investment_plan"]
+        previous_reflection = state.get("previous_decision_reflection") or {}
 
         curr_situation = f"{market_research_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
         past_memories = memory.get_memories(curr_situation, n_matches=2)
@@ -55,10 +57,15 @@ def create_risk_manager(llm, memory):
 
 4. **Learn from Past Mistakes**: Use lessons from **{past_memory_str}** to address prior misjudgments and improve the decision you are making now to make sure you don't make a wrong BUY/SELL/HOLD call that loses money.
 
+5. **Decision Reflection**: If a previous same-ticker decision is provided, compare it against new evidence and explain the expected alpha impact:
+{json.dumps(previous_reflection, ensure_ascii=False)}
+
 **Deliverables:**
 - A clear and actionable recommendation: Buy, Sell, or Hold
 - Detailed reasoning anchored in the debate, long-term trend analysis, risk factor assessment, and past reflections
 - Explicit statement of the decision's time horizon (short-term trading vs. long-term holding)
+- Five-level overall rating (1=strong sell, 2=sell, 3=hold, 4=buy, 5=strong buy), plus ratings for market/technical, fundamentals, sentiment, news/macro, and risk.
+- A STRUCTURED_OUTPUT block with recommendation, rating, section ratings, grounded evidence references, reflection, and alpha note.
 
 ---
 
@@ -129,12 +136,31 @@ Requirements:
         # Detect market type from ticker
         market_type = detect_market_type(ticker)
 
+        report_sections = {
+            "market_report": market_research_report,
+            "sentiment_report": sentiment_report,
+            "news_report": news_report,
+            "fundamentals_report": fundamentals_report,
+            "risk_debate_state": new_risk_debate_state,
+            "investment_plan": trader_plan,
+            "final_trade_decision": response.content,
+            "grounded_evidence": state.get("grounded_evidence", []),
+            "reflection": {
+                "decision_log": response.content,
+                "alpha": previous_reflection.get("alpha", "待后续同标的价格回测确认。"),
+                "lessons": previous_reflection.get("lessons", []),
+            },
+        }
+        structured_report = build_structured_report(report_sections, response.content)
+
         return {
             "risk_debate_state": new_risk_debate_state,
             "final_trade_decision": response.content,
             "ticker": ticker,
             "company_of_interest": company_name,
-            "market_type": market_type
+            "market_type": market_type,
+            "structured_report": structured_report,
+            "reflection": structured_report["reflection"],
         }
 
     return risk_manager_node

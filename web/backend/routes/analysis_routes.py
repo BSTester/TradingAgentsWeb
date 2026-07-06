@@ -77,13 +77,6 @@ async def start_analysis(
     user_config.last_shallow_thinker = request.shallow_thinker
     user_config.last_deep_thinker = request.deep_thinker
     user_config.last_backend_url = request.backend_url
-    user_config.enable_trading_executor = request.enable_trading_executor
-    
-    # Update Futu API config if provided
-    if request.futu_api_base_url:
-        user_config.futu_api_base_url = request.futu_api_base_url
-    if request.futu_api_key:
-        user_config.futu_api_key = request.futu_api_key
     
     # Update API key if provided (single field for all providers)
     if request.api_key:
@@ -149,9 +142,6 @@ async def start_analysis(
         backend_url=request.backend_url,
         api_key=api_key,  # Save API key with the task
         is_public=request.is_public,  # Save privacy setting
-        enable_trading_executor=request.enable_trading_executor,  # Save trading executor setting
-        futu_api_base_url=request.futu_api_base_url,  # Save Futu API config
-        futu_api_key=request.futu_api_key,  # Save Futu API key
         email_notification_enabled=request.email_notification,  # Save email notification preference
         status="queued",
         current_step="Analysis queued",
@@ -172,9 +162,6 @@ async def start_analysis(
         'shallow_thinker': request.shallow_thinker,
         'deep_thinker': request.deep_thinker,
         'backend_url': request.backend_url,
-        'enable_trading_executor': request.enable_trading_executor,
-        'futu_api_base_url': request.futu_api_base_url or user_config.futu_api_base_url,
-        'futu_api_key': request.futu_api_key or user_config.futu_api_key,
         'api_key': api_key,  # Single API key field
     }
     
@@ -274,9 +261,6 @@ async def get_analysis_status(
     # Get selected_analysts from analysts field (JSON)
     selected_analysts = analysis.analysts if analysis.analysts else []
     
-    # Get enable_trading_executor (need to add this field to model if not exists)
-    enable_trading_executor = getattr(analysis, 'enable_trading_executor', False)
-    
     return AnalysisStatus(
         analysis_id=analysis.analysis_id,
         status=analysis.status,
@@ -285,7 +269,6 @@ async def get_analysis_status(
         started_at=analysis.started_at,
         updated_at=analysis.updated_at,
         selected_analysts=selected_analysts,
-        enable_trading_executor=enable_trading_executor
     )
 
 
@@ -364,15 +347,12 @@ async def get_analysis_results(
             "agents": research_agents
         })
     
-    # 阶段3：交易团队（包含交易员和执行交易员）
+    # 阶段3：交易团队（只输出建议，不执行下单）
     if final_state.get("trader_investment_plan"):
         trading_agents = [
             {"name": "交易员", "result": final_state["trader_investment_plan"]}
         ]
-        # 如果有执行交易报告，添加到交易团队
-        if final_state.get("execution_report"):
-            trading_agents.append({"name": "执行交易员", "result": final_state["execution_report"]})
-        
+
         phases.append({
             "id": 3,
             "name": "交易团队",
@@ -583,16 +563,11 @@ async def get_analysis_markdown(
             markdown_parts.append("## 投资评审\n")
             markdown_parts.append(debate_state["judge_decision"] + "\n")
     
-    # 阶段3：交易团队（包含交易员和执行交易员）
+    # 阶段3：交易团队（只输出建议，不执行下单）
     if final_state.get("trader_investment_plan"):
         markdown_parts.append("\n---\n\n# 📈 交易团队\n")
         markdown_parts.append("## 交易员\n")
         markdown_parts.append(final_state["trader_investment_plan"] + "\n")
-        
-        # 如果有执行交易报告，添加到交易团队
-        if final_state.get("execution_report"):
-            markdown_parts.append("## 执行交易员\n")
-            markdown_parts.append(final_state["execution_report"] + "\n")
     
     # 阶段4：风险管理
     if final_state.get("risk_debate_state"):

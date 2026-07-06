@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { AnalysisResults } from '@/components/analysis/AnalysisResults';
 import { useToast, Toast } from '@/components/ui/Toast';
-import { Footer } from '@/components/leaderboard/Footer';
+import { Footer } from '@/components/common/Footer';
 import { AppNavbar } from '@/components/common/AppNavbar';
 
 function HistoryDetailContent() {
@@ -28,7 +28,7 @@ function HistoryDetailContent() {
   };
 
   const handleNewAnalysis = () => {
-    router.push('/dashboard');
+    router.push('/');
   };
 
   React.useEffect(() => {

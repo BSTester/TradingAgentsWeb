@@ -24,6 +24,13 @@ from cli.models import AnalystType
 
 from web.backend.database import SessionLocal, AsyncSessionLocal
 from web.backend.models import AnalysisRecord, User
+from tradingagents.utils.checkpoints import load_checkpoint, save_checkpoint
+from tradingagents.utils.security import safe_join, safe_path_component
+from tradingagents.utils.structured_outputs import (
+    build_structured_report,
+    previous_decision_reflection,
+)
+from web.backend.services.skills.base import clear_skill_event_sink, set_skill_event_sink
 
 
 def serialize_state(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -81,6 +88,18 @@ def safe_commit(db, operation_name="operation"):
             pass
         # Re-raise to let caller handle
         raise
+
+
+def _provider_api_key(provider: str, request_api_key: str | None, config: Dict[str, Any]) -> str:
+    """Resolve API key from request, TRADINGAGENTS_* config, then legacy env."""
+    if request_api_key:
+        return request_api_key
+    provider = (provider or "openai").lower()
+    if provider == "anthropic":
+        return config.get("anthropic_api_key") or os.getenv("TRADINGAGENTS_ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_API_KEY", "")
+    if provider == "google":
+        return config.get("google_api_key") or os.getenv("TRADINGAGENTS_GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY", "")
+    return config.get("openai_api_key") or os.getenv("TRADINGAGENTS_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY", "")
 
 
 class HeartbeatMonitor:
@@ -283,6 +302,23 @@ def run_analysis_task(
         if not analysis_record:
             print(f"❌ 分析记录未找到: {analysis_id}")
             return
+
+        conversation_session_id = request_data.get("conversation_session_id")
+        conversation_message_id = request_data.get("conversation_message_id")
+        conversation_channel_id = f"conversation_{conversation_session_id}" if conversation_session_id else None
+
+        def send_conversation_event(event_type: str, data: dict):
+            if not conversation_channel_id:
+                return
+            try:
+                loop = get_or_create_loop()
+                loop.run_until_complete(manager.send_message({
+                    "type": event_type,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "data": data,
+                }, conversation_channel_id))
+            except Exception as e:
+                print(f"⚠️  发送对话 WebSocket 事件失败: {e}")
         
         def send_log(level: str, message: str, agent: str = 'system', step: str = '', progress: float = 0.0, phase: str = ''):
             """发送日志到控制台和 WebSocket"""
@@ -314,8 +350,52 @@ def run_analysis_task(
                         'phase': phase
                     }
                 }, analysis_id))
+                stage_id = agent or step or phase or "analysis"
+                if "开始" in message:
+                    send_conversation_event("stage_start", {
+                        "stage_id": stage_id,
+                        "stage_name": step or phase or stage_id,
+                        "display_name": step or phase or stage_id,
+                    })
+                elif "完成" in message:
+                    send_conversation_event("stage_complete", {
+                        "stage_id": stage_id,
+                        "completed_at": now_beijing.isoformat(),
+                        "duration_ms": None,
+                    })
+                else:
+                    send_conversation_event("stage_update", {
+                        "stage_id": stage_id,
+                        "summary": truncated_message,
+                    })
+                    if agent != "system" and truncated_message:
+                        send_conversation_event("token", {
+                            "content": truncated_message,
+                            "message_id": conversation_message_id,
+                        })
             except Exception as e:
                 print(f"⚠️  发送 WebSocket 消息失败: {e}")
+
+        def handle_skill_event(event: dict):
+            severity = event.get("severity", "warning")
+            message = truncate_message(event.get("message") or "数据源调用降级", max_length=200)
+            stage_id = event.get("skill") or "data-source"
+            progress = max(float(analysis_record.progress_percentage or 12.0), 12.0)
+            level = "error" if severity == "error" else "warning"
+            send_log(level, message, 'system', '数据源', progress, '分析阶段')
+            if severity == "error":
+                send_conversation_event("stage_error", {
+                    "stage_id": stage_id,
+                    "message": message,
+                    "retryable": event.get("retryable", True),
+                })
+            else:
+                send_conversation_event("stage_warning", {
+                    "stage_id": stage_id,
+                    "message": message,
+                    "partial": event.get("partial", True),
+                    "retryable": event.get("retryable", True),
+                })
         
         def check_stop():
             """检查是否应该停止"""
@@ -345,8 +425,8 @@ def run_analysis_task(
         send_log('info', '🔑 配置 API 密钥...', 'system', '配置', 2.0, '准备阶段')
         check_stop()
         
-        api_key = request_data.get('api_key')
         llm_provider = request_data.get('llm_provider', '').lower()
+        api_key = _provider_api_key(llm_provider, request_data.get('api_key'), DEFAULT_CONFIG)
         
         if api_key:
             if llm_provider == "anthropic":
@@ -362,17 +442,29 @@ def run_analysis_task(
         
         config = DEFAULT_CONFIG.copy()
         config["llm_provider"] = request_data.get('llm_provider', 'openai').lower()
-        config["deep_think_llm"] = request_data.get('deep_thinker', 'gpt-4o')
-        config["quick_think_llm"] = request_data.get('shallow_thinker', 'gpt-4o-mini')
-        config["backend_url"] = request_data.get('backend_url', '')
+        config["deep_think_llm"] = request_data.get('deep_thinker', DEFAULT_CONFIG["deep_think_llm"])
+        config["quick_think_llm"] = request_data.get('shallow_thinker', DEFAULT_CONFIG["quick_think_llm"])
+        config["backend_url"] = request_data.get('backend_url') or DEFAULT_CONFIG["backend_url"]
         config["max_debate_rounds"] = request_data.get('research_depth', 1)
         config["max_risk_discuss_rounds"] = request_data.get('research_depth', 1)
         # Pass analysis_id to ensure unique memory collections per analysis (multi-user safety)
         config["analysis_id"] = analysis_id
-        # Trading executor configuration
-        config["auto_execute_trading"] = request_data.get('enable_trading_executor', False)
-        config["futu_api_base_url"] = request_data.get('futu_api_base_url')
-        config["futu_api_key"] = request_data.get('futu_api_key')
+        config["checkpoint_dir"] = os.getenv("TRADINGAGENTS_CHECKPOINT_DIR", "eval_results")
+        if config["llm_provider"] == "anthropic":
+            config["anthropic_api_key"] = api_key
+        elif config["llm_provider"] == "google":
+            config["google_api_key"] = api_key
+        else:
+            config["openai_api_key"] = api_key
+
+        previous_record = db.query(AnalysisRecord).filter(
+            AnalysisRecord.user_id == user_id,
+            AnalysisRecord.ticker == request_data.get("ticker"),
+            AnalysisRecord.status == "completed",
+            AnalysisRecord.analysis_id != analysis_id,
+        ).order_by(AnalysisRecord.completed_at.desc()).first()
+        previous_reflection = previous_decision_reflection(previous_record)
+        config["previous_decision_reflection"] = previous_reflection
         
         # 转换分析师类型
         analyst_types = []
@@ -390,7 +482,7 @@ def run_analysis_task(
         import time
         time.sleep(0.5)
         
-        print(f"📋 发送配置消息: selected_analysts={analyst_types}, enable_trading_executor={config.get('auto_execute_trading', False)}")
+        print(f"📋 发送配置消息: selected_analysts={analyst_types}")
         try:
             loop = get_or_create_loop()
             loop.run_until_complete(manager.send_message({
@@ -399,7 +491,7 @@ def run_analysis_task(
                 'data': {
                     'selected_analysts': analyst_types,
                     'research_depth': request_data.get('research_depth', 1),
-                    'enable_trading_executor': config.get('auto_execute_trading', False)
+                    'previous_decision_reflection': previous_reflection,
                 }
             }, analysis_id))
             print(f"✅ 配置消息已发送")
@@ -431,7 +523,8 @@ def run_analysis_task(
         init_agent_state = graph.propagator.create_initial_state(
             request_data.get('ticker'),
             request_data.get('analysis_date'),
-            user_id=analysis_record.user_id
+            user_id=analysis_record.user_id,
+            previous_decision_reflection=previous_reflection,
         )
         # Pass user_id to graph args for tools to access
         args = graph.propagator.get_graph_args(user_id=analysis_record.user_id)
@@ -440,7 +533,7 @@ def run_analysis_task(
         
         # 计算进度分配
         # 总进度: 10% -> 90%, 共 80% 的进度空间
-        # 估算总智能体数量: 分析师 + 研究员(2-3个) + 投资评审(1个) + 交易员(1个) + 风险分析(3-4个) + 风险管理(1个) + 交易执行(可选)
+        # 估算总智能体数量: 分析师 + 研究员(2-3个) + 投资评审(1个) + 交易员(1个) + 风险分析(3-4个) + 风险管理(1个)
         num_analysts = len(analyst_types)
         # 固定的其他智能体: 研究员(bull+bear) + 投资评审 + 交易员 + 风险分析(risky+neutral+safe) + 风险管理
         # 根据配置的辩论轮数估算
@@ -449,10 +542,8 @@ def run_analysis_task(
         num_trader = 1
         num_risk_analysts = 3  # risky + neutral + safe
         num_risk_manager = 1
-        num_trading_executor = 1 if config.get("auto_execute_trading", False) else 0  # 执行交易员（可选）
-        
         # 总智能体数量
-        total_agents = num_analysts + num_researchers + num_invest_judge + num_trader + num_risk_analysts + num_risk_manager + num_trading_executor
+        total_agents = num_analysts + num_researchers + num_invest_judge + num_trader + num_risk_analysts + num_risk_manager
         
         progress_per_agent = 80.0 / max(total_agents, 1)  # 每个智能体分配的进度
         base_progress = 10.0
@@ -475,7 +566,6 @@ def run_analysis_task(
             'safe': '保守风险分析师',
             'neutral': '中性风险分析师',
             'risk_manager': '风险管理评审及投资组合分析',
-            'trading_executor': '执行交易员'
         }
         
         # LangGraph 节点名称到内部智能体代码的映射
@@ -493,7 +583,6 @@ def run_analysis_task(
             'Neutral Analyst': 'neutral',
             'Portfolio Manager': 'risk_manager',
             'Risk Judge': 'risk_manager',
-            'Trading Executor': 'trading_executor',
         }
         
         # 智能体对应的报告字段（用于判断节点完成）
@@ -510,7 +599,6 @@ def run_analysis_task(
             'safe': 'risk_debate_state',
             'neutral': 'risk_debate_state',
             'risk_manager': 'investment_plan',
-            'trading_executor': 'execution_report',
         }
         
         # 报告字段收集器
@@ -527,8 +615,32 @@ def run_analysis_task(
             "risk_debate_state": None,
             "investment_plan": None,
             "final_trade_decision": None,
-            "execution_report": None,
+            "grounded_evidence": [],
+            "stage_log": [],
+            "structured_report": None,
+            "reflection": previous_reflection or {},
         }
+        checkpoint_payload = load_checkpoint(
+            config["checkpoint_dir"],
+            user_id,
+            request_data.get('ticker', 'UNKNOWN'),
+            analysis_id,
+        )
+        if checkpoint_payload.get("report_sections"):
+            report_sections.update(checkpoint_payload["report_sections"])
+            init_agent_state.update({
+                key: value
+                for key, value in report_sections.items()
+                if value is not None and key in init_agent_state
+            })
+            send_log(
+                'info',
+                f"已从 checkpoint 恢复到阶段: {checkpoint_payload.get('last_successful_stage', 'unknown')}",
+                'system',
+                '续跑',
+                9.0,
+                '准备阶段',
+            )
         
         # 预定义节点执行顺序（用于追踪智能体切换）
         # 使用与图构建时相同的顺序（analyst_types 就是图的执行顺序）
@@ -536,9 +648,6 @@ def run_analysis_task(
         
         # 后面的固定顺序（按 node_to_agent_map 的顺序）
         fixed_order = ['bull', 'bear', 'invest_judge', 'trader', 'risky', 'safe', 'neutral', 'risk_manager']
-        # Add trading executor if enabled
-        if request_data.get('enable_trading_executor', False):
-            fixed_order.append('trading_executor')
         agent_execution_order.extend(fixed_order)
         
         print(f"📋 预定义智能体执行顺序: {agent_execution_order}")
@@ -570,6 +679,7 @@ def run_analysis_task(
             
             def stream_reader():
                 """在后台线程中读取 stream"""
+                set_skill_event_sink(lambda event: chunk_queue.put(('skill_event', event, analysis_id)))
                 try:
                     for chunk in stream_iterator:
                         chunk_queue.put(('chunk', chunk, analysis_id))
@@ -581,6 +691,7 @@ def run_analysis_task(
                     exception_holder[0] = e
                     chunk_queue.put(('error', e, analysis_id))
                 finally:
+                    clear_skill_event_sink()
                     finished.set()
             
             # 启动后台读取线程
@@ -608,6 +719,8 @@ def run_analysis_task(
                     
                     if msg_type == 'chunk':
                         yield data
+                    elif msg_type == 'skill_event':
+                        handle_skill_event(data)
                     elif msg_type == 'done':
                         break
                     elif msg_type == 'error':
@@ -791,26 +904,30 @@ def run_analysis_task(
                                 print(f"  📊 收集到 investment_plan")
                                 # investment_plan 是由 research_manager 生成的，不是 risk_manager
                             
-                            if "execution_report" in state_update and state_update["execution_report"]:
-                                report_sections["execution_report"] = state_update["execution_report"]
-                                print(f"  📊 收集到 execution_report")
-                                if current_agent == 'trading_executor' and not agent_completed:
-                                    agent_completed = True
-                                    print(f"  ✅ trading_executor 节点完成（收集到报告）")
-                                    # 交易执行是最后一个节点，不需要触发切换
-                            
                             if "final_trade_decision" in state_update and state_update["final_trade_decision"]:
                                 report_sections["final_trade_decision"] = state_update["final_trade_decision"]
                                 print(f"  📊 收集到 final_trade_decision")
                                 if current_agent == 'risk_manager' and not agent_completed:
                                     agent_completed = True
                                     print(f"  ✅ risk_manager 节点完成（收集到报告）")
-                                    # 立即触发切换到下一个智能体（如果启用了交易执行）
                                     if current_agent_index < len(agent_execution_order) - 1:
                                         next_agent_index = current_agent_index + 1
                                         next_agent = agent_execution_order[next_agent_index]
                                         detected_agent = next_agent
                                         print(f"  🔄 触发切换: {current_agent} -> {next_agent} (收集到报告)")
+
+                            if "grounded_evidence" in state_update and state_update["grounded_evidence"]:
+                                existing = report_sections.get("grounded_evidence") or []
+                                report_sections["grounded_evidence"] = existing + list(state_update["grounded_evidence"])
+                                print(f"  📊 收集到 grounded_evidence")
+
+                            if "structured_report" in state_update and state_update["structured_report"]:
+                                report_sections["structured_report"] = state_update["structured_report"]
+                                print(f"  📊 收集到 structured_report")
+
+                            if "reflection" in state_update and state_update["reflection"]:
+                                report_sections["reflection"] = state_update["reflection"]
+                                print(f"  📊 收集到 reflection")
                 
                 # 获取消息列表（从 state_update 或 chunk 中）
                 messages = []
@@ -830,6 +947,24 @@ def run_analysis_task(
                         agent_display_name = agent_name_map.get(last_agent, last_agent)
                         progress = min(90.0, base_progress + (current_analyst_index * progress_per_agent))
                         send_log('info', f'✅ {agent_display_name} 完成分析', last_agent, '完成', progress, '分析阶段')
+                        report_sections.setdefault("stage_log", []).append({
+                            "id": last_agent,
+                            "name": agent_display_name,
+                            "status": "completed",
+                            "completed_at": datetime.utcnow().isoformat(),
+                            "summary": f"{agent_display_name} 完成分析",
+                        })
+                        try:
+                            save_checkpoint(
+                                config["checkpoint_dir"],
+                                user_id,
+                                request_data.get('ticker', 'UNKNOWN'),
+                                analysis_id,
+                                last_agent,
+                                report_sections,
+                            )
+                        except Exception as checkpoint_error:
+                            print(f"⚠️ 保存 checkpoint 失败: {checkpoint_error}")
                         current_analyst_index += 1
                     
                     # 新智能体开始
@@ -937,6 +1072,8 @@ def run_analysis_task(
             decision = '买入'
         elif decision.upper() == 'UNKNOWN':
             decision = '未明确'
+
+        structured_report = report_sections.get("structured_report") or build_structured_report(report_sections, decision_raw)
         
         # 获取基本信息（从收集的字段中）- use Beijing time
         from pytz import timezone as pytz_timezone
@@ -963,15 +1100,24 @@ def run_analysis_task(
             "risk_debate_state": report_sections.get("risk_debate_state", {}),
             "investment_plan": report_sections.get("investment_plan", ""),
             "final_trade_decision": decision_raw,
-            "execution_report": report_sections.get("execution_report", ""),  # 添加交易执行报告
+            "risk_assessment": decision_raw,
+            "grounded_evidence": report_sections.get("grounded_evidence", []),
+            "stage_log": report_sections.get("stage_log", []),
+            "reflection": structured_report.get("reflection", report_sections.get("reflection", {})),
+            "structured_report": structured_report,
         }
         
         # 保存状态到文件(按用户、股票代码和分析ID分开，避免覆盖)
-        user_ticker_dir = Path(f"eval_results/user_{user_id}/{ticker}/TradingAgentsStrategy_logs/")
+        user_ticker_dir = safe_join(
+            "eval_results",
+            f"user_{user_id}",
+            ticker,
+            "TradingAgentsStrategy_logs",
+        )
         user_ticker_dir.mkdir(parents=True, exist_ok=True)
         
         # 使用 analysis_id 作为文件名的一部分，确保每次分析都有唯一的文件
-        log_file = user_ticker_dir / f"full_states_log_{analysis_date}_{analysis_id}.json"
+        log_file = user_ticker_dir / f"full_states_log_{safe_path_component(analysis_date)}_{safe_path_component(analysis_id)}.json"
         
         # 构建完整的日志数据
         log_data = {
@@ -990,7 +1136,10 @@ def run_analysis_task(
                 "risk_debate_state": report_sections.get("risk_debate_state", {}),
                 "investment_plan": report_sections.get("investment_plan", ""),
                 "final_trade_decision": decision_raw,
-                "execution_report": report_sections.get("execution_report", ""),  # 添加交易执行报告
+                "grounded_evidence": report_sections.get("grounded_evidence", []),
+                "stage_log": report_sections.get("stage_log", []),
+                "reflection": structured_report.get("reflection", report_sections.get("reflection", {})),
+                "structured_report": structured_report,
             }
         }
         
@@ -1063,6 +1212,43 @@ def run_analysis_task(
                 db2.close()
             except Exception:
                 pass
+
+        if conversation_message_id:
+            try:
+                from web.backend.models import ConversationMessage
+                from web.backend.services.report_formatter import report_detail, report_preview
+
+                db3 = SessionLocal()
+                try:
+                    conv_msg = db3.query(ConversationMessage).filter(ConversationMessage.id == conversation_message_id).first()
+                    saved_record = db3.query(AnalysisRecord).filter(AnalysisRecord.analysis_id == analysis_id).first()
+                    if conv_msg and saved_record:
+                        conv_msg.status = "completed"
+                        conv_msg.content = structured_report.get("summary") or str(decision)
+                        conv_msg.content_blocks = [
+                            {"type": "text", "content": conv_msg.content},
+                            {
+                                "type": "report",
+                                "report_id": analysis_id,
+                                "report_preview": report_preview(saved_record, conversation_session_id),
+                            },
+                        ]
+                        safe_commit(db3, "update conversation assistant message")
+                        send_conversation_event("analysis_complete", {
+                            "message_id": conversation_message_id,
+                            "duration_ms": None,
+                            "stages_completed": len(report_sections.get("stage_log", [])),
+                            "stages_total": 9,
+                        })
+                        send_conversation_event("report_ready", {
+                            "report_id": analysis_id,
+                            "message_id": conversation_message_id,
+                            "report": report_detail(saved_record, conversation_session_id),
+                        })
+                finally:
+                    db3.close()
+            except Exception as conv_error:
+                print(f"⚠️ 更新对话消息失败: {conv_error}")
         
         # 发送完成消息
         send_log('info', f'分析完成!交易决 {decision}', 'system', '完成', 100.0, '完成阶段')
@@ -1149,6 +1335,26 @@ def run_analysis_task(
                 'message': '分析任务已被中断'
             }
         }, analysis_id))
+        if conversation_message_id:
+            send_conversation_event("stop_ack", {
+                "message_id": conversation_message_id,
+                "stopped_at": datetime.utcnow().isoformat(),
+                "completed_stages": [item.get("id") for item in report_sections.get("stage_log", []) if isinstance(item, dict)],
+                "partial_content": "分析任务已被中断",
+            })
+            try:
+                from web.backend.models import ConversationMessage
+                db_stop = SessionLocal()
+                try:
+                    msg = db_stop.query(ConversationMessage).filter(ConversationMessage.id == conversation_message_id).first()
+                    if msg:
+                        msg.status = "stopped"
+                        msg.content = "分析任务已被中断"
+                        safe_commit(db_stop, "mark conversation message stopped")
+                finally:
+                    db_stop.close()
+            except Exception as conv_error:
+                print(f"⚠️ 更新对话中断状态失败: {conv_error}")
         
         print(f"✅ 中断消息已发送到前端")
         
@@ -1279,6 +1485,39 @@ def run_analysis_task(
             }
             print(f"📤 错误消息内容: {error_message}")
             loop.run_until_complete(manager.send_message(error_message, analysis_id))
+            if conversation_message_id:
+                send_conversation_event("stage_error", {
+                    "stage_id": analysis_record.current_step or "analysis",
+                    "message": user_friendly_error,
+                    "retryable": True,
+                })
+                send_conversation_event("error", {
+                    "code": error_type,
+                    "message": user_friendly_error,
+                    "stage_id": analysis_record.current_step,
+                })
+                try:
+                    from web.backend.models import ConversationMessage
+                    db_err = SessionLocal()
+                    try:
+                        msg = db_err.query(ConversationMessage).filter(ConversationMessage.id == conversation_message_id).first()
+                        if msg:
+                            msg.status = "error"
+                            msg.content = user_friendly_error
+                            msg.content_blocks = [{
+                                "type": "stage_progress",
+                                "stage_id": "analysis",
+                                "stage_name": "分析",
+                                "status": "error",
+                                "summary": user_friendly_error,
+                                "started_at": None,
+                                "completed_at": datetime.utcnow().isoformat(),
+                            }]
+                            safe_commit(db_err, "mark conversation message error")
+                    finally:
+                        db_err.close()
+                except Exception as conv_error:
+                    print(f"⚠️ 更新对话错误状态失败: {conv_error}")
             print(f"✅ 错误消息已发送到前端")
         except Exception as send_error:
             print(f"❌ 发送错误消息失败: {send_error}")

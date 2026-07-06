@@ -151,31 +151,19 @@ These variables will be automatically replaced with actual values during executi
 """
 
 
-def get_default_intraday_prompt() -> str:
+DEFAULT_AGENT_TYPE = "analysis_agent"
+
+
+def get_default_analysis_prompt() -> str:
     """
-    Get the default intraday trader prompt template
+    Get the default analysis agent prompt template
     
     This is the fallback prompt used when a user hasn't customized their template yet.
     """
-    # Read from the original intraday_trader.py file
-    try:
-        import os
-        prompt_file = os.path.join(
-            os.path.dirname(__file__),
-            '../../../tradingagents/agents/trader/intraday_trader_default_prompt.txt'
-        )
-        
-        if os.path.exists(prompt_file):
-            with open(prompt_file, 'r', encoding='utf-8') as f:
-                return f.read()
-    except Exception as e:
-        logger.warning(f"Could not load default prompt from file: {e}")
-    
-    # Fallback inline prompt
-    return """You are an aggressive intraday trading agent operating like a professional day trader with full autonomy to analyze positions and execute trades.
+    return """You are a financial analysis agent. Produce research-backed analysis reports only; never place orders or execute trades.
 
 ## Your Mission
-Maximize risk-adjusted returns through strategic intraday trading.
+Generate concise, evidence-grounded investment analysis and risk recommendations.
 
 ## Available Variables
 - {{market_type}} - Current market (US/HK/CN)
@@ -183,26 +171,25 @@ Maximize risk-adjusted returns through strategic intraday trading.
 - {{timestamp}} - Current timestamp
 - {{user_id}} - User identifier
 
-## Execution Workflow
+## Workflow
 
 ### Phase 1: Information Collection
-Call these tools to gather data:
-- get_futu_account_info(market_type="{{market_type}}")
-- get_futu_positions(market_type="{{market_type}}")
-- get_futu_orders(market_type="{{market_type}}", filter_status=0)
+Gather market, technical, fundamental, news, sentiment, and risk context through read-only data tools.
 
 ### Phase 2: Analysis
-Analyze the collected data and make decisions.
+Analyze the collected data and produce a structured view.
 
-### Phase 3: Execute Trades
-Use place_futu_order() to execute trades if needed.
-
-### Phase 4: Generate Report
-Provide a comprehensive report in Chinese.
+### Phase 3: Generate Report
+Provide a comprehensive report in Chinese. Stop at recommendations; do not call trading/order tools.
 
 Current market: {{market_type}}
 Session: {{session_id}}
 """
+
+
+def get_default_intraday_prompt() -> str:
+    """Backward-compatible alias for old imports; returns non-trading analysis prompt."""
+    return get_default_analysis_prompt()
 
 
 def _create_default_template_for_user_sync(user_id: int, db) -> AgentPromptTemplate:
@@ -218,14 +205,14 @@ def _create_default_template_for_user_sync(user_id: int, db) -> AgentPromptTempl
     """
     from sqlalchemy import select
     
-    default_prompt = get_default_intraday_prompt()
+    default_prompt = get_default_analysis_prompt()
     
     template = AgentPromptTemplate(
-        agent_type="intraday_trader",
+        agent_type=DEFAULT_AGENT_TYPE,
         user_id=user_id,
         system_prompt=default_prompt,
-        template_name="默认日内交易策略",
-        description="系统默认的日内交易 Agent 提示词",
+        template_name="默认分析报告策略",
+        description="系统默认的分析 Agent 提示词",
         version="1.0",
         is_active=True
     )
@@ -288,14 +275,14 @@ def create_default_template_for_user(user_id: int, db: Session) -> AgentPromptTe
     Returns:
         Created template
     """
-    default_prompt = get_default_intraday_prompt()
+    default_prompt = get_default_analysis_prompt()
     
     template = AgentPromptTemplate(
-        agent_type="intraday_trader",
+        agent_type=DEFAULT_AGENT_TYPE,
         user_id=user_id,
         system_prompt=default_prompt,
-        template_name="默认日内交易策略",
-        description="系统默认的日内交易 Agent 提示词",
+        template_name="默认分析报告策略",
+        description="系统默认的分析 Agent 提示词",
         version="1.0",
         is_active=True
     )
@@ -323,7 +310,7 @@ def create_default_template_for_user(user_id: int, db: Session) -> AgentPromptTe
 
 def _load_user_prompt_template_sync(
     user_id: int,
-    agent_type: str = "intraday_trader",
+    agent_type: str = DEFAULT_AGENT_TYPE,
 ) -> str:
     """
     Load user's core prompt template (strategy and behavior only) - Sync version
@@ -351,13 +338,13 @@ def _load_user_prompt_template_sync(
         
         if not user:
             logger.warning(f"User {user_id} not found")
-            default_prompt = get_default_intraday_prompt()
+            default_prompt = get_default_analysis_prompt()
             return default_prompt
         
         if not user.is_active:
             logger.debug(f"User {user_id} is disabled, skipping cache, using default prompt")
             # Don't cache for disabled users
-            return get_default_intraday_prompt()
+            return get_default_analysis_prompt()
         
         # Query user's template
         result = db.execute(
@@ -383,7 +370,7 @@ def _load_user_prompt_template_sync(
                 f"❌ Template found but system_prompt is empty for user {user_id}, "
                 f"template_id={template.id}, using default prompt"
             )
-            prompt = get_default_intraday_prompt()
+            prompt = get_default_analysis_prompt()
             # Don't cache empty prompts
         else:
             _prompt_cache.set(cache_key, prompt)
@@ -398,7 +385,7 @@ def _load_user_prompt_template_sync(
     except Exception as e:
         logger.error(f"❌ Error loading prompt template for user {user_id}: {e}", exc_info=True)
         # Fallback to default core prompt (no system injections)
-        default_prompt = get_default_intraday_prompt()
+        default_prompt = get_default_analysis_prompt()
         return default_prompt
     finally:
         db.close()
@@ -406,7 +393,7 @@ def _load_user_prompt_template_sync(
 
 async def load_user_prompt_template_async(
     user_id: int,
-    agent_type: str = "intraday_trader",
+    agent_type: str = DEFAULT_AGENT_TYPE,
 ) -> str:
     """
     Load user's core prompt template (strategy and behavior only) - Async wrapper
@@ -418,7 +405,7 @@ async def load_user_prompt_template_async(
     
     Args:
         user_id: User ID
-        agent_type: Type of agent (default: intraday_trader)
+        agent_type: Type of agent
         
     Returns:
         User's core prompt string (without system injections)
@@ -430,7 +417,7 @@ async def load_user_prompt_template_async(
 
 def load_user_prompt_template(
     user_id: int,
-    agent_type: str = "intraday_trader",
+    agent_type: str = DEFAULT_AGENT_TYPE,
 ) -> str:
     """
     Load user's core prompt template (strategy and behavior only) - Sync version
@@ -442,7 +429,7 @@ def load_user_prompt_template(
     
     Args:
         user_id: User ID
-        agent_type: Type of agent (default: intraday_trader)
+        agent_type: Type of agent
         
     Returns:
         User's core prompt string (without system injections)
@@ -464,13 +451,13 @@ def load_user_prompt_template(
         
         if not user:
             logger.warning(f"User {user_id} not found")
-            default_prompt = get_default_intraday_prompt()
+            default_prompt = get_default_analysis_prompt()
             return default_prompt
         
         if not user.is_active:
             logger.debug(f"User {user_id} is disabled, skipping cache, using default prompt")
             # Don't cache for disabled users
-            return get_default_intraday_prompt()
+            return get_default_analysis_prompt()
         
         # Query user's template
         template = db.query(AgentPromptTemplate).filter(
@@ -493,7 +480,7 @@ def load_user_prompt_template(
                 f"❌ Template found but system_prompt is empty for user {user_id}, "
                 f"template_id={template.id}, using default prompt"
             )
-            prompt = get_default_intraday_prompt()
+            prompt = get_default_analysis_prompt()
             # Don't cache empty prompts
         else:
             _prompt_cache.set(cache_key, prompt)
@@ -508,7 +495,7 @@ def load_user_prompt_template(
     except Exception as e:
         logger.error(f"❌ Error loading prompt template for user {user_id}: {e}", exc_info=True)
         # Fallback to default core prompt (no system injections)
-        default_prompt = get_default_intraday_prompt()
+        default_prompt = get_default_analysis_prompt()
         # Don't cache error cases
         return default_prompt
         
@@ -516,7 +503,7 @@ def load_user_prompt_template(
         db.close()
 
 
-def get_enabled_tools_for_user(user_id: int, agent_type: str = "intraday_trader") -> List[str]:
+def get_enabled_tools_for_user(user_id: int, agent_type: str = DEFAULT_AGENT_TYPE) -> List[str]:
     """
     Get list of enabled tool names for a user
     
@@ -552,7 +539,7 @@ def get_enabled_tools_for_user(user_id: int, agent_type: str = "intraday_trader"
 
 
 
-def invalidate_prompt_cache(user_id: int, agent_type: str = "intraday_trader"):
+def invalidate_prompt_cache(user_id: int, agent_type: str = DEFAULT_AGENT_TYPE):
     """
     Invalidate prompt cache for a user
     
@@ -560,6 +547,6 @@ def invalidate_prompt_cache(user_id: int, agent_type: str = "intraday_trader"):
     
     Args:
         user_id: User ID
-        agent_type: Agent type (default: intraday_trader)
+        agent_type: Agent type
     """
     _prompt_cache.invalidate(user_id, agent_type)

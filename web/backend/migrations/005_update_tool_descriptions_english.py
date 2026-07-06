@@ -29,9 +29,6 @@ TOOL_DESCRIPTIONS_EN = {
     'get_futu_kline': 'Get stock K-line data supporting multiple timeframes (1min/5min/daily/weekly)',
     'get_futu_technical_analysis': 'Get technical analysis indicators including MACD, RSI, Bollinger Bands',
     
-    # Trading tools
-    'place_futu_order': 'Place trading order supporting buy/sell and market/limit order types',
-    
     # News tools
     'get_futu_hot_news': 'Get hot financial news from Futu supporting Chinese and English',
     'get_futu_hot_stocks': 'Get hot stocks list from Futu to discover market trends',
