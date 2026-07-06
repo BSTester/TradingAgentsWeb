@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { buildApiUrl } from '@/utils/api';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { AppNavbar } from '@/components/common/AppNavbar';
-import { Footer } from '@/components/leaderboard/Footer';
+import { Footer } from '@/components/common/Footer';
 import { ProviderList } from '@/components/admin/llm-config/ProviderList';
 import { ModelList } from '@/components/admin/llm-config/ModelList';
 import { ProviderForm } from '@/components/admin/llm-config/ProviderForm';

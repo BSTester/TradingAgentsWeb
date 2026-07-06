@@ -86,7 +86,7 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
       onShowToast('登录成功！正在跳转...', 'success');
       
       await new Promise(resolve => setTimeout(resolve, 500));
-      router.replace('/dashboard');
+      router.replace('/');
     } catch (error: any) {
       const errorMessage = error.message || '登录失败，请检查用户名和密码';
       onShowToast(errorMessage, 'error');
@@ -121,7 +121,7 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
       onShowToast('登录成功！正在跳转...', 'success');
       
       await new Promise(resolve => setTimeout(resolve, 500));
-      router.replace('/dashboard');
+      router.replace('/');
     } catch (error: any) {
       const errorMessage = error.message || '登录失败，请检查验证码';
       onShowToast(errorMessage, 'error');

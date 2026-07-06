@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },
-  
+
   // Docker 构建时跳过 lint 和类型检查以加快构建速度
   eslint: {
     ignoreDuringBuilds: true,

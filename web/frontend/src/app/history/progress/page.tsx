@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { AnalysisProgress } from '@/components/analysis/AnalysisProgress';
 import { useToast, Toast } from '@/components/ui/Toast';
-import { Footer } from '@/components/leaderboard/Footer';
+import { Footer } from '@/components/common/Footer';
 import { AppNavbar } from '@/components/common/AppNavbar';
 
 function HistoryProgressContent() {

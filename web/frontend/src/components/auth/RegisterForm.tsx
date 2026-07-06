@@ -111,7 +111,7 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
       onShowToast('注册成功！正在跳转...', 'success');
       
       await new Promise(resolve => setTimeout(resolve, 500));
-      router.replace('/dashboard?setup_password=true');
+      router.replace('/?setup_password=true');
     } catch (error: any) {
       const errorMessage = error.message || '注册失败，请稍后重试';
       onShowToast(errorMessage, 'error');
