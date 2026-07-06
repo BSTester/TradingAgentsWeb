@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { AnalysisResults } from '@/components/analysis/AnalysisResults';
 import { useToast, Toast } from '@/components/ui/Toast';
-import { Footer } from '@/components/leaderboard/Footer';
+import { Footer } from '@/components/common/Footer';
 import { AppNavbar } from '@/components/common/AppNavbar';
 
 function AnalysisDetailContent() {
@@ -29,7 +29,7 @@ function AnalysisDetailContent() {
     if (fromLeaderboard) {
       router.push(`/?market=${marketTab}`);
     } else if (user) {
-      router.push('/dashboard');
+      router.push('/');
     } else {
       router.push('/');
     }
@@ -37,7 +37,7 @@ function AnalysisDetailContent() {
 
   const handleNewAnalysis = () => {
     if (user) {
-      router.push('/dashboard');
+      router.push('/');
     } else {
       router.push('/login');
     }

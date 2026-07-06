@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { AppNavbar } from '@/components/common/AppNavbar';
 import { useToast, Toast } from '@/components/ui/Toast';
-import { Footer } from '@/components/leaderboard/Footer';
+import { Footer } from '@/components/common/Footer';
 
 export default function ProfilePage() {
   const { user, logout, isLoading: authLoading } = useAuth();
