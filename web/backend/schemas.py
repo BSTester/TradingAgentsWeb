@@ -62,8 +62,6 @@ class User(UserBase):
     id: int
     role: str
     is_active: bool
-    can_access_intraday_trading: bool
-    participate_in_leaderboard: bool
     has_set_password: bool
     created_at: datetime
     
@@ -128,11 +126,7 @@ class AnalysisRequest(BaseModel):
     shallow_thinker: str
     deep_thinker: str
     # Privacy settings
-    is_public: bool = False  # Whether to show in public leaderboard
-    # Trading executor settings
-    enable_trading_executor: bool = False  # Whether to enable trading executor
-    futu_api_base_url: Optional[str] = None  # Futu API base URL
-    futu_api_key: Optional[str] = None  # Futu API key
+    is_public: bool = False  # Whether to make the generated report public
     # API Key (single field for all LLM providers)
     api_key: Optional[str] = None  # API key for the selected LLM provider
     # Email notification settings
@@ -171,7 +165,6 @@ class AnalysisStatus(BaseModel):
     updated_at: Optional[datetime] = None
     # Configuration info for UI initialization
     selected_analysts: Optional[List[str]] = None
-    enable_trading_executor: bool = False
     email_notification_enabled: bool = False
 
 class AnalysisRecord(BaseModel):
@@ -295,11 +288,6 @@ class ScheduledTaskCreate(BaseModel):
     deep_thinker: str
     is_public: bool = False
     
-    # Trading executor configuration
-    enable_trading_executor: bool = False
-    futu_api_base_url: Optional[str] = None
-    futu_api_key: Optional[str] = None
-    
     # Email notification settings
     email_notification: bool = False  # Whether to send email notification when task completes
     
@@ -383,9 +371,6 @@ class ScheduledTaskResponse(BaseModel):
     deep_thinker: str
     backend_url: str
     is_public: bool
-    enable_trading_executor: bool
-    futu_api_base_url: Optional[str]
-    futu_api_key: Optional[str]
     email_notification_enabled: bool
     execution_cycle: str
     execution_time: str
@@ -434,10 +419,6 @@ class UserStatusUpdate(BaseModel):
     """Schema for updating user status"""
     is_active: bool
 
-class UserIntradayAccessUpdate(BaseModel):
-    """Schema for updating user intraday trading access"""
-    can_access_intraday_trading: bool
-
 # User Configuration schemas
 class UserConfigUpdate(BaseModel):
     """Schema for updating user configuration - all analysis settings"""
@@ -449,11 +430,6 @@ class UserConfigUpdate(BaseModel):
     last_shallow_thinker: Optional[str] = None
     last_deep_thinker: Optional[str] = None
     last_backend_url: Optional[str] = None
-    
-    # Trading executor configuration
-    enable_trading_executor: Optional[bool] = None
-    futu_api_base_url: Optional[str] = None
-    futu_api_key: Optional[str] = None
     
     # API Key (single field for all LLM providers)
     last_api_key: Optional[str] = None  # Last used API key (matches last_llm_provider)
@@ -468,11 +444,6 @@ class UserConfigResponse(BaseModel):
     last_shallow_thinker: Optional[str] = None
     last_deep_thinker: Optional[str] = None
     last_backend_url: Optional[str] = None
-    
-    # Trading executor configuration
-    enable_trading_executor: bool = False
-    futu_api_base_url: Optional[str] = None
-    futu_api_key: Optional[str] = None
     
     # API Key (returns actual key for frontend to use)
     last_api_key: Optional[str] = None  # Last used API key (matches last_llm_provider)
@@ -493,7 +464,7 @@ class PromptTemplateBase(BaseModel):
 
 
 class PromptTemplateCreate(PromptTemplateBase):
-    agent_type: str = "intraday_trader"
+    agent_type: str = "analysis_agent"
 
 
 class PromptTemplateUpdate(BaseModel):
@@ -668,4 +639,3 @@ class LLMConnectionTestResponse(BaseModel):
     success: bool
     message: str
     details: Optional[Dict[str, Any]] = None
-

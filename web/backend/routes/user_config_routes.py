@@ -41,9 +41,6 @@ async def get_user_config(
         last_shallow_thinker=config.last_shallow_thinker,
         last_deep_thinker=config.last_deep_thinker,
         last_backend_url=config.last_backend_url,
-        enable_trading_executor=config.enable_trading_executor,
-        futu_api_base_url=config.futu_api_base_url,
-        futu_api_key=config.futu_api_key,
         # Return actual API key for frontend to use
         last_api_key=config.last_api_key
     )
@@ -81,14 +78,6 @@ async def update_user_config(
     if config_update.last_backend_url is not None:
         config.last_backend_url = config_update.last_backend_url
     
-    # Update trading executor configuration
-    if config_update.enable_trading_executor is not None:
-        config.enable_trading_executor = config_update.enable_trading_executor
-    if config_update.futu_api_base_url is not None:
-        config.futu_api_base_url = config_update.futu_api_base_url
-    if config_update.futu_api_key is not None:
-        config.futu_api_key = config_update.futu_api_key
-    
     # Update API key if provided (single field for all providers)
     if config_update.last_api_key is not None:
         config.last_api_key = config_update.last_api_key
@@ -108,9 +97,6 @@ async def update_user_config(
         last_shallow_thinker=config.last_shallow_thinker,
         last_deep_thinker=config.last_deep_thinker,
         last_backend_url=config.last_backend_url,
-        enable_trading_executor=config.enable_trading_executor,
-        futu_api_base_url=config.futu_api_base_url,
-        futu_api_key=config.futu_api_key,
         # Return actual API key for frontend to use
         last_api_key=config.last_api_key
     )

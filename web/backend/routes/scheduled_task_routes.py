@@ -151,9 +151,6 @@ async def create_scheduled_task(
         backend_url=request.backend_url,
         api_key=api_key,  # Save API key with the scheduled task
         is_public=request.is_public,
-        enable_trading_executor=request.enable_trading_executor,
-        futu_api_base_url=request.futu_api_base_url,
-        futu_api_key=request.futu_api_key,
         email_notification_enabled=request.email_notification,  # Save email notification preference
         execution_cycle=request.execution_cycle,
         execution_time=request.execution_time,

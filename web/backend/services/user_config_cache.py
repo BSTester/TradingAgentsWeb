@@ -178,20 +178,8 @@ def get_user_config_from_cache(user_id: int) -> Optional[Dict[str, Any]]:
                 # Convert to dict
                 config_dict = {
                     'user_id': user_config.user_id,
-                    'futu_api_base_url': user_config.futu_api_base_url,
-                    'intraday_futu_api_url': user_config.intraday_futu_api_url,
-                    'futu_api_key': user_config.futu_api_key,
-                    'intraday_futu_api_key': user_config.intraday_futu_api_key,
                     'last_llm_provider': user_config.last_llm_provider,
                     'last_api_key': user_config.last_api_key,
-                    'intraday_scheduler_auto_start': user_config.intraday_scheduler_auto_start,
-                    # Intraday config
-                    'intraday_llm_provider': user_config.intraday_llm_provider,
-                    'intraday_api_key': user_config.intraday_api_key,
-                    'intraday_llm_model': user_config.intraday_llm_model,
-                    'intraday_backend_url': user_config.intraday_backend_url,
-                    'intraday_interval_minutes': user_config.intraday_interval_minutes,
-                    'intraday_market_type': user_config.intraday_market_type,
                     # Analysis config (fallback)
                     'last_deep_thinker': user_config.last_deep_thinker,
                     'last_backend_url': user_config.last_backend_url,
@@ -257,20 +245,8 @@ def preload_user_configs() -> int:
             for user_config in user_configs:
                 config_dict = {
                     'user_id': user_config.user_id,
-                    'futu_api_base_url': user_config.futu_api_base_url,
-                    'intraday_futu_api_url': user_config.intraday_futu_api_url,
-                    'futu_api_key': user_config.futu_api_key,
-                    'intraday_futu_api_key': user_config.intraday_futu_api_key,
                     'last_llm_provider': user_config.last_llm_provider,
                     'last_api_key': user_config.last_api_key,
-                    'intraday_scheduler_auto_start': user_config.intraday_scheduler_auto_start,
-                    # Intraday config
-                    'intraday_llm_provider': user_config.intraday_llm_provider,
-                    'intraday_api_key': user_config.intraday_api_key,
-                    'intraday_llm_model': user_config.intraday_llm_model,
-                    'intraday_backend_url': user_config.intraday_backend_url,
-                    'intraday_interval_minutes': user_config.intraday_interval_minutes,
-                    'intraday_market_type': user_config.intraday_market_type,
                     # Analysis config (fallback)
                     'last_deep_thinker': user_config.last_deep_thinker,
                     'last_backend_url': user_config.last_backend_url,
