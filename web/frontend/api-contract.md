@@ -2,8 +2,8 @@
 
 > Issue: **WS-18** / `[story-001·前端]` — API 契约 + 前端技术方案（rework）
 > 协作者：前端开发工程师（Agent `1381815f-…`）
-> 权威源：`backend/openapi.yaml`（由 WS-13 rework 产出，提交到 `main` 后为准）
-> 状态：**起草稿（DRAFT，WS-20 重做版）** —— `backend/openapi.yaml` 当前尚未落地，本文档依据 `pm/requirements.md` §3/§6(M2–M5)/§7/§9（WS-20 更新版）与 `pm/stories/story-001/002/004` 起草，待 WS-13 `openapi.yaml` 落地后**逐项对齐**。
+> 权威源：`backend/openapi.yaml`（由 WS-13 rework 产出，PR #16，merge `133fc39`，已落地 `main` —— **本文档已据此对齐**）
+> 状态：**已对齐（Aligned to `backend/openapi.yaml` v0.2.0，PR #16）** —— 系统默认 provider 摘要已按 openapi 移除 `has_api_key` / `api_key_masked` / 脱敏尾号概念（普通用户仅非敏感元数据；管理员仅 `credential_configured`）；E1–E5 与 `AnalysisRequest` 字段已逐项核对一致。
 
 ## 0. 重大模型变更（相对初版）
 
@@ -12,7 +12,7 @@
 - **用户 API KEY 存前端 `localStorage`（按 `用户 + provider` 维度），后端不持久化、不回填用户 KEY。**
 - **用户 AI 设置 API 不再包含 `has_api_key` / `api_key_masked` / 明文 KEY 字段**；只返回 provider **元数据** + `last_validated_at` / `last_validation_status`。
 - 分析启动时，前端从 `localStorage` 取出当前 provider 的 KEY **随请求下发**（亦允许一次性输入）；后端只使用、不保存、不回填。
-- **系统默认 provider 的 KEY 仍由后端保存并脱敏**，其摘要仍用 `has_api_key` / `api_key_masked`，且对普通用户不可见明文（见 §9）。
+- **系统默认 provider 的 KEY 仍由后端保存，但前端契约按 openapi 不再暴露任何 KEY 状态（含脱敏尾号）**：普通用户公开摘要（`PublicSystemDefaultProvider`，§9）仅含非敏感元数据；管理员摘要（`SystemDefaultProvider`，§10）仅用 `credential_configured: boolean` 表示「后端 KEY 是否已配置」，绝不暴露明文或 `sk-***` 尾号（见 §9 / §10）。
 
 > 这是相对初版（`api-contract.md` v1，PR #10）的反转。初版的「后端存 KEY + 脱敏回传」模型已作废。
 
@@ -27,11 +27,11 @@
 | E3 | `PATCH /api/user/llm-settings/providers/{id}` | 编辑 provider 元数据（**无 api_key 字段**） | user | M2 / M3 |
 | E4 | `DELETE /api/user/llm-settings/providers/{id}` | 删除一条 provider 元数据 | user | M2 / M3 |
 | E5 | `POST /api/user/llm-settings/providers/{id}/test` | 测试连接（**临时**带 KEY，后端不持久化） | user | M2 / M3 |
-| E6 | `GET /api/config`（**扩展**） | 在现有响应上追加 `system_default` 摘要（脱敏） | user | M4 / M5 |
+| E6 | `GET /api/config`（**扩展**） | 在现有响应上追加 `system_default` **非敏感**摘要（无 KEY 状态） | user | M4 / M5 |
 | E7 | `PUT /api/admin/llm/system-default` | 管理员设系统默认 provider（后端 KEY） | admin | M4 |
 | E8 | `POST /api/analyze`（已存在） | 分析启动，KEY 来自前端 `localStorage` 或一次性输入 | user | M5 |
 
-> 端点形态（E1–E7）与初版一致；**唯一语义变化：E1–E5 完全不含用户 KEY；E5 改为由前端临时下发 KEY 做验证**。系统默认（E6/E7）的 `api_key_masked` 保留（那是后端 KEY，非用户 KEY）。
+> 端点形态（E1–E7）与初版一致；**唯一语义变化：E1–E5 完全不含用户 KEY；E5 改为由前端临时下发 KEY 做验证**。系统默认（E6/E7）的 KEY 属后端，但前端契约按 openapi **不再暴露明文或脱敏尾号**：公开摘要仅非敏感元数据，管理员摘要仅 `credential_configured: boolean`（见 §9 / §10）。
 
 ---
 
@@ -111,7 +111,7 @@ export type LLMConfigSource =
 export type ValidationStatus = 'ok' | 'failed' | 'untested' | null;
 ```
 
-> 注意：**用户侧已无 `ApiKeyMask` 类型**。只有系统默认摘要（§9）保留脱敏字段。
+> 注意：**全文已无任何 `ApiKeyMask` / `has_api_key` / `api_key_masked` 类型**。系统默认摘要（§9 / §10）按 openapi 也不再含脱敏字段：公开摘要仅非敏感元数据，管理员摘要仅 `credential_configured: boolean`。
 
 ---
 
@@ -120,13 +120,17 @@ export type ValidationStatus = 'ok' | 'failed' | 'untested' | null;
 **响应 `200`** → `UserLLMSettingsResponse`
 
 ```ts
+export type ProviderProfileType = 'catalog' | 'custom';
+
 export interface UserLLMProviderSetting {
-  id: string;                     // 配置主键（UUID 或数字串）
-  provider_name: string;         // 系统 provider 标识，或用户自定义名称
+  id: number;                     // 配置主键（openapi: integer）
+  provider_name: string;         // 系统 provider 标识（小写 slug），或用户自定义名称
+  provider_type: ProviderProfileType; // 'catalog' | 'custom'
+  catalog_provider_id: number | null; // provider_type=catalog 时关联的系统 LLMProvider.id
   display_name: string;
-  base_url: string;
-  shallow_model: string | null;
-  deep_model: string | null;
+  base_url: string;              // format: uri
+  shallow_model: string;
+  deep_model: string;
   is_enabled: boolean;
   is_default: boolean;           // 该用户的默认 provider
   last_validated_at: string | null;   // ISO8601（后端记录，不存 KEY）
@@ -135,10 +139,17 @@ export interface UserLLMProviderSetting {
   updated_at: string;
 }
 
+export interface LegacyLLMConfigSummary {
+  available: boolean;
+  last_llm_provider: string | null;
+  last_backend_url: string | null;
+}
+
 export interface UserLLMSettingsResponse {
   providers: UserLLMProviderSetting[];
-  default_provider_id: string | null;
+  default_provider_id: number | null;
   has_legacy_config: boolean;    // 旧 UserConfig.last_* 是否仍有值（迁移提示）
+  legacy_config: LegacyLLMConfigSummary | null; // 旧配置摘要（available + 非敏感 last_*）
 }
 ```
 
@@ -154,11 +165,13 @@ export interface UserLLMSettingsResponse {
 
 ```ts
 export interface CreateUserLLMProviderRequest {
-  provider_name: string;
+  provider_name: string;                 // pattern: ^[a-zA-Z0-9_-]+$
+  provider_type: ProviderProfileType;    // 'catalog' | 'custom'
+  catalog_provider_id?: number | null;  // provider_type=catalog 时关联系统 LLMProvider.id
   display_name: string;
   base_url: string;
-  shallow_model?: string | null;
-  deep_model?: string | null;
+  shallow_model: string;
+  deep_model: string;
   is_enabled?: boolean;    // 默认 true
   is_default?: boolean;    // 默认 false；true 时取消其他默认
 }
@@ -215,8 +228,9 @@ export interface UpdateUserLLMProviderRequest {
 
 ```ts
 export interface TestUserLLMProviderRequest {
-  base_url: string;
-  api_key: string;   // 一次性明文；优先用表单当前输入，其次本地 localStorage 取出的 KEY
+  api_key: string;                 // writeOnly：一次性明文；优先用表单当前输入，其次本地 localStorage 取出的 KEY
+  base_url?: string | null;        // 测试用 base URL 覆盖；省略则用保存的元数据
+  model?: string | null;           // 可选模型名，用于轻量验证请求
 }
 ```
 
@@ -225,8 +239,10 @@ export interface TestUserLLMProviderRequest {
 ```ts
 export interface TestUserLLMProviderResponse {
   valid: boolean;
-  message?: string;          // 失败原因（不泄露 KEY）
-  last_validated_at: string; // ISO8601，后端记录验证状态/时间
+  message: string;                 // 失败原因（不泄露 KEY）
+  last_validated_at: string;       // ISO8601，后端记录验证状态/时间
+  last_validation_status: ValidationStatus;
+  details?: Record<string, unknown> | null; // 已脱敏诊断，不含密钥
 }
 ```
 
@@ -236,42 +252,66 @@ export interface TestUserLLMProviderResponse {
 
 ---
 
-## 9. E6 `GET /api/config`（扩展）—— 系统默认摘要（后端 KEY，仍脱敏）
+## 9. E6 `GET /api/config`（扩展）—— 系统默认**非敏感**摘要（无 KEY 状态）
 
-`/api/config` 在现有响应上**追加** `system_default` 字段（向后兼容）：
+`/api/config` 在现有响应上**追加** `system_default` 字段（向后兼容）。按 openapi `PublicSystemDefaultProvider`，**普通用户只能看到非敏感元数据，无任何 KEY 状态**（无 `has_api_key` / `api_key_masked` / 脱敏尾号）：
 
 ```ts
 export interface AppConfig {
-  llm_providers: LLMProviderOption[];   // { value, label, description, url }
-  models: Record<string, { shallow: LLMModelOption[]; deep: LLMModelOption[] }>;
-  analysts?: string[];
-  research_depths?: number[];
+  analysts: { value: string; label: string; description?: string | null }[];
+  research_depths: { value: number; label: string; description?: string | null }[];
+  llm_providers: { value: string; label: string; description?: string | null; url?: string | null }[];
+  models: Record<string, { shallow: { value: string; label: string }[]; deep: { value: string; label: string }[] }>;
   backend_url?: string;
 }
 
-// 系统默认 provider：后端 KEY，对普通用户仅暴露脱敏摘要
-export interface SystemDefaultProviderSummary {
+// 系统默认 provider：仅非敏感元数据（对应 openapi PublicSystemDefaultProvider）
+export interface PublicSystemDefaultProvider {
   provider_id: number;
   provider_name: string;
   display_name: string;
-  base_url: string;
-  has_api_key: boolean;          // 仍存在（这是系统 KEY，后端持有）
-  api_key_masked: string | null; // 脱敏尾号，如 "sk-***abcd"
-  is_active: boolean;
+  base_url: string | null;        // format: uri
+  shallow_model: string | null;
+  deep_model: string | null;
+  // 注意：无 has_api_key / api_key_masked —— 普通用户看不到任何 KEY 状态
 }
 
 export interface AppConfigWithSystemDefault extends AppConfig {
-  system_default: SystemDefaultProviderSummary | null;
+  system_default: PublicSystemDefaultProvider | null;
 }
 ```
 
 **契约要点**
-- `has_api_key` / `api_key_masked` **仅在此系统默认摘要中出现**（系统 KEY 后端持有，须脱敏）；用户侧 API（E1–E5）不包含这两个字段。
-- 普通用户永远拿不到系统默认 provider 的明文 KEY。
+- 普通用户**永远拿不到**系统默认 provider 的 KEY 明文、脱敏尾号或「是否已配置」布尔；`PublicSystemDefaultProvider` 仅含非敏感元数据（见 openapi `system_default` + `PublicSystemDefaultProvider`）。
+- 分析表单「来源」展示只使用 `provider_name` / `display_name` / `base_url` / `models`（见 `frontend-tech-spec.md` §6.1 / §6.3），**绝不展示任何 KEY 状态**。
 
 ---
 
-## 10. E7 `PUT /api/admin/llm/system-default` —— 设置系统默认 provider
+## 10. E7 `GET` / `PUT /api/admin/llm/system-default` —— 管理员系统默认 provider
+
+### GET（读取当前系统默认摘要）
+
+**响应**
+- `200` → `SystemDefaultProvider | null`（没有配置的系统默认时为 `null`）
+- `401` → 未登录
+- `403` → 非管理员
+
+```ts
+// 管理员视角的系统默认 provider 摘要（对应 openapi SystemDefaultProvider）
+export interface SystemDefaultProvider {
+  provider_id: number;
+  provider_name: string;
+  display_name: string;
+  is_active: boolean;
+  credential_configured: boolean;  // 仅此布尔：后端 KEY 是否已配置；不暴露明文/脱敏尾号
+  base_url: string | null;         // format: uri
+  shallow_model: string | null;
+  deep_model: string | null;
+  updated_at: string | null;       // ISO8601
+}
+```
+
+### PUT（设置系统默认 provider）
 
 **请求体** `SetSystemDefaultRequest`
 
@@ -282,12 +322,16 @@ export interface SetSystemDefaultRequest {
 ```
 
 **响应**
-- `200` → `SystemDefaultProviderSummary`（设置后的脱敏摘要）
-- `400` → 所选 provider 非 active（`detail: "cannot set inactive provider as system default"`）
+- `200` → `SystemDefaultProvider`（设置后的摘要，含 `credential_configured`）
+- `400` → 所选 provider 非 active（`SYSTEM_DEFAULT_PROVIDER_INACTIVE`）或约束冲突
+- `401` → 未登录
 - `403` → 非管理员
-- `404` → provider 不存在
+- `404` → provider 不存在（`LLM_PROVIDER_NOT_FOUND`）
+- `409` → 所选 provider 无后端托管凭据（`SYSTEM_DEFAULT_PROVIDER_CREDENTIAL_MISSING`）
 
-（与初版一致；系统 KEY 仍后端持有。）
+**契约要点**
+- 管理员摘要**只暴露「是否已配置后端 KEY」**（`credential_configured: boolean`），**绝不暴露明文 KEY 或脱敏尾号 `sk-***`**（与 openapi `SystemDefaultProvider` + WS-19 设计一致）。
+- 系统 KEY 仍后端持有；前端此页不涉及用户本地 KEY。
 
 ---
 
@@ -296,23 +340,31 @@ export interface SetSystemDefaultRequest {
 `analysisAPI.startAnalysis` 请求体中的 `api_key` 字段语义更新为：**来自前端 `localStorage`（本地 KEY）或用户一次性输入**，且随请求下发后**后端不持久化、不回填**。
 
 ```ts
+// 对应 openapi AnalysisRequest（WS-12 LLM 解析契约）
 export interface StartAnalysisRequest {
+  // —— 必填（openapi required）——
   ticker: string;
-  analysis_date: string;
-  analysts: string[];
-  research_depth: number;
-  llm_provider: string;
-  backend_url?: string;
-  shallow_thinker?: string;
-  deep_thinker?: string;
-  api_key?: string;            // 来自 localStorage 或一次性输入；仅本次请求使用
-  is_public?: boolean;
-  email_notification?: boolean;
-  enable_trading_executor?: boolean;
-  futu_api_base_url?: string;
-  futu_api_key?: string;
+  analysis_date: string;        // format: date
+  analysts: string[];           // enum: market | social | news | fundamentals（minItems: 1）
+  research_depth: number;       // minimum: 1
+
+  // —— 请求级 LLM 覆盖（均可为 null，省略则后端按优先级解析）——
+  llm_provider?: string | null;     // 请求级 provider 选择（如 "openai"）
+  backend_url?: string | null;      // format: uri，请求级 base URL
+  shallow_thinker?: string | null;
+  deep_thinker?: string | null;
+  api_key?: string | null;          // writeOnly：来自 localStorage 或一次性输入；仅本次请求使用，后端绝不持久化
+
+  // —— 兜底开关 ——
+  use_system_default?: boolean;     // 未提供 api_key 时显式请求系统默认兜底（默认 false）
+
+  // —— 现有开关 ——
+  is_public?: boolean;              // 默认 false
+  email_notification?: boolean;     // 默认 false
 }
 ```
+
+> **应用级扩展（非 WS-12 契约，待与 `backend/openapi.yaml` 对齐）**：本仓库现有 `AnalysisConfigForm` 另携带富途交易相关字段（`enable_trading_executor`、`futu_api_base_url`、`futu_api_key`，见 `frontend-tech-spec.md` §6.4）。这些**不在** WS-12 `AnalysisRequest` 内；若 stage-2 仍需保留，应在 openapi 中补充字段后再回流对齐，前端暂按既有实现透传，不写入本契约的权威形状。
 
 **契约要点**
 - 前端构造请求时：`api_key = getLocalKey(providerKey) ?? oneTimeInput`（见 §2.2）。
@@ -352,18 +404,20 @@ export const llmSettingsAPI = {
   getSettings: () => apiClient.get<UserLLMSettingsResponse>('/api/user/llm-settings').then(r => r.data),
   createProvider: (body: CreateUserLLMProviderRequest) =>
     apiClient.post<UserLLMProviderSetting>('/api/user/llm-settings/providers', body).then(r => r.data),
-  updateProvider: (id: string, body: UpdateUserLLMProviderRequest) =>
+  updateProvider: (id: number, body: UpdateUserLLMProviderRequest) =>
     apiClient.patch<UserLLMProviderSetting>(`/api/user/llm-settings/providers/${id}`, body).then(r => r.data),
-  deleteProvider: (id: string) =>
+  deleteProvider: (id: number) =>
     apiClient.delete(`/api/user/llm-settings/providers/${id}`).then(r => r.data),
-  testProvider: (id: string, body: TestUserLLMProviderRequest) =>
+  testProvider: (id: number, body: TestUserLLMProviderRequest) =>
     apiClient.post<TestUserLLMProviderResponse>(`/api/user/llm-settings/providers/${id}/test`, body).then(r => r.data),
 };
 
-// 管理员系统默认 provider（后端 KEY，脱敏摘要）
+// 管理员系统默认 provider（后端 KEY，仅 credential_configured 布尔，无明文/脱敏尾号）
 export const adminDefaultProviderAPI = {
+  getSystemDefault: () =>
+    apiClient.get<SystemDefaultProvider | null>('/api/admin/llm/system-default').then(r => r.data),
   setSystemDefault: (body: SetSystemDefaultRequest) =>
-    apiClient.put<SystemDefaultProviderSummary>('/api/admin/llm/system-default', body).then(r => r.data),
+    apiClient.put<SystemDefaultProvider>('/api/admin/llm/system-default', body).then(r => r.data),
 };
 ```
 
@@ -371,12 +425,19 @@ export const adminDefaultProviderAPI = {
 
 ---
 
-## 14. 待后端确认 / 字段冻结清单（与 WS-13 rework 对齐）
+## 14. 待与 openapi 复核 / 字段冻结清单（已对齐 PR #16）
 
-1. **配置文件落地路径**：`frontend/` = 仓库 `web/frontend/`。
-2. **主键类型**：用户 provider 配置主键 `id` 用 `string` 还是 `number`（需与后端表对齐）。
-3. **E7 端点形态**：当前提议 `PUT /api/admin/llm/system-default`；若后端复用 `PATCH /api/admin/llm/providers/{id}` 的 `is_default` 字段则前端相应调整。
-4. **`/api/config` 是否追加 `system_default`**：需在现有 `get_config` 补充或另出端点。
-5. **`has_legacy_config`**：迁移提示依赖此字段；若后端不返回，前端改用「`providers` 为空且存在旧 `last_api_key`」推断，并在 AI 设置首访提示「在当前浏览器重新保存 KEY 到 localStorage」（需求 M6 迁移策略）。
-6. **`last_validated_at` 由后端记录**：确认 E5 返回并写入，前端列表据此展示（不依赖本地时间）。
-7. 字段最终以 WS-13 落地后的 `backend/openapi.yaml` 为准，冲突处以后者优先并回流更新本文档。
+下列原「待确认」项已由 `backend/openapi.yaml`（PR #16，v0.2.0）落地并**已回流更新本文档**：
+
+1. **配置文件落地路径**：`frontend/` = 仓库 `web/frontend/`。（已确认）
+2. **主键类型**：已确认 —— `id` / 路径 `{provider_id}` 均为 **`integer`**（文档已改为 `number`）。
+3. **E7 端点形态**：已确认 —— `PUT /api/admin/llm/system-default`；且 openapi 新增 `GET /api/admin/llm/system-default`（读当前摘要，可为 `null`）。文档 §10 已含 GET + PUT。
+4. **`/api/config` 追加 `system_default`**：已确认 —— 类型为 `PublicSystemDefaultProvider | null`（仅非敏感元数据，无 KEY 状态）。文档 §9 已对齐。
+5. **`has_legacy_config`**：已确认后端返回；并补充 `legacy_config: LegacyLLMConfigSummary | null`（含 `available` / 非敏感 `last_llm_provider` / `last_backend_url`）。文档 §4 已对齐。
+6. **`last_validated_at` 由后端记录**：已确认 —— E5 返回并写入 `last_validated_at` / `last_validation_status`，前端列表据此展示。
+
+**仍待协调 / 非阻塞项（随后续迭代回流）：**
+
+7. **系统默认摘要彻底移除脱敏概念**（本次对齐核心）：普通用户 `PublicSystemDefaultProvider` 与管理员 `SystemDefaultProvider` 均**不再含** `has_api_key` / `api_key_masked` / `sk-***` 尾号；管理员改用 `credential_configured: boolean`。WS-19 `ui-spec.md` 亦确认移除。✅ 已对齐。
+8. **`AnalysisRequest` 富途扩展字段（`enable_trading_executor` / `futu_api_base_url` / `futu_api_key`）**：不在 WS-12 `AnalysisRequest` 契约内。若 stage-2 仍需保留，应在 openapi 补充字段后再回流对齐（文档 §11 已标注为应用级扩展）。
+9. 字段以 `backend/openapi.yaml` 为权威源；如后端调整字段，**先在 WS-13 / 本 issue 评论与后端/设计达成一致再改 openapi**，前端不单边改契约。
