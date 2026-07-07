@@ -8,7 +8,7 @@
 
 ## 0. 重大模型变更（相对初版）
 
-WS-20 用户追加决策：**用户 API KEY 存前端 `localStorage`（按 `用户 + provider` 维度），后端只保存 provider 元数据、不持久化/不回填用户 KEY**。系统默认 provider 的 KEY 仍后端保存并脱敏。
+WS-20 用户追加决策：**用户 API KEY 存前端 `localStorage`（按 `用户 + provider` 维度），后端只保存 provider 元数据、不持久化/不回填用户 KEY**。系统默认 provider 的 KEY 仍后端保存，但前端契约按 openapi **不暴露任何 KEY 状态（含脱敏尾号）**：普通用户公开摘要仅非敏感元数据，管理员摘要仅 `credential_configured: boolean`（见 `api-contract.md` §9 / §10）。
 
 由此带来的方案反转：
 - 用户 AI 设置 API 与组件**不再处理脱敏回传**；KEY 的保存/替换/清除是**纯前端 `localStorage` 操作**。
@@ -78,7 +78,7 @@ lib/
 
 ### 3.3 全局状态
 - 明文 KEY 不进入跨页面 state；仅存在于 `LocalKeyField` / `AnalysisConfigForm` 局部 `useState`，用完即 `setApiKey('')`。
-- 系统默认摘要经 `/api/config` 的 `system_default`（脱敏）进入分析表单「来源」展示。
+- 系统默认摘要经 `/api/config` 的 `system_default`（仅非敏感元数据，无 KEY 状态）进入分析表单「来源」展示。
 
 ---
 
@@ -128,8 +128,8 @@ lib/
 
 ## 5. M4 独立管理员「系统默认 Provider」配置页（不变）
 
-与初版一致（系统 KEY 仍后端，仅脱敏摘要）：
-- `/admin/system-default-provider`：从 active providers 选择 + 二次确认（`ConfirmDialog`）+ 展示当前默认脱敏摘要（`SystemDefaultProviderSummary`，含 `api_key_masked`）。
+与初版一致（系统 KEY 仍后端，前端仅见 `credential_configured` 布尔，无任何 KEY 明文/脱敏尾号）：
+- `/admin/system-default-provider`：从 active providers 选择 + 二次确认（`ConfirmDialog`）+ 展示当前默认摘要（`SystemDefaultProvider`，含 `credential_configured: boolean`，**无** `api_key_masked` / 明文）。
 - 仅允许 active provider；inactive 禁用 + 后端 400 双保险。
 - 普通用户永不可见系统默认明文 KEY。
 
@@ -192,8 +192,8 @@ lib/
 
 ## 9. 协调待确认（需 Leader / 后端 WS-13 rework 拍板）
 1. **UI 技术栈**：沿用仓库现有 Tailwind 暗色体系（已确认不迁 Ant Design）。
-2. **系统默认端点形态**：`PUT /api/admin/llm/system-default`（同初版待确认项）。
-3. **`/api/config` 是否追加 `system_default`**：待后端确认。
+2. **系统默认端点形态**：已确认 —— `PUT /api/admin/llm/system-default`，且 openapi 新增 `GET /api/admin/llm/system-default`（读当前摘要，可为 `null`）；管理员摘要用 `credential_configured: boolean`，**无** `api_key_masked` / 明文（见 `api-contract.md` §10）。
+3. **`/api/config` 追加 `system_default`**：已确认 —— 类型为 `PublicSystemDefaultProvider | null`，仅非敏感元数据（见 `api-contract.md` §9）。
 4. **本地 KEY 是否加密存储**：用户决策为明文存 `localStorage`；建议仅做 XSS 防护与文案提示（「KEY 仅存于本浏览器」），不引入额外加密（避免与「换浏览器需重填」语义冲突）。如需 session-only 模式可后续增强。
-5. **`has_legacy_config`** 是否由后端返回（见 `api-contract.md` §14.5）。
-6. 字段最终以 WS-13 rework 落地后的 `backend/openapi.yaml` 为准，冲突处以后者优先并回流更新本方案与 `api-contract.md`。
+5. **`has_legacy_config`**：已确认由后端返回（并补充 `legacy_config` 摘要，见 `api-contract.md` §4 / §14）。
+6. 字段以 `backend/openapi.yaml` 为权威源；如后端调整字段，先在 WS-13 / WS-18 评论与后端/设计达成一致再改 openapi，前端不单边改契约。
