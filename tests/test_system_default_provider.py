@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 from web.backend.database import Base
 from web.backend.models import LLMModel, LLMProvider
 from web.backend.services.system_default_provider import (
+    get_admin_system_default_provider,
     get_public_system_default_provider,
     set_system_default_provider,
 )
@@ -105,8 +106,9 @@ class SystemDefaultProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(summary["shallow_model"], "quick-model")
         self.assertEqual(summary["deep_model"], "deep-model")
         self.assertTrue(summary["credential_configured"])
+        self.assertTrue(summary["has_api_key"])
+        self.assertEqual(summary["api_key_masked"], "sk-***cret")
         self.assertNotIn("api_key", summary)
-        self.assertNotIn("api_key_masked", summary)
 
     async def test_set_default_rejects_inactive_provider_and_preserves_current_default(self):
         current_default = await self._provider("current", is_default=True)
@@ -115,10 +117,10 @@ class SystemDefaultProviderTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(HTTPException) as raised:
             await set_system_default_provider(self.db, inactive.id)
 
-        self.assertEqual(raised.exception.status_code, 409)
+        self.assertEqual(raised.exception.status_code, 400)
         self.assertEqual(
-            raised.exception.detail["error"]["code"],
-            "SYSTEM_DEFAULT_PROVIDER_INACTIVE",
+            raised.exception.detail,
+            "cannot set inactive provider as system default",
         )
 
         await self.db.refresh(current_default)
@@ -133,23 +135,32 @@ class SystemDefaultProviderTests(unittest.IsolatedAsyncioTestCase):
             await set_system_default_provider(self.db, provider.id)
 
         self.assertEqual(raised.exception.status_code, 409)
-        self.assertEqual(
-            raised.exception.detail["error"]["code"],
-            "SYSTEM_DEFAULT_PROVIDER_CREDENTIAL_MISSING",
-        )
+        self.assertIsInstance(raised.exception.detail, str)
         await self.db.refresh(provider)
         self.assertFalse(provider.is_default)
 
-    async def test_public_summary_excludes_all_credential_material(self):
+    async def test_public_summary_includes_masked_system_credential_state(self):
         default = await self._provider("public", is_default=True)
 
         summary = await get_public_system_default_provider(self.db)
 
         self.assertEqual(summary["provider_id"], default.id)
         self.assertEqual(summary["provider_name"], "public")
+        self.assertTrue(summary["has_api_key"])
+        self.assertEqual(summary["api_key_masked"], "sk-***cret")
         self.assertNotIn("api_key", summary)
-        self.assertNotIn("api_key_masked", summary)
         self.assertNotIn("credential_configured", summary)
+
+    async def test_admin_summary_includes_legacy_key_fields_for_current_default_card(self):
+        default = await self._provider("admin", is_default=True)
+
+        summary = await get_admin_system_default_provider(self.db)
+
+        self.assertEqual(summary["provider_id"], default.id)
+        self.assertTrue(summary["credential_configured"])
+        self.assertTrue(summary["has_api_key"])
+        self.assertEqual(summary["api_key_masked"], "sk-***cret")
+        self.assertNotIn("api_key", summary)
 
     async def test_config_response_includes_public_system_default_summary(self):
         default = await self._provider("config", is_default=True)
@@ -158,6 +169,8 @@ class SystemDefaultProviderTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(config["system_default"]["provider_id"], default.id)
         self.assertEqual(config["system_default"]["provider_name"], "config")
+        self.assertTrue(config["system_default"]["has_api_key"])
+        self.assertEqual(config["system_default"]["api_key_masked"], "sk-***cret")
         self.assertNotIn("api_key", config["system_default"])
 
         providers = await self.db.execute(select(LLMProvider))

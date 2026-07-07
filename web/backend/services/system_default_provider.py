@@ -15,16 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from web.backend.models import LLMModel, LLMProvider
 
 
-def _structured_error(
-    status_code: int,
-    code: str,
-    message: str,
-    details: Optional[dict[str, Any]] = None,
-) -> HTTPException:
-    error: dict[str, Any] = {"code": code, "message": message}
-    if details is not None:
-        error["details"] = details
-    return HTTPException(status_code=status_code, detail={"error": error})
+def _http_error(status_code: int, message: str) -> HTTPException:
+    return HTTPException(status_code=status_code, detail=message)
 
 
 def provider_has_credential(provider: LLMProvider) -> bool:
@@ -33,6 +25,19 @@ def provider_has_credential(provider: LLMProvider) -> bool:
 
 def provider_has_base_url(provider: LLMProvider) -> bool:
     return bool(str(provider.base_url or "").strip())
+
+
+def mask_api_key(api_key: Optional[str]) -> Optional[str]:
+    key = str(api_key or "").strip()
+    if not key:
+        return None
+    if len(key) <= 4:
+        return "***"
+
+    prefix, separator, _ = key.partition("-")
+    if separator and prefix:
+        return f"{prefix}-***{key[-4:]}"
+    return f"***{key[-4:]}"
 
 
 async def _get_model_hints(db: AsyncSession, provider_id: int) -> dict[str, Optional[str]]:
@@ -68,24 +73,30 @@ async def get_system_default_provider(db: AsyncSession) -> Optional[LLMProvider]
 
 
 async def _admin_summary(db: AsyncSession, provider: LLMProvider) -> dict[str, Any]:
+    has_api_key = provider_has_credential(provider)
     return {
         "provider_id": provider.id,
         "provider_name": provider.provider_name,
         "display_name": provider.display_name,
         "base_url": provider.base_url,
         "is_active": provider.is_active,
-        "credential_configured": provider_has_credential(provider),
+        "credential_configured": has_api_key,
+        "has_api_key": has_api_key,
+        "api_key_masked": mask_api_key(provider.api_key),
         **await _get_model_hints(db, provider.id),
         "updated_at": provider.updated_at,
     }
 
 
 async def _public_summary(db: AsyncSession, provider: LLMProvider) -> dict[str, Any]:
+    has_api_key = provider_has_credential(provider)
     return {
         "provider_id": provider.id,
         "provider_name": provider.provider_name,
         "display_name": provider.display_name,
         "base_url": provider.base_url,
+        "has_api_key": has_api_key,
+        "api_key_masked": mask_api_key(provider.api_key),
         **await _get_model_hints(db, provider.id),
     }
 
@@ -109,35 +120,27 @@ async def set_system_default_provider(db: AsyncSession, provider_id: int) -> dic
     provider = result.scalars().first()
 
     if provider is None:
-        raise _structured_error(
+        raise _http_error(
             status.HTTP_404_NOT_FOUND,
-            "LLM_PROVIDER_NOT_FOUND",
             "Provider does not exist.",
-            {"provider_id": provider_id},
         )
 
     if not provider.is_active:
-        raise _structured_error(
-            status.HTTP_409_CONFLICT,
-            "SYSTEM_DEFAULT_PROVIDER_INACTIVE",
-            "Inactive providers cannot be set as system default.",
-            {"provider_id": provider_id},
+        raise _http_error(
+            status.HTTP_400_BAD_REQUEST,
+            "cannot set inactive provider as system default",
         )
 
     if not provider_has_credential(provider):
-        raise _structured_error(
+        raise _http_error(
             status.HTTP_409_CONFLICT,
-            "SYSTEM_DEFAULT_PROVIDER_CREDENTIAL_MISSING",
             "The selected provider has no backend-managed credential.",
-            {"provider_id": provider_id},
         )
 
     if not provider_has_base_url(provider):
-        raise _structured_error(
+        raise _http_error(
             status.HTTP_409_CONFLICT,
-            "LLM_CONFIG_UNRESOLVED",
             "The selected provider has no base URL configured.",
-            {"provider_id": provider_id},
         )
 
     await db.execute(update(LLMProvider).values(is_default=False))
