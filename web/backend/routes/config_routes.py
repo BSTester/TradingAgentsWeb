@@ -10,6 +10,7 @@ import httpx
 from web.backend.models import User, LLMProvider, LLMModel
 from web.backend.auth_routes import get_current_active_user
 from web.backend.database import get_db
+from web.backend.services.system_default_provider import get_public_system_default_provider
 
 router = APIRouter(prefix="/api", tags=["config"])
 
@@ -85,7 +86,8 @@ async def get_config(db: AsyncSession = Depends(get_db)):
             {"value": 5, "label": "深入", "description": "全面研究，深入的辨论和策略讨论"}
         ],
         "llm_providers": llm_providers,
-        "models": models
+        "models": models,
+        "system_default": await get_public_system_default_provider(db),
     }
 
 

@@ -22,8 +22,16 @@ from web.backend.schemas import (
     LLMModelResponse,
     LLMConnectionTest,
     LLMConnectionTestResponse,
+    SetSystemDefaultProviderRequest,
+    SystemDefaultProviderResponse,
 )
 from web.backend.auth_routes import get_current_active_user
+from web.backend.services.system_default_provider import (
+    get_admin_system_default_provider,
+    provider_has_base_url,
+    provider_has_credential,
+    set_system_default_provider,
+)
 
 router = APIRouter(prefix="/api/admin/llm", tags=["llm-config"])
 
@@ -43,6 +51,24 @@ def require_admin(current_user: User = Depends(get_current_active_user)) -> User
 # ============================================================================
 # Provider Management
 # ============================================================================
+
+@router.get("/system-default", response_model=Optional[SystemDefaultProviderResponse])
+async def get_system_default(
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Read the current system default provider summary without credentials."""
+    return await get_admin_system_default_provider(db)
+
+
+@router.put("/system-default", response_model=SystemDefaultProviderResponse)
+async def update_system_default(
+    request: SetSystemDefaultProviderRequest,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Set one active, credentialed provider as the only system default."""
+    return await set_system_default_provider(db, request.provider_id)
 
 @router.get("/providers", response_model=List[LLMProviderResponse])
 async def get_all_providers(
@@ -209,6 +235,13 @@ async def update_provider(
     update_data = provider_data.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(provider, field, value)
+
+    if provider.is_default and (
+        not provider.is_active
+        or not provider_has_credential(provider)
+        or not provider_has_base_url(provider)
+    ):
+        provider.is_default = False
     
     await db.commit()
     await db.refresh(provider)

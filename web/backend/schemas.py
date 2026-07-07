@@ -256,6 +256,7 @@ class ConfigResponse(BaseModel):
     research_depths: List[Dict[str, Any]]
     llm_providers: List[Dict[str, Any]]
     models: Dict[str, Dict[str, List[Dict[str, str]]]]
+    system_default: Optional[Dict[str, Any]] = None
 
 # API Key validation
 class APIKeyValidation(BaseModel):
@@ -565,10 +566,36 @@ class LLMProviderResponse(BaseModel):
     base_url: Optional[str]
     description: Optional[str]
     is_active: bool
+    is_default: bool = False
     config_json: Optional[Dict[str, Any]]
     created_at: datetime
     updated_at: datetime
     models_count: Optional[int] = 0  # Number of models under this provider
+
+
+class SetSystemDefaultProviderRequest(BaseModel):
+    provider_id: int = Field(..., ge=1, description="Provider ID to use as system fallback")
+
+
+class SystemDefaultProviderResponse(BaseModel):
+    provider_id: int
+    provider_name: str
+    display_name: str
+    base_url: Optional[str]
+    is_active: bool
+    credential_configured: bool
+    shallow_model: Optional[str] = None
+    deep_model: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
+
+class PublicSystemDefaultProviderResponse(BaseModel):
+    provider_id: int
+    provider_name: str
+    display_name: str
+    base_url: Optional[str]
+    shallow_model: Optional[str] = None
+    deep_model: Optional[str] = None
 
 
 class LLMModelBase(BaseModel):

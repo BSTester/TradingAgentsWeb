@@ -46,6 +46,11 @@ MIGRATIONS = [
         "file": "add_has_set_password.py",
         "description": "Add has_set_password field to users table and update existing users"
     },
+    {
+        "name": "add_llm_provider_is_default",
+        "file": "add_llm_provider_is_default.py",
+        "description": "Add is_default field to LLM providers"
+    },
     # Future migrations will be added here
     # Example:
     # {
