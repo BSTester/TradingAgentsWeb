@@ -90,7 +90,7 @@ def insert_default_data():
             {
                 'provider_name': 'openai',
                 'display_name': 'OneInfinity OpenAI Compatible',
-                'base_url': 'https://api.oneinfinityai.com/v1',
+                'base_url': 'https://api.openai.com/v1',
                 'description': 'OneInfinity OpenAI兼容模型',
                 'is_active': True,
             },
