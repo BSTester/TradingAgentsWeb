@@ -47,9 +47,19 @@ MIGRATIONS = [
         "description": "Add has_set_password field to users table and update existing users"
     },
     {
+        "name": "add_llm_providers_models",
+        "file": "add_llm_providers_models.py",
+        "description": "Create LLM providers and models tables"
+    },
+    {
         "name": "add_llm_provider_is_default",
         "file": "add_llm_provider_is_default.py",
         "description": "Add is_default field to LLM providers"
+    },
+    {
+        "name": "add_user_llm_provider_settings",
+        "file": "add_user_llm_provider_settings.py",
+        "description": "Add user-owned LLM provider metadata table without user API keys"
     },
     # Future migrations will be added here
     # Example:
@@ -161,7 +171,7 @@ def compare_and_sync_schema(engine, verbose=True):
     Returns:
         tuple: (columns_added, errors)
     """
-    from web.backend.models import User, UserConfig, AnalysisRecord, AnalysisLog, ExportRecord, ScheduledTask
+    from web.backend.models import User, UserConfig, UserLLMProviderSetting, AnalysisRecord, AnalysisLog, ExportRecord, ScheduledTask
     from web.backend.database import Base
     
     inspector = inspect(engine)

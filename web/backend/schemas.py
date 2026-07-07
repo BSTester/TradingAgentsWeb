@@ -5,6 +5,7 @@ Pydantic schemas for TradingAgents Web Interface
 
 from datetime import datetime
 from typing import Optional, List, Dict, Any
+from urllib.parse import urlparse
 from pydantic import BaseModel, EmailStr, Field, validator
 
 # User schemas
@@ -266,6 +267,130 @@ class APIKeyValidation(BaseModel):
 class APIKeyValidationResponse(BaseModel):
     valid: bool
     message: str
+
+
+class LegacyLLMConfigSummary(BaseModel):
+    available: bool
+    last_llm_provider: Optional[str] = None
+    last_backend_url: Optional[str] = None
+
+
+class UserLLMProviderBase(BaseModel):
+    provider_name: str = Field(..., min_length=1, max_length=100)
+    provider_type: str = Field(..., description="catalog or custom")
+    catalog_provider_id: Optional[int] = Field(None, ge=1)
+    display_name: str = Field(..., min_length=1, max_length=200)
+    base_url: str = Field(..., min_length=1, max_length=500)
+    shallow_model: str = Field(..., min_length=1, max_length=200)
+    deep_model: str = Field(..., min_length=1, max_length=200)
+    is_enabled: bool = True
+    is_default: bool = False
+
+    class Config:
+        extra = "forbid"
+
+    @validator("provider_name")
+    def validate_user_provider_name(cls, v):
+        import re
+        value = v.strip().lower()
+        if not re.match(r"^[a-zA-Z0-9_-]+$", value):
+            raise ValueError("Provider name can only contain letters, numbers, underscores, and hyphens")
+        return value
+
+    @validator("provider_type")
+    def validate_user_provider_type(cls, v):
+        value = v.strip().lower()
+        if value not in {"catalog", "custom"}:
+            raise ValueError("provider_type must be catalog or custom")
+        return value
+
+    @validator("base_url")
+    def validate_user_provider_base_url(cls, v):
+        value = v.strip()
+        parsed = urlparse(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("base_url must be an absolute HTTP(S) URL")
+        return value
+
+
+class UserLLMProviderCreate(UserLLMProviderBase):
+    pass
+
+
+class UserLLMProviderUpdate(BaseModel):
+    display_name: Optional[str] = Field(None, min_length=1, max_length=200)
+    base_url: Optional[str] = Field(None, min_length=1, max_length=500)
+    shallow_model: Optional[str] = Field(None, min_length=1, max_length=200)
+    deep_model: Optional[str] = Field(None, min_length=1, max_length=200)
+    is_enabled: Optional[bool] = None
+    is_default: Optional[bool] = None
+
+    class Config:
+        extra = "forbid"
+
+    @validator("base_url")
+    def validate_update_base_url(cls, v):
+        if v is None:
+            return v
+        value = v.strip()
+        parsed = urlparse(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("base_url must be an absolute HTTP(S) URL")
+        return value
+
+
+class UserLLMProviderResponse(BaseModel):
+    id: int
+    provider_name: str
+    provider_type: str
+    catalog_provider_id: Optional[int] = None
+    display_name: str
+    base_url: str
+    shallow_model: str
+    deep_model: str
+    is_enabled: bool
+    is_default: bool
+    last_validated_at: Optional[datetime] = None
+    last_validation_status: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class UserLLMSettingsResponse(BaseModel):
+    providers: List[UserLLMProviderResponse]
+    default_provider_id: Optional[int]
+    has_legacy_config: bool
+    legacy_config: Optional[LegacyLLMConfigSummary] = None
+
+
+class UserLLMConnectionTestRequest(BaseModel):
+    api_key: str = Field(..., min_length=1, max_length=1000)
+    base_url: Optional[str] = Field(None, min_length=1, max_length=500)
+    model: Optional[str] = Field(None, min_length=1, max_length=200)
+
+    class Config:
+        extra = "forbid"
+
+    @validator("base_url")
+    def validate_test_base_url(cls, v):
+        if v is None:
+            return v
+        value = v.strip()
+        parsed = urlparse(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("base_url must be an absolute HTTP(S) URL")
+        return value
+
+
+class UserLLMConnectionTestResponse(BaseModel):
+    valid: bool
+    message: str
+    last_validated_at: datetime
+    last_validation_status: str
+    details: Optional[Dict[str, Any]] = None
 
 # Pagination
 class PaginatedResponse(BaseModel):
