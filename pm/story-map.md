@@ -40,7 +40,7 @@ story-001
 | 数据模型与迁移 | story-002, story-003, story-005 |
 | 用户 AI 设置 API | story-001, story-002 |
 | 用户 Profile/AI 设置 UI | story-002 |
-| 管理员默认 Provider API/UI | story-003 |
+| 独立管理员默认 Provider API/UI | story-003 |
 | 分析和定时任务配置解析 | story-004 |
 | KEY 脱敏、迁移、回归 QA | story-005 |
 
@@ -56,4 +56,4 @@ Designer 应一次性阅读:
 - Profile 中“AI 设置”的信息架构。
 - API KEY 已保存/替换/清除的安全交互。
 - 分析表单展示“个人配置”与“系统默认”的来源提示。
-- 管理员 LLM Provider 列表中的默认 provider 标记和设置动作。
+- 独立管理员“系统默认 Provider”配置页的信息架构与交互。
