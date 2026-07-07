@@ -4,7 +4,7 @@ SQLAlchemy models for TradingAgents Web Interface
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey, Float, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey, Float, JSON, Index, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from web.backend.database import Base
@@ -32,6 +32,7 @@ class User(Base):
     scheduled_tasks = relationship("ScheduledTask", back_populates="user", cascade="all, delete-orphan")
     conversation_sessions = relationship("ConversationSession", back_populates="user", cascade="all, delete-orphan")
     user_config = relationship("UserConfig", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    llm_provider_settings = relationship("UserLLMProviderSetting", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"
@@ -67,6 +68,44 @@ class UserConfig(Base):
     
     def __repr__(self):
         return f"<UserConfig(id={self.id}, user_id={self.user_id})>"
+
+
+class UserLLMProviderSetting(Base):
+    """
+    User-owned LLM provider metadata.
+    User API keys are intentionally not modeled here.
+    """
+    __tablename__ = "user_llm_provider_settings"
+    __table_args__ = (
+        UniqueConstraint("user_id", "provider_name", name="uq_user_llm_provider_settings_user_provider"),
+        Index("ix_user_llm_provider_settings_user_enabled", "user_id", "is_enabled"),
+        Index("ix_user_llm_provider_settings_user_default", "user_id", "is_default"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    provider_name = Column(String(100), nullable=False)
+    provider_type = Column(String(20), default="custom", nullable=False)
+    catalog_provider_id = Column(Integer, ForeignKey("llm_providers.id", ondelete="SET NULL"), nullable=True, index=True)
+    display_name = Column(String(200), nullable=False)
+    base_url = Column(String(500), nullable=False)
+    shallow_model = Column(String(200), nullable=False)
+    deep_model = Column(String(200), nullable=False)
+    is_enabled = Column(Boolean, default=True, nullable=False, index=True)
+    is_default = Column(Boolean, default=False, nullable=False, index=True)
+    last_validated_at = Column(DateTime(timezone=True), nullable=True)
+    last_validation_status = Column(String(20), default="untested", nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="llm_provider_settings")
+    catalog_provider = relationship("LLMProvider")
+
+    def __repr__(self):
+        return (
+            f"<UserLLMProviderSetting(id={self.id}, user_id={self.user_id}, "
+            f"provider_name='{self.provider_name}', default={self.is_default})>"
+        )
 
 class ScheduledTask(Base):
     """
