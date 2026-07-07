@@ -122,7 +122,7 @@ class AnalysisRequest(BaseModel):
     analysts: List[str]
     research_depth: int
     llm_provider: str = "openai"
-    backend_url: str = "https://api.oneinfinityai.com/v1"
+    backend_url: str = "https://api.openai.com/v1"
     shallow_thinker: str = "gpt-5.5"
     deep_thinker: str = "gpt-5.5"
     # Privacy settings

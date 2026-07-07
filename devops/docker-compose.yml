@@ -21,11 +21,11 @@ services:
       dockerfile: devops/Dockerfile.backend
     container_name: tagents-backend
     environment:
-      # AI provider — defaults already resolve to gpt-5.5 + oneinfinityai via
+      # AI provider — defaults already resolve to gpt-5.5 + official OpenAI via
       # tradingagents/default_config.py, but we pass them through explicitly
       # so .env is the single source of truth.
       OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY must be set in .env}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.oneinfinityai.com/v1}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       DEEP_THINK_LLM: ${DEEP_THINK_LLM:-gpt-5.5}
       QUICK_THINK_LLM: ${QUICK_THINK_LLM:-gpt-5.5}
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}

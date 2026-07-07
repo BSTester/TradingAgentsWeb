@@ -30,7 +30,7 @@ LLM_PROVIDERS_CONFIG = [
         "provider_name": "openai",
         "display_name": "OneInfinity OpenAI Compatible",
         "description": "OneInfinity OpenAI兼容模型",
-        "base_url": "https://api.oneinfinityai.com/v1",
+        "base_url": "https://api.openai.com/v1",
         "is_active": True
     },
     {
