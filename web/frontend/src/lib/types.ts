@@ -73,6 +73,39 @@ export interface AppConfig {
   backend_url: string;
 }
 
+// 系统默认 provider：后端 KEY，对普通用户仅暴露脱敏摘要（见 api-contract.md §9 / §10）
+export interface SystemDefaultProviderSummary {
+  provider_id: number;
+  provider_name: string;
+  display_name: string;
+  base_url: string;
+  has_api_key: boolean;          // 系统 KEY，后端持有
+  api_key_masked: string | null; // 脱敏尾号，如 "sk-***abcd"
+  is_active: boolean;
+}
+
+export interface AppConfigWithSystemDefault extends AppConfig {
+  system_default: SystemDefaultProviderSummary | null;
+}
+
+export interface SetSystemDefaultRequest {
+  provider_id: number; // 必须是 active 的 LLMProvider.id
+}
+
+// 管理员 LLM 供应商目录（Provider/Model CRUD 源），用于系统默认页选择
+export interface AdminLLMProvider {
+  id: number;
+  provider_name: string;
+  display_name: string;
+  api_key: string | null;
+  base_url: string | null;
+  description: string | null;
+  is_active: boolean;
+  models_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface LLMProvider {
   id: string;
   name: string;
@@ -106,7 +139,7 @@ export interface AnalysisHistory {
   decision?: string;
 }
 // 定时任务
-相关类型
+// 相关类型
 export interface ScheduledTask {
   id: number;
   user_id: number;
