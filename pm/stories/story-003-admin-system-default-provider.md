@@ -1,7 +1,7 @@
 # story-003 管理员系统默认 Provider 配置
 
 - Parent Epic: WS-12
-- Story file: `/home/penn/multica_workspaces/d89c1fdd-7ff0-426d-ae76-a7d2f32ce6a1/2827b647/workdir/TradingAgentsWeb/pm/stories/story-003-admin-system-default-provider.md`
+- Story file: `/home/penn/multica_workspaces/d89c1fdd-7ff0-426d-ae76-a7d2f32ce6a1/2f09bcb1/workdir/TradingAgentsWeb/pm/stories/story-003-admin-system-default-provider.md`
 - Priority: high
 - Type: AFK
 - Suggested role: backend + frontend
@@ -20,6 +20,7 @@
 - 前端新建独立管理员“系统默认 Provider”配置页，并在现有 admin 导航下新增入口。
 - 独立页面从 active providers 中选择默认 provider，展示当前默认 provider 摘要，并在保存前进行二次确认。
 - `/api/config` 或新摘要 API 向前端返回非敏感的系统默认 provider 摘要。
+- 系统默认 provider 的 KEY 仍由后端保存和注入，不进入普通用户前端 `localStorage`。
 
 ## Acceptance Criteria
 
@@ -30,6 +31,7 @@
 - [ ] 独立页面在设置默认 provider 前有二次确认，避免误操作。
 - [ ] 独立页面提供到 Provider/Model 目录管理页的入口，便于管理员先创建或启用 provider。
 - [ ] 普通用户可读取默认 provider 的非敏感摘要，例如 provider name、display name、base URL、默认来源，但不能读取 API KEY。
+- [ ] 系统默认 provider 的 KEY 不通过普通用户 API、日志、错误信息或分析记录明文外泄。
 - [ ] 如果系统没有默认 provider，前端和后端都能给出可操作提示。
 - [ ] 现有 Provider/Model CRUD 不因默认 provider 字段新增而回归。
 
