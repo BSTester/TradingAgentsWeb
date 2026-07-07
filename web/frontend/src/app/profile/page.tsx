@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { AppNavbar } from '@/components/common/AppNavbar';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { Footer } from '@/components/common/Footer';
+import { AISettingsCard } from '@/components/profile/AISettingsCard';
 
 export default function ProfilePage() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -141,6 +142,9 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
+
+          {/* AI Settings Card */}
+          <AISettingsCard />
 
           {/* Password Settings Card */}
           <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">

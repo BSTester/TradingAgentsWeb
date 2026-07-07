@@ -1,6 +1,16 @@
 import axios from 'axios';
 
 import { API_BASE_URL } from '@/utils/api';
+import {
+  CreateUserLLMProviderRequest,
+  SetSystemDefaultRequest,
+  SystemDefaultProviderSummary,
+  TestUserLLMProviderRequest,
+  TestUserLLMProviderResponse,
+  UpdateUserLLMProviderRequest,
+  UserLLMProviderSetting,
+  UserLLMSettingsResponse,
+} from '@/lib/types';
 
 
 
@@ -597,6 +607,89 @@ export const intradayTradingAPI = {
                           error.response?.data?.message || 
                           error.message || 
                           '撤销订单失败';
+      throw new Error(errorMessage);
+    }
+  },
+};
+
+// User LLM Settings API (需要认证) — 仅管理 provider 元数据（无用户 KEY）
+export const llmSettingsAPI = {
+  getSettings: async (): Promise<UserLLMSettingsResponse> => {
+    try {
+      const response = await apiClient.get<UserLLMSettingsResponse>('/api/user/llm-settings');
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        '获取 AI 设置失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  createProvider: async (body: CreateUserLLMProviderRequest): Promise<UserLLMProviderSetting> => {
+    try {
+      const response = await apiClient.post<UserLLMProviderSetting>('/api/user/llm-settings/providers', body);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        '创建 provider 失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  updateProvider: async (id: string, body: UpdateUserLLMProviderRequest): Promise<UserLLMProviderSetting> => {
+    try {
+      const response = await apiClient.patch<UserLLMProviderSetting>(`/api/user/llm-settings/providers/${id}`, body);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        '更新 provider 失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  deleteProvider: async (id: string): Promise<void> => {
+    try {
+      await apiClient.delete(`/api/user/llm-settings/providers/${id}`);
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        '删除 provider 失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  testProvider: async (id: string, body: TestUserLLMProviderRequest): Promise<TestUserLLMProviderResponse> => {
+    try {
+      const response = await apiClient.post<TestUserLLMProviderResponse>(`/api/user/llm-settings/providers/${id}/test`, body);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        '测试连接失败';
+      throw new Error(errorMessage);
+    }
+  },
+};
+
+// Admin system default provider API (需要认证) — 后端 KEY，仅脱敏摘要
+export const adminDefaultProviderAPI = {
+  setSystemDefault: async (body: SetSystemDefaultRequest): Promise<SystemDefaultProviderSummary> => {
+    try {
+      const response = await apiClient.put<SystemDefaultProviderSummary>('/api/admin/llm/system-default', body);
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        '设置系统默认 provider 失败';
       throw new Error(errorMessage);
     }
   },
