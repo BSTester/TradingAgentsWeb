@@ -584,6 +584,8 @@ class SystemDefaultProviderResponse(BaseModel):
     base_url: Optional[str]
     is_active: bool
     credential_configured: bool
+    has_api_key: bool
+    api_key_masked: Optional[str] = None
     shallow_model: Optional[str] = None
     deep_model: Optional[str] = None
     updated_at: Optional[datetime] = None
@@ -594,6 +596,8 @@ class PublicSystemDefaultProviderResponse(BaseModel):
     provider_name: str
     display_name: str
     base_url: Optional[str]
+    has_api_key: bool
+    api_key_masked: Optional[str] = None
     shallow_model: Optional[str] = None
     deep_model: Optional[str] = None
 

@@ -199,8 +199,8 @@ paths:
       description: |
         Returns the admin-visible summary of the configured system default
         provider. The default provider is a fallback only and must not override a
-        request that includes a user-supplied key. This response never includes
-        plaintext credentials.
+        request that includes a user-supplied key. This response includes only
+        credential presence and a masked suffix, never plaintext credentials.
       security:
         - bearerAuth: []
       responses:
@@ -242,30 +242,54 @@ paths:
               schema:
                 $ref: "#/components/schemas/SystemDefaultProvider"
         "400":
-          $ref: "#/components/responses/BadRequest"
+          description: The selected provider cannot be used as default.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - detail
+                properties:
+                  detail:
+                    type: string
+              examples:
+                inactiveProvider:
+                  value:
+                    detail: cannot set inactive provider as system default
         "401":
           $ref: "#/components/responses/AuthRequired"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
-          $ref: "#/components/responses/CatalogProviderNotFound"
+          description: The requested catalog provider does not exist.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - detail
+                properties:
+                  detail:
+                    type: string
+              examples:
+                notFound:
+                  value:
+                    detail: Provider does not exist.
         "409":
           description: The selected provider cannot be used as default.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                type: object
+                required:
+                  - detail
+                properties:
+                  detail:
+                    type: string
               examples:
-                inactiveProvider:
-                  value:
-                    error:
-                      code: SYSTEM_DEFAULT_PROVIDER_INACTIVE
-                      message: Inactive providers cannot be set as system default.
                 missingCredential:
                   value:
-                    error:
-                      code: SYSTEM_DEFAULT_PROVIDER_CREDENTIAL_MISSING
-                      message: The selected provider has no backend-managed credential.
+                    detail: The selected provider has no backend-managed credential.
         "422":
           $ref: "#/components/responses/ValidationError"
 
@@ -278,8 +302,8 @@ paths:
       description: |
         Extends the existing public config payload with a non-sensitive system
         default provider summary. Ordinary users can see provider name, display
-        name, base URL, and model hints only. System default credentials are not
-        exposed.
+        name, base URL, model hints, and masked system credential state only.
+        Plaintext system default credentials are not exposed.
       responses:
         "200":
           description: Public frontend configuration.
@@ -715,6 +739,7 @@ components:
         - display_name
         - is_active
         - credential_configured
+        - has_api_key
       properties:
         provider_id:
           type: integer
@@ -733,6 +758,14 @@ components:
         credential_configured:
           type: boolean
           description: Admin-visible boolean only; no credential value is returned.
+        has_api_key:
+          type: boolean
+          description: Whether the backend-managed system default credential is configured.
+        api_key_masked:
+          type: string
+          nullable: true
+          description: Masked backend-managed credential suffix; plaintext is never returned.
+          example: sk-***abcd
         shallow_model:
           type: string
           nullable: true
@@ -750,6 +783,7 @@ components:
         - provider_id
         - provider_name
         - display_name
+        - has_api_key
       properties:
         provider_id:
           type: integer
@@ -761,6 +795,14 @@ components:
           type: string
           format: uri
           nullable: true
+        has_api_key:
+          type: boolean
+          description: Whether the backend-managed system default credential is configured.
+        api_key_masked:
+          type: string
+          nullable: true
+          description: Masked backend-managed credential suffix; plaintext is never returned.
+          example: sk-***abcd
         shallow_model:
           type: string
           nullable: true

@@ -8,10 +8,10 @@ Implemented system default provider backend support for story-003:
 
 Security behavior:
 
-- Admin default responses expose only `credential_configured`, never plaintext or masked credential material.
-- Public config summaries exclude credential state entirely.
-- Setting inactive providers or providers without backend credentials is rejected with structured error codes.
+- Admin default responses expose `credential_configured`, `has_api_key`, and a masked `api_key_masked` suffix, never plaintext credential material.
+- Public config summaries expose `has_api_key` and masked `api_key_masked` for the backend-managed system credential, never plaintext credential material.
+- Setting inactive providers is rejected with HTTP 400 and string `detail`; providers without backend credentials are rejected with string `detail`.
 
 Verification:
 
-- `tests/test_system_default_provider.py` covers unique default switching, inactive rejection, credential rejection, public redaction, and `/api/config` summary inclusion.
+- `tests/test_system_default_provider.py` covers unique default switching, inactive rejection, credential rejection, admin/public masked summaries, and `/api/config` summary inclusion.
