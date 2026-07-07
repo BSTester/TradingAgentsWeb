@@ -1,0 +1,998 @@
+openapi: 3.0.3
+info:
+  title: TradingAgentsWeb WS-12 AI Settings API
+  version: 0.1.0
+  description: |
+    Authoritative backend contract for WS-12 user AI provider/key settings,
+    system default provider fallback, and LLM configuration resolution.
+
+    This contract is the source for frontend mirroring work. Saved API keys are
+    write-only on request schemas and are never returned in plaintext. Responses
+    use `has_api_key`, `api_key_masked`, `last_validated_at`, and
+    `last_validation_status` for saved-key state.
+servers:
+  - url: /
+tags:
+  - name: user-llm-settings
+    description: Authenticated user AI provider settings.
+  - name: admin-system-default-provider
+    description: Admin-only system default provider fallback.
+  - name: config
+    description: Public frontend configuration bootstrap.
+  - name: analysis
+    description: Analysis start endpoint and request-level LLM overrides.
+
+paths:
+  /api/user/llm-settings:
+    get:
+      tags:
+        - user-llm-settings
+      operationId: listUserLLMSettings
+      summary: List the current user's saved AI provider settings.
+      description: |
+        Returns all saved user provider configurations for the authenticated
+        user. The response never includes a plaintext API key.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User AI settings summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserLLMSettingsResponse"
+        "401":
+          $ref: "#/components/responses/AuthRequired"
+
+  /api/user/llm-settings/providers:
+    post:
+      tags:
+        - user-llm-settings
+      operationId: createUserLLMProvider
+      summary: Create a user AI provider setting.
+      description: |
+        Creates one provider/key profile for the authenticated user. Users may
+        create multiple provider profiles. If `is_default` is true, the backend
+        must unset any other default profile for the same user in the same
+        transaction. The submitted `api_key` is persisted encrypted and is never
+        returned.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserLLMProviderCreate"
+      responses:
+        "201":
+          description: Created provider setting.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserLLMProvider"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/AuthRequired"
+        "409":
+          description: Duplicate provider profile or default constraint violation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                duplicateProvider:
+                  value:
+                    error:
+                      code: USER_LLM_PROVIDER_DUPLICATE
+                      message: A provider profile with this provider_name already exists for this user.
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/user/llm-settings/providers/{provider_id}:
+    parameters:
+      - $ref: "#/components/parameters/UserProviderId"
+    patch:
+      tags:
+        - user-llm-settings
+      operationId: updateUserLLMProvider
+      summary: Update a user AI provider setting.
+      description: |
+        Updates editable fields for one user provider profile. Omitted fields are
+        unchanged. `api_key` replaces the saved key for this profile only.
+        `api_key: null` clears the saved key. `is_default: true` makes this
+        profile the user's only default profile.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserLLMProviderUpdate"
+      responses:
+        "200":
+          description: Updated provider setting.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserLLMProvider"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/AuthRequired"
+        "404":
+          $ref: "#/components/responses/UserProviderNotFound"
+        "409":
+          description: Provider state conflicts with the requested update.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                defaultDisabled:
+                  value:
+                    error:
+                      code: USER_LLM_PROVIDER_DISABLED
+                      message: A disabled provider profile cannot be set as default.
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - user-llm-settings
+      operationId: deleteUserLLMProvider
+      summary: Delete a user AI provider setting.
+      description: |
+        Deletes one provider profile owned by the authenticated user. If the
+        deleted profile was the user's default, the user has no default until
+        another profile is explicitly marked default. The system default provider
+        remains a fallback only when the user has no applicable enabled profile.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/AuthRequired"
+        "404":
+          $ref: "#/components/responses/UserProviderNotFound"
+
+  /api/user/llm-settings/providers/{provider_id}/test:
+    parameters:
+      - $ref: "#/components/parameters/UserProviderId"
+    post:
+      tags:
+        - user-llm-settings
+      operationId: testUserLLMProvider
+      summary: Test a user AI provider setting.
+      description: |
+        Tests connectivity for a saved user provider profile. Optional request
+        fields are test-only overrides and are not persisted. If `api_key` is
+        omitted, the backend uses the saved encrypted key. The response updates
+        and returns validation metadata only; it never returns plaintext key
+        material.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserLLMConnectionTestRequest"
+      responses:
+        "200":
+          description: Connection test result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LLMConnectionTestResponse"
+        "401":
+          $ref: "#/components/responses/AuthRequired"
+        "404":
+          $ref: "#/components/responses/UserProviderNotFound"
+        "409":
+          description: The profile is missing required connection material.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                keyMissing:
+                  value:
+                    error:
+                      code: USER_LLM_PROVIDER_KEY_MISSING
+                      message: This provider profile has no saved API key to test.
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/admin/llm/system-default:
+    get:
+      tags:
+        - admin-system-default-provider
+      operationId: getSystemDefaultProvider
+      summary: Read the system default provider.
+      description: |
+        Returns the admin-visible summary of the configured system default
+        provider. The default provider is only a fallback and never overrides a
+        matching user provider configuration.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current system default provider summary.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SystemDefaultProvider"
+                nullable: true
+        "401":
+          $ref: "#/components/responses/AuthRequired"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      tags:
+        - admin-system-default-provider
+      operationId: setSystemDefaultProvider
+      summary: Set the system default provider.
+      description: |
+        Sets one active catalog provider as the system fallback provider. The
+        backend must reject inactive providers and providers missing required
+        connection material. At most one `LLMProvider` row may have `is_default`
+        true after this operation.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetSystemDefaultProviderRequest"
+      responses:
+        "200":
+          description: Updated system default provider summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemDefaultProvider"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/AuthRequired"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/CatalogProviderNotFound"
+        "409":
+          description: The selected provider cannot be used as a default.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                inactiveProvider:
+                  value:
+                    error:
+                      code: LLM_PROVIDER_INACTIVE
+                      message: Inactive providers cannot be set as the system default.
+                missingKey:
+                  value:
+                    error:
+                      code: SYSTEM_DEFAULT_PROVIDER_KEY_MISSING
+                      message: The selected provider has no configured API key.
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/config:
+    get:
+      tags:
+        - config
+      operationId: getPublicConfig
+      summary: Get frontend configuration bootstrap data.
+      description: |
+        Extends the existing public config payload with a non-sensitive system
+        default provider summary. This endpoint must not expose plaintext or
+        API keys for the system default provider; it exposes `has_api_key` only
+        so the UI can explain availability without showing key material.
+      responses:
+        "200":
+          description: Public frontend configuration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigResponse"
+
+  /api/analyze:
+    post:
+      tags:
+        - analysis
+      operationId: startAnalysis
+      summary: Start a trading analysis.
+      description: |
+        Starts a trading analysis using the LLM configuration resolved by the
+        backend. If `api_key` is supplied, it is a request-level override for
+        this run only. It must not create, update, or replace any saved user
+        provider key.
+
+        Resolution priority:
+        1. Explicit request-level provider/base URL/API key/model.
+        2. Enabled user provider profile matching the requested provider.
+        3. User default provider profile when no provider is explicitly selected.
+        4. Active system default provider.
+        5. Structured error if no valid provider/key/base URL can be resolved.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalysisRequest"
+      responses:
+        "200":
+          description: Analysis accepted or connected to an existing running task.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/AuthRequired"
+        "409":
+          description: LLM configuration cannot be resolved for this request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                userProviderKeyMissing:
+                  value:
+                    error:
+                      code: USER_LLM_PROVIDER_KEY_MISSING
+                      message: The selected provider has no saved API key. Add a key or choose another provider.
+                userDefaultMissing:
+                  value:
+                    error:
+                      code: USER_LLM_DEFAULT_NOT_SET
+                      message: No user default provider is configured. Choose a provider or set a default.
+                systemDefaultMissing:
+                  value:
+                    error:
+                      code: SYSTEM_DEFAULT_PROVIDER_NOT_SET
+                      message: No system default provider is configured.
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "503":
+          description: The configured provider is unavailable or incomplete.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UserProviderId:
+      name: provider_id
+      in: path
+      required: true
+      description: User-owned provider profile ID.
+      schema:
+        type: integer
+        minimum: 1
+
+  responses:
+    AuthRequired:
+      description: Authentication is required.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            authRequired:
+              value:
+                error:
+                  code: AUTH_REQUIRED
+                  message: Authentication is required.
+    Forbidden:
+      description: The authenticated user does not have permission.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            forbidden:
+              value:
+                error:
+                  code: FORBIDDEN
+                  message: Admin permission is required.
+    BadRequest:
+      description: The request is syntactically valid but violates business rules.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            validation:
+              value:
+                error:
+                  code: VALIDATION_ERROR
+                  message: Request validation failed.
+                  details:
+                    field: base_url
+                    reason: Must be an absolute http or https URL.
+    UserProviderNotFound:
+      description: The requested user provider profile does not exist or is not owned by the current user.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            notFound:
+              value:
+                error:
+                  code: USER_LLM_PROVIDER_NOT_FOUND
+                  message: Provider profile not found.
+    CatalogProviderNotFound:
+      description: The requested catalog provider does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            notFound:
+              value:
+                error:
+                  code: LLM_PROVIDER_NOT_FOUND
+                  message: Catalog provider not found.
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          $ref: "#/components/schemas/ErrorDetail"
+
+    ErrorDetail:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code.
+          enum:
+            - AUTH_REQUIRED
+            - FORBIDDEN
+            - VALIDATION_ERROR
+            - USER_LLM_PROVIDER_NOT_FOUND
+            - USER_LLM_PROVIDER_DUPLICATE
+            - USER_LLM_PROVIDER_DISABLED
+            - USER_LLM_PROVIDER_KEY_MISSING
+            - USER_LLM_DEFAULT_NOT_SET
+            - LLM_PROVIDER_NOT_FOUND
+            - LLM_PROVIDER_INACTIVE
+            - SYSTEM_DEFAULT_PROVIDER_NOT_SET
+            - SYSTEM_DEFAULT_PROVIDER_KEY_MISSING
+            - INVALID_BASE_URL
+            - CONNECTION_TEST_FAILED
+            - LLM_CONFIG_UNRESOLVED
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+          nullable: true
+        request_id:
+          type: string
+          nullable: true
+
+    ValidationStatus:
+      type: string
+      nullable: true
+      enum:
+        - untested
+        - ok
+        - failed
+
+    ProviderProfileType:
+      type: string
+      enum:
+        - catalog
+        - custom
+
+    UserLLMSettingsResponse:
+      type: object
+      required:
+        - providers
+        - has_legacy_config
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserLLMProvider"
+        default_provider_id:
+          type: integer
+          nullable: true
+          description: The user's default provider profile ID, if configured.
+        has_legacy_config:
+          type: boolean
+          description: True when old UserConfig.last_* values can be offered for migration.
+        legacy_migration:
+          $ref: "#/components/schemas/LegacyLLMMigrationSummary"
+          nullable: true
+          description: Optional detail for the migration prompt. Frontend may rely on has_legacy_config only.
+
+    LegacyLLMMigrationSummary:
+      type: object
+      required:
+        - available
+        - has_last_api_key
+      properties:
+        available:
+          type: boolean
+          description: True when old UserConfig.last_* values can be offered for migration.
+        last_llm_provider:
+          type: string
+          nullable: true
+        last_backend_url:
+          type: string
+          nullable: true
+        has_last_api_key:
+          type: boolean
+
+    UserLLMProvider:
+      type: object
+      required:
+        - id
+        - provider_name
+        - provider_type
+        - display_name
+        - base_url
+        - shallow_model
+        - deep_model
+        - is_enabled
+        - is_default
+        - has_api_key
+        - last_validation_status
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+        provider_name:
+          type: string
+          description: Lowercase provider slug used by analysis requests.
+          example: openai
+        provider_type:
+          $ref: "#/components/schemas/ProviderProfileType"
+        catalog_provider_id:
+          type: integer
+          nullable: true
+          description: Linked system catalog provider ID when provider_type is catalog.
+        display_name:
+          type: string
+          example: OpenAI compatible
+        base_url:
+          type: string
+          format: uri
+          example: https://api.openai.com/v1
+        shallow_model:
+          type: string
+          example: gpt-5.5
+        deep_model:
+          type: string
+          example: gpt-5.5
+        is_enabled:
+          type: boolean
+        is_default:
+          type: boolean
+        has_api_key:
+          type: boolean
+        api_key_masked:
+          type: string
+          nullable: true
+          description: Masked saved key suffix, for example sk-...abcd. Never plaintext.
+        last_validated_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_validation_status:
+          $ref: "#/components/schemas/ValidationStatus"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UserLLMProviderCreate:
+      type: object
+      required:
+        - provider_name
+        - provider_type
+        - display_name
+        - base_url
+        - api_key
+        - shallow_model
+        - deep_model
+      properties:
+        provider_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          pattern: "^[a-zA-Z0-9_-]+$"
+          description: Provider slug. For catalog providers, use the catalog provider_name.
+        provider_type:
+          $ref: "#/components/schemas/ProviderProfileType"
+        catalog_provider_id:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Required when binding to an existing catalog provider if provider_name is ambiguous.
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        base_url:
+          type: string
+          format: uri
+          maxLength: 500
+          description: Absolute HTTP(S) base URL for the provider.
+        api_key:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          writeOnly: true
+          description: Saved encrypted for this profile. Never returned.
+        shallow_model:
+          type: string
+          minLength: 1
+          maxLength: 200
+        deep_model:
+          type: string
+          minLength: 1
+          maxLength: 200
+        is_enabled:
+          type: boolean
+          default: true
+        is_default:
+          type: boolean
+          default: false
+
+    UserLLMProviderUpdate:
+      type: object
+      description: At least one field must be supplied.
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        base_url:
+          type: string
+          format: uri
+          maxLength: 500
+        api_key:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          writeOnly: true
+          nullable: true
+          description: Replaces the saved key when a string is supplied; clears it when null; leaves it unchanged when omitted.
+        shallow_model:
+          type: string
+          minLength: 1
+          maxLength: 200
+        deep_model:
+          type: string
+          minLength: 1
+          maxLength: 200
+        is_enabled:
+          type: boolean
+        is_default:
+          type: boolean
+          description: True makes this profile the user's only default profile.
+
+    UserLLMConnectionTestRequest:
+      type: object
+      properties:
+        api_key:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          writeOnly: true
+          nullable: true
+          description: Test-only key override. Omit to use the saved encrypted key.
+        base_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Test-only base URL override. Omit to use the saved base URL.
+        model:
+          type: string
+          nullable: true
+          description: Optional model name to use for a lightweight test request.
+
+    LLMConnectionTestResponse:
+      type: object
+      required:
+        - valid
+        - message
+        - last_validated_at
+        - last_validation_status
+      properties:
+        valid:
+          type: boolean
+        message:
+          type: string
+        last_validated_at:
+          type: string
+          format: date-time
+        last_validation_status:
+          $ref: "#/components/schemas/ValidationStatus"
+        provider:
+          $ref: "#/components/schemas/UserLLMProvider"
+        details:
+          type: object
+          additionalProperties: true
+          nullable: true
+          description: Sanitized diagnostics without secrets.
+
+    SystemDefaultProvider:
+      type: object
+      required:
+        - provider_id
+        - provider_name
+        - display_name
+        - is_active
+        - has_api_key
+      properties:
+        provider_id:
+          type: integer
+        provider_name:
+          type: string
+          example: openai
+        display_name:
+          type: string
+          example: OneInfinity OpenAI Compatible
+        base_url:
+          type: string
+          format: uri
+          nullable: true
+        is_active:
+          type: boolean
+        has_api_key:
+          type: boolean
+        api_key_masked:
+          type: string
+          nullable: true
+          description: Admin-only masked key suffix. Never plaintext.
+        shallow_model:
+          type: string
+          nullable: true
+        deep_model:
+          type: string
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    PublicSystemDefaultProvider:
+      type: object
+      required:
+        - provider_id
+        - provider_name
+        - display_name
+        - has_api_key
+      properties:
+        provider_id:
+          type: integer
+        provider_name:
+          type: string
+        display_name:
+          type: string
+        base_url:
+          type: string
+          format: uri
+          nullable: true
+        has_api_key:
+          type: boolean
+        shallow_model:
+          type: string
+          nullable: true
+        deep_model:
+          type: string
+          nullable: true
+
+    SetSystemDefaultProviderRequest:
+      type: object
+      required:
+        - provider_id
+      properties:
+        provider_id:
+          type: integer
+          minimum: 1
+          description: Existing active LLMProvider ID to use as the system fallback.
+
+    ConfigResponse:
+      type: object
+      required:
+        - analysts
+        - research_depths
+        - llm_providers
+        - models
+        - system_default
+      properties:
+        analysts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Option"
+        research_depths:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResearchDepthOption"
+        llm_providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicLLMProvider"
+        models:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/ProviderModelGroups"
+        system_default:
+          allOf:
+            - $ref: "#/components/schemas/PublicSystemDefaultProvider"
+          nullable: true
+
+    Option:
+      type: object
+      required:
+        - value
+        - label
+      properties:
+        value:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+          nullable: true
+
+    ResearchDepthOption:
+      type: object
+      required:
+        - value
+        - label
+      properties:
+        value:
+          type: integer
+        label:
+          type: string
+        description:
+          type: string
+          nullable: true
+
+    PublicLLMProvider:
+      type: object
+      required:
+        - value
+        - label
+      properties:
+        value:
+          type: string
+          description: Provider slug used by analysis requests.
+        label:
+          type: string
+        description:
+          type: string
+          nullable: true
+        url:
+          type: string
+          nullable: true
+
+    ProviderModelGroups:
+      type: object
+      required:
+        - shallow
+        - deep
+      properties:
+        shallow:
+          type: array
+          items:
+            $ref: "#/components/schemas/Option"
+        deep:
+          type: array
+          items:
+            $ref: "#/components/schemas/Option"
+
+    AnalysisRequest:
+      type: object
+      required:
+        - ticker
+        - analysis_date
+        - analysts
+        - research_depth
+      properties:
+        ticker:
+          type: string
+          example: AAPL
+        analysis_date:
+          type: string
+          format: date
+        analysts:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum:
+              - market
+              - social
+              - news
+              - fundamentals
+        research_depth:
+          type: integer
+          minimum: 1
+        llm_provider:
+          type: string
+          nullable: true
+          description: Request-level provider selection. If omitted, user default resolution applies.
+          example: openai
+        backend_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Request-level base URL override for this analysis only.
+        shallow_thinker:
+          type: string
+          nullable: true
+        deep_thinker:
+          type: string
+          nullable: true
+        api_key:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          writeOnly: true
+          nullable: true
+          description: One-time analysis override only. Must not replace saved keys.
+        is_public:
+          type: boolean
+          default: false
+        email_notification:
+          type: boolean
+          default: false
+
+    AnalysisResponse:
+      type: object
+      required:
+        - analysis_id
+        - status
+      properties:
+        analysis_id:
+          type: string
+        status:
+          type: string
+          enum:
+            - running
+            - queued
+            - initializing
+        message:
+          type: string
+          nullable: true
