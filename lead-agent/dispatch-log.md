@@ -18,7 +18,7 @@
 | --- | --- | --- | --- | --- |
 | WS-13 | 后端 | openapi + backend-tech-spec（PR #12，**未合并，勿合并**） | 去除用户 KEY 后端持久化（`api_key_encrypted`）、`has_api_key`/`api_key_masked`；`/test` 临时收 KEY 不持久化；`resolve_llm_config` = 请求级 KEY > 系统默认 > 报错；系统默认 KEY 仍后端不外泄 | `in_progress`（已派回后端） |
 | WS-18 | 前端 | api-contract + frontend-tech-spec（PR #10，已并入 main，内容过期） | 镜像后端 openapi：无用户 KEY 类型；KEY 由前端 `localStorage` 按 provider 管理、随请求下发、换浏览器重填；分析表单不回填明文 KEY | `in_progress`（已派回前端） |
-| WS-19 | 设计 | 原型 + ui-spec（PR #11，已并入 main，内容过期） | KEY 改为本地保存/替换/清除/换浏览器重填交互；来源提示“个人配置（本地 KEY）/系统默认”；空/错误态：本浏览器未存 KEY | `in_progress`（已派回设计师） |
+| WS-19 | 设计 | 原型 + ui-spec（PR #11，已并入 main，内容过期） | KEY 改为本地保存/替换/清除/换浏览器重填交互；来源提示“个人配置（本地 KEY）/系统默认”；空/错误态：本浏览器未存 KEY | ✅ rework merged — PR [#15](https://github.com/BSTester/TradingAgentsWeb/pull/15)（分支 `agent/ux/rework`，merge `6c1ff38`），12 屏高保真 + ui-spec，Leader 复核通过，2026-07-07 |
 
 ## 备注
 
@@ -26,3 +26,5 @@
 - WS-13 的旧 PR #12（`agent/agent/d93c5ee8`）基于过期需求，**不予合并**；后端 rework 时更新或替换该 PR。
 - 协调约定不变：以后端 `backend/openapi.yaml` 为权威源，前端镜像；前端可在 openapi 落地前先按更新后的 `pm/requirements.md` 起草，落地后对齐。
 - Stage 1 rework 三件完成后，Leader 再复核合并，然后推进 stage 2（WS-14/WS-15）。
+- WS-19 rework 复核（2026-07-07）：Leader 依据 rework 验收清单逐项核对 PR #15——原型 12 屏覆盖 profile AI 设置（本地 KEY）/ 独立管理员默认页 / 分析表单三处主流程 + 关键空/错误态（含「本浏览器未存 KEY」），ui-spec 明确本地 KEY 保存/替换/清除/换浏览器重填 + 来源提示 + 二次确认、列表/来源/记录不展示明文 KEY，5 项范围决策（含「用户 KEY 前端存储」）全部落实，旧脱敏尾号文案已移除。merge commit `6c1ff38` 已并入 main，远端分支已删除。
+- Stage 1 rework 进度（repo 侧）：WS-18（前端，PR #14 / `a7653d4`）+ WS-19（设计，PR #15 / `6c1ff38`）已并入 main；待 WS-13（后端 openapi + tech-spec）rework 完成并复核合并后，即可推进 stage 2。
