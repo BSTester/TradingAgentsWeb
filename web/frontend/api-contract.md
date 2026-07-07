@@ -1,19 +1,20 @@
-# API 契约（前端视角）
+# API 契约（前端视角）— WS-20 Rework 版
 
-> Issue: **WS-18** / `[story-001·前端]` — API 契约 + 前端技术方案
+> Issue: **WS-18** / `[story-001·前端]` — API 契约 + 前端技术方案（rework）
 > 协作者：前端开发工程师（Agent `1381815f-…`）
-> 权威源：`backend/openapi.yaml`（由 WS-13 产出，提交到 `main` 后为准）
-> 状态：**起草稿（DRAFT）** — `backend/openapi.yaml` 当前尚未落地，本文档依据 `pm/requirements.md` §3/§6(M2–M5) 与现有后端路由（`web/backend/routes/*`）的现实结构起草，待 WS-13 `openapi.yaml` 落地后**逐项对齐**，对齐差异见文末「待后端确认 / 字段冻结清单」。
+> 权威源：`backend/openapi.yaml`（由 WS-13 rework 产出，提交到 `main` 后为准）
+> 状态：**起草稿（DRAFT，WS-20 重做版）** —— `backend/openapi.yaml` 当前尚未落地，本文档依据 `pm/requirements.md` §3/§6(M2–M5)/§7/§9（WS-20 更新版）与 `pm/stories/story-001/002/004` 起草，待 WS-13 `openapi.yaml` 落地后**逐项对齐**。
 
-## 0. 范围与约定
+## 0. 重大模型变更（相对初版）
 
-本文档是 `frontend/`（本仓库即 `web/frontend/`）对后端 LLM 配置相关接口的**前端契约镜像**：
+用户追加决策（WS-20，PR #13 已并入 `main`）：
 
-- 给出 TypeScript 类型、API client 方法签名、请求/响应结构、错误处理。
-- 所有「已保存 KEY」相关响应**只暴露脱敏字段**，绝不包含明文 `api_key`。
-- **明文 KEY 不写 `localStorage`，不进入前端持久状态**（仅在一次请求体 / 一次性表单态中短暂存在）。
+- **用户 API KEY 存前端 `localStorage`（按 `用户 + provider` 维度），后端不持久化、不回填用户 KEY。**
+- **用户 AI 设置 API 不再包含 `has_api_key` / `api_key_masked` / 明文 KEY 字段**；只返回 provider **元数据** + `last_validated_at` / `last_validation_status`。
+- 分析启动时，前端从 `localStorage` 取出当前 provider 的 KEY **随请求下发**（亦允许一次性输入）；后端只使用、不保存、不回填。
+- **系统默认 provider 的 KEY 仍由后端保存并脱敏**，其摘要仍用 `has_api_key` / `api_key_masked`，且对普通用户不可见明文（见 §9）。
 
-前端新增的 API 调用统一收敛到一个新的 `llmSettingsAPI`（用户侧）+ `adminDefaultProviderAPI`（管理员系统默认）对象，挂在 `web/frontend/src/lib/apiClient.ts` 下，沿用现有 `apiClient`（axios，自动带 `Authorization`）。
+> 这是相对初版（`api-contract.md` v1，PR #10）的反转。初版的「后端存 KEY + 脱敏回传」模型已作废。
 
 ---
 
@@ -21,51 +22,105 @@
 
 | # | 方法 & 路径 | 用途 | 角色 | 对应需求 |
 | --- | --- | --- | --- | --- |
-| E1 | `GET /api/user/llm-settings` | 拉取当前用户全部 AI provider 配置（脱敏）+ 默认/迁移提示 | user | M2 / M3 |
-| E2 | `POST /api/user/llm-settings/providers` | 新增一条用户 provider 配置（请求体携带一次性 KEY） | user | M2 / M3 |
-| E3 | `PATCH /api/user/llm-settings/providers/{id}` | 编辑配置；`api_key` 为 `string`=替换、`null`=清除、省略=不变 | user | M2 / M3 |
-| E4 | `DELETE /api/user/llm-settings/providers/{id}` | 删除一条配置 | user | M2 / M3 |
-| E5 | `POST /api/user/llm-settings/providers/{id}/test` | 测试连接（请求体携带一次性 base_url + api_key） | user | M2 / M3 |
-| E6 | `GET /api/config`（**扩展**） | 在现有响应上追加 `system_default` 摘要；供分析表单「来源」展示 | user | M4 / M5 |
-| E7 | `PUT /api/admin/llm/system-default` | 管理员将一个 active provider 设为系统默认 | admin | M4 |
-| E8 | `GET /api/config`（已存在）+ `POST /api/validate-key`（已存在） | 分析表单可选的一次性 KEY 验证与 active provider 列表 | user | M5 |
+| E1 | `GET /api/user/llm-settings` | 拉取当前用户全部 provider **元数据**（无 KEY） | user | M2 / M3 |
+| E2 | `POST /api/user/llm-settings/providers` | 新增一条 provider 元数据 | user | M2 / M3 |
+| E3 | `PATCH /api/user/llm-settings/providers/{id}` | 编辑 provider 元数据（**无 api_key 字段**） | user | M2 / M3 |
+| E4 | `DELETE /api/user/llm-settings/providers/{id}` | 删除一条 provider 元数据 | user | M2 / M3 |
+| E5 | `POST /api/user/llm-settings/providers/{id}/test` | 测试连接（**临时**带 KEY，后端不持久化） | user | M2 / M3 |
+| E6 | `GET /api/config`（**扩展**） | 在现有响应上追加 `system_default` 摘要（脱敏） | user | M4 / M5 |
+| E7 | `PUT /api/admin/llm/system-default` | 管理员设系统默认 provider（后端 KEY） | admin | M4 |
+| E8 | `POST /api/analyze`（已存在） | 分析启动，KEY 来自前端 `localStorage` 或一次性输入 | user | M5 |
 
-> 现有真实端点复核（已在仓库中）：
-> - `GET /api/config` → 返回 `{ llm_providers: [{value,label,description,url}], models: { provider: { shallow:[...], deep:[...] } } }`（见 `routes/config_routes.py::get_config`）。
-> - `POST /api/validate-key` → 请求 `{ provider, api_key }`，按 provider 实际调用校验（见 `routes/config_routes.py::validate_api_key`）。
-> - `GET/PATCH/DELETE /api/admin/llm/providers/{id}` 已存在（见 `routes/llm_config_routes.py`），但**不含**系统默认设置入口，故新增 E7。
+> 端点形态（E1–E7）与初版一致；**唯一语义变化：E1–E5 完全不含用户 KEY；E5 改为由前端临时下发 KEY 做验证**。系统默认（E6/E7）的 `api_key_masked` 保留（那是后端 KEY，非用户 KEY）。
 
 ---
 
-## 2. 共享类型（建议放入 `web/frontend/src/lib/types.ts`）
+## 2. 用户 KEY 本地存储契约（核心，取代原脱敏回传）
+
+用户 KEY **不在任何后端响应里出现**，只存在于当前浏览器的 `localStorage`，按 `用户 + provider` 维度隔离。
+
+### 2.1 localStorage schema
+
+```
+命名空间:  "taw:llmkey:v1"
+完整 key:  `taw:llmkey:v1:<userId>:<providerKey>`
+value:     JSON 字符串
+```
 
 ```ts
-// ── 来源标记：分析表单展示「个人配置 / 系统默认」 ──────────────
-export type LLMConfigSource =
-  | 'user_explicit'      // 用户在表单显式选择的具体 provider
-  | 'user_default'       // 用户默认 provider
-  | 'system_default'     // 系统默认 provider（兜底）
-  | 'request_override'   // 本次请求一次性 KEY 覆盖
-  | 'none';              // 无可用配置
+export const LOCAL_KEY_NS = 'taw:llmkey:v1';
 
-// ── KEY 脱敏载体：永远不出现明文 ─────────────────────────────
-export interface ApiKeyMask {
-  has_api_key: boolean;        // 是否已保存 KEY
-  api_key_masked: string | null; // 如 "sk-***abcd"；未保存为 null
+export interface LocalLLMKeyRecord {
+  key: string;            // 明文 API KEY（用户已确认存前端；见 §2.4 安全约束）
+  savedAt: string;        // ISO8601
+  provider: string;       // 与 providerKey 对应的 provider 标识
 }
 
-// ── 验证状态 ────────────────────────────────────────────────
+// 组合 key 的工具
+export function localKeyId(userId: string, providerKey: string): string {
+  return `${LOCAL_KEY_NS}:${userId}:${providerKey}`;
+}
+```
+
+- `providerKey`：对系统 provider 用 `provider_name`（如 `openai`）；对用户自定义 provider 用其配置的 `id` 或 `provider_name`，保证唯一。
+- 按 `userId` 隔离：多账户共用一台浏览器时，不同用户的 KEY 不会串用；切换账户后前端用当前 `user.id` 读写。
+- **仅此浏览器有效**：换浏览器 / 清站点数据 / 无痕模式无此记录，需用户重填（见 §2.3）。
+
+### 2.2 TypeScript 类型（本地 Key Vault）
+
+```ts
+export interface UserKeyVaultState {
+  // providerKey -> 是否存在本地 KEY（绝不暴露明文到组件层之外的日志/网络）
+  hasLocalKey: (providerKey: string) => boolean;
+  getLocalKey: (providerKey: string) => string | null;     // 仅请求构造时使用
+  saveLocalKey: (providerKey: string, key: string) => void;
+  replaceLocalKey: (providerKey: string, key: string) => void;
+  clearLocalKey: (providerKey: string) => void;
+}
+```
+
+### 2.3 交互语义（保存 / 替换 / 清除 / 换浏览器）
+
+| 操作 | 行为 |
+| --- | --- |
+| **保存 KEY** | 用户在当前 provider 表单输入明文 KEY → `saveLocalKey(providerKey, key)` 写入 `localStorage`；可勾选「仅本次分析」(不保存) 或「保存到当前浏览器」。 |
+| **替换 KEY** | 已有本地 KEY → 展开输入框输入新值 → `replaceLocalKey` 覆盖。 |
+| **清除 KEY** | `clearLocalKey(providerKey)` 删除该 `localStorage` 项；清除后该 provider 在当前浏览器无 KEY。 |
+| **换浏览器/清缓存/无痕** | `hasLocalKey` 为 false → 前端提示「当前浏览器未保存该 provider 的 KEY，请重新填写，或切换到系统默认 provider」。 |
+
+### 2.4 安全约束（强制，取代初版 §12）
+
+1. **不写后端**：明文 KEY 永不进入 `POST/PATCH` 的持久化字段；仅 E5（临时验证）与 E8（分析请求）在**请求体**中一次性携带，后端不得落库/回填。
+2. **不进 localStorage 以外的前端存储**：仅 `localStorage`（用户已确认）；不写 `sessionStorage`/`IndexedDB`/Cookie 全局态。
+3. **不进全局 React 状态**：明文只在表单局部 `useState` 与「构造请求前的那一刻」存在，提交/用完立即 `setApiKey('')`。
+4. **不打印/不泄露**：`console.log` 不得打印明文 KEY；错误捕获不得把 KEY 写进前端日志或上报；分析记录/定时任务记录也不得含请求中的 KEY 明文（后端约束，前端配合）。
+5. **XSS 风险缓解（建议）**：因 KEY 在 `localStorage` 明文可读，前端应强化 XSS 防护（CSP、避免 `dangerouslySetInnerHTML`、依赖最小、输入不拼进 innerHTML），并在 UI 文案明确「KEY 仅存于本浏览器」。
+
+---
+
+## 3. 共享类型（建议放入 `lib/types.ts`）
+
+```ts
+export type LLMConfigSource =
+  | 'user_explicit'      // 用户在表单显式选择的个人 provider（KEY 来自本地）
+  | 'user_default'       // 用户默认 provider
+  | 'system_default'     // 系统默认 provider（兜底，后端 KEY）
+  | 'request_override'   // 本次请求一次性 KEY
+  | 'none';
+
 export type ValidationStatus = 'ok' | 'failed' | 'untested' | null;
 ```
 
+> 注意：**用户侧已无 `ApiKeyMask` 类型**。只有系统默认摘要（§9）保留脱敏字段。
+
 ---
 
-## 3. E1 `GET /api/user/llm-settings` —— 用户 AI 设置总览
+## 4. E1 `GET /api/user/llm-settings` —— 用户 provider 元数据总览
 
 **响应 `200`** → `UserLLMSettingsResponse`
 
 ```ts
-export interface UserLLMProviderSetting extends ApiKeyMask {
+export interface UserLLMProviderSetting {
   id: string;                     // 配置主键（UUID 或数字串）
   provider_name: string;         // 系统 provider 标识，或用户自定义名称
   display_name: string;
@@ -73,37 +128,35 @@ export interface UserLLMProviderSetting extends ApiKeyMask {
   shallow_model: string | null;
   deep_model: string | null;
   is_enabled: boolean;
-  is_default: boolean;           // 是否为该用户的默认 provider
-  last_validated_at: string | null;   // ISO8601
+  is_default: boolean;           // 该用户的默认 provider
+  last_validated_at: string | null;   // ISO8601（后端记录，不存 KEY）
   last_validation_status: ValidationStatus;
-  created_at: string;            // ISO8601
-  updated_at: string;            // ISO8601
+  created_at: string;
+  updated_at: string;
 }
 
 export interface UserLLMSettingsResponse {
   providers: UserLLMProviderSetting[];
-  default_provider_id: string | null;  // = providers 中 is_default 为 true 的 id
-  has_legacy_config: boolean;          // 旧 UserConfig.last_* 是否仍有值（迁移提示）
+  default_provider_id: string | null;
+  has_legacy_config: boolean;    // 旧 UserConfig.last_* 是否仍有值（迁移提示）
 }
 ```
 
 **契约要点**
-- 响应**绝不**包含 `api_key` 明文；KEY 仅以 `has_api_key` + `api_key_masked` 表示。
-- `providers` 列表按 `is_default` → `updated_at` 排序，前端无需再排。
-- `has_legacy_config=true` 时，前端在 AI 设置模块顶部展示一次性「迁移提示」（见 `frontend-tech-spec.md` M3 迁移提示）。
+- 响应**完全不含** `api_key` / `has_api_key` / `api_key_masked`（AC #195）。用户 KEY 状态由前端从 `localStorage` 自行判断（见 §2）。
+- `last_validated_at` / `last_validation_status`：由 E5 验证时在后端记录（仅状态/时间，不含 KEY），供列表展示「已验证/失败 + 时间」。
 
 ---
 
-## 4. E2 `POST /api/user/llm-settings/providers` —— 新增配置
+## 5. E2 `POST /api/user/llm-settings/providers` —— 新增 provider 元数据
 
-**请求体** `CreateUserLLMProviderRequest`
+**请求体** `CreateUserLLMProviderRequest`（**无 api_key 字段**）
 
 ```ts
 export interface CreateUserLLMProviderRequest {
-  provider_name: string;   // 必填：系统 active provider 名，或自定义名
-  display_name: string;    // 必填
-  base_url: string;        // 必填（OpenAI-compatible 自定义也走这里）
-  api_key: string;         // 必填：一次性传入；服务端加密存储，不回写明文
+  provider_name: string;
+  display_name: string;
+  base_url: string;
   shallow_model?: string | null;
   deep_model?: string | null;
   is_enabled?: boolean;    // 默认 true
@@ -112,70 +165,58 @@ export interface CreateUserLLMProviderRequest {
 ```
 
 **响应**
-- `201` → `UserLLMProviderSetting`（新建记录，KEY 已脱敏）
-- `400` → 校验失败（如 `provider_name` 为空、`api_key` 为空）
+- `201` → `UserLLMProviderSetting`
+- `400` → 校验失败（如 `provider_name` 为空）
 - `422` → 字段类型/格式错误
 
 **契约要点**
-- 请求体里的 `api_key` 是**唯一**允许出现明文 KEY 的地方，且仅在传输途中；前端不得将其存入 state/localStorage 或回显到输入框。
-- 创建成功后前端用响应里的脱敏对象刷新列表，不保留用户刚输入的明文。
+- 创建的是**元数据**；该 provider 的 KEY 由前端在本地 `localStorage` 保存（§2），**不经此接口**。
 
 ---
 
-## 5. E3 `PATCH /api/user/llm-settings/providers/{id}` —— 编辑 / 替换 / 清除 KEY
+## 6. E3 `PATCH /api/user/llm-settings/providers/{id}` —— 编辑元数据
 
-**请求体** `UpdateUserLLMProviderRequest`（全字段可选，部分更新）
+**请求体** `UpdateUserLLMProviderRequest`（全字段可选，**无 api_key**）
 
 ```ts
 export interface UpdateUserLLMProviderRequest {
   display_name?: string;
   base_url?: string;
-  /**
-   * KEY 语义（关键）：
-   *  - 省略该字段        → 不改动已保存 KEY
-   *  - api_key: string   → 替换 KEY（新明文，一次性传输）
-   *  - api_key: null     → 清除 KEY（has_api_key 置 false）
-   */
-  api_key?: string | null;
   shallow_model?: string | null;
   deep_model?: string | null;
   is_enabled?: boolean;
-  is_default?: boolean;    // true 时取消该用户其他默认
+  is_default?: boolean;
 }
 ```
 
 **响应**
 - `200` → `UserLLMProviderSetting`
-- `404` → 配置不存在（`detail: "provider config not found"`）
-- `400` → 非法更新（如把 `is_default` 设给 `is_enabled=false` 的配置）
+- `404` → 配置不存在
 
 **契约要点**
-- 「替换 KEY」：提交新 `api_key` 字符串；成功后前端只更新脱敏状态，不保留明文。
-- 「清除 KEY」：提交 `api_key: null`；成功后 `has_api_key=false`、`api_key_masked=null`。
-- 表单交互态见 `frontend-tech-spec.md` M3 的「已保存 / 替换 / 清除」三态。
+- 替换/清除 KEY 是**纯前端 `localStorage` 操作**（§2.3），不走此接口、不触发后端请求。
 
 ---
 
-## 6. E4 `DELETE /api/user/llm-settings/providers/{id}` —— 删除
+## 7. E4 `DELETE /api/user/llm-settings/providers/{id}` —— 删除元数据
 
 **响应**
 - `204` → 无内容
 - `404` → 配置不存在
 
 **契约要点**
-- 删除的是「用户配置」，不影响系统 `LLMProvider` 目录。
-- 若删除的是 `is_default` 配置，响应后用户 `default_provider_id` 置 `null`，下次分析回退到系统默认。
+- 删除后端元数据后，前端应同步 `clearLocalKey(providerKey)` 清掉本地 KEY（否则孤儿 KEY 残留）；可在 UI 确认时提示「同时清除本浏览器保存的 KEY」。
 
 ---
 
-## 7. E5 `POST /api/user/llm-settings/providers/{id}/test` —— 测试连接
+## 8. E5 `POST /api/user/llm-settings/providers/{id}/test` —— 测试连接（临时 KEY）
 
 **请求体** `TestUserLLMProviderRequest`
 
 ```ts
 export interface TestUserLLMProviderRequest {
-  base_url: string;   // 必填：优先用表单当前填写值
-  api_key: string;    // 必填：一次性明文；若表单未填新 KEY，则用「替换」语义传当前明文
+  base_url: string;
+  api_key: string;   // 一次性明文；优先用表单当前输入，其次本地 localStorage 取出的 KEY
 }
 ```
 
@@ -185,56 +226,54 @@ export interface TestUserLLMProviderRequest {
 export interface TestUserLLMProviderResponse {
   valid: boolean;
   message?: string;          // 失败原因（不泄露 KEY）
-  last_validated_at: string; // ISO8601，无论成功失败都回写本次尝试时间
+  last_validated_at: string; // ISO8601，后端记录验证状态/时间
 }
 ```
 
 **契约要点**
-- 测试连接的 `api_key` 同样为一次性传输，**不持久化、不回显**。
-- 成功后前端把 `last_validation_status` 置为 `ok`，并刷新 `last_validated_at`；失败置 `failed` 并 toast `message`。
-- `message` 中禁止包含 KEY 明文（后端约束，见 `pm/requirements.md` §9 安全）。
+- 前端**临时**把 KEY 发给后端验证；后端只返回结果并写入 `last_validated_at`/`last_validation_status`，**不持久化 KEY**。
+- 验证用的 KEY 不写入元数据、不回填；成功后前端仅更新本地「已验证/失败」状态（可选在本地记录验证时间，但 KEY 来源仍是 §2 的 `localStorage`）。
 
 ---
 
-## 8. E6 `GET /api/config`（扩展）—— 系统默认摘要
+## 9. E6 `GET /api/config`（扩展）—— 系统默认摘要（后端 KEY，仍脱敏）
 
-在**现有** `/api/config` 响应上**追加**一个字段（向后兼容，旧字段保留）：
+`/api/config` 在现有响应上**追加** `system_default` 字段（向后兼容）：
 
 ```ts
-// 现有响应（保持不变）
 export interface AppConfig {
   llm_providers: LLMProviderOption[];   // { value, label, description, url }
   models: Record<string, { shallow: LLMModelOption[]; deep: LLMModelOption[] }>;
-  // 以下为现有前端已使用字段（如后端实际未返回，前端保留兜底默认）
   analysts?: string[];
   research_depths?: number[];
   backend_url?: string;
 }
 
-// 新增字段
-export interface SystemDefaultProviderSummary extends ApiKeyMask {
-  provider_id: number;     // LLMProvider.id
+// 系统默认 provider：后端 KEY，对普通用户仅暴露脱敏摘要
+export interface SystemDefaultProviderSummary {
+  provider_id: number;
   provider_name: string;
   display_name: string;
   base_url: string;
+  has_api_key: boolean;          // 仍存在（这是系统 KEY，后端持有）
+  api_key_masked: string | null; // 脱敏尾号，如 "sk-***abcd"
   is_active: boolean;
 }
 
-// 扩展后的配置响应
 export interface AppConfigWithSystemDefault extends AppConfig {
-  system_default: SystemDefaultProviderSummary | null; // 无系统默认时为 null
+  system_default: SystemDefaultProviderSummary | null;
 }
 ```
 
 **契约要点**
-- `system_default` 只含**非敏感摘要**，普通用户永远拿不到系统默认 provider 的明文 KEY（`api_key_masked` 已脱敏，`has_api_key` 仅布尔）。
-- 分析表单默认选中逻辑见 `frontend-tech-spec.md` M5。
+- `has_api_key` / `api_key_masked` **仅在此系统默认摘要中出现**（系统 KEY 后端持有，须脱敏）；用户侧 API（E1–E5）不包含这两个字段。
+- 普通用户永远拿不到系统默认 provider 的明文 KEY。
 
 ---
 
-## 9. E7 `PUT /api/admin/llm/system-default` —— 设置系统默认 provider
+## 10. E7 `PUT /api/admin/llm/system-default` —— 设置系统默认 provider
 
-**请求体**
+**请求体** `SetSystemDefaultRequest`
 
 ```ts
 export interface SetSystemDefaultRequest {
@@ -243,21 +282,18 @@ export interface SetSystemDefaultRequest {
 ```
 
 **响应**
-- `200` → `SystemDefaultProviderSummary`（设置后的当前默认摘要）
+- `200` → `SystemDefaultProviderSummary`（设置后的脱敏摘要）
 - `400` → 所选 provider 非 active（`detail: "cannot set inactive provider as system default"`）
 - `403` → 非管理员
 - `404` → provider 不存在
 
-**契约要点**
-- 该端点**只选 active provider**；inactive 一律拒绝（安全约束 `pm/requirements.md` M4）。
-- 全局同一时刻至多一个 active provider 为默认（后端保证）。
-- 管理员页在保存前需二次确认（交互见 `frontend-tech-spec.md` M4）。
+（与初版一致；系统 KEY 仍后端持有。）
 
 ---
 
-## 10. E8 分析启动的一次性 KEY（沿用 `/api/analyze`）
+## 11. E8 分析启动的 KEY（来自 localStorage / 一次性输入）
 
-现有分析启动请求（`analysisAPI.startAnalysis`）继续允许 `api_key` 作为**单次覆盖**，契约约定：
+`analysisAPI.startAnalysis` 请求体中的 `api_key` 字段语义更新为：**来自前端 `localStorage`（本地 KEY）或用户一次性输入**，且随请求下发后**后端不持久化、不回填**。
 
 ```ts
 export interface StartAnalysisRequest {
@@ -269,8 +305,7 @@ export interface StartAnalysisRequest {
   backend_url?: string;
   shallow_thinker?: string;
   deep_thinker?: string;
-  // 一次性 KEY：仅本次请求优先，不持久化、不回填表单
-  api_key?: string;
+  api_key?: string;            // 来自 localStorage 或一次性输入；仅本次请求使用
   is_public?: boolean;
   email_notification?: boolean;
   enable_trading_executor?: boolean;
@@ -280,52 +315,39 @@ export interface StartAnalysisRequest {
 ```
 
 **契约要点**
-- 若用户已保存配置，前端**不**把已保存 KEY 填入 `api_key`，仅当用户在表单**显式重新输入**一个 KEY 时才带 `api_key`。
-- 用户显式输入但未保存的 KEY，仅对本次请求生效，不覆盖已保存 KEY（除非用户明确在 AI 设置里「替换」）。
-- `api_key` 为一次性传输，**禁止**写入 `localStorage` 或前端全局 state。
+- 前端构造请求时：`api_key = getLocalKey(providerKey) ?? oneTimeInput`（见 §2.2）。
+- 若用户既无本地 KEY 又无一次性输入 → **不**带 `api_key`，后端回退系统默认（M5）；若用户显式选了个人 provider 但前端未下发 KEY，后端**不**静默用系统默认，而返回可操作错误（§12）。
+- 一次性 KEY「仅本次」时**不**写 `localStorage`；用户勾选「保存到当前浏览器」才 `saveLocalKey`。
+- `api_key` 明文不进 `localStorage` 之外的存储、不进全局 state、不打印。
 
 ---
 
-## 11. 错误处理约定
+## 12. 错误处理约定
 
-所有接口统一错误包络（与现有 `apiClient` 解析一致）：
+统一错误包络（与现有 `apiClient` 解析一致）：
 
 ```ts
-// 校验 / 业务错误：FastAPI 风格
-interface ApiError {
-  detail: string;        // 人类可读，不含 KEY 明文
-}
-// 部分旧接口可能用 message，前端 apiClient 已兼容：
-// error.response?.data?.detail || error.response?.data?.message || error.message
+interface ApiError { detail: string; }   // 不含 KEY 明文
+// 或旧接口 { message: string }；apiClient 已兼容
 ```
 
 | HTTP | 场景 | 前端处理 |
 | --- | --- | --- |
-| 400 | 参数非法 / 选了 inactive provider 作默认 | toast `detail`；不回退到系统默认 |
+| 400 | 参数非法 / 选了 inactive provider 作默认 / **个人 provider 缺 KEY** | toast `detail`；个人 provider 缺 KEY 时提示「请补充本浏览器 KEY 或切到系统默认」 |
 | 401 | 未登录 / token 失效 | 跳转登录 |
-| 403 | 非管理员调用 E7 | 提示无权限 |
+| 403 | 非管理员调 E7 | 提示无权限 |
 | 404 | 配置 / provider 不存在 | toast；刷新列表 |
 | 422 | 请求体字段校验失败 | 表单字段级报错 |
 | 429 | 限流（测试连接高频） | toast「操作过于频繁」 |
 
-**关键约束**：用户显式选择了一个未配置 KEY 的 provider 时，后端**不**应静默回退系统默认，而应返回可操作错误（4xx），前端提示「请补充该 provider 的 KEY 或切换到默认 provider」（见 `pm/requirements.md` §7 关键约束）。
-
----
-
-## 12. KEY 脱敏与前端禁令（强制）
-
-1. **响应零明文**：所有用户/系统 provider 配置响应只含 `has_api_key` + `api_key_masked`，类型定义中**不存在** `api_key: string` 的「读取」字段。
-2. **不落盘**：明文 KEY 绝不写入 `localStorage` / `sessionStorage` / `IndexedDB` / Cookie。
-3. **不进全局态**：明文 KEY 不进入 Redux/Zustand/Context 等跨页面状态；仅在表单局部 `useState` 中短暂存在，提交后立即清空（`setApiKey('')`）。
-4. **不回显**：保存/替换成功后，KEY 输入框不再显示明文，只显示「已保存 / 脱敏尾号 / 替换 / 清除」交互态。
-5. **日志禁令**：`console.log` 不得打印明文 KEY（现有 `AnalysisConfigForm` 仅在 dev 打印「已验证（从缓存）」这类状态，不得打印值）。
+**关键约束**：用户显式选择了一个个人 provider 却未下发 KEY（本地无、也未一次性输入）时，后端返回 4xx，前端提示补充或切换系统默认（§7 关键约束、需求 §7）。
 
 ---
 
 ## 13. 建议的 API Client 方法签名（新增于 `lib/apiClient.ts`）
 
 ```ts
-// 用户侧 AI 设置
+// 用户侧 AI 设置（仅元数据，无 KEY）
 export const llmSettingsAPI = {
   getSettings: () => apiClient.get<UserLLMSettingsResponse>('/api/user/llm-settings').then(r => r.data),
   createProvider: (body: CreateUserLLMProviderRequest) =>
@@ -338,22 +360,23 @@ export const llmSettingsAPI = {
     apiClient.post<TestUserLLMProviderResponse>(`/api/user/llm-settings/providers/${id}/test`, body).then(r => r.data),
 };
 
-// 管理员系统默认 provider
+// 管理员系统默认 provider（后端 KEY，脱敏摘要）
 export const adminDefaultProviderAPI = {
   setSystemDefault: (body: SetSystemDefaultRequest) =>
     apiClient.put<SystemDefaultProviderSummary>('/api/admin/llm/system-default', body).then(r => r.data),
 };
-
-// 现有 configAPI.getConfig() 返回类型升级为 AppConfigWithSystemDefault
 ```
+
+> 用户 KEY 不在 `apiClient` 的任何返回/持久字段里；本地 KEY 由独立的 `useLocalLLMKeys`（见 `frontend-tech-spec.md` §3）读写 `localStorage`。
 
 ---
 
-## 14. 待后端确认 / 字段冻结清单（与 WS-13 对齐）
+## 14. 待后端确认 / 字段冻结清单（与 WS-13 rework 对齐）
 
-1. **配置文件落地路径**：本文档假设 `frontend/` = 仓库 `web/frontend/`。待 WS-13 `openapi.yaml` 落地后，以 `backend/openapi.yaml` 为准逐项核对端点名、字段名、状态码。
-2. **用户 provider 配置主键类型**：本文档用 `string`（兼容 UUID/数字）；需与后端表主键对齐。
-3. **E7 端点形态**：当前提议为 `PUT /api/admin/llm/system-default`；若后端选择复用 `PATCH /api/admin/llm/providers/{id}` 的 `is_default` 字段，前端相应调整。
-4. **`/api/config` 是否追加 `system_default`**：需后端确认在现有 `get_config` 中补充，或另外提供独立端点。
-5. **`has_legacy_config` 字段**：迁移提示依赖此字段；若后端不返回，前端改用「`providers` 为空且存在旧 `last_api_key`」推断。
-6. **脱敏格式**：建议 `api_key_masked` 统一为 `"<prefix>***<last4>"`（与 `LLMProvider.to_dict` 现有 `"***"+last4` 对齐，建议补齐前缀）。
+1. **配置文件落地路径**：`frontend/` = 仓库 `web/frontend/`。
+2. **主键类型**：用户 provider 配置主键 `id` 用 `string` 还是 `number`（需与后端表对齐）。
+3. **E7 端点形态**：当前提议 `PUT /api/admin/llm/system-default`；若后端复用 `PATCH /api/admin/llm/providers/{id}` 的 `is_default` 字段则前端相应调整。
+4. **`/api/config` 是否追加 `system_default`**：需在现有 `get_config` 补充或另出端点。
+5. **`has_legacy_config`**：迁移提示依赖此字段；若后端不返回，前端改用「`providers` 为空且存在旧 `last_api_key`」推断，并在 AI 设置首访提示「在当前浏览器重新保存 KEY 到 localStorage」（需求 M6 迁移策略）。
+6. **`last_validated_at` 由后端记录**：确认 E5 返回并写入，前端列表据此展示（不依赖本地时间）。
+7. 字段最终以 WS-13 落地后的 `backend/openapi.yaml` 为准，冲突处以后者优先并回流更新本文档。
