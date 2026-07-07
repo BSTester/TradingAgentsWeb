@@ -410,6 +410,7 @@ class LLMProvider(Base):
     base_url = Column(String(500), nullable=True)  # API基础URL
     description = Column(Text, nullable=True)  # 供应商描述
     is_active = Column(Boolean, default=True, nullable=False, index=True)  # 是否启用
+    is_default = Column(Boolean, default=False, nullable=False, index=True)  # 是否为系统默认供应商
     config_json = Column(JSON, nullable=True)  # 额外配置参数（JSON格式）
     
     # Timestamps
@@ -443,6 +444,7 @@ class LLMProvider(Base):
             "base_url": self.base_url,
             "description": self.description,
             "is_active": self.is_active,
+            "is_default": self.is_default,
             "config_json": self.config_json,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
