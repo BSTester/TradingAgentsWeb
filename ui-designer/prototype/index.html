@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>WS-12 UI 原型 · AI 设置 / 系统默认 Provider</title>
+  <title>WS-12 UI 原型（重做）· 用户 KEY 前端存储</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -11,24 +11,9 @@
       theme: {
         extend: {
           colors: {
-            dark: {
-              primary: '#0a0e1a',
-              secondary: '#141824',
-              tertiary: '#1a1f2e',
-              elevated: '#1f2937',
-              border: '#2d3748',
-            },
-            accent: {
-              primary: '#00d4ff',
-              secondary: '#0066ff',
-              tertiary: '#00a8e8',
-            },
-            text: {
-              primary: '#ffffff',
-              secondary: '#a0aec0',
-              tertiary: '#718096',
-              muted: '#4a5568',
-            },
+            dark: { primary: '#0a0e1a', secondary: '#141824', tertiary: '#1a1f2e', elevated: '#1f2937', border: '#2d3748' },
+            accent: { primary: '#00d4ff', secondary: '#0066ff', tertiary: '#00a8e8' },
+            text: { primary: '#ffffff', secondary: '#a0aec0', tertiary: '#718096', muted: '#4a5568' },
             success: { 400: '#4ade80', 500: '#00ff88', 600: '#16a34a' },
             danger: { 400: '#f87171', 500: '#ff3366', 600: '#dc2626' },
             warning: { 400: '#fbbf24', 500: '#ffaa00', 600: '#d97706' },
@@ -37,9 +22,7 @@
             'glow-cyan': '0 0 20px rgba(0, 212, 255, 0.3), 0 0 40px rgba(0, 212, 255, 0.1)',
             'card-dark': '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
           },
-          backgroundImage: {
-            'gradient-button': 'linear-gradient(90deg, #00d4ff 0%, #0066ff 100%)',
-          },
+          backgroundImage: { 'gradient-button': 'linear-gradient(90deg, #00d4ff 0%, #0066ff 100%)' },
         },
       },
     };
@@ -52,7 +35,6 @@
     ::-webkit-scrollbar-thumb:hover { background: #00d4ff; }
     .nav-active { background: linear-gradient(90deg, #00d4ff 0%, #0066ff 100%); color: #fff; box-shadow: 0 0 20px rgba(0,212,255,0.3), 0 0 40px rgba(0,212,255,0.1); }
     select option { background: #1a1f2e; color: #fff; }
-    .kbd { font-family: ui-monospace, monospace; }
   </style>
 </head>
 <body class="antialiased text-text-primary" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei',sans-serif;">
@@ -60,32 +42,29 @@
   <!-- ============ 原型导航（左右切换器，非产品 chrome） ============ -->
   <aside id="switcher" class="fixed top-0 left-0 z-[60] h-screen w-60 bg-dark-secondary border-r border-dark-border flex flex-col">
     <div class="px-4 py-4 border-b border-dark-border">
-      <div class="text-accent-primary font-bold text-sm flex items-center gap-2">
-        <i class="fas fa-palette"></i> WS-19 原型
-      </div>
-      <div class="text-text-tertiary text-xs mt-1">UI 设计师交付 · 高保真</div>
+      <div class="text-accent-primary font-bold text-sm flex items-center gap-2"><i class="fas fa-palette"></i> WS-19 原型（重做）</div>
+      <div class="text-text-tertiary text-xs mt-1">用户 KEY 改前端 localStorage</div>
     </div>
     <nav class="flex-1 overflow-y-auto py-3 text-sm">
       <div class="px-4 py-1 text-text-tertiary text-xs uppercase tracking-wider">Profile · AI 设置</div>
-      <button onclick="showScreen('profile-list')" data-group="profile" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-list w-4 text-text-tertiary"></i> Provider 列表</button>
-      <button onclick="showScreen('profile-form')" data-group="profile" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-plus w-4 text-text-tertiary"></i> 新增/编辑表单</button>
-      <button onclick="showScreen('profile-key')" data-group="profile" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-key w-4 text-text-tertiary"></i> KEY 交互态</button>
-      <button onclick="showScreen('profile-empty')" data-group="profile" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-inbox w-4 text-text-tertiary"></i> 空状态</button>
-      <button onclick="showScreen('profile-error')" data-group="profile" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-exclamation-triangle w-4 text-text-tertiary"></i> 错误态·连接失败</button>
+      <button onclick="showScreen('profile-list')" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-list w-4 text-text-tertiary"></i> Provider 列表</button>
+      <button onclick="showScreen('profile-form')" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-plus w-4 text-text-tertiary"></i> 新增/编辑表单</button>
+      <button onclick="showScreen('profile-key')" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-key w-4 text-text-tertiary"></i> 本地 KEY 交互态</button>
+      <button onclick="showScreen('profile-browser')" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-globe w-4 text-text-tertiary"></i> 换浏览器未存 KEY</button>
+      <button onclick="showScreen('profile-empty')" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-inbox w-4 text-text-tertiary"></i> 空状态</button>
+      <button onclick="showScreen('profile-error')" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-exclamation-triangle w-4 text-text-tertiary"></i> 错误态·连接失败</button>
 
       <div class="px-4 py-1 mt-3 text-text-tertiary text-xs uppercase tracking-wider">Admin · 系统默认 Provider</div>
-      <button onclick="showScreen('admin-default')" data-group="admin" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-cog w-4 text-text-tertiary"></i> 配置页</button>
-      <button onclick="showScreen('admin-confirm')" data-group="admin" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-shield-alt w-4 text-text-tertiary"></i> 二次确认</button>
-      <button onclick="showScreen('admin-none')" data-group="admin" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-ban w-4 text-text-tertiary"></i> 无默认/inactive</button>
+      <button onclick="showScreen('admin-default')" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-cog w-4 text-text-tertiary"></i> 配置页</button>
+      <button onclick="showScreen('admin-confirm')" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-shield-alt w-4 text-text-tertiary"></i> 二次确认</button>
+      <button onclick="showScreen('admin-none')" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-ban w-4 text-text-tertiary"></i> 无默认/inactive</button>
 
       <div class="px-4 py-1 mt-3 text-text-tertiary text-xs uppercase tracking-wider">分析表单 · 来源提示</div>
-      <button onclick="showScreen('analysis-personal')" data-group="analysis" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-user-check w-4 text-text-tertiary"></i> 来源：个人配置</button>
-      <button onclick="showScreen('analysis-system')" data-group="analysis" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-server w-4 text-text-tertiary"></i> 来源：系统默认</button>
-      <button onclick="showScreen('analysis-error')" data-group="analysis" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-times-circle w-4 text-text-tertiary"></i> 无有效配置</button>
+      <button onclick="showScreen('analysis-personal')" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-user-check w-4 text-text-tertiary"></i> 来源：本地 KEY</button>
+      <button onclick="showScreen('analysis-system')" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-server w-4 text-text-tertiary"></i> 来源：系统默认</button>
+      <button onclick="showScreen('analysis-error')" class="sw-btn w-full text-left px-4 py-2 hover:bg-dark-tertiary transition-colors flex items-center gap-2"><i class="fas fa-times-circle w-4 text-text-tertiary"></i> 本浏览器未存 KEY</button>
     </nav>
-    <div class="px-4 py-3 border-t border-dark-border text-text-tertiary text-xs">
-      点击左侧切换屏幕。所有屏幕共享同一产品外壳（导航/页脚）。
-    </div>
+    <div class="px-4 py-3 border-t border-dark-border text-text-tertiary text-xs">点击左侧切换屏幕。所有屏幕共享同一产品外壳（导航/页脚）。</div>
   </aside>
 
   <!-- ============ 产品外壳：顶部导航 ============ -->
@@ -94,22 +73,15 @@
       <div class="flex justify-between h-16">
         <div class="flex items-center">
           <div class="flex-shrink-0 cursor-pointer">
-            <h1 class="text-text-primary text-xl font-bold flex items-center space-x-2">
-              <i class="fas fa-chart-line text-accent-primary"></i>
-              <span>TradingAgentsWeb</span>
-            </h1>
+            <h1 class="text-text-primary text-xl font-bold flex items-center space-x-2"><i class="fas fa-chart-line text-accent-primary"></i><span>TradingAgentsWeb</span></h1>
           </div>
         </div>
         <div class="flex items-center space-x-2">
-          <button id="nav-home" class="px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary transition-all"><i class="fas fa-plus-circle mr-1"></i>新建对话</button>
-          <button id="nav-history" class="px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary transition-all"><i class="fas fa-history mr-1"></i>分析历史</button>
-          <button id="nav-tasks" class="px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary transition-all"><i class="fas fa-clock mr-1"></i>定期报告</button>
+          <button class="px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary transition-all"><i class="fas fa-plus-circle mr-1"></i>新建对话</button>
+          <button class="px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary transition-all"><i class="fas fa-history mr-1"></i>分析历史</button>
+          <button class="px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary transition-all"><i class="fas fa-clock mr-1"></i>定期报告</button>
           <div class="relative">
-            <button class="px-3 py-2 rounded-lg text-sm font-medium nav-active flex items-center">
-              <i class="fas fa-crown mr-2"></i> admin
-              <span class="mx-2 px-2 py-0.5 bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-xs font-bold rounded">管理员</span>
-              <i class="fas fa-chevron-down ml-2 text-xs"></i>
-            </button>
+            <button class="px-3 py-2 rounded-lg text-sm font-medium nav-active flex items-center"><i class="fas fa-crown mr-2"></i> admin<span class="mx-2 px-2 py-0.5 bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-xs font-bold rounded">管理员</span><i class="fas fa-chevron-down ml-2 text-xs"></i></button>
             <div class="absolute top-full right-0 mt-1 w-52 bg-dark-secondary border border-dark-border rounded-lg shadow-lg py-2 z-50">
               <button class="w-full text-left px-4 py-2 text-sm text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary transition-all flex items-center"><i class="fas fa-user-circle w-4 mr-3"></i>个人中心</button>
               <div class="border-t border-dark-border my-1"></div>
@@ -136,7 +108,6 @@
           <p class="mt-2 text-text-secondary">管理您的账户信息和设置</p>
         </div>
 
-        <!-- 账户信息卡（现有） -->
         <div class="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6 mb-6">
           <h2 class="text-xl md:text-2xl font-semibold text-text-primary mb-4"><i class="fas fa-id-card mr-2"></i>账户信息</h2>
           <div class="space-y-1">
@@ -146,24 +117,23 @@
           </div>
         </div>
 
-        <!-- AI 设置模块（新增） -->
+        <!-- AI 设置模块（用户 KEY 前端存储） -->
         <div class="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6 mb-6">
           <div class="flex items-start justify-between mb-1">
             <div>
               <h2 class="text-xl md:text-2xl font-semibold text-text-primary"><i class="fas fa-robot mr-2 text-accent-primary"></i>AI 设置</h2>
-              <p class="text-text-secondary mt-1 text-sm">管理您个人的 AI 提供商与 API KEY。未配置时将自动使用系统默认 Provider 兜底。</p>
+              <p class="text-text-secondary mt-1 text-sm">管理您个人的 AI 提供商配置。您的 API KEY 仅保存在<strong class="text-text-primary">当前浏览器</strong>（localStorage），不进入后端；换浏览器或清除数据后需重新填写。</p>
             </div>
             <button class="px-4 py-2 bg-gradient-to-r from-accent-primary to-accent-secondary text-white rounded-lg hover:shadow-glow-cyan transition-all whitespace-nowrap text-sm"><i class="fas fa-plus mr-2"></i>新增 Provider</button>
           </div>
 
-          <!-- 来源提示条 -->
           <div class="mt-4 mb-4 flex items-center gap-2 text-sm rounded-lg border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 text-accent-primary">
             <i class="fas fa-info-circle"></i>
-            <span>分析时优先使用下方「默认」配置；若都不适用，将回退到 <strong class="mx-1">系统默认 Provider</strong>。</span>
+            <span>分析时优先使用下方「默认」配置；若本浏览器未保存对应 KEY，将提示您补填或回退到 <strong class="mx-1">系统默认 Provider</strong>。</span>
           </div>
 
           <div class="space-y-4">
-            <!-- Provider 卡片 1：默认 + 已保存 KEY -->
+            <!-- Provider 卡片 1：默认 + 本浏览器已保存 KEY -->
             <div class="rounded-lg border border-accent-primary/50 bg-accent-primary/5 p-4 relative">
               <div class="flex items-start justify-between">
                 <div class="flex items-center gap-3">
@@ -183,21 +153,23 @@
                 </div>
               </div>
               <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div class="flex items-center gap-2 text-text-secondary"><i class="fas fa-key text-text-muted w-4"></i>API KEY
-                  <span class="kbd text-success-500 bg-success-500/10 px-2 py-0.5 rounded">sk-****************3aF9</span>
-                  <span class="text-text-tertiary text-xs">已保存·脱敏</span>
+                <div class="col-span-1 sm:col-span-2 flex items-center gap-2">
+                  <i class="fas fa-key text-text-muted w-4"></i>
+                  <span class="text-text-secondary">本浏览器已保存 KEY</span>
+                  <span class="px-2 py-0.5 rounded-full text-xs bg-success-500/20 text-success-500"><i class="fas fa-laptop-code mr-1"></i>localStorage</span>
+                  <span class="text-text-tertiary text-xs">换浏览器需重填</span>
                 </div>
                 <div class="flex items-center gap-2 text-text-secondary"><i class="fas fa-link text-text-muted w-4"></i>https://api.openai.com/v1</div>
                 <div class="flex items-center gap-2 text-text-secondary"><i class="fas fa-clock text-text-muted w-4"></i>验证于 2026-07-07 12:40</div>
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-3 col-span-1 sm:col-span-2">
+                  <button class="text-accent-primary hover:underline text-xs"><i class="fas fa-eye mr-1"></i>查看/编辑 KEY</button>
                   <button class="text-accent-primary hover:underline text-xs"><i class="fas fa-sync mr-1"></i>测试连接</button>
-                  <button class="text-accent-primary hover:underline text-xs"><i class="fas fa-exchange-alt mr-1"></i>替换 KEY</button>
                   <button class="text-danger-500 hover:underline text-xs"><i class="fas fa-eraser mr-1"></i>清除 KEY</button>
                 </div>
               </div>
             </div>
 
-            <!-- Provider 卡片 2：非默认 + 自定义 OpenAI 兼容 -->
+            <!-- Provider 卡片 2：非默认 + 自定义兼容 -->
             <div class="rounded-lg border border-dark-border bg-dark-tertiary p-4">
               <div class="flex items-start justify-between">
                 <div class="flex items-center gap-3">
@@ -216,15 +188,15 @@
                 </div>
               </div>
               <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div class="flex items-center gap-2 text-text-secondary"><i class="fas fa-key text-text-muted w-4"></i>API KEY
-                  <span class="kbd text-success-500 bg-success-500/10 px-2 py-0.5 rounded">sk-****************9b21</span>
-                  <span class="text-text-tertiary text-xs">已保存·脱敏</span>
+                <div class="col-span-1 sm:col-span-2 flex items-center gap-2">
+                  <i class="fas fa-key text-text-muted w-4"></i><span class="text-text-secondary">本浏览器已保存 KEY</span>
+                  <span class="px-2 py-0.5 rounded-full text-xs bg-success-500/20 text-success-500"><i class="fas fa-laptop-code mr-1"></i>localStorage</span>
                 </div>
                 <div class="flex items-center gap-2 text-text-secondary"><i class="fas fa-link text-text-muted w-4"></i>https://api.deepseek.com/v1</div>
                 <div class="flex items-center gap-2 text-text-secondary"><i class="fas fa-clock text-text-muted w-4"></i>验证于 2026-07-06 09:12</div>
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-3 col-span-1 sm:col-span-2">
+                  <button class="text-accent-primary hover:underline text-xs"><i class="fas fa-eye mr-1"></i>查看/编辑 KEY</button>
                   <button class="text-accent-primary hover:underline text-xs"><i class="fas fa-sync mr-1"></i>测试连接</button>
-                  <button class="text-accent-primary hover:underline text-xs"><i class="fas fa-exchange-alt mr-1"></i>替换 KEY</button>
                   <button class="text-danger-500 hover:underline text-xs"><i class="fas fa-eraser mr-1"></i>清除 KEY</button>
                 </div>
               </div>
@@ -241,21 +213,18 @@
         <div class="bg-dark-secondary rounded-lg shadow-lg border border-dark-border">
           <div class="p-6 border-b border-dark-border">
             <h2 class="text-xl md:text-2xl font-semibold text-text-primary"><i class="fas fa-plus mr-2 text-accent-primary"></i>新增 AI Provider 配置</h2>
-            <p class="text-text-secondary text-sm mt-1">可基于系统 active provider 创建，或填写自定义 OpenAI 兼容端点。</p>
+            <p class="text-text-secondary text-sm mt-1">provider 元数据由后端保存；<strong class="text-text-primary">API KEY 仅保存在当前浏览器</strong>。</p>
           </div>
           <div class="p-6 space-y-5">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium text-text-secondary mb-2">显示名称</label>
-                <input class="w-full h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-transparent" placeholder="例如：我的 OpenAI" />
+                <input class="w-full h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary" placeholder="例如：我的 OpenAI" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-text-secondary mb-2">Provider 类型</label>
                 <select class="w-full h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary">
-                  <option>系统目录：OpenAI</option>
-                  <option>系统目录：Deepseek</option>
-                  <option>系统目录：Qwen</option>
-                  <option>自定义 OpenAI 兼容</option>
+                  <option>系统目录：OpenAI</option><option>系统目录：Deepseek</option><option>系统目录：Qwen</option><option>自定义 OpenAI 兼容</option>
                 </select>
               </div>
             </div>
@@ -263,17 +232,17 @@
               <label class="block text-sm font-medium text-text-secondary mb-2">Base URL</label>
               <input class="w-full h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary" placeholder="https://api.openai.com/v1" />
             </div>
-            <!-- KEY 输入（新建时明文输入 + 眼睛切换，保存后不再回显明文） -->
+            <!-- KEY 输入（保存至本浏览器 localStorage，可眼睛预览） -->
             <div>
-              <label class="block text-sm font-medium text-text-secondary mb-2"><i class="fas fa-key mr-1"></i>API KEY</label>
+              <label class="block text-sm font-medium text-text-secondary mb-2"><i class="fas fa-key mr-1"></i>API KEY（保存到本浏览器）</label>
               <div class="flex gap-2">
                 <div class="relative flex-1">
-                  <input id="formKey" type="password" class="w-full h-12 px-4 pr-12 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary" placeholder="输入 API KEY（保存后将以脱敏形式展示）" />
+                  <input id="formKey" type="password" class="w-full h-12 px-4 pr-12 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary" placeholder="输入 API KEY，将仅保存在本浏览器 localStorage" />
                   <button type="button" onclick="toggleKey('formKey', this)" class="absolute inset-y-0 right-0 pr-3 flex items-center text-text-tertiary hover:text-accent-primary"><i class="fas fa-eye"></i></button>
                 </div>
                 <button class="px-4 rounded-lg border border-dark-border text-text-secondary hover:bg-dark-primary transition-colors text-sm"><i class="fas fa-plug mr-1"></i>测试连接</button>
               </div>
-              <p class="text-text-tertiary text-xs mt-1"><i class="fas fa-lock mr-1"></i>KEY 仅加密存储于服务端，前端永不明文回显。</p>
+              <p class="text-text-tertiary text-xs mt-1"><i class="fas fa-laptop-code mr-1"></i>该 KEY 不入后端、不回传；换浏览器/清缓存/无痕模式将丢失，需重新填写。</p>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -285,12 +254,8 @@
                 <select class="w-full h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary"><option>gpt-4o</option><option>gpt-4-turbo</option></select>
               </div>
             </div>
-            <label class="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
-              <input type="checkbox" class="h-4 w-4 text-accent-primary border-dark-border rounded bg-dark-tertiary" /> 设为我的默认 Provider
-            </label>
-            <label class="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
-              <input type="checkbox" checked class="h-4 w-4 text-accent-primary border-dark-border rounded bg-dark-tertiary" /> 启用该配置
-            </label>
+            <label class="flex items-center gap-2 text-sm text-text-secondary cursor-pointer"><input type="checkbox" class="h-4 w-4 text-accent-primary border-dark-border rounded bg-dark-tertiary" /> 设为我的默认 Provider</label>
+            <label class="flex items-center gap-2 text-sm text-text-secondary cursor-pointer"><input type="checkbox" checked class="h-4 w-4 text-accent-primary border-dark-border rounded bg-dark-tertiary" /> 启用该配置</label>
             <div class="flex gap-3 pt-2">
               <button class="flex-1 px-4 py-3 border border-dark-border text-text-primary bg-dark-tertiary rounded-lg hover:bg-dark-primary transition-colors">取消</button>
               <button class="flex-1 px-4 py-3 bg-gradient-to-r from-accent-primary to-accent-secondary text-white rounded-lg hover:shadow-glow-cyan transition-all font-medium">保存配置</button>
@@ -300,53 +265,56 @@
       </div>
     </section>
 
-    <!-- ================= 屏幕 3：Profile · KEY 交互态（已保存/替换/清除） ================= -->
+    <!-- ================= 屏幕 3：Profile · 本地 KEY 交互态（已保存/替换/清除） ================= -->
     <section id="screen-profile-key" class="screen" style="display:none;">
       <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 class="text-2xl md:text-3xl font-bold text-text-primary mb-2"><i class="fas fa-key mr-3 text-accent-primary"></i>API KEY 安全交互态</h1>
-        <p class="text-text-secondary mb-6">已保存的 KEY 永远不以明文展示；仅提供「已保存/脱敏」「替换」「清除」三种动作。</p>
+        <h1 class="text-2xl md:text-3xl font-bold text-text-primary mb-2"><i class="fas fa-key mr-3 text-accent-primary"></i>本地 KEY 安全交互态</h1>
+        <p class="text-text-secondary mb-6">KEY 保存在当前浏览器 localStorage（按 provider）。明文仅在本地可编辑，不进入后端、不回传。</p>
 
-        <!-- 态 A：已保存 + 已验证 -->
+        <!-- 态 A：本浏览器已保存（可眼睛预览，非脱敏尾号） -->
         <div class="bg-dark-secondary rounded-lg border border-dark-border p-6 mb-6">
-          <div class="text-sm text-text-tertiary mb-3 font-medium">态 A · 已保存且已验证</div>
+          <div class="text-sm text-text-tertiary mb-3 font-medium">态 A · 本浏览器已保存</div>
           <div class="flex flex-wrap items-center gap-3">
-            <span class="kbd text-success-500 bg-success-500/10 px-3 py-1.5 rounded">sk-****************3aF9</span>
-            <span class="px-2 py-0.5 rounded-full text-xs bg-success-500/20 text-success-500"><i class="fas fa-check-circle mr-1"></i>已保存·脱敏</span>
-            <span class="px-2 py-0.5 rounded-full text-xs bg-success-500/20 text-success-500"><i class="fas fa-shield-check mr-1"></i>验证通过</span>
+            <div class="relative flex-1 min-w-[220px]">
+              <input id="savedKey" type="password" value="sk-proj-ABCD1234efgh5678IJKL9012" class="w-full h-12 px-4 pr-12 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary kbd" />
+              <button type="button" onclick="toggleKey('savedKey', this)" class="absolute inset-y-0 right-0 pr-3 flex items-center text-text-tertiary hover:text-accent-primary"><i class="fas fa-eye"></i></button>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-xs bg-success-500/20 text-success-500"><i class="fas fa-laptop-code mr-1"></i>本浏览器已保存</span>
+            <span class="px-2 py-0.5 rounded-full text-xs bg-success-500/20 text-success-500"><i class="fas fa-check-circle mr-1"></i>验证通过</span>
           </div>
           <div class="flex items-center gap-4 mt-4">
             <button class="text-accent-primary hover:underline text-sm"><i class="fas fa-sync mr-1"></i>测试连接</button>
-            <button class="text-accent-primary hover:underline text-sm"><i class="fas fa-exchange-alt mr-1"></i>替换 KEY</button>
+            <button class="text-accent-primary hover:underline text-sm"><i class="fas fa-edit mr-1"></i>替换 KEY</button>
             <button class="text-danger-500 hover:underline text-sm"><i class="fas fa-eraser mr-1"></i>清除 KEY</button>
           </div>
-          <p class="text-text-tertiary text-xs mt-3"><i class="fas fa-eye-slash mr-1"></i>此处不提供「显示明文」按钮——脱敏尾号即全部可见信息。</p>
+          <p class="text-text-tertiary text-xs mt-3"><i class="fas fa-eye mr-1"></i>眼睛按钮仅<strong class="text-text-secondary">在当前浏览器</strong>预览明文；此值不会发送到后端，也不会出现在列表/来源提示中。</p>
         </div>
 
-        <!-- 态 B：替换 KEY（输入新 KEY，可眼睛切换，保存后重新脱敏） -->
+        <!-- 态 B：替换/编辑（直接改输入框，保存到本浏览器） -->
         <div class="bg-dark-secondary rounded-lg border border-dark-border p-6 mb-6">
-          <div class="text-sm text-text-tertiary mb-3 font-medium">态 B · 替换 KEY（点击「替换 KEY」后展开）</div>
+          <div class="text-sm text-text-tertiary mb-3 font-medium">态 B · 替换 KEY（点「替换 KEY」后直接编辑输入框）</div>
           <div class="flex gap-2 max-w-xl">
             <div class="relative flex-1">
-              <input id="replaceKey" type="password" class="w-full h-12 px-4 pr-12 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary" placeholder="输入新的 API KEY" />
+              <input id="replaceKey" type="password" class="w-full h-12 px-4 pr-12 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary kbd" placeholder="输入新的 API KEY" />
               <button type="button" onclick="toggleKey('replaceKey', this)" class="absolute inset-y-0 right-0 pr-3 flex items-center text-text-tertiary hover:text-accent-primary"><i class="fas fa-eye"></i></button>
             </div>
-            <button class="px-4 rounded-lg bg-gradient-to-r from-accent-primary to-accent-secondary text-white transition-all text-sm">保存替换</button>
+            <button class="px-4 rounded-lg bg-gradient-to-r from-accent-primary to-accent-secondary text-white transition-all text-sm">保存到本浏览器</button>
             <button class="px-4 rounded-lg border border-dark-border text-text-secondary hover:bg-dark-primary text-sm">取消</button>
           </div>
-          <p class="text-text-tertiary text-xs mt-2"><i class="fas fa-info-circle mr-1"></i>新 KEY 为本次输入（可眼睛切换预览），保存后立即脱敏，不明文留存。</p>
+          <p class="text-text-tertiary text-xs mt-2"><i class="fas fa-info-circle mr-1"></i>保存后仅覆盖本浏览器该 provider 的 KEY；不写入后端，不影响其他浏览器。</p>
         </div>
 
         <!-- 态 C：清除 KEY 确认对话框 -->
         <div class="bg-dark-secondary rounded-lg border border-dark-border p-6">
           <div class="text-sm text-text-tertiary mb-3 font-medium">态 C · 清除 KEY（二次确认）</div>
-          <div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" style="position:static;background:rgba(0,0,0,.4);border-radius:.5rem;">
+          <div class="rounded-lg border border-dark-border p-0 overflow-hidden" style="background:rgba(0,0,0,.25);">
             <div class="bg-dark-secondary rounded-lg border border-dark-border max-w-md w-full p-6 shadow-xl">
               <div class="flex items-start mb-4">
                 <div class="flex-shrink-0"><i class="fas fa-eraser text-danger-500 text-2xl"></i></div>
                 <div class="ml-4">
-                  <h3 class="text-lg font-semibold text-text-primary">清除 API KEY？</h3>
-                  <p class="text-sm text-text-secondary mt-2">将从「我的 OpenAI」移除已保存的 API KEY（<span class="kbd text-danger-500">sk-****************3aF9</span>）。清除后该配置在补回 KEY 前不可用。</p>
-                  <p class="text-sm text-text-tertiary mt-2"><i class="fas fa-info-circle mr-1 text-accent-primary"></i>该操作不影响其他 Provider，也不会影响系统默认 Provider。</p>
+                  <h3 class="text-lg font-semibold text-text-primary">清除本浏览器的 API KEY？</h3>
+                  <p class="text-sm text-text-secondary mt-2">将从<strong class="text-text-primary">当前浏览器</strong>移除「我的 OpenAI」的 API KEY。此操作仅影响本机 localStorage，不影响后端与其他配置。</p>
+                  <p class="text-sm text-text-tertiary mt-2"><i class="fas fa-exclamation-triangle mr-1 text-warning-500"></i>清除后，本浏览器分析该 provider 时需重新填写 KEY 或切换系统默认 Provider。</p>
                 </div>
               </div>
               <div class="flex gap-3 mt-6">
@@ -359,7 +327,54 @@
       </div>
     </section>
 
-    <!-- ================= 屏幕 4：Profile · 空状态 ================= -->
+    <!-- ================= 屏幕 4：Profile · 换浏览器未存 KEY 提示态 ================= -->
+    <section id="screen-profile-browser" class="screen" style="display:none;">
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h1 class="text-2xl md:text-3xl font-bold text-text-primary mb-2"><i class="fas fa-user-circle mr-3 text-accent-primary"></i>个人中心</h1>
+        <div class="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6 mt-6">
+          <h2 class="text-xl md:text-2xl font-semibold text-text-primary mb-4"><i class="fas fa-robot mr-2 text-accent-primary"></i>AI 设置</h2>
+          <!-- provider 元数据在，但本浏览器无 KEY -->
+          <div class="rounded-lg border border-warning-500/40 bg-warning-500/10 p-4 mb-4">
+            <div class="flex items-start gap-3">
+              <i class="fas fa-globe text-warning-500 mt-0.5"></i>
+              <div class="text-sm">
+                <div class="font-semibold text-warning-500">当前浏览器未保存该 Provider 的 KEY</div>
+                <div class="text-text-secondary mt-1">「我的 OpenAI」配置存在，但本浏览器（localStorage）中没有 KEY——可能因为是换浏览器、清除站点数据或无痕模式。请在本机填写 KEY，或切换为系统默认 Provider。</div>
+              </div>
+            </div>
+          </div>
+          <div class="rounded-lg border border-dark-border bg-dark-tertiary p-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-accent-primary to-accent-secondary flex items-center justify-center text-white"><i class="fab fa-openai"></i></div>
+                <div>
+                  <div class="flex items-center gap-2"><span class="font-semibold text-text-primary">我的 OpenAI</span><span class="px-2 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-accent-primary to-accent-secondary text-white">默认</span><span class="px-2 py-0.5 rounded-full text-xs bg-warning-500/20 text-warning-500"><i class="fas fa-exclamation-triangle mr-1"></i>本浏览器无 KEY</span></div>
+                  <div class="text-text-tertiary text-xs mt-1">OpenAI · gpt-4o-mini / gpt-4o</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-1">
+                <button class="w-8 h-8 rounded-lg text-text-secondary hover:text-accent-primary hover:bg-dark-secondary" title="编辑"><i class="fas fa-edit"></i></button>
+                <button class="w-8 h-8 rounded-lg text-text-secondary hover:text-danger-500 hover:bg-dark-secondary" title="删除"><i class="fas fa-trash"></i></button>
+              </div>
+            </div>
+            <!-- 内嵌填写 KEY -->
+            <div class="mt-3">
+              <label class="block text-sm font-medium text-text-secondary mb-2"><i class="fas fa-key mr-1"></i>在本浏览器填写 KEY（保存到 localStorage）</label>
+              <div class="flex gap-2">
+                <div class="relative flex-1">
+                  <input type="password" class="w-full h-12 px-4 pr-12 bg-dark-primary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary" placeholder="输入 API KEY" />
+                  <button class="absolute inset-y-0 right-0 pr-3 flex items-center text-text-tertiary hover:text-accent-primary"><i class="fas fa-eye"></i></button>
+                </div>
+                <button class="px-4 rounded-lg bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-sm">保存到本浏览器</button>
+              </div>
+              <p class="text-text-tertiary text-xs mt-1"><i class="fas fa-laptop-code mr-1"></i>仅保存到此浏览器，不会同步到其他设备或浏览器。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 屏幕 5：Profile · 空状态 ================= -->
     <section id="screen-profile-empty" class="screen" style="display:none;">
       <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 class="text-2xl md:text-3xl font-bold text-text-primary mb-2"><i class="fas fa-user-circle mr-3 text-accent-primary"></i>个人中心</h1>
@@ -368,7 +383,6 @@
             <h2 class="text-xl md:text-2xl font-semibold text-text-primary"><i class="fas fa-robot mr-2 text-accent-primary"></i>AI 设置</h2>
             <button class="px-4 py-2 bg-gradient-to-r from-accent-primary to-accent-secondary text-white rounded-lg hover:shadow-glow-cyan transition-all text-sm"><i class="fas fa-plus mr-2"></i>新增 Provider</button>
           </div>
-          <!-- 空状态 -->
           <div class="flex flex-col items-center justify-center text-center py-16 border border-dashed border-dark-border rounded-lg">
             <div class="w-16 h-16 rounded-full bg-dark-tertiary flex items-center justify-center text-text-tertiary text-2xl mb-4"><i class="fas fa-robot"></i></div>
             <h3 class="text-lg font-semibold text-text-primary">尚未配置任何 AI Provider</h3>
@@ -379,7 +393,7 @@
       </div>
     </section>
 
-    <!-- ================= 屏幕 5：Profile · 错误态·连接失败 ================= -->
+    <!-- ================= 屏幕 6：Profile · 错误态·连接失败 ================= -->
     <section id="screen-profile-error" class="screen" style="display:none;">
       <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 class="text-2xl md:text-3xl font-bold text-text-primary mb-2"><i class="fas fa-user-circle mr-3 text-accent-primary"></i>个人中心</h1>
@@ -390,12 +404,11 @@
               <i class="fas fa-exclamation-triangle text-danger-500 mt-0.5"></i>
               <div class="text-sm">
                 <div class="font-semibold text-danger-500">连接测试失败</div>
-                <div class="text-text-secondary mt-1">「自建兼容端点」返回 401 Unauthorized。请检查 Base URL 与 API KEY 是否正确，或重新替换 KEY 后重试。</div>
+                <div class="text-text-secondary mt-1">「自建兼容端点」返回 401 Unauthorized。请检查 Base URL 与本浏览器保存的 KEY 是否正确，或重新替换 KEY 后重试。</div>
                 <div class="text-text-tertiary text-xs mt-1 kbd">detail: authentication failed for https://api.deepseek.com/v1</div>
               </div>
             </div>
           </div>
-          <!-- 失败卡片 -->
           <div class="rounded-lg border border-danger-500/40 bg-dark-tertiary p-4">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-3">
@@ -412,20 +425,19 @@
             </div>
             <div class="mt-3 flex items-center gap-3 text-sm">
               <button class="text-accent-primary hover:underline text-xs"><i class="fas fa-sync mr-1"></i>重新测试</button>
-              <button class="text-accent-primary hover:underline text-xs"><i class="fas fa-exchange-alt mr-1"></i>替换 KEY</button>
+              <button class="text-accent-primary hover:underline text-xs"><i class="fas fa-edit mr-1"></i>替换 KEY</button>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ================= 屏幕 6：Admin · 系统默认 Provider 配置页 ================= -->
+    <!-- ================= 屏幕 7：Admin · 系统默认 Provider 配置页 ================= -->
     <section id="screen-admin-default" class="screen" style="display:none;">
       <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 class="text-2xl md:text-3xl font-bold text-text-primary mb-2"><i class="fas fa-cog mr-3 text-accent-primary"></i>系统默认 Provider</h1>
-        <p class="text-text-secondary mb-6">设置全站兜底 AI Provider。仅当用户未配置个人 Provider 时生效（不覆盖用户配置）。</p>
+        <p class="text-text-secondary mb-6">设置全站兜底 AI Provider。仅当用户未配置/本浏览器无 KEY 时生效（不覆盖用户配置）。系统默认 KEY 由后端保存，不对普通用户与前端暴露。</p>
 
-        <!-- 当前默认摘要（非敏感） -->
         <div class="bg-dark-secondary rounded-lg border border-dark-border p-6 mb-6">
           <h2 class="text-lg font-semibold text-text-primary mb-4"><i class="fas fa-info-circle mr-2 text-accent-primary"></i>当前系统默认 Provider</h2>
           <div class="flex items-center gap-3">
@@ -435,19 +447,14 @@
               <div class="text-text-tertiary text-sm mt-1">Base URL：https://api.openai.com/v1 · gpt-4o-mini / gpt-4o</div>
             </div>
           </div>
-          <p class="text-text-tertiary text-xs mt-3"><i class="fas fa-lock mr-1"></i>仅展示非敏感摘要，KEY 不对普通用户与前端暴露。</p>
+          <p class="text-text-tertiary text-xs mt-3"><i class="fas fa-lock mr-1"></i>仅展示非敏感摘要；系统默认 KEY 由后端保存，不对普通用户与前端暴露。</p>
         </div>
 
-        <!-- 选择表单 -->
         <div class="bg-dark-secondary rounded-lg border border-dark-border p-6">
           <h2 class="text-lg font-semibold text-text-primary mb-4"><i class="fas fa-sliders mr-2 text-accent-primary"></i>设置新的系统默认 Provider</h2>
           <label class="block text-sm font-medium text-text-secondary mb-2">从 active providers 中选择</label>
           <select class="w-full h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary">
-            <option>OpenAI（active）</option>
-            <option>Deepseek（active）</option>
-            <option>Qwen（active）</option>
-            <option>Anthropic（active）</option>
-            <option class="text-text-tertiary">Ollama（inactive · 不可选）</option>
+            <option>OpenAI（active）</option><option>Deepseek（active）</option><option>Qwen（active）</option><option>Anthropic（active）</option><option class="text-text-tertiary">Ollama（inactive · 不可选）</option>
           </select>
           <p class="text-text-tertiary text-xs mt-2"><i class="fas fa-external-link-alt mr-1 text-accent-primary"></i>未找到合适的 provider？请先到 <a class="text-accent-primary hover:underline" href="#">LLM 管理</a> 创建并激活。</p>
           <div class="mt-5">
@@ -457,18 +464,17 @@
       </div>
     </section>
 
-    <!-- ================= 屏幕 7：Admin · 二次确认 ================= -->
+    <!-- ================= 屏幕 8：Admin · 二次确认 ================= -->
     <section id="screen-admin-confirm" class="screen" style="display:none;">
       <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 class="text-2xl md:text-3xl font-bold text-text-primary mb-2"><i class="fas fa-cog mr-3 text-accent-primary"></i>系统默认 Provider</h1>
-        <p class="text-text-secondary mb-6">设置全站兜底 AI Provider。仅当用户未配置个人 Provider 时生效。</p>
+        <p class="text-text-secondary mb-6">设置全站兜底 AI Provider。仅当用户未配置/本浏览器无 KEY 时生效。</p>
         <div class="bg-dark-secondary rounded-lg border border-dark-border p-6 opacity-60 pointer-events-none select-none">
           <h2 class="text-lg font-semibold text-text-primary mb-4"><i class="fas fa-sliders mr-2 text-accent-primary"></i>设置新的系统默认 Provider</h2>
           <label class="block text-sm font-medium text-text-secondary mb-2">从 active providers 中选择</label>
           <div class="w-full h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg flex items-center">Deepseek（active）</div>
         </div>
       </div>
-      <!-- 二次确认对话框 -->
       <div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
         <div class="bg-dark-secondary rounded-lg border border-dark-border max-w-md w-full p-6 shadow-xl animate-fade-in">
           <div class="flex items-start mb-4">
@@ -480,7 +486,7 @@
                 <div class="font-semibold text-text-primary flex items-center gap-2"><i class="fab fa-openai text-accent-primary"></i> Deepseek</div>
                 <div class="text-text-tertiary text-xs mt-1">Base URL：https://api.deepseek.com/v1 · deepseek-chat / deepseek-reasoner</div>
               </div>
-              <p class="text-sm text-text-secondary mt-3"><i class="fas fa-info-circle mr-1 text-accent-primary"></i>该设置仅作为兜底；已配置个人 Provider 的用户不受此更改影响。</p>
+              <p class="text-sm text-text-secondary mt-3"><i class="fas fa-info-circle mr-1 text-accent-primary"></i>该设置仅作为兜底；已配置个人 Provider 且本浏览器有 KEY 的用户不受此更改影响。</p>
             </div>
           </div>
           <div class="flex gap-3 mt-6">
@@ -491,24 +497,21 @@
       </div>
     </section>
 
-    <!-- ================= 屏幕 8：Admin · 无默认 / inactive 拒绝 ================= -->
+    <!-- ================= 屏幕 9：Admin · 无默认 / inactive 拒绝 ================= -->
     <section id="screen-admin-none" class="screen" style="display:none;">
       <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 class="text-2xl md:text-3xl font-bold text-text-primary mb-2"><i class="fas fa-cog mr-3 text-accent-primary"></i>系统默认 Provider</h1>
         <div class="bg-dark-secondary rounded-lg border border-dark-border p-6 mt-6">
           <h2 class="text-lg font-semibold text-text-primary mb-4"><i class="fas fa-info-circle mr-2 text-accent-primary"></i>当前系统默认 Provider</h2>
-          <!-- 无默认状态 -->
           <div class="flex items-center gap-3 rounded-lg border border-warning-500/40 bg-warning-500/10 p-4">
             <i class="fas fa-exclamation-triangle text-warning-500"></i>
-            <div class="text-sm"><div class="font-semibold text-warning-500">尚未设置系统默认 Provider</div><div class="text-text-secondary mt-1">用户未配置个人 Provider 时将无法启动分析。请尽快设置一个 active provider 为默认。</div></div>
+            <div class="text-sm"><div class="font-semibold text-warning-500">尚未设置系统默认 Provider</div><div class="text-text-secondary mt-1">用户无个人 KEY 时将无法启动分析。请尽快设置一个 active provider 为默认。</div></div>
           </div>
 
           <h2 class="text-lg font-semibold text-text-primary mt-6 mb-4"><i class="fas fa-sliders mr-2 text-accent-primary"></i>设置新的系统默认 Provider</h2>
           <label class="block text-sm font-medium text-text-secondary mb-2">从 active providers 中选择</label>
           <select class="w-full h-12 px-4 bg-dark-tertiary border border-danger-500/50 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-danger-500">
-            <option>OpenAI（active）</option>
-            <option>Deepseek（active）</option>
-            <option class="text-text-tertiary line-through">Ollama（inactive · 已禁用）</option>
+            <option>OpenAI（active）</option><option>Deepseek（active）</option><option class="text-text-tertiary line-through">Ollama（inactive · 已禁用）</option>
           </select>
           <div class="flex items-center gap-2 mt-2 text-sm text-danger-500"><i class="fas fa-ban"></i><span>inactive provider 不可设为系统默认，保存时后端将拒绝并返回明确错误。</span></div>
           <div class="mt-5">
@@ -518,30 +521,24 @@
       </div>
     </section>
 
-    <!-- ================= 屏幕 9：分析表单 · 来源提示（个人配置） ================= -->
+    <!-- ================= 屏幕 10：分析表单 · 来源提示（本地 KEY） ================= -->
     <section id="screen-analysis-personal" class="screen" style="display:none;">
       <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div class="bg-dark-secondary rounded-lg shadow-lg border border-dark-border">
-          <div class="p-6 border-b border-dark-border">
-            <h3 class="text-lg font-semibold text-text-primary"><i class="fas fa-cog mr-2 text-accent-primary"></i>配置分析</h3>
-          </div>
+          <div class="p-6 border-b border-dark-border"><h3 class="text-lg font-semibold text-text-primary"><i class="fas fa-cog mr-2 text-accent-primary"></i>配置分析</h3></div>
           <div class="p-6 space-y-8">
-            <!-- 步骤5 LLM 服务商（节选） -->
             <div class="space-y-4">
-              <div class="flex items-center space-x-3">
-                <div class="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">5</div>
-                <h4 class="text-lg font-medium text-text-primary">LLM 服务商</h4>
-              </div>
+              <div class="flex items-center space-x-3"><div class="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">5</div><h4 class="text-lg font-medium text-text-primary">LLM 服务商</h4></div>
               <div class="ml-11 space-y-4">
-                <!-- 来源提示：个人配置 -->
+                <!-- 来源提示：个人配置（本地 KEY） -->
                 <div class="flex items-center gap-2 text-sm rounded-lg border border-accent-primary/30 bg-accent-primary/10 px-4 py-2 text-accent-primary">
                   <i class="fas fa-user-check"></i>
-                  <span>来源：<strong class="mx-1">个人配置「我的 OpenAI」</strong>，已应用您保存的 KEY（脱敏）。如需临时改用其他 KEY，见下方「一次性 KEY」。</span>
+                  <span>来源：<strong class="mx-1">个人配置「我的 OpenAI」（本浏览器 KEY）</strong>。前端将从 localStorage 取出 KEY 随请求下发。</span>
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-text-secondary mb-2">选择要使用的服务商</label>
                   <select class="w-full px-4 h-12 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary">
-                    <option>我的 OpenAI（个人默认）</option>
+                    <option>我的 OpenAI（个人默认 · 本浏览器已存 KEY）</option>
                     <option>自建兼容端点（个人）</option>
                     <option>系统默认：OpenAI</option>
                   </select>
@@ -551,47 +548,39 @@
                   <label class="block text-sm font-medium text-text-secondary mb-2"><i class="fas fa-key mr-1"></i>本次使用一次性 KEY（可选，不保存）</label>
                   <div class="flex gap-2">
                     <div class="relative flex-1">
-                      <input id="onceKeyP" type="password" class="w-full h-12 px-4 pr-12 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary" placeholder="留空则使用已保存 KEY" />
+                      <input id="onceKeyP" type="password" class="w-full h-12 px-4 pr-12 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary" placeholder="留空则使用本浏览器已存 KEY" />
                       <button type="button" onclick="toggleKey('onceKeyP', this)" class="absolute inset-y-0 right-0 pr-3 flex items-center text-text-tertiary hover:text-accent-primary"><i class="fas fa-eye"></i></button>
                     </div>
                     <button class="px-4 rounded-lg border border-dark-border text-text-secondary hover:bg-dark-primary text-sm">验证</button>
                   </div>
-                  <p class="text-text-tertiary text-xs mt-1"><i class="fas fa-info-circle mr-1"></i>仅对本次分析生效，不会覆盖或修改您已保存的 KEY。</p>
+                  <p class="text-text-tertiary text-xs mt-1"><i class="fas fa-info-circle mr-1"></i>仅对本次分析生效；只有明确保存时才写入本浏览器 localStorage。</p>
                 </div>
               </div>
             </div>
-            <div class="text-center pt-2">
-              <button class="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-blue-700 transition-colors"><i class="fas fa-play mr-2"></i>开始分析</button>
-            </div>
+            <div class="text-center pt-2"><button class="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-blue-700 transition-colors"><i class="fas fa-play mr-2"></i>开始分析</button></div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ================= 屏幕 10：分析表单 · 来源提示（系统默认） ================= -->
+    <!-- ================= 屏幕 11：分析表单 · 来源提示（系统默认） ================= -->
     <section id="screen-analysis-system" class="screen" style="display:none;">
       <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div class="bg-dark-secondary rounded-lg shadow-lg border border-dark-border">
-          <div class="p-6 border-b border-dark-border">
-            <h3 class="text-lg font-semibold text-text-primary"><i class="fas fa-cog mr-2 text-accent-primary"></i>配置分析</h3>
-          </div>
+          <div class="p-6 border-b border-dark-border"><h3 class="text-lg font-semibold text-text-primary"><i class="fas fa-cog mr-2 text-accent-primary"></i>配置分析</h3></div>
           <div class="p-6 space-y-8">
             <div class="space-y-4">
-              <div class="flex items-center space-x-3">
-                <div class="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">5</div>
-                <h4 class="text-lg font-medium text-text-primary">LLM 服务商</h4>
-              </div>
+              <div class="flex items-center space-x-3"><div class="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">5</div><h4 class="text-lg font-medium text-text-primary">LLM 服务商</h4></div>
               <div class="ml-11 space-y-4">
                 <!-- 来源提示：系统默认 -->
                 <div class="flex items-center gap-2 text-sm rounded-lg border border-warning-500/30 bg-warning-500/10 px-4 py-2 text-warning-500">
                   <i class="fas fa-server"></i>
-                  <span>来源：<strong class="mx-1">系统默认 Provider（OpenAI）</strong>。您尚未配置个人 Provider，本次分析将使用该默认配置兜底。</span>
+                  <span>来源：<strong class="mx-1">系统默认 Provider（OpenAI）</strong>。您未配置个人 Provider，或本浏览器无 KEY，本次分析将使用该默认配置兜底。</span>
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-text-secondary mb-2">选择要使用的服务商</label>
                   <select class="w-full px-4 h-12 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary">
-                    <option>系统默认：OpenAI</option>
-                    <option>+ 新增个人 Provider 配置</option>
+                    <option>系统默认：OpenAI</option><option>+ 新增个人 Provider 配置</option>
                   </select>
                 </div>
                 <div class="border-t border-dark-border pt-4">
@@ -603,51 +592,44 @@
                     </div>
                     <button class="px-4 rounded-lg border border-dark-border text-text-secondary hover:bg-dark-primary text-sm">验证</button>
                   </div>
-                  <p class="text-text-tertiary text-xs mt-1"><i class="fas fa-info-circle mr-1"></i>系统默认 KEY 由管理员托管，前端不可见；如需自定义请新增个人 Provider。</p>
+                  <p class="text-text-tertiary text-xs mt-1"><i class="fas fa-info-circle mr-1"></i>系统默认 KEY 由管理员托管（后端），前端不可见；如需自定义请新增个人 Provider 并在本浏览器存 KEY。</p>
                 </div>
               </div>
             </div>
-            <div class="text-center pt-2">
-              <button class="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-blue-700 transition-colors"><i class="fas fa-play mr-2"></i>开始分析</button>
-            </div>
+            <div class="text-center pt-2"><button class="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-blue-700 transition-colors"><i class="fas fa-play mr-2"></i>开始分析</button></div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ================= 屏幕 11：分析表单 · 无有效配置错误 ================= -->
+    <!-- ================= 屏幕 12：分析表单 · 本浏览器未存 KEY 错误 ================= -->
     <section id="screen-analysis-error" class="screen" style="display:none;">
       <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div class="bg-dark-secondary rounded-lg shadow-lg border border-dark-border">
-          <div class="p-6 border-b border-dark-border">
-            <h3 class="text-lg font-semibold text-text-primary"><i class="fas fa-cog mr-2 text-accent-primary"></i>配置分析</h3>
-          </div>
+          <div class="p-6 border-b border-dark-border"><h3 class="text-lg font-semibold text-text-primary"><i class="fas fa-cog mr-2 text-accent-primary"></i>配置分析</h3></div>
           <div class="p-6 space-y-6">
             <div class="space-y-4">
-              <div class="flex items-center space-x-3">
-                <div class="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">5</div>
-                <h4 class="text-lg font-medium text-text-primary">LLM 服务商</h4>
-              </div>
+              <div class="flex items-center space-x-3"><div class="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">5</div><h4 class="text-lg font-medium text-text-primary">LLM 服务商</h4></div>
               <div class="ml-11 space-y-4">
-                <!-- 错误态：无有效配置 -->
+                <!-- 错误态：本浏览器未存 KEY -->
                 <div class="rounded-lg border border-danger-500/40 bg-danger-500/10 p-4">
                   <div class="flex items-start gap-3">
                     <i class="fas fa-times-circle text-danger-500 mt-0.5"></i>
                     <div class="text-sm">
-                      <div class="font-semibold text-danger-500">无法启动分析：无有效 LLM 配置</div>
-                      <div class="text-text-secondary mt-1">您选择了「自建兼容端点」但未配置 KEY，且未设置系统默认兜底。请补回该 Provider 的 KEY，或切换为系统默认 Provider。</div>
+                      <div class="font-semibold text-danger-500">无法启动分析：本浏览器未保存该 Provider 的 KEY</div>
+                      <div class="text-text-secondary mt-1">您选择了「我的 OpenAI」，但<strong class="text-text-primary">当前浏览器</strong>的 localStorage 中没有对应 KEY（可能换浏览器/清缓存/无痕）。请在本机补填 KEY，或切换为系统默认 Provider。</div>
                       <div class="mt-3 flex gap-2">
-                        <button class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-xs"><i class="fas fa-plus mr-1"></i>去配置 KEY</button>
+                        <button class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-xs"><i class="fas fa-key mr-1"></i>在本浏览器填写 KEY</button>
                         <button class="px-3 py-1.5 rounded-lg border border-dark-border text-text-secondary text-xs hover:bg-dark-primary">使用系统默认</button>
                       </div>
+                      <p class="text-text-tertiary text-xs mt-3"><i class="fas fa-info-circle mr-1"></i>若无系统默认 Provider，则必须在本浏览器保存 KEY 后才能分析。</p>
                     </div>
                   </div>
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-text-secondary mb-2">选择要使用的服务商</label>
                   <select class="w-full px-4 h-12 bg-dark-tertiary border border-danger-500/50 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-danger-500">
-                    <option>自建兼容端点（未配置 KEY）</option>
-                    <option>系统默认：OpenAI</option>
+                    <option>我的 OpenAI（本浏览器无 KEY）</option><option>系统默认：OpenAI</option>
                   </select>
                 </div>
               </div>
@@ -659,9 +641,8 @@
 
   </main>
 
-  <!-- ============ 页脚 ============ -->
   <footer class="border-t border-dark-border py-6 text-center text-text-tertiary text-sm" style="margin-left:15rem;">
-    TradingAgentsWeb · WS-12 UI 原型（设计稿，非生产代码）
+    TradingAgentsWeb · WS-12 UI 原型（重做：用户 KEY 前端存储）· 设计稿，非生产代码
   </footer>
 
   <script>
@@ -669,20 +650,9 @@
       document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
       const el = document.getElementById('screen-' + id);
       if (el) el.style.display = 'block';
-      // 更新切换器高亮
       document.querySelectorAll('.sw-btn').forEach(b => b.classList.remove('nav-active'));
-      const activeBtn = document.querySelector('.sw-btn[data-group]');
-      // 简单高亮：找到对应按钮
-      document.querySelectorAll('.sw-btn').forEach(b => {
-        if (b.getAttribute('onclick').includes("'" + id + "'")) b.classList.add('nav-active');
-      });
-      // 更新顶部导航高亮
-      const group = (document.querySelector('.sw-btn[onclick*="' + id + '"]') || {}).dataset?.group;
-      setNavActive(group);
+      document.querySelectorAll('.sw-btn').forEach(b => { if (b.getAttribute('onclick').includes("'" + id + "'")) b.classList.add('nav-active'); });
       window.scrollTo(0, 0);
-    }
-    function setNavActive(group) {
-      // 这里仅做示意：保持用户菜单展开态即可，实际产品由路由决定
     }
     function toggleKey(inputId, btn) {
       const inp = document.getElementById(inputId);
@@ -691,7 +661,6 @@
       inp.type = isPwd ? 'text' : 'password';
       btn.querySelector('i').className = isPwd ? 'fas fa-eye-slash' : 'fas fa-eye';
     }
-    // 初始
     showScreen('profile-list');
   </script>
 </body>
