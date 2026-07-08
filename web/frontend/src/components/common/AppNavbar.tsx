@@ -220,6 +220,20 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
                               <i className="fas fa-brain w-4 mr-3" />
                               LLM管理
                             </button>
+                            <button
+                              onClick={() => {
+                                handleNavigation('/admin/system-default-provider');
+                                setShowUserMenu(false);
+                              }}
+                              className={`w-full text-left px-4 py-2 text-sm transition-all flex items-center ${
+                                isActive('/admin/system-default-provider')
+                                  ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white'
+                                  : 'text-text-secondary hover:text-accent-primary hover:bg-dark-tertiary'
+                              }`}
+                            >
+                              <i className="fas fa-star w-4 mr-3" />
+                              系统默认 Provider
+                            </button>
                           </>
                         )}
 
@@ -394,6 +408,17 @@ export function AppNavbar({ user, onLogout, showNewAnalysis = true, showUserMana
                           >
                             <i className="fas fa-brain w-6 text-lg mr-3" />
                             LLM管理
+                          </button>
+                          <button
+                            onClick={() => handleNavigation('/admin/system-default-provider')}
+                            className={`w-full flex items-center px-4 py-3 text-base font-medium transition-all ${
+                              isActive('/admin/system-default-provider')
+                                ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white'
+                                : 'text-text-secondary hover:text-accent-primary hover:bg-dark-secondary'
+                            }`}
+                          >
+                            <i className="fas fa-star w-6 text-lg mr-3" />
+                            系统默认 Provider
                           </button>
                         </>
                       )}

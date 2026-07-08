@@ -1,6 +1,11 @@
 import axios from 'axios';
 
 import { API_BASE_URL } from '@/utils/api';
+import type {
+  AdminLLMProvider,
+  AppConfigWithSystemDefault,
+  SystemDefaultProviderSummary,
+} from '@/lib/types';
 
 
 
@@ -243,6 +248,58 @@ export const configAPI = {
                           error.response?.data?.message || 
                           error.message || 
                           'API密钥验证失败';
+      throw new Error(errorMessage);
+    }
+  },
+
+  // 仅取 system_default 脱敏摘要（E6 扩展字段），普通用户也可读
+  getSystemDefault: async (): Promise<SystemDefaultProviderSummary | null> => {
+    try {
+      const response = await apiClient.get('/api/config');
+      const data = response.data as AppConfigWithSystemDefault;
+      return data?.system_default ?? null;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail ||
+                          error.response?.data?.message ||
+                          error.message ||
+                          '获取系统默认 provider 失败';
+      throw new Error(errorMessage);
+    }
+  },
+};
+
+// 管理员 LLM 供应商目录（Provider/Model CRUD 源），供系统默认页选择
+export const adminLLMAPI = {
+  listProviders: async (includeInactive = true): Promise<AdminLLMProvider[]> => {
+    try {
+      const response = await apiClient.get(
+        `/api/admin/llm/providers?include_inactive=${includeInactive}`,
+      );
+      return response.data as AdminLLMProvider[];
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail ||
+                          error.response?.data?.message ||
+                          error.message ||
+                          '获取供应商列表失败';
+      throw new Error(errorMessage);
+    }
+  },
+};
+
+// 管理员设置系统默认 provider（E7，后端 KEY，脱敏摘要返回）
+export const adminDefaultProviderAPI = {
+  setSystemDefault: async (providerId: number): Promise<SystemDefaultProviderSummary> => {
+    try {
+      const response = await apiClient.put('/api/admin/llm/system-default', {
+        provider_id: providerId,
+      });
+      return response.data as SystemDefaultProviderSummary;
+    } catch (error: any) {
+      // 优先取后端 detail（如 "cannot set inactive provider as system default"）
+      const errorMessage = error.response?.data?.detail ||
+                          error.response?.data?.message ||
+                          error.message ||
+                          '设置系统默认 provider 失败';
       throw new Error(errorMessage);
     }
   },
