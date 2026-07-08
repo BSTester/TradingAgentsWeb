@@ -5,7 +5,11 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from web.backend.services.prompt_loader import load_user_prompt_template
+from web.backend.services.prompt_loader import (
+    generate_tool_documentation,
+    generate_variable_documentation,
+    load_user_prompt_template,
+)
 from web.backend.database import SessionLocal
 from web.backend.models import AgentTool
 
@@ -15,7 +19,12 @@ def verify_english_docs():
     print("Test 1: English Documentation")
     print("=" * 80)
     
-    prompt = load_user_prompt_template(1, 'intraday_trader', 'US')
+    prompt = "\n\n".join([
+        generate_variable_documentation(),
+        generate_tool_documentation(),
+        "## Agent Configuration\n",
+        load_user_prompt_template(1, 'intraday_trader'),
+    ])
     
     checks = [
         "Runtime Variables",
@@ -40,7 +49,12 @@ def verify_all_tools():
     print("Test 2: All Tools Injected")
     print("=" * 80)
     
-    prompt = load_user_prompt_template(1, 'intraday_trader', 'US')
+    prompt = "\n\n".join([
+        generate_variable_documentation(),
+        generate_tool_documentation(),
+        "## Agent Configuration\n",
+        load_user_prompt_template(1, 'intraday_trader'),
+    ])
     
     db = SessionLocal()
     try:

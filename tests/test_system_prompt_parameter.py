@@ -13,21 +13,18 @@ def test_prompt_loader_returns_string():
     print("=" * 80)
     print("Test: Prompt Loader Returns String")
     print("=" * 80)
-    
+
     from web.backend.services.prompt_loader import load_user_prompt_template
-    
-    result = load_user_prompt_template(1, 'intraday_trader', 'US')
-    
+
+    result = load_user_prompt_template(1, 'intraday_trader')
+
     print(f"  Return type: {type(result)}")
     print(f"  Is string: {isinstance(result, str)}")
     print(f"  Length: {len(result)} chars")
-    
-    if isinstance(result, str):
-        print("  ✅ Returns string only")
-        return True
-    else:
-        print("  ❌ Does not return string")
-        return False
+
+    assert isinstance(result, str)
+    assert result
+    print("  ✅ Returns string only")
 
 
 def test_concept():
@@ -35,53 +32,56 @@ def test_concept():
     print("\n" + "=" * 80)
     print("Test: Concept - Pass Prompt as Parameter")
     print("=" * 80)
-    
+
     # Simulate loading prompt
     from web.backend.services.prompt_loader import load_user_prompt_template
-    
-    # Load prompt with all injections
-    complete_prompt = load_user_prompt_template(1, 'intraday_trader', 'US', 'test_session')
-    
-    print(f"  ✓ Loaded complete prompt: {len(complete_prompt)} chars")
-    print(f"  ✓ Contains variables: {'Runtime Variables' in complete_prompt}")
-    print(f"  ✓ Contains tools: {'Available Tools' in complete_prompt}")
-    print(f"  ✓ Contains user config: {'Agent Configuration' in complete_prompt}")
-    
+
+    # Load only the user's core strategy prompt. Runtime/system documentation is
+    # injected by the agent at execution time.
+    core_prompt = load_user_prompt_template(1, 'intraday_trader')
+
+    print(f"  ✓ Loaded core prompt: {len(core_prompt)} chars")
+    print(f"  ✓ Contains runtime docs: {'Runtime Variables' in core_prompt}")
+    print(f"  ✓ Contains tool docs: {'Available Tools' in core_prompt}")
+    print(f"  ✓ Contains user config wrapper: {'Agent Configuration' in core_prompt}")
+
+    assert isinstance(core_prompt, str)
+    assert core_prompt
+    assert "Runtime Variables" not in core_prompt
+    assert "Available Tools" not in core_prompt
+    assert "Agent Configuration" not in core_prompt
+
     # This prompt can now be passed to create_intraday_trader
     # create_intraday_trader(llm, memory, user_id=1, system_prompt=complete_prompt)
-    
+
     print("\n  ✅ Concept verified:")
-    print("     1. Load prompt with load_user_prompt_template()")
-    print("     2. Pass complete prompt to create_intraday_trader()")
-    print("     3. No circular import!")
-    
-    return True
+    print("     1. Load core prompt with load_user_prompt_template()")
+    print("     2. Pass core prompt to the agent")
+    print("     3. Let the agent inject system documentation at runtime")
 
 
 def main():
     print("\n🎯 System Prompt Parameter Test\n")
-    
+
     results = {
-        "Prompt Loader": test_prompt_loader_returns_string(),
-        "Concept": test_concept(),
+        "Prompt Loader": test_prompt_loader_returns_string() is None,
+        "Concept": test_concept() is None,
     }
-    
+
     print("\n" + "=" * 80)
     print("Summary")
     print("=" * 80)
-    
+
     for name, passed in results.items():
         print(f"  {'✅' if passed else '❌'} {name}")
-    
+
     if all(results.values()):
         print("\n✅ Concept is valid!")
         print("\nImplementation plan:")
-        print("  1. load_user_prompt_template() returns complete prompt string")
-        print("  2. create_intraday_trader() accepts system_prompt parameter")
-        print("  3. If system_prompt provided, use it directly")
-        print("  4. If not provided, fallback to dynamic loading")
-        print("  5. No circular import issues!")
-    
+        print("  1. load_user_prompt_template() returns core prompt string")
+        print("  2. Agent runtime injects system documentation")
+        print("  3. No circular import issues!")
+
     return all(results.values())
 
 

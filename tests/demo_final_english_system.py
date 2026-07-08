@@ -103,10 +103,15 @@ def show_final_prompt_structure():
     print("📐 Final Prompt Structure")
     print("=" * 80)
     
-    prompt, tools = load_user_prompt_template(1, 'intraday_trader', 'US')
+    core_prompt = load_user_prompt_template(1, 'intraday_trader')
+    prompt = "\n\n".join([
+        generate_variable_documentation(),
+        generate_tool_documentation(),
+        "## Agent Configuration\n",
+        core_prompt,
+    ])
     
     print(f"\n✅ Total Length: {len(prompt)} characters")
-    print(f"✅ Tools Available: {len(tools)}")
     
     print("\n📄 Structure:")
     print("  1️⃣  Runtime Variables (Auto-Injected)")

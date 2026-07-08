@@ -9,7 +9,11 @@ import os
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from web.backend.services.prompt_loader import load_user_prompt_template
+from web.backend.services.prompt_loader import (
+    generate_tool_documentation,
+    generate_variable_documentation,
+    load_user_prompt_template,
+)
 from web.backend.database import SessionLocal
 from web.backend.models import AgentTool
 
@@ -53,16 +57,21 @@ def show_full_prompt_structure():
     print("📋 完整提示词结构（自动生成文档）")
     print("=" * 80)
     
-    prompt, tools = load_user_prompt_template(1, 'intraday_trader', 'US')
+    core_prompt = load_user_prompt_template(1, 'intraday_trader')
+    prompt = "\n\n".join([
+        generate_variable_documentation(),
+        generate_tool_documentation(),
+        "## Agent Configuration\n",
+        core_prompt,
+    ])
     
     print(f"\n✅ 提示词总长度: {len(prompt)} 字符")
-    print(f"✅ 启用工具数量: {len(tools)}")
     
     # Show structure
     print("\n📐 提示词结构:")
     print("  1️⃣ 运行时变量说明（自动生成）")
     print("  2️⃣ 可用工具说明（根据用户选择的工具自动生成）")
-    print("  3️⃣ Agent 行为配置（用户编辑的提示词）")
+    print("  3️⃣ Agent 行为配置（用户编辑的核心提示词）")
     
     # Show each section
     sections = [
@@ -100,47 +109,15 @@ def show_full_prompt_structure():
 def show_selective_tools_demo():
     """Demo: Show how tool documentation adapts to user selection"""
     print("\n" + "=" * 80)
-    print("🎯 工具选择演示（工具说明自动适配）")
+    print("🎯 工具文档演示（全量可用工具）")
     print("=" * 80)
     
     from web.backend.services.prompt_loader import generate_tool_documentation
     
-    scenarios = [
-        ("只读模式（仅查询工具）", [
-            'get_futu_account_info',
-            'get_futu_positions',
-            'get_futu_quote',
-            'get_futu_kline',
-        ]),
-        ("完整交易模式（所有工具）", [
-            'get_futu_account_info',
-            'get_futu_positions',
-            'get_futu_orders',
-            'get_futu_quote',
-            'get_futu_kline',
-            'get_futu_technical_analysis',
-            'place_futu_order',
-            'get_futu_hot_news',
-            'get_futu_hot_stocks',
-            'get_akshare_news',
-            'get_akshare_hot_stocks',
-        ]),
-        ("新闻分析模式（新闻+行情）", [
-            'get_futu_quote',
-            'get_futu_hot_news',
-            'get_akshare_news',
-            'get_akshare_hot_stocks',
-        ]),
-    ]
-    
-    for scenario_name, tool_list in scenarios:
-        print(f"\n{'─' * 80}")
-        print(f"📌 场景: {scenario_name}")
-        print(f"   工具数量: {len(tool_list)}")
-        print('─' * 80)
-        
-        doc = generate_tool_documentation(tool_list)
-        print(doc)
+    print(f"\n{'─' * 80}")
+    print("📌 当前 generate_tool_documentation() 输出所有可用工具")
+    print('─' * 80)
+    print(generate_tool_documentation())
 
 
 def main():
@@ -159,8 +136,7 @@ def main():
     print("\n核心特性:")
     print("  ✓ 所有工具描述使用中文")
     print("  ✓ 系统自动添加变量说明")
-    print("  ✓ 系统自动添加工具使用说明")
-    print("  ✓ 工具说明根据用户选择自动适配")
+    print("  ✓ 系统自动添加全量可用工具说明")
     print("  ✓ 用户只需编辑 Agent 行为配置部分")
     print("\n🚀 系统已完全就绪！")
 
