@@ -14,10 +14,9 @@ def main():
     print("=" * 80)
     
     # Load for a new user (will get default prompt)
-    prompt, tools = load_user_prompt_template(999, 'intraday_trader', 'US')
+    prompt = load_user_prompt_template(999, 'intraday_trader')
     
     print(f"\n✅ Prompt length: {len(prompt)} chars")
-    print(f"✅ Tools count: {len(tools)}")
     
     # Check structure
     print("\n📐 Structure Check:")
@@ -37,40 +36,29 @@ def main():
     # Check that old tool documentation is NOT in user's prompt
     print("\n🔍 Verify Clean Prompt (no tool docs in user section):")
     
-    agent_config_idx = prompt.find("Agent Configuration")
-    if agent_config_idx != -1:
-        user_section = prompt[agent_config_idx:]
-        
-        # These should NOT be in user's section
-        old_patterns = [
-            "get_futu_account_info(market_type=",
-            "call these 3 tools in parallel",
-            "Step 1: Account & Position Overview",
-            "PARALLEL TOOL CALLS",
-        ]
-        
-        clean = True
-        for pattern in old_patterns:
-            if pattern in user_section:
-                print(f"  ✗ Found old pattern: '{pattern[:50]}...'")
-                clean = False
-        
-        if clean:
-            print("  ✓ User section is clean (no tool documentation)")
+    old_patterns = [
+        "Runtime Variables",
+        "Available Tools",
+        "Agent Configuration",
+        "get_futu_account_info(market_type=",
+        "call these 3 tools in parallel",
+        "Step 1: Account & Position Overview",
+        "PARALLEL TOOL CALLS",
+    ]
+    
+    clean = True
+    for pattern in old_patterns:
+        if pattern in prompt:
+            print(f"  ✗ Found old pattern: '{pattern[:50]}...'")
+            clean = False
+    
+    if clean:
+        print("  ✓ Core prompt is clean (no injected system documentation)")
     
     # Show preview of each section
     print("\n📄 Section Previews:")
-    print("\n1. Runtime Variables:")
-    runtime_idx = prompt.find("Runtime Variables")
-    tools_idx = prompt.find("Available Tools")
-    print(prompt[runtime_idx:tools_idx][:300] + "...")
-    
-    print("\n2. Available Tools:")
-    config_idx = prompt.find("Agent Configuration")
-    print(prompt[tools_idx:config_idx][:300] + "...")
-    
-    print("\n3. Agent Configuration (User's Prompt):")
-    print(prompt[config_idx:config_idx+500] + "...")
+    print("\n1. Core Prompt:")
+    print(prompt[:500] + "...")
     
     print("\n" + "=" * 80)
     print("✅ Test Complete!")

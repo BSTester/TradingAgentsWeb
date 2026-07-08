@@ -15,17 +15,16 @@ def test_prompt_loader():
     from web.backend.services.prompt_loader import load_user_prompt_template
     
     # Load prompt
-    prompt = load_user_prompt_template(1, 'intraday_trader', 'US')
+    prompt = load_user_prompt_template(1, 'intraday_trader')
     
     print(f"  ✓ Prompt loaded: {len(prompt)} chars")
     print(f"  ✓ Return type: str")
     
     # Check structure
     checks = [
-        ("Runtime Variables" in prompt, "Variable docs present"),
-        ("Available Tools" in prompt, "Tool docs present"),
-        ("Agent Configuration" in prompt, "User section present"),
-        (prompt.count("get_futu_") >= 7, "Tool documentation included"),
+        ("Runtime Variables" not in prompt, "Variable docs omitted from core prompt"),
+        ("Available Tools" not in prompt, "Tool docs omitted from core prompt"),
+        ("Agent Configuration" not in prompt, "User section wrapper omitted from core prompt"),
     ]
     
     all_passed = True

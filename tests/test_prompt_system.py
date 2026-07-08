@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from web.backend.database import SessionLocal
 from web.backend.models import AgentTool, AgentPromptTemplate, TemplateTools, User
 from tradingagents.agents.utils.tool_registry import get_all_tools_metadata, get_tools_by_names
-from web.backend.services.prompt_loader import load_user_prompt_template
+from web.backend.services.prompt_loader import get_enabled_tools_for_user, load_user_prompt_template
 
 
 def test_database_models():
@@ -107,24 +107,24 @@ def test_prompt_loader():
         
         print(f"\n🧪 Testing with user: {user.username} (ID: {user.id})")
         
-        # Load prompt template
-        prompt, tool_names = load_user_prompt_template(
+        # Load the core prompt only. System docs and runtime context are added
+        # by the agent at execution time.
+        prompt = load_user_prompt_template(
             user_id=user.id,
             agent_type="intraday_trader",
-            market_type="US",
-            session_id="test_session_123"
         )
+        tool_names = get_enabled_tools_for_user(user.id, "intraday_trader")
         
         print(f"\n✅ Loaded prompt template:")
         print(f"   - Prompt length: {len(prompt)} characters")
         print(f"   - Enabled tools: {len(tool_names)}")
         print(f"   - Tools: {', '.join(tool_names[:5])}{'...' if len(tool_names) > 5 else ''}")
         
-        # Check variable injection
-        if "US" in prompt and "test_session_123" in prompt:
-            print(f"\n✅ Variables injected correctly")
+        # Check that system documentation is not pre-injected into the user prompt.
+        if "Runtime Variables" not in prompt and "Available Tools" not in prompt:
+            print(f"\n✅ Core prompt is clean; runtime docs are injected later")
         else:
-            print(f"\n⚠️  Variables may not be injected correctly")
+            print(f"\n⚠️  Core prompt appears to include system documentation")
         
         return True
     except Exception as e:
