@@ -36,3 +36,12 @@
 - Leader 独立复核（2026-07-08）：checkout main，逐项核 diff（service/schemas/openapi/tests）+ 新建 `.venv` 装最小依赖跑 `tests/test_system_default_provider.py` → **6 tests OK**（inactive 400+字符串、credential 缺失字符串 detail、admin/public 摘要含 `has_api_key`/`api_key_masked` 且无明文 `api_key`、`/api/config` 公开摘要、默认唯一切换不泄密）。`git merge --no-ff` → merge commit `d9ae341` 已并入 main，远端分支 `agent/agent/dfdcd22a` 已删除，PR #22 GitHub 标记 MERGED。
 - **B3 契约裁决（Leader，2026-07-08）**：公开摘要暴露 `api_key_masked`（系统默认 KEY 的掩码尾号）**可接受并追认**——系统默认 KEY 为后端共享资源（非用户私有密钥），掩码仅前缀+尾 4（行业惯例），明文永不外泄，满足「系统默认 KEY 不外泄」核心不变量；前端 `SystemDefaultProviderSummary`（WS-31）亦期望该字段以渲染「当前默认」卡片/来源提示。后端 dev 已同步改 openapi，Leader 追认此契约变更。（注：此条与上方 WS-18 备注的「系统默认摘要移除尾号」取向不同——WS-18 是**用户侧**公开摘要，WS-15 此处是**系统默认 provider** 摘要且 KEY 存后端，二者模型不同，不冲突。）
 - WS-15 现状：分支已并入 main，issue 置 `in_review` 待 QA 复测。已解除 WS-31 `blocked`，重新派 QA 基于修复后的 main 复测 story-003 前后端联调；WS-15 待 WS-31 复测通过后置 `done`。WS-14（story-002 后端，PR #19）仍 `in_review` 待处理，本 run 未触及其范围。
+
+## WS-32 仓库分支清理 + prompt_loader 测试对齐（2026-07-07 ~ 2026-07-08）
+
+| Issue | 标题 | 角色 | 分支 | Merge Commit | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| WS-32 | 清理仓库多余分支：删已合并 + 合并 WS-4/WS-15 未整合线 | 运维（清理）+ 后端（整合） | WS-4 `agent/agent/83516268` 权威终态 + WS-15 `agent/agent/73f3fcfd` 等 → 直推 | `0b92016` | ✅ merged to main 2026-07-07（WS-4 内核升级/conversation agent/skills/Docker + WS-15 system-default provider；解冲突保留 WS-11 OpenAI base URL 默认值 + WS-15 provider 字段；无 force-push；冗余远端分支 `d93c5ee8`/`73f3fcfd` 已删；origin 仅剩 `main` + 3 条不在范围的 story 分支） |
+| WS-32 | 对齐 prompt_loader stale 测试到现行 API | 后端 | `agent/agent/f4473be2`（commit `a1193e1`） | `09bb055` | ✅ merged to main 2026-07-08（test-only，生产 API 未动；pytest 29 passed/0 failed；远端分支已删） |
+
+- WS-32 收口（2026-07-08）：① 运维清理已合并分支 + 后端将未整合的 WS-4/WS-15 并入 main（`0b92016`），Leader checkout 复核 + 派 QA 在 `0b92016` 实跑 pytest；② QA 报 5 个失败，Leader 独立比对 `24edec0..0b92016` 确认这 5 个为 prompt/tool API 演进后的历史 stale 测试、非本次集成引入（`test_system_prompt_parameter.py`/`test_tool_documentation.py` 及 `prompt_loader.py` 合入前后未改）；③ 应用户「对齐一下」指示，派后端在 `f4473be2` 把 `tests/` 旧调用对齐到现行 `load_user_prompt_template(user_id, agent_type)->str`、`generate_tool_documentation()->str`（docstring 明示为有意重构：prompt 仅返核心策略、工具文档运行时注入）；④ Leader 独立复核——diff 仅 `tests/`（生产零风险）+ 合并后 main 实跑 `pytest tests` **29 passed/0 failed**，直推合并 `09bb055`、远端分支删除。WS-32 全部目标达成并验证，待用户确认后置 `done`。
