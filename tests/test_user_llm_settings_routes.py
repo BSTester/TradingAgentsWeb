@@ -184,6 +184,7 @@ def test_create_list_and_delete_keep_user_keys_out_and_enforce_single_default(ws
 
     rejected = create_provider(client, provider_name="leaky", api_key="sk-user-secret")
     assert rejected.status_code == 422
+    assert isinstance(rejected.json()["detail"], str)
 
     first_response = create_provider(client, provider_name="openai", is_default=True)
     assert first_response.status_code == 201, first_response.text
@@ -312,3 +313,29 @@ def test_connection_test_updates_validation_state_without_echoing_or_storing_key
     assert provider.last_validation_status == "failed"
     assert provider.last_validated_at is not None
     assert not any("api_key" in column.name for column in UserLLMProviderSetting.__table__.columns)
+
+
+def test_create_provider_requires_provider_type_per_openapi_with_string_detail(ws14_app):
+    client = ws14_app["client"]
+    payload = {
+        "provider_name": "openai",
+        "catalog_provider_id": 10,
+        "display_name": "Alice OpenAI",
+        "base_url": "https://api.openai.com/v1",
+        "shallow_model": "gpt-4o-mini",
+        "deep_model": "gpt-4o",
+    }
+
+    response = client.post("/api/user/llm-settings/providers", json=payload)
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Request validation failed."}
+
+
+def test_create_catalog_provider_missing_catalog_uses_bad_request_detail(ws14_app):
+    client = ws14_app["client"]
+
+    response = create_provider(client, provider_name="missing-catalog", catalog_provider_id=999)
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Catalog provider not found."}
