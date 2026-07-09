@@ -78,18 +78,14 @@ async def start_analysis(
     user_config.last_deep_thinker = request.deep_thinker
     user_config.last_backend_url = request.backend_url
     
-    # Update API key if provided (single field for all providers)
-    if request.api_key:
-        user_config.last_api_key = request.api_key
-    
     await db.commit()
     
     # Invalidate cache after updating user config
     from web.backend.services.user_config_cache import invalidate_user_config_cache
     invalidate_user_config_cache(current_user.id)
     
-    # Use cached API key if not provided in request
-    api_key = request.api_key or user_config.last_api_key
+    # User API keys are request-scoped only. Do not read or write UserConfig.last_api_key.
+    api_key = request.api_key
     
     # Normalize and validate ticker
     ticker = normalize_ticker(request.ticker)
@@ -140,7 +136,7 @@ async def start_analysis(
         shallow_thinker=request.shallow_thinker,
         deep_thinker=request.deep_thinker,
         backend_url=request.backend_url,
-        api_key=api_key,  # Save API key with the task
+        api_key=None,  # User request keys must never be persisted
         is_public=request.is_public,  # Save privacy setting
         email_notification_enabled=request.email_notification,  # Save email notification preference
         status="queued",

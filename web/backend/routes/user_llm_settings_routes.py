@@ -9,7 +9,9 @@ from typing import Any, Dict, Optional
 
 import httpx
 from fastapi import APIRouter, Depends, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,9 +29,31 @@ from web.backend.schemas import (
 )
 
 
-router = APIRouter(prefix="/api/user/llm-settings", tags=["user-llm-settings"])
-
 SENSITIVE_DETAIL_KEYS = {"authorization", "api_key", "apikey", "token", "secret", "password", "key"}
+
+
+class StringValidationErrorRoute(APIRoute):
+    def get_route_handler(self):
+        original_route_handler = super().get_route_handler()
+
+        async def custom_route_handler(request):
+            try:
+                return await original_route_handler(request)
+            except RequestValidationError:
+                return detail_response(status.HTTP_422_UNPROCESSABLE_ENTITY, "Request validation failed.")
+
+        return custom_route_handler
+
+
+router = APIRouter(
+    prefix="/api/user/llm-settings",
+    tags=["user-llm-settings"],
+    route_class=StringValidationErrorRoute,
+)
+
+
+def detail_response(status_code: int, detail: str) -> JSONResponse:
+    return JSONResponse(status_code=status_code, content={"detail": detail})
 
 
 def error_response(status_code: int, code: str, message: str, details: Optional[Dict[str, Any]] = None) -> JSONResponse:
@@ -94,20 +118,14 @@ async def validate_catalog_provider(db: AsyncSession, provider_type: str, catalo
     if provider_type != "catalog" and catalog_provider_id is None:
         return None
     if provider_type == "catalog" and catalog_provider_id is None:
-        return error_response(
+        return detail_response(
             status.HTTP_400_BAD_REQUEST,
-            "VALIDATION_ERROR",
             "catalog_provider_id is required for catalog provider profiles.",
         )
 
     result = await db.execute(select(LLMProvider).where(LLMProvider.id == catalog_provider_id))
     if not result.scalars().first():
-        return error_response(
-            status.HTTP_404_NOT_FOUND,
-            "LLM_PROVIDER_NOT_FOUND",
-            "Catalog provider does not exist.",
-            {"catalog_provider_id": catalog_provider_id},
-        )
+        return detail_response(status.HTTP_400_BAD_REQUEST, "Catalog provider not found.")
     return None
 
 
@@ -314,7 +332,7 @@ async def update_user_llm_provider(
     else:
         update_data = provider_data.dict(exclude_unset=True)
     if not update_data:
-        return error_response(status.HTTP_400_BAD_REQUEST, "VALIDATION_ERROR", "At least one field must be supplied.")
+        return detail_response(status.HTTP_400_BAD_REQUEST, "At least one field must be supplied.")
 
     provider = await get_user_provider(db, current_user.id, provider_id)
     if not provider:

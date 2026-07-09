@@ -68,7 +68,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UserLLMProvider"
         "400":
-          $ref: "#/components/responses/BadRequest"
+          $ref: "#/components/responses/DetailBadRequest"
         "401":
           $ref: "#/components/responses/AuthRequired"
         "409":
@@ -84,7 +84,7 @@ paths:
                       code: USER_LLM_PROVIDER_DUPLICATE
                       message: A provider profile with this provider_name already exists for this user.
         "422":
-          $ref: "#/components/responses/ValidationError"
+          $ref: "#/components/responses/DetailValidationError"
 
   /api/user/llm-settings/providers/{provider_id}:
     parameters:
@@ -115,7 +115,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/UserLLMProvider"
         "400":
-          $ref: "#/components/responses/BadRequest"
+          $ref: "#/components/responses/DetailBadRequest"
         "401":
           $ref: "#/components/responses/AuthRequired"
         "404":
@@ -133,7 +133,7 @@ paths:
                       code: USER_LLM_PROVIDER_DISABLED
                       message: A disabled provider profile cannot be set as default.
         "422":
-          $ref: "#/components/responses/ValidationError"
+          $ref: "#/components/responses/DetailValidationError"
     delete:
       tags:
         - user-llm-settings
@@ -182,13 +182,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/LLMConnectionTestResponse"
         "400":
-          $ref: "#/components/responses/BadRequest"
+          $ref: "#/components/responses/DetailBadRequest"
         "401":
           $ref: "#/components/responses/AuthRequired"
         "404":
           $ref: "#/components/responses/UserProviderNotFound"
         "422":
-          $ref: "#/components/responses/ValidationError"
+          $ref: "#/components/responses/DetailValidationError"
 
   /api/admin/llm/system-default:
     get:
@@ -415,6 +415,36 @@ components:
                 error:
                   code: VALIDATION_ERROR
                   message: Request validation failed.
+    DetailBadRequest:
+      description: The request is syntactically valid but violates business rules.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - detail
+            properties:
+              detail:
+                type: string
+          examples:
+            catalogProviderMissing:
+              value:
+                detail: Catalog provider not found.
+    DetailValidationError:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - detail
+            properties:
+              detail:
+                type: string
+          examples:
+            validation:
+              value:
+                detail: Request validation failed.
     UserProviderNotFound:
       description: The requested user provider metadata does not exist or is not owned by the current user.
       content:
