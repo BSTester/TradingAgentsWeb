@@ -198,13 +198,19 @@ export interface UserLLMSettingsResponse {
   has_legacy_config: boolean; // 旧 UserConfig.last_* 是否仍有值（迁移提示）
 }
 
+// provider_type 取值（后端 openapi ProviderProfileType 枚举）
+export type ProviderProfileType = 'catalog' | 'custom';
+
 // E2 新增 provider 元数据（无 api_key 字段）
+// 依据 backend/openapi.yaml (main) UserLLMProviderCreate：provider_type 为必填字段（BUG-001 修复点）
 export interface CreateUserLLMProviderRequest {
   provider_name: string;
+  provider_type: ProviderProfileType; // 必填，本表单新建的均为用户自定义 provider
   display_name: string;
   base_url: string;
   shallow_model?: string | null;
   deep_model?: string | null;
+  catalog_provider_id?: number | null;
   is_enabled?: boolean;
   is_default?: boolean;
 }

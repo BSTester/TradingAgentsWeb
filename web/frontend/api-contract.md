@@ -153,12 +153,17 @@ export interface UserLLMSettingsResponse {
 **请求体** `CreateUserLLMProviderRequest`（**无 api_key 字段**）
 
 ```ts
+// provider_type 取值（后端 openapi ProviderProfileType 枚举）
+export type ProviderProfileType = 'catalog' | 'custom';
+
 export interface CreateUserLLMProviderRequest {
   provider_name: string;
+  provider_type: ProviderProfileType; // 必填（openapi 校验，缺则 422）—— 本前端新建均为 'custom'
   display_name: string;
   base_url: string;
   shallow_model?: string | null;
   deep_model?: string | null;
+  catalog_provider_id?: number | null;
   is_enabled?: boolean;    // 默认 true
   is_default?: boolean;    // 默认 false；true 时取消其他默认
 }
@@ -167,7 +172,8 @@ export interface CreateUserLLMProviderRequest {
 **响应**
 - `201` → `UserLLMProviderSetting`
 - `400` → 校验失败（如 `provider_name` 为空）
-- `422` → 字段类型/格式错误
+- `409` → provider_name 重复
+- `422` → 字段类型/格式错误（**缺失必填 `provider_type` 即触发，见 BUG-001**）
 
 **契约要点**
 - 创建的是**元数据**；该 provider 的 KEY 由前端在本地 `localStorage` 保存（§2），**不经此接口**。

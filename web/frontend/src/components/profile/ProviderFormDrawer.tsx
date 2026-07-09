@@ -90,7 +90,7 @@ export function ProviderFormDrawer({ provider, onClose, onSuccess }: ProviderFor
     }
     setSaving(true);
     try {
-      const payload = {
+      const basePayload = {
         provider_name: form.provider_name.trim(),
         display_name: form.display_name.trim(),
         base_url: form.base_url.trim(),
@@ -99,9 +99,11 @@ export function ProviderFormDrawer({ provider, onClose, onSuccess }: ProviderFor
         is_enabled: form.is_enabled,
         is_default: form.is_default,
       };
+      // 新建时补齐 openapi UserLLMProviderCreate 必填字段 provider_type（BUG-001 修复）
+      // 编辑走 UserLLMProviderUpdate，无 provider_type 字段，故仅新建时附带。
       const saved = isEdit
-        ? await updateProvider.mutateAsync({ id: provider!.id, body: payload })
-        : await createProvider.mutateAsync(payload);
+        ? await updateProvider.mutateAsync({ id: provider!.id, body: basePayload })
+        : await createProvider.mutateAsync({ ...basePayload, provider_type: 'custom' });
       showToast(isEdit ? 'provider 已更新' : 'provider 已创建', 'success');
       onSuccess(saved);
     } catch (err: any) {
