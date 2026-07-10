@@ -19,7 +19,11 @@ from web.backend.schemas import (
 )
 from web.backend.auth_routes import get_current_active_user
 from web.backend.analysis_task import run_analysis_task
-from web.backend.services.llm_config_resolver import resolve_llm_config
+from web.backend.services.llm_config_resolver import (
+    LLMConfigResolutionError,
+    llm_config_error_response,
+    resolve_llm_config,
+)
 from web.backend.utils.market_detector import normalize_ticker, normalize_ticker_with_suffix, validate_ticker, detect_market
 
 # 这些需要从 app_v2.py 导入
@@ -70,15 +74,23 @@ async def start_analysis(
         user_config = UserConfig(user_id=current_user.id)
         db.add(user_config)
     
-    resolved_llm = await resolve_llm_config(
-        db,
-        user_id=current_user.id,
-        llm_provider=request.llm_provider,
-        backend_url=request.backend_url,
-        shallow_thinker=request.shallow_thinker,
-        deep_thinker=request.deep_thinker,
-        api_key=request.api_key,
-    )
+    request_fields = getattr(request, "model_fields_set", None)
+    if request_fields is None:
+        request_fields = getattr(request, "__fields_set__", set())
+    requested_provider = request.llm_provider if "llm_provider" in request_fields else None
+
+    try:
+        resolved_llm = await resolve_llm_config(
+            db,
+            user_id=current_user.id,
+            llm_provider=requested_provider,
+            backend_url=request.backend_url,
+            shallow_thinker=request.shallow_thinker,
+            deep_thinker=request.deep_thinker,
+            api_key=request.api_key,
+        )
+    except LLMConfigResolutionError as exc:
+        return llm_config_error_response(exc)
 
     # Update configuration cache with the effective non-secret request settings.
     user_config.last_ticker = request.ticker  # 保存股票代码

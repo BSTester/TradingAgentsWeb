@@ -62,8 +62,27 @@ class LLMConfigResolverTests(unittest.IsolatedAsyncioTestCase):
         await self.db.refresh(provider)
         return provider
 
+    async def _catalog_provider(self, provider_name: str) -> LLMProvider:
+        provider = LLMProvider(
+            provider_name=provider_name,
+            display_name=provider_name.title(),
+            base_url=f"https://api.{provider_name}.example/v1",
+            is_active=True,
+            is_default=False,
+        )
+        self.db.add(provider)
+        await self.db.commit()
+        await self.db.refresh(provider)
+        return provider
+
+    def assert_error_code(self, exc: HTTPException, code: str) -> None:
+        self.assertIsInstance(exc.detail, dict)
+        self.assertEqual(exc.detail["error"]["code"], code)
+        self.assertTrue(exc.detail["error"]["message"])
+
     async def test_request_level_key_uses_request_config(self):
         await self._system_default()
+        await self._catalog_provider("deepseek")
 
         resolved = await resolve_llm_config(
             self.db,
@@ -83,12 +102,12 @@ class LLMConfigResolverTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(resolved.api_key, "sk-request")
 
     async def test_missing_key_uses_system_default_when_no_user_provider_matches(self):
-        await self._system_default()
+        system_default = await self._system_default()
 
         resolved = await resolve_llm_config(
             self.db,
             user_id=1,
-            llm_provider="openai",
+            llm_provider=system_default.provider_name,
             backend_url="",
             shallow_thinker="",
             deep_thinker="",
@@ -107,15 +126,15 @@ class LLMConfigResolverTests(unittest.IsolatedAsyncioTestCase):
             await resolve_llm_config(
                 self.db,
                 user_id=1,
-                llm_provider="openai",
+                llm_provider=None,
                 backend_url="",
                 shallow_thinker="",
                 deep_thinker="",
                 api_key=None,
             )
 
-        self.assertEqual(raised.exception.status_code, 400)
-        self.assertIn("系统默认 provider", raised.exception.detail)
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assert_error_code(raised.exception, "SYSTEM_DEFAULT_PROVIDER_NOT_SET")
 
     async def test_explicit_user_provider_without_request_key_does_not_fallback(self):
         await self._system_default()
@@ -145,10 +164,47 @@ class LLMConfigResolverTests(unittest.IsolatedAsyncioTestCase):
                 api_key="",
             )
 
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assert_error_code(raised.exception, "REQUEST_PROVIDER_KEY_REQUIRED")
+
+    async def test_explicit_catalog_provider_without_request_key_does_not_fallback(self):
+        await self._system_default()
+        await self._catalog_provider("deepseek")
+
+        with self.assertRaises(HTTPException) as raised:
+            await resolve_llm_config(
+                self.db,
+                user_id=1,
+                llm_provider="deepseek",
+                backend_url="https://api.deepseek.com/v1",
+                shallow_thinker="deepseek-chat",
+                deep_thinker="deepseek-reasoner",
+                api_key=None,
+            )
+
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assert_error_code(raised.exception, "REQUEST_PROVIDER_KEY_REQUIRED")
+
+    async def test_request_level_key_rejects_unknown_provider(self):
+        await self._system_default()
+
+        with self.assertRaises(HTTPException) as raised:
+            await resolve_llm_config(
+                self.db,
+                user_id=1,
+                llm_provider="ghost",
+                backend_url="https://api.ghost.example/v1",
+                shallow_thinker="ghost-chat",
+                deep_thinker="ghost-reasoner",
+                api_key="sk-request",
+            )
+
         self.assertEqual(raised.exception.status_code, 400)
-        self.assertIn("当前浏览器未随请求提供 KEY", raised.exception.detail)
+        self.assert_error_code(raised.exception, "REQUEST_PROVIDER_INVALID")
 
     async def test_request_level_key_rejects_invalid_base_url(self):
+        await self._system_default()
+
         with self.assertRaises(HTTPException) as raised:
             await resolve_llm_config(
                 self.db,
@@ -161,7 +217,7 @@ class LLMConfigResolverTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(raised.exception.status_code, 400)
-        self.assertIn("base URL 无效", raised.exception.detail)
+        self.assert_error_code(raised.exception, "INVALID_BASE_URL")
 
 
 if __name__ == "__main__":

@@ -15,7 +15,11 @@ from web.backend.auth_routes import get_current_active_user
 from web.backend.database import get_db
 from web.backend.models import AnalysisRecord, ScheduledTask, User
 from web.backend.schemas import ScheduledTaskCreate, ScheduledTaskUpdate
-from web.backend.services.llm_config_resolver import resolve_llm_config
+from web.backend.services.llm_config_resolver import (
+    LLMConfigResolutionError,
+    llm_config_error_response,
+    resolve_llm_config,
+)
 from web.backend.services.report_formatter import report_preview
 from web.backend.services.scheduler_service import get_scheduler_service
 from web.backend.utils.market_detector import detect_market, normalize_ticker, normalize_ticker_with_suffix, validate_ticker
@@ -112,15 +116,18 @@ async def create_scheduled_task(
         beijing_tz = pytz_timezone("Asia/Shanghai")
         end_date_dt = beijing_tz.localize(datetime.strptime(request.end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59))
 
-    resolved_llm = await resolve_llm_config(
-        db,
-        user_id=current_user.id,
-        llm_provider=request.llm_provider,
-        backend_url=request.backend_url,
-        shallow_thinker=request.shallow_thinker,
-        deep_thinker=request.deep_thinker,
-        api_key=request.api_key,
-    )
+    try:
+        resolved_llm = await resolve_llm_config(
+            db,
+            user_id=current_user.id,
+            llm_provider=request.llm_provider,
+            backend_url=request.backend_url,
+            shallow_thinker=request.shallow_thinker,
+            deep_thinker=request.deep_thinker,
+            api_key=request.api_key,
+        )
+    except LLMConfigResolutionError as exc:
+        return llm_config_error_response(exc)
     scheduler_cycle, scheduler_interval_days = _cycle_for_scheduler(request.execution_cycle, request.interval_days)
     scheduled_task = ScheduledTask(
         user_id=current_user.id,
@@ -133,7 +140,7 @@ async def create_scheduled_task(
         shallow_thinker=resolved_llm.shallow_thinker,
         deep_thinker=resolved_llm.deep_thinker,
         backend_url=resolved_llm.backend_url,
-        api_key=resolved_llm.api_key if resolved_llm.source == "request" else None,
+        api_key=None,
         is_public=request.is_public,
         email_notification_enabled=request.email_notification,
         execution_cycle=scheduler_cycle,

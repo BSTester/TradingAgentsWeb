@@ -380,23 +380,37 @@ export interface StartAnalysisRequest {
 
 ## 12. 错误处理约定
 
-统一错误包络（与现有 `apiClient` 解析一致）：
+统一错误包络（与 `backend/openapi.yaml` 的 `ErrorResponse` 一致）：
 
 ```ts
-interface ApiError { detail: string; }   // 不含 KEY 明文
-// 或旧接口 { message: string }；apiClient 已兼容
+interface ApiError {
+  error: {
+    code:
+      | 'SYSTEM_DEFAULT_PROVIDER_NOT_SET'
+      | 'SYSTEM_DEFAULT_PROVIDER_CREDENTIAL_MISSING'
+      | 'REQUEST_PROVIDER_KEY_REQUIRED'
+      | 'REQUEST_PROVIDER_INVALID'
+      | 'INVALID_BASE_URL'
+      | 'LLM_CONFIG_UNRESOLVED'
+      | string;
+    message: string;              // 不含 KEY 明文
+    details?: Record<string, unknown> | null;
+    request_id?: string | null;
+  };
+}
 ```
 
 | HTTP | 场景 | 前端处理 |
 | --- | --- | --- |
-| 400 | 参数非法 / 选了 inactive provider 作默认 / **个人 provider 缺 KEY** | toast `detail`；个人 provider 缺 KEY 时提示「请补充本浏览器 KEY 或切到系统默认」 |
+| 400 | 参数非法 / 请求级 provider 非法 / base URL 非法 | toast `error.message`；`REQUEST_PROVIDER_INVALID` 时提示刷新 provider 列表或切换 provider |
 | 401 | 未登录 / token 失效 | 跳转登录 |
 | 403 | 非管理员调 E7 | 提示无权限 |
 | 404 | 配置 / provider 不存在 | toast；刷新列表 |
+| 409 | **个人 provider 缺 KEY** / 系统默认未配置或不可用 | toast `error.message`；个人 provider 缺 KEY 时提示「请补充本浏览器 KEY 或切到系统默认」 |
 | 422 | 请求体字段校验失败 | 表单字段级报错 |
 | 429 | 限流（测试连接高频） | toast「操作过于频繁」 |
 
-**关键约束**：用户显式选择了一个个人 provider 却未下发 KEY（本地无、也未一次性输入）时，后端返回 4xx，前端提示补充或切换系统默认（§7 关键约束、需求 §7）。
+**关键约束**：用户显式选择了一个个人 provider 却未下发 KEY（本地无、也未一次性输入）时，后端返回 `REQUEST_PROVIDER_KEY_REQUIRED`，前端提示补充或切换系统默认（§7 关键约束、需求 §7）。请求级 provider 不在用户 provider 或后端 active catalog provider 集合内时，后端返回 `REQUEST_PROVIDER_INVALID`，不得启动分析或静默兜底。
 
 ---
 
