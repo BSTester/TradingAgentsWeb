@@ -61,3 +61,15 @@
 - Leader 合并 + main smoke（2026-07-10）：checkout main，两分支均含 main 为祖先（rebase 干净）→ `git merge --no-ff` 先后端后前端，**无冲突**（13 + 21 文件，文件集基本不相交：`backend/` + `tests/` vs `web/frontend/`）→ push `lead/ws44-story002-merge:main`（fast-forward `e6cc967..c214e1c`，无 force）。main smoke：① 合并树静态校验——工作树干净、新模块 `py_compile` OK、`backend/openapi.yaml` 合法 YAML 且含 E1–E5（`/api/user/llm-settings` CRUD + `/providers/{id}/test`）、前端 story-002 文件齐全；② 后端 scoped `pytest tests/test_user_llm_settings_routes.py tests/test_analysis_key_persistence.py` 在最小 venv 实跑 **7 passed**（与 dev/QA 一致；中途 pytz/email-validator 缺失为本机 venv 环境问题、补装即过，非代码缺陷）；③ 前端树 == QA 已验收 tip `bfad2de`（合并未改前端字节），重跑需完整 Next.js 工具链（本 ARM 主机不便），沿用 QA 的 33 vitest + build + UI harness pass。
 - 分支清理：rebase 分支 `a291727a-backend`/`a291727a-1783675413` 已并入 main；**删除属破坏性操作**，原分支与 rebase 分支的删/留按 WS-44 约定待 Penn 确认后再处理（本轮不删）。
 - **WS-44、WS-45、WS-46 置 `done`。** story-002 前后端闭环并入 main；story-004（WS-16）/ story-005（WS-17）的前置依赖 story-002 就绪。
+
+## WS-54 · story-004（分析与定时任务使用有效 LLM 配置）合并（2026-07-11）
+
+| Issue | 标题 | 角色 | 分支 | PR | Merge Commit | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| WS-16 | [story-004] 分析与定时任务使用有效 LLM 配置 | 全栈 | `agent/agent/0b038b92`@`c2c6852` | [#23](https://github.com/BSTester/TradingAgentsWeb/pull/23) | `6afdc20` | ✅ merged to main 2026-07-11（QA conditional pass） |
+| WS-54 | [WS-16/QA] story-004 有效 LLM 配置 e2e 验收 | QA | 复验 `origin/agent/agent/0b038b92`@`c2c6852` | — | — | ✅ 第二轮复验 conditional pass，分支可由 Leader 合并 |
+
+- QA 复验（WS-54，2026-07-11）：第二轮复验仅覆盖 `2ff9031..c2c6852` 返工 diff。后端指定测试 10 passed；前端 LLM key 相关 21 passed；前端全量 Vitest 33 passed；API 契约 harness 9 用例全过（覆盖 `SYSTEM_DEFAULT_PROVIDER_NOT_SET` / `REQUEST_PROVIDER_KEY_REQUIRED` / `REQUEST_PROVIDER_INVALID` / `INVALID_BASE_URL`、请求 KEY 优先级、不静默兜底、定时任务不持久化一次性 KEY）。上轮 3 个阻断缺陷均修复：BUG-WS54-001（错误响应改稳定结构 `{ error: { code, message, details, request_id } }`）、BUG-WS54-002（非法 provider→`REQUEST_PROVIDER_INVALID`、显式 provider 缺 KEY→`REQUEST_PROVIDER_KEY_REQUIRED`、均不静默兜底）、BUG-WS54-003（新建定时任务后 `ScheduledTask.api_key` 保持 NULL）。
+- Leader 合并（2026-07-11）：checkout main（`feab0a6`）；特性分支 `origin/agent/agent/0b038b92`@`c2c6852`，merge-base = `feab0a6` = main HEAD（main 完全包含于特性分支，干净 fast-forward 拓扑）→ `git merge --no-ff`，**无冲突**（11 文件：新增 `web/backend/services/llm_config_resolver.py` + 改 `app.py`/`analysis_routes.py`/`scheduled_task_routes.py`/`task_executor.py` + 前端 `AnalysisConfigForm.tsx`/`api-contract.md` + 后端/前端测试 + `fullstack/issues/WS-16/{api-contract.md,openapi.yaml}`）→ merge commit `6afdc20`（parents `feab0a6` + `c2c6852`）→ push `HEAD:main`（fast-forward `feab0a6..6afdc20`，无 force）→ 删远端分支 `agent/agent/0b038b92`，PR [#23](https://github.com/BSTester/TradingAgentsWeb/pull/23) 标 MERGED。
+- 已知风险：`npm run typecheck` 仍失败，但报错文件不在 `2ff9031..c2c6852` 返工 diff 内，按既有基线构建风险记录，**不阻断** story-004 合并（QA 裁决）。本轮未做浏览器 E2E（插件不可用），结论基于单测 + 契约 harness + 源码归因。
+- story-004 前后端闭环并入 main；BUG-WS31-002（普通用户分析表单未展示系统默认来源）随 story-004 一并修复；`UserConfig.last_api_key` 不再作为正式优先级来源（迁移留 story-005/WS-17）。issue 状态变更不在本触发评论范围内，未自行改动 WS-16/WS-54 状态。
