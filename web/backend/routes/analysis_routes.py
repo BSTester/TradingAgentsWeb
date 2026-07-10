@@ -19,6 +19,7 @@ from web.backend.schemas import (
 )
 from web.backend.auth_routes import get_current_active_user
 from web.backend.analysis_task import run_analysis_task
+from web.backend.services.llm_config_resolver import resolve_llm_config
 from web.backend.utils.market_detector import normalize_ticker, normalize_ticker_with_suffix, validate_ticker, detect_market
 
 # 这些需要从 app_v2.py 导入
@@ -69,23 +70,30 @@ async def start_analysis(
         user_config = UserConfig(user_id=current_user.id)
         db.add(user_config)
     
-    # Update configuration cache with current request
+    resolved_llm = await resolve_llm_config(
+        db,
+        user_id=current_user.id,
+        llm_provider=request.llm_provider,
+        backend_url=request.backend_url,
+        shallow_thinker=request.shallow_thinker,
+        deep_thinker=request.deep_thinker,
+        api_key=request.api_key,
+    )
+
+    # Update configuration cache with the effective non-secret request settings.
     user_config.last_ticker = request.ticker  # 保存股票代码
     user_config.last_analysts = request.analysts
     user_config.last_research_depth = request.research_depth
-    user_config.last_llm_provider = request.llm_provider
-    user_config.last_shallow_thinker = request.shallow_thinker
-    user_config.last_deep_thinker = request.deep_thinker
-    user_config.last_backend_url = request.backend_url
+    user_config.last_llm_provider = resolved_llm.llm_provider
+    user_config.last_shallow_thinker = resolved_llm.shallow_thinker
+    user_config.last_deep_thinker = resolved_llm.deep_thinker
+    user_config.last_backend_url = resolved_llm.backend_url
     
     await db.commit()
     
     # Invalidate cache after updating user config
     from web.backend.services.user_config_cache import invalidate_user_config_cache
     invalidate_user_config_cache(current_user.id)
-    
-    # User API keys are request-scoped only. Do not read or write UserConfig.last_api_key.
-    api_key = request.api_key
     
     # Normalize and validate ticker
     ticker = normalize_ticker(request.ticker)
@@ -132,10 +140,10 @@ async def start_analysis(
         analysis_date=request.analysis_date,
         analysts=request.analysts,
         research_depth=request.research_depth,
-        llm_provider=request.llm_provider,
-        shallow_thinker=request.shallow_thinker,
-        deep_thinker=request.deep_thinker,
-        backend_url=request.backend_url,
+        llm_provider=resolved_llm.llm_provider,
+        shallow_thinker=resolved_llm.shallow_thinker,
+        deep_thinker=resolved_llm.deep_thinker,
+        backend_url=resolved_llm.backend_url,
         api_key=None,  # User request keys must never be persisted
         is_public=request.is_public,  # Save privacy setting
         email_notification_enabled=request.email_notification,  # Save email notification preference
@@ -154,11 +162,11 @@ async def start_analysis(
         'analysis_date': request.analysis_date,
         'analysts': request.analysts,
         'research_depth': request.research_depth,
-        'llm_provider': request.llm_provider,
-        'shallow_thinker': request.shallow_thinker,
-        'deep_thinker': request.deep_thinker,
-        'backend_url': request.backend_url,
-        'api_key': api_key,  # Single API key field
+        'llm_provider': resolved_llm.llm_provider,
+        'shallow_thinker': resolved_llm.shallow_thinker,
+        'deep_thinker': resolved_llm.deep_thinker,
+        'backend_url': resolved_llm.backend_url,
+        'api_key': resolved_llm.api_key,
     }
     
     # Submit task to task manager

@@ -1,0 +1,149 @@
+openapi: 3.0.3
+info:
+  title: WS-16 Effective LLM Resolution
+  version: 1.0.0
+paths:
+  /api/analyze:
+    post:
+      summary: Start analysis with centrally resolved LLM configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalysisRequest"
+      responses:
+        "200":
+          description: Analysis accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResponse"
+        "400":
+          description: Invalid or unavailable LLM configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/scheduled-tasks:
+    post:
+      summary: Create a scheduled task with centrally resolved LLM configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduledTaskCreate"
+      responses:
+        "201":
+          description: Scheduled task created
+        "400":
+          description: Invalid or unavailable LLM configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    EffectiveLLMFields:
+      type: object
+      required:
+        - llm_provider
+        - backend_url
+        - shallow_thinker
+        - deep_thinker
+      properties:
+        llm_provider:
+          type: string
+        backend_url:
+          type: string
+          format: uri
+        shallow_thinker:
+          type: string
+        deep_thinker:
+          type: string
+        api_key:
+          type: string
+          nullable: true
+          description: Request-scoped key from localStorage or one-time input.
+    AnalysisRequest:
+      allOf:
+        - $ref: "#/components/schemas/EffectiveLLMFields"
+        - type: object
+          required:
+            - ticker
+            - analysis_date
+            - analysts
+            - research_depth
+          properties:
+            ticker:
+              type: string
+            analysis_date:
+              type: string
+              format: date
+            analysts:
+              type: array
+              items:
+                type: string
+            research_depth:
+              type: integer
+            is_public:
+              type: boolean
+            email_notification:
+              type: boolean
+    ScheduledTaskCreate:
+      allOf:
+        - $ref: "#/components/schemas/EffectiveLLMFields"
+        - type: object
+          required:
+            - task_name
+            - ticker
+            - analysts
+            - research_depth
+            - execution_cycle
+            - execution_time
+          properties:
+            task_name:
+              type: string
+            ticker:
+              type: string
+            analysts:
+              type: array
+              items:
+                type: string
+            research_depth:
+              type: integer
+            execution_cycle:
+              type: string
+            execution_time:
+              type: string
+            interval_days:
+              type: integer
+              nullable: true
+            day_of_week:
+              type: string
+              nullable: true
+            end_date:
+              type: string
+              format: date
+              nullable: true
+    AnalysisResponse:
+      type: object
+      required:
+        - analysis_id
+        - status
+      properties:
+        analysis_id:
+          type: string
+        status:
+          type: string
+        message:
+          type: string
+          nullable: true
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string

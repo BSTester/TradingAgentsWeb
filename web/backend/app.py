@@ -229,17 +229,16 @@ async def cleanup_running_tasks():
                 restored_count = 0
                 for task in queued_tasks:
                     try:
-                        # 优先使用任务中保存的 API 密钥，如果没有则从用户配置中读取（兜底）
-                        api_key = task.api_key
-                        
-                        if not api_key:
-                            # 兜底：从用户配置中读取
-                            from web.backend.models import UserConfig
-                            user_config_result = await db.execute(
-                                select(UserConfig).where(UserConfig.user_id == task.user_id)
-                            )
-                            user_config = user_config_result.scalars().first()
-                            api_key = user_config.last_api_key if user_config else ''
+                        from web.backend.services.llm_config_resolver import resolve_llm_config
+                        resolved_llm = await resolve_llm_config(
+                            db,
+                            user_id=task.user_id,
+                            llm_provider=task.llm_provider,
+                            backend_url=task.backend_url,
+                            shallow_thinker=task.shallow_thinker,
+                            deep_thinker=task.deep_thinker,
+                            api_key=task.api_key,
+                        )
                         
                         # 准备请求数据（严格使用任务保存的配置）
                         request_data = {
@@ -247,11 +246,11 @@ async def cleanup_running_tasks():
                             'analysis_date': task.analysis_date,
                             'analysts': task.analysts if task.analysts else [],
                             'research_depth': task.research_depth or 1,
-                            'llm_provider': task.llm_provider or 'openai',
-                            'deep_thinker': task.deep_thinker or 'gpt-4o',
-                            'shallow_thinker': task.shallow_thinker or 'gpt-4o-mini',
-                            'api_key': api_key,  # 优先任务配置，兜底用户配置
-                            'backend_url': task.backend_url or '',
+                            'llm_provider': resolved_llm.llm_provider,
+                            'deep_thinker': resolved_llm.deep_thinker,
+                            'shallow_thinker': resolved_llm.shallow_thinker,
+                            'api_key': resolved_llm.api_key,
+                            'backend_url': resolved_llm.backend_url,
                         }
                         
                         # 提交任务到任务管理器

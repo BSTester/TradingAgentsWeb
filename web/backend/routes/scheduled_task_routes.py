@@ -11,11 +11,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tradingagents.default_config import DEFAULT_CONFIG
 from web.backend.auth_routes import get_current_active_user
 from web.backend.database import get_db
-from web.backend.models import AnalysisRecord, ScheduledTask, User, UserConfig
+from web.backend.models import AnalysisRecord, ScheduledTask, User
 from web.backend.schemas import ScheduledTaskCreate, ScheduledTaskUpdate
+from web.backend.services.llm_config_resolver import resolve_llm_config
 from web.backend.services.report_formatter import report_preview
 from web.backend.services.scheduler_service import get_scheduler_service
 from web.backend.utils.market_detector import detect_market, normalize_ticker, normalize_ticker_with_suffix, validate_ticker
@@ -112,9 +112,15 @@ async def create_scheduled_task(
         beijing_tz = pytz_timezone("Asia/Shanghai")
         end_date_dt = beijing_tz.localize(datetime.strptime(request.end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59))
 
-    config_result = await db.execute(select(UserConfig).where(UserConfig.user_id == current_user.id))
-    user_config = config_result.scalars().first()
-    api_key = request.api_key or (user_config.last_api_key if user_config else "")
+    resolved_llm = await resolve_llm_config(
+        db,
+        user_id=current_user.id,
+        llm_provider=request.llm_provider,
+        backend_url=request.backend_url,
+        shallow_thinker=request.shallow_thinker,
+        deep_thinker=request.deep_thinker,
+        api_key=request.api_key,
+    )
     scheduler_cycle, scheduler_interval_days = _cycle_for_scheduler(request.execution_cycle, request.interval_days)
     scheduled_task = ScheduledTask(
         user_id=current_user.id,
@@ -123,11 +129,11 @@ async def create_scheduled_task(
         market=market,
         analysts=request.analysts,
         research_depth=request.research_depth,
-        llm_provider=request.llm_provider or DEFAULT_CONFIG["llm_provider"],
-        shallow_thinker=request.shallow_thinker or DEFAULT_CONFIG["quick_think_llm"],
-        deep_thinker=request.deep_thinker or DEFAULT_CONFIG["deep_think_llm"],
-        backend_url=request.backend_url or DEFAULT_CONFIG["backend_url"],
-        api_key=api_key,
+        llm_provider=resolved_llm.llm_provider,
+        shallow_thinker=resolved_llm.shallow_thinker,
+        deep_thinker=resolved_llm.deep_thinker,
+        backend_url=resolved_llm.backend_url,
+        api_key=resolved_llm.api_key if resolved_llm.source == "request" else None,
         is_public=request.is_public,
         email_notification_enabled=request.email_notification,
         execution_cycle=scheduler_cycle,
