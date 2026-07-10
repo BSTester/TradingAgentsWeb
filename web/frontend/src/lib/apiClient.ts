@@ -5,7 +5,6 @@ import type {
   AdminLLMProvider,
   AppConfigWithSystemDefault,
   CreateUserLLMProviderRequest,
-  SetSystemDefaultRequest,
   SystemDefaultProviderSummary,
   TestUserLLMProviderRequest,
   TestUserLLMProviderResponse,
@@ -728,22 +727,6 @@ export const llmSettingsAPI = {
         error.response?.data?.message ||
         error.message ||
         '测试连接失败';
-      throw new Error(errorMessage);
-    }
-  },
-};
-
-// Admin system default provider API (需要认证) — 后端 KEY，仅脱敏摘要
-export const adminDefaultProviderAPI = {
-  setSystemDefault: async (body: SetSystemDefaultRequest): Promise<SystemDefaultProviderSummary> => {
-    try {
-      const response = await apiClient.put<SystemDefaultProviderSummary>('/api/admin/llm/system-default', body);
-      return response.data;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail ||
-        error.response?.data?.message ||
-        error.message ||
-        '设置系统默认 provider 失败';
       throw new Error(errorMessage);
     }
   },
