@@ -47,3 +47,17 @@
 | WS-32 | 对齐 prompt_loader stale 测试到现行 API | 后端 | `agent/agent/f4473be2`（commit `a1193e1`） | `09bb055` | ✅ merged to main 2026-07-08（test-only，生产 API 未动；pytest 29 passed/0 failed；远端分支已删） |
 
 - WS-32 收口（2026-07-08）：① 运维清理已合并分支 + 后端将未整合的 WS-4/WS-15 并入 main（`0b92016`），Leader checkout 复核 + 派 QA 在 `0b92016` 实跑 pytest；② QA 报 5 个失败，Leader 独立比对 `24edec0..0b92016` 确认这 5 个为 prompt/tool API 演进后的历史 stale 测试、非本次集成引入（`test_system_prompt_parameter.py`/`test_tool_documentation.py` 及 `prompt_loader.py` 合入前后未改）；③ 应用户「对齐一下」指示，派后端在 `f4473be2` 把 `tests/` 旧调用对齐到现行 `load_user_prompt_template(user_id, agent_type)->str`、`generate_tool_documentation()->str`（docstring 明示为有意重构：prompt 仅返核心策略、工具文档运行时注入）；④ Leader 独立复核——diff 仅 `tests/`（生产零风险）+ 合并后 main 实跑 `pytest tests` **29 passed/0 failed**，直推合并 `09bb055`、远端分支删除。WS-32 全部目标达成并验证，待用户确认后置 `done`。
+
+## WS-44 / WS-45 / WS-46 · story-002（用户自定义 LLM provider / 本地 KEY 管理）合并（2026-07-10）
+
+| Issue | 标题 | 角色 | 分支 | Merge Commit | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| WS-45 | [story-002] rebase 前后端两分支到最新 main 并跑测试 | 全栈 | 后端 `agent/agent/a291727a-backend`@`f451069` + 前端 `agent/agent/a291727a-1783675413`@`bfad2de` | — | ✅ rebase done（Leader 复核） |
+| WS-46 | [WS-44/QA] story-002 端到端验收 | QA | rebase 后两分支 + `qa/ws46-story002-combined` 集成装配 | — | ✅ conditional pass，无阻塞缺陷 |
+| WS-44 | TradingAgentsWeb：评估处理两个未合并功能分支 | Leader | 后端 `a291727a-backend` + 前端 `a291727a-1783675413` → `--no-ff` 并入 main | `c1f456f`(后端) + `c214e1c`(前端) | ✅ merged to main 2026-07-10（fast-forward 推送 `e6cc967..c214e1c`，无 force） |
+
+- 评估结论（WS-44）：两分支是 story-002 实现、功能仍需，**保留 + rebase 合并**（非删除）。原分支 `agent/agent/1fecec46`（前端 WS-30）+ `agent/agent/323e9974`（后端 WS-14）基于旧 main（落后 190 提交），经 WS-45 rebase 到最新 main、冲突按加性并集解决、未改 main 权威契约、保留 BUG-001 与 key-persistence fix，推送 rebase 后新分支 `a291727a-backend`/`a291727a-1783675413`；原分支留作备份。
+- QA（WS-46）：后端 scoped `pytest` 7 passed、前端 `vitest` 33 passed + `npm run build` 通过、Chromium UI harness 通过（provider 列表 / 本地 KEY save·replace·clear / `/test` 临时 KEY / `provider_type=custom` 无 `api_key` / set-default PATCH / 删本地 KEY 清理）。裁决 **conditional pass**，无 story-002 阻塞缺陷；final release 须等 Leader 合并两分支 + main smoke 通过。
+- Leader 合并 + main smoke（2026-07-10）：checkout main，两分支均含 main 为祖先（rebase 干净）→ `git merge --no-ff` 先后端后前端，**无冲突**（13 + 21 文件，文件集基本不相交：`backend/` + `tests/` vs `web/frontend/`）→ push `lead/ws44-story002-merge:main`（fast-forward `e6cc967..c214e1c`，无 force）。main smoke：① 合并树静态校验——工作树干净、新模块 `py_compile` OK、`backend/openapi.yaml` 合法 YAML 且含 E1–E5（`/api/user/llm-settings` CRUD + `/providers/{id}/test`）、前端 story-002 文件齐全；② 后端 scoped `pytest tests/test_user_llm_settings_routes.py tests/test_analysis_key_persistence.py` 在最小 venv 实跑 **7 passed**（与 dev/QA 一致；中途 pytz/email-validator 缺失为本机 venv 环境问题、补装即过，非代码缺陷）；③ 前端树 == QA 已验收 tip `bfad2de`（合并未改前端字节），重跑需完整 Next.js 工具链（本 ARM 主机不便），沿用 QA 的 33 vitest + build + UI harness pass。
+- 分支清理：rebase 分支 `a291727a-backend`/`a291727a-1783675413` 已并入 main；**删除属破坏性操作**，原分支与 rebase 分支的删/留按 WS-44 约定待 Penn 确认后再处理（本轮不删）。
+- **WS-44、WS-45、WS-46 置 `done`。** story-002 前后端闭环并入 main；story-004（WS-16）/ story-005（WS-17）的前置依赖 story-002 就绪。
