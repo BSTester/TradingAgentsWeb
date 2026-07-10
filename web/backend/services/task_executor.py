@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from web.backend.database import SessionLocal
 from web.backend.models import ScheduledTask, AnalysisRecord
+from web.backend.services.llm_config_resolver import resolve_llm_config_sync
 
 
 def execute_scheduled_task(scheduled_task_id: int):
@@ -82,15 +83,25 @@ def execute_scheduled_task(scheduled_task_id: int):
         if not user_config:
             user_config = UserConfig(user_id=task.user_id)
             db.add(user_config)
+
+        resolved_llm = resolve_llm_config_sync(
+            db,
+            user_id=task.user_id,
+            llm_provider=task.llm_provider,
+            backend_url=task.backend_url,
+            shallow_thinker=task.shallow_thinker,
+            deep_thinker=task.deep_thinker,
+            api_key=task.api_key,
+        )
         
         # Cache configuration from scheduled task
         user_config.last_ticker = task.ticker
         user_config.last_analysts = task.analysts
         user_config.last_research_depth = task.research_depth
-        user_config.last_llm_provider = task.llm_provider
-        user_config.last_shallow_thinker = task.shallow_thinker
-        user_config.last_deep_thinker = task.deep_thinker
-        user_config.last_backend_url = task.backend_url
+        user_config.last_llm_provider = resolved_llm.llm_provider
+        user_config.last_shallow_thinker = resolved_llm.shallow_thinker
+        user_config.last_deep_thinker = resolved_llm.deep_thinker
+        user_config.last_backend_url = resolved_llm.backend_url
         
         db.commit()
         print(f"✅ Updated user configuration cache for user {task.user_id}")
@@ -116,11 +127,11 @@ def execute_scheduled_task(scheduled_task_id: int):
             analysis_date=now_beijing.strftime('%Y-%m-%d'),
             analysts=task.analysts,
             research_depth=task.research_depth,
-            llm_provider=task.llm_provider,
-            shallow_thinker=task.shallow_thinker,
-            deep_thinker=task.deep_thinker,
-            backend_url=task.backend_url,
-            api_key=task.api_key,  # Copy API key from scheduled task
+            llm_provider=resolved_llm.llm_provider,
+            shallow_thinker=resolved_llm.shallow_thinker,
+            deep_thinker=resolved_llm.deep_thinker,
+            backend_url=resolved_llm.backend_url,
+            api_key=None,
             is_public=task.is_public,
             email_notification_enabled=task.email_notification_enabled,  # Copy email notification setting
             status="queued"
@@ -133,19 +144,16 @@ def execute_scheduled_task(scheduled_task_id: int):
         from web.backend.analysis_task import run_analysis_task
         from web.backend.app import manager as websocket_manager
         
-        # Use API key from scheduled task, fallback to user config if not available
-        api_key = task.api_key or (user_config.last_api_key if user_config else '')
-        
         request_data = {
             'ticker': task.ticker,
             'analysts': task.analysts,
             'research_depth': task.research_depth,
-            'llm_provider': task.llm_provider,
-            'backend_url': task.backend_url,
-            'shallow_thinker': task.shallow_thinker,
-            'deep_thinker': task.deep_thinker,
+            'llm_provider': resolved_llm.llm_provider,
+            'backend_url': resolved_llm.backend_url,
+            'shallow_thinker': resolved_llm.shallow_thinker,
+            'deep_thinker': resolved_llm.deep_thinker,
             'analysis_date': now_beijing.strftime('%Y-%m-%d'),
-            'api_key': api_key,  # Use task's API key, fallback to user config
+            'api_key': resolved_llm.api_key,
         }
         
         # Submit task (task_manager handles user-level queuing)

@@ -6,8 +6,8 @@ import { normalizeTicker, validateTicker, getTickerErrorMessage } from '@/utils/
 import { ScheduleConfig, ScheduleData } from './ScheduleConfig';
 import { useUserConfig } from '@/hooks/useUserConfig';
 import { useAuth } from '@/lib/auth';
-import { useIsMobile } from '@/hooks/useMediaQuery';
 import { useLocalLLMKeys } from '@/hooks/useLocalLLMKeys';
+import { useUserLLMSettings } from '@/hooks/useUserLLMSettings';
 
 interface AnalysisConfigFormProps {
   config: any;
@@ -61,8 +61,8 @@ interface AnalysisResponse {
 export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: AnalysisConfigFormProps) {
   const { token } = useAuth();
   const { config: userConfig, loading: configLoading } = useUserConfig(token);
-  const { getLocalKey, hasLocalKey } = useLocalLLMKeys();
-  const isMobile = useIsMobile();
+  const { data: llmSettings, isLoading: llmSettingsLoading } = useUserLLMSettings();
+  const { getLocalKey, hasLocalKey, saveLocalKey } = useLocalLLMKeys();
   
   const [formData, setFormData] = useState<FormData>({
     ticker: '',
@@ -81,6 +81,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
   const [apiKeyValidated, setApiKeyValidated] = useState(false);
   const [validatingKey, setValidatingKey] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [saveApiKeyToBrowser, setSaveApiKeyToBrowser] = useState(false);
   const [tickerError, setTickerError] = useState<string>('');
   const [showPrivacyDialog, setShowPrivacyDialog] = useState(false);
 
@@ -112,8 +113,23 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     end_date: ''
   });
 
-  // 检查当前选择的LLM提供商是否需要API密钥
+  const enabledUserProviders = (llmSettings?.providers || []).filter((provider: any) => provider.is_enabled);
+  const defaultUserProvider =
+    enabledUserProviders.find((provider: any) => String(provider.id) === String(llmSettings?.default_provider_id)) ||
+    enabledUserProviders.find((provider: any) => provider.is_default) ||
+    enabledUserProviders[0] ||
+    null;
+  const selectedUserProvider =
+    enabledUserProviders.find((provider: any) => provider.provider_name === formData.llm_provider) || null;
+  const systemDefault = config?.system_default || null;
+  const isUsingSystemDefault =
+    !selectedUserProvider &&
+    !!systemDefault?.provider_name &&
+    systemDefault.provider_name === formData.llm_provider;
+
+  // 检查当前选择的LLM提供商是否需要用户 API 密钥；系统默认使用后端 KEY，不要求用户输入
   const requiresApiKey = formData.llm_provider && formData.llm_provider !== 'ollama';
+  const requiresUserApiKey = !!requiresApiKey && !isUsingSystemDefault;
 
   // 当前 provider 在本地浏览器是否已有保存的 KEY（不回显明文）
   const localKeyForProvider =
@@ -124,6 +140,12 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
   // 是否提供了可用 KEY：本地已存 / 一次性输入 / 已手动验证
   const apiKeyProvided = apiKeyValidated || !!localKeyForProvider || !!formData.api_key.trim();
 
+  const effectiveBackendUrl =
+    selectedUserProvider?.base_url ||
+    (isUsingSystemDefault ? systemDefault?.base_url : '') ||
+    config?.llm_providers?.find((p: any) => p.value === formData.llm_provider)?.url ||
+    '';
+
   // 从服务器加载配置（只加载一次）
   const [configLoaded, setConfigLoaded] = useState(false);
   
@@ -131,29 +153,42 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     // 防止重复加载
     if (configLoaded) return;
     
-    if (userConfig && !configLoading) {
+    if ((configLoading || llmSettingsLoading) && !configLoaded) return;
+
+    if ((userConfig || llmSettings || config) && !configLoaded) {
       console.log('📋 加载用户配置:', userConfig);
+      const initialProvider = defaultUserProvider?.provider_name || systemDefault?.provider_name || userConfig?.last_llm_provider || '';
+      const initialShallow =
+        defaultUserProvider?.shallow_model ||
+        systemDefault?.shallow_model ||
+        userConfig?.last_shallow_thinker ||
+        '';
+      const initialDeep =
+        defaultUserProvider?.deep_model ||
+        systemDefault?.deep_model ||
+        userConfig?.last_deep_thinker ||
+        '';
       
       // 加载服务端缓存的配置（注意：服务端不再返回用户明文 API KEY，KEY 仅存前端 localStorage）
       setFormData(prev => ({
         ...prev,
-        ticker: userConfig.last_ticker || '',  // 加载最后的股票代码
-        analysts: userConfig.last_analysts || ['market', 'social', 'news', 'fundamentals'],
-        research_depth: userConfig.last_research_depth || 1,
-        llm_provider: userConfig.last_llm_provider || '',
-        shallow_thinker: userConfig.last_shallow_thinker || '',
-        deep_thinker: userConfig.last_deep_thinker || '',
+        ticker: userConfig?.last_ticker || '',  // 加载最后的股票代码
+        analysts: userConfig?.last_analysts || ['market', 'social', 'news', 'fundamentals'],
+        research_depth: userConfig?.last_research_depth || 1,
+        llm_provider: initialProvider,
+        shallow_thinker: initialShallow,
+        deep_thinker: initialDeep,
         // api_key 不回填（安全约束：不回显明文 KEY，不把 KEY 写回后端/缓存）
         analysis_date: new Date().toISOString().split('T')[0] || ''
       }));
       
       // 加载执行交易配置
-      setEnableTradingExecutor(userConfig.enable_trading_executor || false);
-      setFutuApiBaseUrl(userConfig.futu_api_base_url || '');
-      setFutuApiKey(userConfig.futu_api_key || '');
+      setEnableTradingExecutor(userConfig?.enable_trading_executor || false);
+      setFutuApiBaseUrl(userConfig?.futu_api_base_url || '');
+      setFutuApiKey(userConfig?.futu_api_key || '');
       
       // 如果有富途 API 配置，设置为已验证
-      if (userConfig.enable_trading_executor && userConfig.futu_api_base_url && userConfig.futu_api_key) {
+      if (userConfig?.enable_trading_executor && userConfig?.futu_api_base_url && userConfig?.futu_api_key) {
         setFutuApiValidated(true);
         console.log('✅ 富途 API 已验证（从缓存）');
       }
@@ -161,7 +196,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       console.log('✅ 配置加载完成');
       setConfigLoaded(true);
       onShowToast('已加载上次配置', 'info');
-    } else if (!configLoading && !userConfig && !configLoaded) {
+    } else if (!configLoading && !llmSettingsLoading && !userConfig && !configLoaded) {
       // 如果没有配置，设置默认值
       console.log('⚠️ 未找到用户配置，使用默认值');
       setFormData(prev => ({
@@ -170,7 +205,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       }));
       setConfigLoaded(true);
     }
-  }, [userConfig, configLoading, configLoaded, onShowToast]);
+  }, [userConfig, configLoading, llmSettingsLoading, llmSettings, config, configLoaded, defaultUserProvider, systemDefault, onShowToast]);
 
   const availableAnalysts: Analyst[] = config?.analysts || [
     { value: 'market', label: '市场分析师', description: '分析市场趋势和技术指标' },
@@ -195,6 +230,12 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     { value: 'oneai', label: 'OneAI', description: '多模型聚合平台' },
     { value: 'ollama', label: 'Ollama', description: '本地模型服务' }
   ];
+
+  const effectiveProviderLabel =
+    selectedUserProvider?.display_name ||
+    systemDefault?.display_name ||
+    llmProviders.find((provider: LLMProvider) => provider.value === formData.llm_provider)?.label ||
+    formData.llm_provider;
 
   const getModelsForProvider = (provider: string, type: 'shallow' | 'deep'): Model[] => {
     // 将provider转换为小写以匹配后端返回的键名
@@ -317,6 +358,9 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     if (name === 'llm_provider' || name === 'api_key') {
       setApiKeyValidated(false);
     }
+    if (name === 'llm_provider') {
+      setSaveApiKeyToBrowser(false);
+    }
 
     // 如果更改了股票代码，实时校验
     if (name === 'ticker') {
@@ -427,8 +471,8 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     }
 
     // 检查API密钥验证
-    if (requiresApiKey && !apiKeyProvided) {
-      onShowToast('请先填写或验证 API 密钥（或在本浏览器保存该 provider 的 KEY）', 'error');
+    if (requiresUserApiKey && !apiKeyProvided) {
+      onShowToast('当前浏览器未保存该个人 provider 的 KEY，请补充 KEY、保存到当前浏览器，或切换到系统默认 provider', 'error');
       return;
     }
 
@@ -465,7 +509,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
         analysts: formData.analysts,
         research_depth: formData.research_depth,
         llm_provider: formData.llm_provider,
-        backend_url: config?.llm_providers?.find((p: any) => p.value === formData.llm_provider)?.url || '',
+        backend_url: effectiveBackendUrl,
         shallow_thinker: formData.shallow_thinker,
         deep_thinker: formData.deep_thinker,
         is_public: formData.is_public,
@@ -479,6 +523,9 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       const effectiveApiKey = localKeyForProvider || formData.api_key.trim() || undefined;
       if (effectiveApiKey) {
         requestData.api_key = effectiveApiKey;
+      }
+      if (formData.api_key.trim() && saveApiKeyToBrowser) {
+        saveLocalKey(formData.llm_provider, formData.api_key.trim());
       }
 
       // 检查是否是定期报告
@@ -752,8 +799,41 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
               </select>
             </div>
 
+            {formData.llm_provider && (
+              <div role="status" aria-live="polite" className="rounded-md border border-dark-border bg-dark-tertiary px-3 py-2 text-sm">
+                {selectedUserProvider ? (
+                  localKeyForProvider ? (
+                    <span className="text-success-500">
+                      <i className="fas fa-key mr-1" />
+                      来源：个人配置（本浏览器 KEY）· {effectiveProviderLabel}
+                    </span>
+                  ) : (
+                    <span className="text-warning-500">
+                      <i className="fas fa-exclamation-triangle mr-1" />
+                      来源：个人配置 · {effectiveProviderLabel}，当前浏览器未保存 KEY
+                    </span>
+                  )
+                ) : isUsingSystemDefault ? (
+                  <span className="text-accent-primary">
+                    <i className="fas fa-building mr-1" />
+                    来源：系统默认 Provider · {effectiveProviderLabel}
+                  </span>
+                ) : formData.api_key.trim() ? (
+                  <span className="text-text-secondary">
+                    <i className="fas fa-user-edit mr-1" />
+                    来源：本次一次性输入
+                  </span>
+                ) : (
+                  <span className="text-warning-500">
+                    <i className="fas fa-exclamation-triangle mr-1" />
+                    未找到个人配置或系统默认来源；请填写本次 KEY
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* API密钥输入 */}
-            {requiresApiKey && (
+            {requiresUserApiKey && (
               <div>
                 <label htmlFor="api_key" className="block text-sm font-medium text-text-secondary mb-2">
                   <i className="fas fa-key mr-1" />
@@ -769,7 +849,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 bg-dark-tertiary border border-dark-border text-white rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
                       placeholder={getApiKeyPlaceholder(formData.llm_provider)}
-                      required
+                      required={requiresUserApiKey}
                     />
                     <button
                       type="button"
@@ -824,20 +904,32 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
                   ) : (
                     <span className="text-warning-500">
                       <i className="fas fa-exclamation-triangle mr-1" />
-                      当前浏览器未保存该 provider 的 KEY；未填写则回退系统默认，若已显式选择个人 provider 则可能启动失败
+                      当前浏览器未保存该个人 provider 的 KEY；请补充 KEY 或切换到系统默认 provider
                     </span>
                   )}
                 </div>
 
+                {formData.api_key.trim() && (
+                  <label className="mt-2 flex items-start gap-2 text-sm text-text-secondary">
+                    <input
+                      type="checkbox"
+                      checked={saveApiKeyToBrowser}
+                      onChange={(e) => setSaveApiKeyToBrowser(e.target.checked)}
+                      className="mt-1 h-4 w-4 text-accent-primary focus:ring-accent-primary border-dark-border rounded cursor-pointer bg-dark-secondary"
+                    />
+                    <span>保存到当前浏览器，后续自动随该 provider 请求下发</span>
+                  </label>
+                )}
+
                 <p className="text-sm text-text-tertiary mt-1">
                   <i className="fas fa-info-circle mr-1" />
-                  访问所选LLM服务商需要您的API密钥；保存的 KEY 仅用于本次请求，不会回传或持久化到后端
+                  访问个人 provider 需要您的 API 密钥；不勾选保存时仅本次使用，不会持久化到后端
                 </p>
               </div>
             )}
 
             {/* 思维智能体选择 */}
-            {(apiKeyValidated || !!localKeyForProvider || formData.llm_provider === 'ollama') && (
+            {(!requiresUserApiKey || apiKeyValidated || !!localKeyForProvider || !!formData.api_key.trim() || formData.llm_provider === 'ollama') && (
               <div className="border-t pt-4">
                 <div className="flex items-center space-x-2 mb-4">
                   <i className="fas fa-lightbulb text-green-600" />
