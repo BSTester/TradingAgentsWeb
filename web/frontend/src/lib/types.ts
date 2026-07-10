@@ -138,8 +138,7 @@ export interface AnalysisHistory {
   timestamp: string;
   decision?: string;
 }
-// 定时任务
-// 相关类型
+// 定时任务 相关类型
 export interface ScheduledTask {
   id: number;
   user_id: number;
@@ -197,4 +196,76 @@ export interface ScheduledTaskListResponse {
   limit: number;
   has_next: boolean;
   has_prev: boolean;
+}
+
+// ===== 用户 AI 设置 / 本地 KEY 契约类型（依据 web/frontend/api-contract.md）=====
+
+export type LLMConfigSource =
+  | 'user_explicit' // 用户在表单显式选择的个人 provider（KEY 来自本地）
+  | 'user_default' // 用户默认 provider
+  | 'system_default' // 系统默认 provider（兜底，后端 KEY）
+  | 'request_override' // 本次请求一次性 KEY
+  | 'none';
+
+export type ValidationStatus = 'ok' | 'failed' | 'untested' | null;
+
+// 用户 provider 元数据（E1 响应，完全不含 api_key）
+export interface UserLLMProviderSetting {
+  id: string; // 配置主键（UUID 或数字串）
+  provider_name: string; // 系统 provider 标识，或用户自定义名称
+  display_name: string;
+  base_url: string;
+  shallow_model: string | null;
+  deep_model: string | null;
+  is_enabled: boolean;
+  is_default: boolean; // 该用户的默认 provider
+  last_validated_at: string | null; // ISO8601（后端记录，不存 KEY）
+  last_validation_status: ValidationStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserLLMSettingsResponse {
+  providers: UserLLMProviderSetting[];
+  default_provider_id: string | null;
+  has_legacy_config: boolean; // 旧 UserConfig.last_* 是否仍有值（迁移提示）
+}
+
+// provider_type 取值（后端 openapi ProviderProfileType 枚举）
+export type ProviderProfileType = 'catalog' | 'custom';
+
+// E2 新增 provider 元数据（无 api_key 字段）
+// 依据 backend/openapi.yaml (main) UserLLMProviderCreate：provider_type 为必填字段（BUG-001 修复点）
+export interface CreateUserLLMProviderRequest {
+  provider_name: string;
+  provider_type: ProviderProfileType; // 必填，本表单新建的均为用户自定义 provider
+  display_name: string;
+  base_url: string;
+  shallow_model?: string | null;
+  deep_model?: string | null;
+  catalog_provider_id?: number | null;
+  is_enabled?: boolean;
+  is_default?: boolean;
+}
+
+// E3 编辑 provider 元数据（全字段可选，无 api_key）
+export interface UpdateUserLLMProviderRequest {
+  display_name?: string;
+  base_url?: string;
+  shallow_model?: string | null;
+  deep_model?: string | null;
+  is_enabled?: boolean;
+  is_default?: boolean;
+}
+
+// E5 测试连接（临时 KEY）
+export interface TestUserLLMProviderRequest {
+  base_url: string;
+  api_key: string; // 一次性明文；优先用表单当前输入，其次本地 localStorage 取出的 KEY
+}
+
+export interface TestUserLLMProviderResponse {
+  valid: boolean;
+  message?: string;
+  last_validated_at: string;
 }
