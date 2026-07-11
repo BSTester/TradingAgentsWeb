@@ -307,6 +307,11 @@ export const scheduledTasksAPI = {
       limit: number;
       has_next: boolean;
       has_prev: boolean;
+      stats?: {
+        enabled: number;
+        paused: number;
+        completed: number;
+      };
     }>(`/api/scheduled-tasks/?${queryParams.toString()}`);
   },
 

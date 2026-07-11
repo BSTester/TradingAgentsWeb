@@ -76,8 +76,8 @@ export async function updatePromptTemplate(
   agentType: string,
   data: {
     system_prompt?: string;
-    template_name?: string;
-    description?: string;
+    template_name?: string | undefined;
+    description?: string | undefined;
     version?: string;
   }
 ): Promise<PromptTemplate> {

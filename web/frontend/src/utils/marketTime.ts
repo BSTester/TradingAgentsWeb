@@ -40,12 +40,12 @@ function getTimeInTimezone(timezone: string): Date {
   
   // 构造本地时间的Date对象
   const localDate = new Date(
-    parseInt(dateParts.year),
-    parseInt(dateParts.month) - 1,
-    parseInt(dateParts.day),
-    parseInt(dateParts.hour),
-    parseInt(dateParts.minute),
-    parseInt(dateParts.second)
+    parseInt(dateParts.year ?? ''),
+    parseInt(dateParts.month ?? '') - 1,
+    parseInt(dateParts.day ?? ''),
+    parseInt(dateParts.hour ?? ''),
+    parseInt(dateParts.minute ?? ''),
+    parseInt(dateParts.second ?? '')
   );
   
   return localDate;
@@ -84,17 +84,17 @@ function checkUSMarketStatus(): MarketStatus {
   const weekdayMap: Record<string, number> = {
     'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
   };
-  const day = weekdayMap[dateParts.weekday] || 0;
-  
-  const hour = parseInt(dateParts.hour);
-  const minute = parseInt(dateParts.minute);
+  const day = weekdayMap[dateParts.weekday ?? ''] || 0;
+
+  const hour = parseInt(dateParts.hour ?? '');
+  const minute = parseInt(dateParts.minute ?? '');
   const time = hour * 60 + minute;
-  
+
   const timeStr = `${dateParts.hour}:${dateParts.minute}`;
-  
+
   let isOpen = false;
   let message = '';
-  
+
   if (day >= 1 && day <= 5) {
     // 周一到周五
     if (time >= 570 && time < 960) { // 9:30-16:00
@@ -143,17 +143,17 @@ function checkHKMarketStatus(): MarketStatus {
   const weekdayMap: Record<string, number> = {
     'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
   };
-  const day = weekdayMap[dateParts.weekday] || 0;
-  
-  const hour = parseInt(dateParts.hour);
-  const minute = parseInt(dateParts.minute);
+  const day = weekdayMap[dateParts.weekday ?? ''] || 0;
+
+  const hour = parseInt(dateParts.hour ?? '');
+  const minute = parseInt(dateParts.minute ?? '');
   const time = hour * 60 + minute;
-  
+
   const timeStr = `${dateParts.hour}:${dateParts.minute}`;
-  
+
   let isOpen = false;
   let message = '';
-  
+
   if (day >= 1 && day <= 5) {
     // 周一到周五
     if ((time >= 570 && time < 720) || (time >= 780 && time < 960)) {
@@ -205,17 +205,17 @@ function checkCNMarketStatus(): MarketStatus {
   const weekdayMap: Record<string, number> = {
     'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6
   };
-  const day = weekdayMap[dateParts.weekday] || 0;
-  
-  const hour = parseInt(dateParts.hour);
-  const minute = parseInt(dateParts.minute);
+  const day = weekdayMap[dateParts.weekday ?? ''] || 0;
+
+  const hour = parseInt(dateParts.hour ?? '');
+  const minute = parseInt(dateParts.minute ?? '');
   const time = hour * 60 + minute;
-  
+
   const timeStr = `${dateParts.hour}:${dateParts.minute}`;
-  
+
   let isOpen = false;
   let message = '';
-  
+
   if (day >= 1 && day <= 5) {
     // 周一到周五
     if ((time >= 570 && time < 690) || (time >= 780 && time < 900)) {
