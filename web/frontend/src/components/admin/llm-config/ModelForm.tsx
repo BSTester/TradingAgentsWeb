@@ -46,7 +46,7 @@ export function ModelForm({ model, providers, onClose, onSuccess }: ModelFormPro
       // 新建模式：设置默认供应商
       setFormData(prev => ({ 
         ...prev, 
-        provider_id: providers[0].id 
+        provider_id: providers[0]!.id 
       }));
     }
   }, [model, providers]);

@@ -205,14 +205,14 @@ export const authAPI = {
     }
   },
 
-  loginWithEmailCode: async (email: string, code: string, captcha: { id: string; answer: string }) => {
+  loginWithEmailCode: async (email: string, code: string, captcha?: { id: string; answer: string }) => {
     try {
-      const response = await publicApiClient.post('/api/auth/email-code/login', {
-        email,
-        code,
-        captcha_id: captcha.id,
-        captcha_answer: captcha.answer,
-      });
+      const payload: any = { email, code };
+      if (captcha?.id && captcha?.answer) {
+        payload.captcha_id = captcha.id;
+        payload.captcha_answer = captcha.answer;
+      }
+      const response = await publicApiClient.post('/api/auth/email-code/login', payload);
       return response.data;
     } catch (error: any) {
       let errorMessage = error.response?.data?.detail || 
