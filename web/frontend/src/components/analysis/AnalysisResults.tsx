@@ -3,9 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { buildApiUrl, API_ENDPOINTS } from '../../utils/api';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkBreaks from 'remark-breaks';
+import LazyMarkdown from '@/components/common/LazyMarkdown';
+import { AnalysisResultsSkeleton } from './AnalysisResultsSkeleton';
 import { logger } from '@/utils/logger';
 
 interface AnalysisResultsProps {
@@ -345,8 +344,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
               color: '#78350f',
               fontFamily: 'system-ui, -apple-system, sans-serif'
             }}>
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkBreaks]}
+              <LazyMarkdown
+                preset="gfm"
                 components={{
                   p: ({ children }) => <p style={{ marginBottom: '0.75rem' }}>{children}</p>,
                   strong: ({ children }) => <strong style={{ fontWeight: 'bold' }}>{children}</strong>,
@@ -356,7 +355,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                 }}
               >
                 {results.final_analysis}
-              </ReactMarkdown>
+              </LazyMarkdown>
             </div>
           </div>
         )}
@@ -414,8 +413,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                   color: '#374151',
                   fontFamily: 'system-ui, -apple-system, sans-serif'
                 }}>
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkBreaks]}
+                  <LazyMarkdown
+                    preset="gfm"
                     components={{
                       h2: ({ children }) => (
                         <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1f2937', marginTop: '1.5rem', marginBottom: '0.75rem', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -520,7 +519,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                         </a>
                       ),
                     }}
-                  >{agent.result}</ReactMarkdown>
+                  >{agent.result}</LazyMarkdown>
                 </div>
               </div>
             ))}
@@ -925,20 +924,9 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
   };
 
   if (loading) {
-    return (
-      <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-12">
-        <div className="text-center">
-          <div className="relative inline-block mb-4">
-            {/* 外圈旋转 */}
-            <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-            {/* 内圈反向旋转 */}
-            <div className="absolute top-2 left-2 w-16 h-16 border-4 border-purple-200 border-b-purple-600 rounded-full animate-spin-reverse"></div>
-          </div>
-          <p className="text-text-primary font-medium text-lg">正在加载分析结果...</p>
-          <p className="text-sm text-text-tertiary mt-2">正在获取详细报告，请稍候</p>
-        </div>
-      </div>
-    );
+    // Same skeleton shown while the code-split chunk loads — keeps the route
+    // switch free of a white screen / spinner flash. See frontend/issues/WS-86.
+    return <AnalysisResultsSkeleton />;
   }
 
   return (
@@ -1464,8 +1452,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                       </h2>
                     </div>
                     <div className="p-4 md:p-6 bg-dark-tertiary">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm, remarkBreaks]}
+                      <LazyMarkdown
+                        preset="gfm"
                         components={{
                           // 一级标题 - 大标题，带渐变背景和图标
                           h1: ({ children }) => (
@@ -1626,7 +1614,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                             </a>
                           ),
                         }}
-                      >{content}</ReactMarkdown>
+                      >{content}</LazyMarkdown>
                     </div>
                   </div>
                 );
@@ -1646,8 +1634,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                     </div>
                     <div className="p-4 md:p-6 bg-dark-tertiary">
                       <div className="markdown-content">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm, remarkBreaks]}
+                        <LazyMarkdown
+                          preset="gfm"
                           components={{
                             // 标题
                             h1: ({ children }) => (
@@ -1801,7 +1789,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                               </a>
                             ),
                           }}
-                        >{agent.result}</ReactMarkdown>
+                        >{agent.result}</LazyMarkdown>
                       </div>
                     </div>
                   </div>
@@ -1942,8 +1930,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                               </h3>
                             </div>
                             <div className="p-4 bg-white">
-                              <ReactMarkdown
-                                remarkPlugins={[remarkGfm, remarkBreaks]}
+                              <LazyMarkdown
+                                preset="gfm"
                                 components={{
                                   h1: ({ children }) => (
                                     <h1 className="text-xl font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 rounded-lg mb-3 shadow-sm flex items-center">
@@ -2037,7 +2025,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                                     <a href={href} className="text-blue-600 hover:text-blue-800 underline font-medium" target="_blank" rel="noopener noreferrer">{children}</a>
                                   ),
                                 }}
-                              >{agent.result}</ReactMarkdown>
+                              >{agent.result}</LazyMarkdown>
                             </div>
                           </div>
                         ))}
@@ -2063,8 +2051,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                               <h3 className="font-bold text-base">{title}</h3>
                             </div>
                             <div className="p-4 bg-white">
-                              <ReactMarkdown
-                                remarkPlugins={[remarkGfm, remarkBreaks]}
+                              <LazyMarkdown
+                                preset="gfm"
                                 components={{
                                   h1: ({ children }) => (
                                     <h1 className="text-xl font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 rounded-lg mb-3 shadow-sm flex items-center">
@@ -2140,7 +2128,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                                     <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{children}</td>
                                   ),
                                 }}
-                              >{content}</ReactMarkdown>
+                              >{content}</LazyMarkdown>
                             </div>
                           </div>
                         );

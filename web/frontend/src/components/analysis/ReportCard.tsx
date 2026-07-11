@@ -1,8 +1,7 @@
 'use client';
 
 import React from 'react';
-import ReactMarkdown from 'react-markdown';
-import rehypeSanitize from 'rehype-sanitize';
+import LazyMarkdown from '@/components/common/LazyMarkdown';
 import type { Report } from '@/types/conversation';
 import { RatingScale } from './RatingScale';
 import { SectionAccordion } from './SectionAccordion';
@@ -92,7 +91,7 @@ export function ReportCard({ report, compact = false }: { report: Report; compac
             )}
 
             <div className="prose-invert max-w-none text-sm">
-              <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{section.content || section.summary}</ReactMarkdown>
+              <LazyMarkdown preset="sanitize">{section.content || section.summary}</LazyMarkdown>
             </div>
 
             {section.risk_factors && section.risk_factors.length > 0 && (

@@ -3,10 +3,19 @@
 import React, { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { AnalysisResults } from '@/components/analysis/AnalysisResults';
+import dynamic from 'next/dynamic';
+import { AnalysisResultsSkeleton } from '@/components/analysis/AnalysisResultsSkeleton';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { Footer } from '@/components/common/Footer';
 import { AppNavbar } from '@/components/common/AppNavbar';
+
+// Code-split the heavy AnalysisResults (≈2k-line report view + markdown deps) so
+// the route shell + skeleton paint on navigation instead of a white screen while
+// the whole component downloads/parses. See frontend/issues/WS-86.
+const AnalysisResults = dynamic(
+  () => import('@/components/analysis/AnalysisResults').then((m) => m.AnalysisResults),
+  { ssr: false, loading: () => <AnalysisResultsSkeleton /> },
+);
 
 function AnalysisDetailContent() {
   const { user, logout, isLoading: authLoading } = useAuth();
