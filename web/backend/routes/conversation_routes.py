@@ -14,11 +14,11 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cli.models import AnalystType
-from tradingagents.default_config import DEFAULT_CONFIG
 from web.backend.analysis_task import run_analysis_task
 from web.backend.auth_routes import get_current_active_user
 from web.backend.database import get_db
 from web.backend.models import AnalysisRecord, ConversationMessage, ConversationSession, User, UserConfig
+from web.backend.services.llm_config_resolver import resolve_llm_config
 from web.backend.utils.market_detector import detect_market, normalize_ticker, normalize_ticker_with_suffix, validate_ticker
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
@@ -143,7 +143,15 @@ async def _trigger_analysis(db: AsyncSession, user: User, session: ConversationS
         raise HTTPException(status_code=400, detail=f"无效的股票代码格式: {ticker_raw}")
 
     user_config = await _get_user_config(db, user.id)
-    api_key = user_config.last_api_key or DEFAULT_CONFIG.get("openai_api_key") or ""
+    resolved_llm = await resolve_llm_config(
+        db,
+        user_id=user.id,
+        llm_provider=user_config.last_llm_provider,
+        backend_url=user_config.last_backend_url,
+        shallow_thinker=user_config.last_shallow_thinker,
+        deep_thinker=user_config.last_deep_thinker,
+        api_key=None,
+    )
     now = datetime.utcnow()
     analysis_id = f"conv_{now.strftime('%Y%m%d_%H%M%S')}_{ticker}_{user.id}_{assistant_message.id[:8]}"
     analysts = [item.value for item in AnalystType if item.value in {"market", "social", "news", "fundamentals"}]
@@ -155,11 +163,11 @@ async def _trigger_analysis(db: AsyncSession, user: User, session: ConversationS
         analysis_date=now.strftime("%Y-%m-%d"),
         analysts=analysts,
         research_depth=user_config.last_research_depth or 1,
-        llm_provider=user_config.last_llm_provider or DEFAULT_CONFIG["llm_provider"],
-        shallow_thinker=user_config.last_shallow_thinker or DEFAULT_CONFIG["quick_think_llm"],
-        deep_thinker=user_config.last_deep_thinker or DEFAULT_CONFIG["deep_think_llm"],
-        backend_url=user_config.last_backend_url or DEFAULT_CONFIG["backend_url"],
-        api_key=api_key,
+        llm_provider=resolved_llm.llm_provider,
+        shallow_thinker=resolved_llm.shallow_thinker,
+        deep_thinker=resolved_llm.deep_thinker,
+        backend_url=resolved_llm.backend_url,
+        api_key=None,
         is_public=False,
         status="queued",
         current_step="对话触发分析已入队",
@@ -191,11 +199,11 @@ async def _trigger_analysis(db: AsyncSession, user: User, session: ConversationS
         "analysis_date": record.analysis_date,
         "analysts": analysts,
         "research_depth": record.research_depth,
-        "llm_provider": record.llm_provider,
-        "shallow_thinker": record.shallow_thinker,
-        "deep_thinker": record.deep_thinker,
-        "backend_url": record.backend_url,
-        "api_key": api_key,
+        "llm_provider": resolved_llm.llm_provider,
+        "shallow_thinker": resolved_llm.shallow_thinker,
+        "deep_thinker": resolved_llm.deep_thinker,
+        "backend_url": resolved_llm.backend_url,
+        "api_key": resolved_llm.api_key,
         "conversation_session_id": session.id,
         "conversation_message_id": assistant_message.id,
     }

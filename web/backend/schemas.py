@@ -561,9 +561,6 @@ class UserConfigUpdate(BaseModel):
     last_shallow_thinker: Optional[str] = None
     last_deep_thinker: Optional[str] = None
     last_backend_url: Optional[str] = None
-    
-    # API Key (single field for all LLM providers)
-    last_api_key: Optional[str] = None  # Last used API key (matches last_llm_provider)
 
 class UserConfigResponse(BaseModel):
     """Schema for user configuration response - returns all cached settings"""
@@ -575,9 +572,6 @@ class UserConfigResponse(BaseModel):
     last_shallow_thinker: Optional[str] = None
     last_deep_thinker: Optional[str] = None
     last_backend_url: Optional[str] = None
-    
-    # API Key (returns actual key for frontend to use)
-    last_api_key: Optional[str] = None  # Last used API key (matches last_llm_provider)
     
     class Config:
         from_attributes = True

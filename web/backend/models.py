@@ -56,8 +56,8 @@ class UserConfig(Base):
     last_deep_thinker = Column(String(100), nullable=True)  # Last deep thinker model
     last_backend_url = Column(String(255), nullable=True)  # Last backend URL
     
-    # API Key cache (single field for all LLM providers, should be encrypted in production)
-    last_api_key = Column(String(1000), nullable=True)  # Last used API key (supports JWT tokens)
+    # Legacy API key cache. Kept only for compatibility/migration prompts; do not return, update, or use for LLM resolution.
+    last_api_key = Column(String(1000), nullable=True)
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

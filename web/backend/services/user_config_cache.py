@@ -179,7 +179,6 @@ def get_user_config_from_cache(user_id: int) -> Optional[Dict[str, Any]]:
                 config_dict = {
                     'user_id': user_config.user_id,
                     'last_llm_provider': user_config.last_llm_provider,
-                    'last_api_key': user_config.last_api_key,
                     # Analysis config (fallback)
                     'last_deep_thinker': user_config.last_deep_thinker,
                     'last_backend_url': user_config.last_backend_url,
@@ -246,7 +245,6 @@ def preload_user_configs() -> int:
                 config_dict = {
                     'user_id': user_config.user_id,
                     'last_llm_provider': user_config.last_llm_provider,
-                    'last_api_key': user_config.last_api_key,
                     # Analysis config (fallback)
                     'last_deep_thinker': user_config.last_deep_thinker,
                     'last_backend_url': user_config.last_backend_url,
