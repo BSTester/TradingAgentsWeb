@@ -1,6 +1,7 @@
 /**
  * Hook for managing user configuration (server-side cached settings)
- * Replaces localStorage with server-side storage for better security and cross-device sync
+ * Caches non-sensitive analysis preferences on the server.
+ * LLM API keys are managed separately in browser localStorage by provider.
  */
 
 import { useState, useEffect } from 'react';
@@ -20,9 +21,6 @@ export interface UserConfig {
   enable_trading_executor: boolean;
   futu_api_base_url?: string;
   futu_api_key?: string;
-  
-  // API key (single field for all providers)
-  last_api_key?: string;  // Actual API key value
 }
 
 export interface UserConfigUpdate {
@@ -36,7 +34,6 @@ export interface UserConfigUpdate {
   enable_trading_executor?: boolean;
   futu_api_base_url?: string;
   futu_api_key?: string;
-  last_api_key?: string;  // Single API key field for all providers
 }
 
 export function useUserConfig(token: string | null) {
