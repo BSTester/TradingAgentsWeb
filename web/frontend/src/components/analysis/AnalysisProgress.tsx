@@ -91,7 +91,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
     {
       id: 1,
       name: '分析师团队',
-      description: '收集和分析市场数据',
+      description: 'Market → Social → News → Fundamentals 依次研究',
       icon: 'fa-users',
       status: 'running',
       agents: [
@@ -103,20 +103,20 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
     },
     {
       id: 2,
-      name: '研究团队',
-      description: '深度研究和辩论',
-      icon: 'fa-search',
+      name: '研究辩论',
+      description: 'Bull ↔ Bear 多空研究辩论，研究经理裁决',
+      icon: 'fa-comments',
       status: 'pending',
       agents: [
         { name: '多头研究员', status: 'pending', logs: [] },
         { name: '空头研究员', status: 'pending', logs: [] },
-        { name: '投资评审', status: 'pending', logs: [] }
+        { name: '研究经理', status: 'pending', logs: [] }
       ]
     },
     {
       id: 3,
-      name: '交易团队',
-      description: '制定交易策略',
+      name: '交易计划',
+      description: '交易员生成交易建议（不执行订单）',
       icon: 'fa-chart-line',
       status: 'pending',
       agents: [
@@ -125,15 +125,24 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
     },
     {
       id: 4,
-      name: '风险管理',
-      description: '评估和管理风险',
-      icon: 'fa-shield-alt',
+      name: '风险审议',
+      description: 'Risky → Safe → Neutral 三方风险审议',
+      icon: 'fa-shield-halved',
       status: 'pending',
       agents: [
         { name: '激进风险分析师', status: 'pending', logs: [] },
         { name: '保守风险分析师', status: 'pending', logs: [] },
-        { name: '中性风险分析师', status: 'pending', logs: [] },
-        { name: '风险管理评审及投资组合分析', status: 'pending', logs: [] }
+        { name: '中性风险分析师', status: 'pending', logs: [] }
+      ]
+    },
+    {
+      id: 5,
+      name: '最终裁决',
+      description: '风险裁决（Risk Judge）输出最终交易建议',
+      icon: 'fa-gavel',
+      status: 'pending',
+      agents: [
+        { name: '风险裁决', status: 'pending', logs: [] }
       ]
     }
   ]);
@@ -383,13 +392,13 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                     'researcher': 1,
                     'bull': 1,
                     'bear': 1,
-                    'invest_judge': 1,
+                    'invest_judge': 1,    // Research Manager 结束研究辩论 band
                     'trader': 2,
                     'risky': 3,
                     'neutral': 3,
                     'safe': 3,
-                    'risk_manager': 3,
-                    'trading_executor': 4,  // 执行交易员在风险管理之后（阶段索引4，对应id=5）
+                    'risk_manager': 4,    // Risk Judge 是独立的最终裁决 band（终末节点）
+                    'trading_executor': 4, // 已废弃；保留兜底
                   };
 
                   // 阶段名称到索引的映射（兼容旧格式）
@@ -429,7 +438,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                         setCurrentPhaseIndex(phaseIdx);
                       }
 
-                      // 智能体名称映射（英文 -> 中文）
+                      // 智能体名称映射（英文 -> 中文，与 GraphSetup 节点对齐）
                       const agentNameMap: { [key: string]: string } = {
                         'system': '系统',
                         'market': '市场分析师',
@@ -440,11 +449,11 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                         'bull': '多头研究员',
                         'bear': '空头研究员',
                         'trader': '交易员',
-                        'invest_judge': '投资评审',
+                        'invest_judge': '研究经理',
                         'risky': '激进风险分析师',
                         'neutral': '中性风险分析师',
                         'safe': '保守风险分析师',
-                        'risk_manager': '风险管理评审及投资组合分析',
+                        'risk_manager': '风险裁决',
                         'trading_executor': '执行交易员'
                       };
 

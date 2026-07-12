@@ -63,7 +63,7 @@ export function Composer({ onSend, onStop, isStreaming, disabled, placeholder }:
           <button
             onClick={submit}
             disabled={disabled || !value.trim()}
-            className="flex-shrink-0 w-11 h-11 rounded-xl bg-gradient-to-r from-accent-primary to-accent-secondary text-white flex items-center justify-center hover:shadow-glow-cyan transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-shrink-0 w-11 h-11 rounded-xl bg-gradient-to-r from-accent-primary to-accent-secondary text-dark-primary flex items-center justify-center hover:shadow-glow-cyan transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             aria-label="发送"
           >
             <i className="fas fa-paper-plane" aria-hidden="true" />

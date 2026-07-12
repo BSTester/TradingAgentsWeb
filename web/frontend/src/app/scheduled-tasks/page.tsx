@@ -436,7 +436,7 @@ export default function ScheduledTasksPage() {
                             onClick={() => setPage(p)}
                             className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                               p === page
-                                ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white'
+                                ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-dark-primary'
                                 : 'text-text-primary bg-dark-tertiary border border-dark-border hover:bg-dark-primary'
                             }`}
                           >

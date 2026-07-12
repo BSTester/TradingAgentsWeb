@@ -377,7 +377,7 @@ export default function UserManagementPage() {
               <p className="text-text-secondary mb-4">加载失败</p>
               <button
                 onClick={() => refetch()}
-                className="px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-secondary"
+                className="px-4 py-2 bg-accent-primary text-dark-primary rounded-lg hover:bg-accent-secondary"
               >
                 重试
               </button>

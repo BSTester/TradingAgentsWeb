@@ -476,7 +476,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
                       key={p}
                       onClick={() => setPage(p)}
                       className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${p === page
-                        ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white shadow-glow-cyan'
+                        ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-dark-primary shadow-glow-cyan'
                         : 'text-text-secondary bg-dark-tertiary border border-dark-border hover:bg-dark-secondary'
                         }`}
                     >

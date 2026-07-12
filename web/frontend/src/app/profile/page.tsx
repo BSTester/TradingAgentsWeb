@@ -162,7 +162,7 @@ export default function ProfilePage() {
               </div>
               <button
                 onClick={() => setShowPasswordModal(true)}
-                className="px-6 py-3 bg-accent-primary text-white rounded-lg hover:bg-accent-secondary focus:outline-none focus:ring-2 focus:ring-accent-primary transition-colors whitespace-nowrap ml-6"
+                className="px-6 py-3 bg-accent-primary text-dark-primary rounded-lg hover:bg-accent-secondary focus:outline-none focus:ring-2 focus:ring-accent-primary transition-colors whitespace-nowrap ml-6"
               >
                 <i className="fas fa-key mr-2" />
                 {user.has_set_password ? '修改密码' : '设置密码'}
@@ -293,7 +293,7 @@ export default function ProfilePage() {
                   type="button"
                   onClick={handleSetPassword}
                   disabled={isSettingPassword || !password || !confirmPassword || (user.has_set_password && !oldPassword)}
-                  className="flex-1 px-4 py-3 bg-accent-primary text-white rounded-lg hover:bg-accent-secondary focus:outline-none focus:ring-2 focus:ring-accent-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex-1 px-4 py-3 bg-accent-primary text-dark-primary rounded-lg hover:bg-accent-secondary focus:outline-none focus:ring-2 focus:ring-accent-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSettingPassword ? (
                     <>

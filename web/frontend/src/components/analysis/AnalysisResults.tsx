@@ -2212,7 +2212,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                     await handleExport('markdown');
                     setShowExportPreview(false);
                   }}
-                  className="px-8 py-3 bg-gradient-to-r from-accent-primary to-accent-secondary text-white rounded-lg hover:shadow-glow-cyan transition-all flex items-center font-medium shadow-lg hover:scale-105"
+                  className="px-8 py-3 bg-gradient-to-r from-accent-primary to-accent-secondary text-dark-primary rounded-lg hover:shadow-glow-cyan transition-all flex items-center font-medium shadow-lg hover:scale-105"
                 >
                   <i className="fas fa-file-code mr-2" />
                   导出为 Markdown

@@ -13,7 +13,7 @@ export function LoginNudge() {
       </div>
       <button
         onClick={() => router.push('/login')}
-        className="px-4 py-2 rounded-lg bg-gradient-to-r from-accent-primary to-accent-secondary text-white text-sm font-medium hover:shadow-glow-cyan transition-all"
+        className="px-4 py-2 rounded-lg bg-gradient-to-r from-accent-primary to-accent-secondary text-dark-primary text-sm font-medium hover:shadow-glow-cyan transition-all"
       >
         登录 / 注册
       </button>

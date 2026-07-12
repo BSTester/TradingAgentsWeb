@@ -205,7 +205,7 @@ export function LocalKeyField({ providerKey, providerLabel, baseUrl, providerId,
               type="button"
               onClick={handleSave}
               disabled={!apiKey.trim() || (!saveToBrowser && !onTest)}
-              className="px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 bg-accent-primary text-dark-primary rounded-lg hover:bg-accent-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {saveToBrowser ? '保存 KEY' : '仅本次使用'}
             </button>
@@ -233,7 +233,7 @@ export function LocalKeyField({ providerKey, providerLabel, baseUrl, providerId,
               type="button"
               onClick={handleReplace}
               disabled={!apiKey.trim()}
-              className="px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-secondary disabled:opacity-50 transition-colors"
+              className="px-4 py-2 bg-accent-primary text-dark-primary rounded-lg hover:bg-accent-secondary disabled:opacity-50 transition-colors"
             >
               确认替换
             </button>

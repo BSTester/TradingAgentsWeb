@@ -17,7 +17,7 @@ function ProviderSummaryCard({ provider }: { provider: SystemDefaultProviderSumm
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-3">
-          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-accent-primary to-accent-secondary text-white text-xl">
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-accent-primary to-accent-secondary text-dark-primary text-xl">
             <i className="fas fa-star" aria-hidden="true" />
           </div>
           <div>
@@ -210,7 +210,7 @@ export function SystemDefaultForm() {
             type="button"
             disabled={!canSave}
             onClick={() => setConfirmOpen(true)}
-            className="px-4 py-2 bg-gradient-to-r from-accent-primary to-accent-secondary text-white rounded-lg hover:shadow-glow-cyan transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-gradient-to-r from-accent-primary to-accent-secondary text-dark-primary rounded-lg hover:shadow-glow-cyan transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <i className="fas fa-save mr-2" aria-hidden="true" />
             保存为系统默认

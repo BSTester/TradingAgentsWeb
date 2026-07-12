@@ -148,7 +148,7 @@ function AnalysisDetailContent() {
       {showBackToTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-8 right-8 bg-gradient-to-r from-accent-primary to-accent-secondary text-white w-12 h-12 rounded-full shadow-glow-cyan hover:scale-110 transition-all duration-300 flex items-center justify-center z-50"
+          className="fixed bottom-8 right-8 bg-gradient-to-r from-accent-primary to-accent-secondary text-dark-primary w-12 h-12 rounded-full shadow-glow-cyan hover:scale-110 transition-all duration-300 flex items-center justify-center z-50"
           aria-label="返回顶部"
         >
           <i className="fas fa-arrow-up text-xl" />
