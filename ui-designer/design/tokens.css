@@ -1,0 +1,35 @@
+/* TradingAgents Signal Field — handoff tokens */
+:root {
+  --sf-ink: #080b10;
+  --sf-ink-raised: #10151d;
+  --sf-rail: #0d1118;
+  --sf-panel: #151b25;
+  --sf-panel-hover: #1b2330;
+  --sf-line: #273140;
+  --sf-line-strong: #46566a;
+  --sf-text: #f3f6f8;
+  --sf-muted: #9aa8b7;
+  --sf-dim: #667587;
+  --sf-lime: #d7ff4f;
+  --sf-lime-ink: #162000;
+  --sf-cyan: #68e3ff;
+  --sf-positive: #6ee7ad;
+  --sf-negative: #ff7b8c;
+  --sf-warning: #ffca6b;
+  --sf-info: #9ac8ff;
+  --sf-radius-sm: 8px;
+  --sf-radius-md: 14px;
+  --sf-radius-lg: 22px;
+  --sf-shadow-panel: 0 20px 48px rgba(0, 0, 0, .22);
+  --sf-space-1: 4px;
+  --sf-space-2: 8px;
+  --sf-space-3: 12px;
+  --sf-space-4: 16px;
+  --sf-space-5: 20px;
+  --sf-space-6: 24px;
+  --sf-space-8: 32px;
+  --sf-space-10: 40px;
+  --sf-motion-fast: 160ms;
+  --sf-motion-standard: 220ms;
+  --sf-ease: cubic-bezier(.2, .8, .2, 1);
+}
