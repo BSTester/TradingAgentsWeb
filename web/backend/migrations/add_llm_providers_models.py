@@ -35,6 +35,7 @@ def upgrade():
         Column('base_url', String(500), nullable=True, comment='API基础URL'),
         Column('description', Text, nullable=True, comment='供应商描述'),
         Column('is_active', Boolean, default=True, nullable=False, index=True, comment='是否启用'),
+        Column('is_default', Boolean, default=False, nullable=False, index=True, comment='是否为系统默认供应商'),
         Column('config_json', JSON, nullable=True, comment='额外配置参数（JSON格式）'),
         Column('created_at', DateTime(timezone=True), server_default=func.now(), nullable=False),
         Column('updated_at', DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False),
@@ -93,6 +94,7 @@ def insert_default_data():
                 'base_url': 'https://api.openai.com/v1',
                 'description': 'OneInfinity OpenAI兼容模型',
                 'is_active': True,
+                'is_default': False,
             },
             {
                 'provider_name': 'anthropic',
@@ -100,6 +102,7 @@ def insert_default_data():
                 'base_url': 'https://api.anthropic.com/v1',
                 'description': 'Anthropic Claude系列模型',
                 'is_active': True,
+                'is_default': False,
             },
             {
                 'provider_name': 'deepseek',
@@ -107,6 +110,7 @@ def insert_default_data():
                 'base_url': 'https://api.deepseek.com/v1',
                 'description': 'DeepSeek系列模型',
                 'is_active': True,
+                'is_default': False,
             },
             {
                 'provider_name': 'custom',
@@ -114,6 +118,7 @@ def insert_default_data():
                 'base_url': '',
                 'description': '自定义LLM服务供应商',
                 'is_active': True,
+                'is_default': False,
             }
         ]
         
@@ -122,8 +127,8 @@ def insert_default_data():
             result = conn.execute(
                 text("""
                     INSERT INTO llm_providers 
-                    (provider_name, display_name, base_url, description, is_active)
-                    VALUES (:provider_name, :display_name, :base_url, :description, :is_active)
+                    (provider_name, display_name, base_url, description, is_active, is_default)
+                    VALUES (:provider_name, :display_name, :base_url, :description, :is_active, :is_default)
                 """),
                 provider
             )
