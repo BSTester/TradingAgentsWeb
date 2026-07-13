@@ -10,19 +10,58 @@ interface AnalysisProgressProps {
   onShowToast: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
-interface PhaseAgent {
+export interface PhaseAgent {
   name: string;
   status: 'pending' | 'running' | 'completed' | 'error';
   logs: string[];
 }
 
-interface AnalysisPhase {
-  id: number;
+export interface AnalysisPhase {
+  id: string;
   name: string;
   description: string;
   icon: string;
   agents: PhaseAgent[];
   status: 'pending' | 'running' | 'completed' | 'error';
+}
+
+const analystNames: Record<string, string> = {
+  market: '市场分析师',
+  social: '社交媒体分析师',
+  news: '新闻分析师',
+  fundamentals: '基本面分析师',
+};
+
+/** The five bands mirror GraphSetup. Risk Judge is always the terminal band. */
+export function createAnalysisPhases(): AnalysisPhase[] {
+  return [
+    { id: 'analysts', name: '分析师团队', description: 'Market → Social → News → Fundamentals 依次研究', icon: 'fa-users', status: 'running', agents: Object.values(analystNames).map(name => ({ name, status: 'pending', logs: [] })) },
+    { id: 'research', name: '研究辩论', description: 'Bull ↔ Bear 多空研究辩论，研究经理裁决', icon: 'fa-comments', status: 'pending', agents: ['多头研究员', '空头研究员', '研究经理'].map(name => ({ name, status: 'pending', logs: [] })) },
+    { id: 'trader', name: '交易计划', description: '交易员生成交易建议（不执行订单）', icon: 'fa-chart-line', status: 'pending', agents: [{ name: '交易员', status: 'pending', logs: [] }] },
+    { id: 'risk-debate', name: '风险审议', description: 'Risky → Safe → Neutral 三方风险审议', icon: 'fa-shield-halved', status: 'pending', agents: ['激进风险分析师', '保守风险分析师', '中性风险分析师'].map(name => ({ name, status: 'pending', logs: [] })) },
+    { id: 'risk-judge', name: '最终裁决', description: '风险裁决（Risk Judge）输出最终交易建议', icon: 'fa-gavel', status: 'pending', agents: [{ name: '风险裁决', status: 'pending', logs: [] }] },
+  ];
+}
+
+/** Config may select analysts, but cannot remove the terminal Risk Judge band. */
+export function applyProgressConfig(phases: AnalysisPhase[], config: Pick<WebSocketMessage['data'], 'selected_analysts'> & { enable_trading_executor?: boolean }): AnalysisPhase[] {
+  const next = phases.map(phase => ({ ...phase, agents: phase.agents.map(agent => ({ ...agent, logs: [...agent.logs] })) }));
+  const analystPhase = next[0];
+  if (analystPhase && Array.isArray(config.selected_analysts)) {
+    analystPhase.agents = config.selected_analysts
+      .filter(agent => Boolean(analystNames[agent]))
+      .map(agent => ({ name: analystNames[agent]!, status: 'pending', logs: [] }));
+  }
+  return next;
+}
+
+export function phaseIndexForAgent(agent: string, phases: AnalysisPhase[]): number {
+  const phaseId = ({
+    system: 'analysts', market: 'analysts', social: 'analysts', news: 'analysts', fundamentals: 'analysts',
+    researcher: 'research', bull: 'research', bear: 'research', invest_judge: 'research',
+    trader: 'trader', risky: 'risk-debate', neutral: 'risk-debate', safe: 'risk-debate', risk_manager: 'risk-judge',
+  } as Record<string, string>)[agent];
+  return Math.max(0, phases.findIndex(phase => phase.id === phaseId));
 }
 
 interface WebSocketMessage {
@@ -87,67 +126,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
     }
   };
 
-  const [phases, setPhases] = useState<AnalysisPhase[]>([
-    {
-      id: 1,
-      name: '分析师团队',
-      description: 'Market → Social → News → Fundamentals 依次研究',
-      icon: 'fa-users',
-      status: 'running',
-      agents: [
-        { name: '市场分析师', status: 'pending', logs: [] },
-        { name: '社交媒体分析师', status: 'pending', logs: [] },
-        { name: '新闻分析师', status: 'pending', logs: [] },
-        { name: '基本面分析师', status: 'pending', logs: [] }
-      ]
-    },
-    {
-      id: 2,
-      name: '研究辩论',
-      description: 'Bull ↔ Bear 多空研究辩论，研究经理裁决',
-      icon: 'fa-comments',
-      status: 'pending',
-      agents: [
-        { name: '多头研究员', status: 'pending', logs: [] },
-        { name: '空头研究员', status: 'pending', logs: [] },
-        { name: '研究经理', status: 'pending', logs: [] }
-      ]
-    },
-    {
-      id: 3,
-      name: '交易计划',
-      description: '交易员生成交易建议（不执行订单）',
-      icon: 'fa-chart-line',
-      status: 'pending',
-      agents: [
-        { name: '交易员', status: 'pending', logs: [] }
-      ]
-    },
-    {
-      id: 4,
-      name: '风险审议',
-      description: 'Risky → Safe → Neutral 三方风险审议',
-      icon: 'fa-shield-halved',
-      status: 'pending',
-      agents: [
-        { name: '激进风险分析师', status: 'pending', logs: [] },
-        { name: '保守风险分析师', status: 'pending', logs: [] },
-        { name: '中性风险分析师', status: 'pending', logs: [] }
-      ]
-    },
-    {
-      id: 5,
-      name: '最终裁决',
-      description: '风险裁决（Risk Judge）输出最终交易建议',
-      icon: 'fa-gavel',
-      status: 'pending',
-      agents: [
-        { name: '风险裁决', status: 'pending', logs: [] }
-      ]
-    }
-  ]);
-  
-  const [enableTradingExecutor, setEnableTradingExecutor] = useState(false);
+  const [phases, setPhases] = useState<AnalysisPhase[]>(createAnalysisPhases);
   const [configInitialized, setConfigInitialized] = useState(false);
 
   // Fetch analysis status to get configuration on mount
@@ -165,61 +144,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
           const status = await response.json();
           console.log('📋 Fetched analysis config:', status);
 
-          // Update phases based on configuration
-          if (status.selected_analysts && Array.isArray(status.selected_analysts)) {
-            setPhases(prevPhases => {
-              const newPhases = [...prevPhases];
-
-              // Update analyst team
-              const analystPhase = newPhases[0];
-              if (analystPhase) {
-                const analystMap: { [key: string]: string } = {
-                  'market': '市场分析师',
-                  'social': '社交媒体分析师',
-                  'news': '新闻分析师',
-                  'fundamentals': '基本面分析师'
-                };
-
-                const newAgents: PhaseAgent[] = status.selected_analysts
-                  .filter((a: string) => !!analystMap[a])
-                  .map((a: string) => ({
-                    name: analystMap[a]!,
-                    status: 'pending' as const,
-                    logs: []
-                  }));
-
-                analystPhase.agents = newAgents;
-                console.log(`✅ Initialized analyst team with ${newAgents.length} analysts`);
-              }
-
-              return newPhases;
-            });
-          }
-
-          // Add trading executor phase if enabled
-          if (status.enable_trading_executor) {
-            setEnableTradingExecutor(true);
-            setPhases(prevPhases => {
-              const hasTradingExecutorPhase = prevPhases.some(p => p.id === 5);
-              if (!hasTradingExecutorPhase) {
-                console.log('✅ Adding trading executor phase from status');
-                return [
-                  ...prevPhases,
-                  {
-                    id: 5,
-                    name: '交易执行',
-                    description: '执行交易操作',
-                    icon: 'fa-robot',
-                    status: 'pending',
-                    agents: [
-                      { name: '执行交易员', status: 'pending', logs: [] }
-                    ]
-                  }
-                ];
-              }
-              return prevPhases;
-            });
-          }
+          setPhases(prevPhases => applyProgressConfig(prevPhases, status));
 
           setConfigInitialized(true);
         }
@@ -290,84 +215,10 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
             }
 
             if (message.type === 'config') {
-              // 接收配置信息，更新显示的智能体
-              const { selected_analysts, enable_trading_executor } = message.data;
+              const { selected_analysts } = message.data;
               console.log('📋 Received config message');
               console.log('Selected analysts:', selected_analysts);
-              console.log('Enable trading executor:', enable_trading_executor);
-
-              // 更新执行交易状态
-              if (enable_trading_executor !== undefined) {
-                setEnableTradingExecutor(enable_trading_executor);
-              }
-
-              if (selected_analysts && Array.isArray(selected_analysts)) {
-                console.log(`🔄 Updating analyst team with ${selected_analysts.length} analysts`);
-
-                setPhases(prevPhases => {
-                  let newPhases = [...prevPhases];
-
-                  // 更新分析师团队，只显示选中的分析师
-                  const analystPhase = newPhases[0];
-                  if (analystPhase) {
-                    console.log('Current analyst phase:', analystPhase.name);
-                    console.log('Current agents:', analystPhase.agents.map(a => a.name));
-
-                    // 分析师映射
-                    const analystMap: { [key: string]: string } = {
-                      'market': '市场分析师',
-                      'social': '社交媒体分析师',
-                      'news': '新闻分析师',
-                      'fundamentals': '基本面分析师'
-                    };
-
-                    // 只保留选中的分析师
-                    const newAgents: PhaseAgent[] = selected_analysts
-                      .filter(a => {
-                        const hasMapping = !!analystMap[a];
-                        console.log(`Analyst ${a}: has mapping = ${hasMapping}`);
-                        return hasMapping;
-                      })
-                      .map(a => ({
-                        name: analystMap[a]!,  // 使用非空断言，因为已经过滤了
-                        status: 'pending' as const,
-                        logs: []
-                      }));
-
-                    console.log('New agents:', newAgents.map(a => a.name));
-                    analystPhase.agents = newAgents;
-
-                    console.log(`✅ 更新分析师团队: ${analystPhase.agents.length} 个分析师`);
-                  } else {
-                    console.warn('⚠️ Analyst phase not found!');
-                  }
-
-                  // 如果启用了执行交易，添加第5个阶段（交易执行）
-                  if (enable_trading_executor) {
-                    const hasTradingExecutorPhase = newPhases.some(p => p.id === 5);
-                    if (!hasTradingExecutorPhase) {
-                      console.log('✅ 添加交易执行阶段');
-                      newPhases.push({
-                        id: 5,
-                        name: '交易执行',
-                        description: '执行交易操作',
-                        icon: 'fa-robot',
-                        status: 'pending',
-                        agents: [
-                          { name: '执行交易员', status: 'pending', logs: [] }
-                        ]
-                      });
-                    }
-                  } else {
-                    // 如果未启用，移除交易执行阶段
-                    newPhases = newPhases.filter(p => p.id !== 5);
-                  }
-
-                  return newPhases;
-                });
-              } else {
-                console.warn('⚠️ Invalid selected_analysts:', selected_analysts);
-              }
+              setPhases(prevPhases => applyProgressConfig(prevPhases, message.data));
             } else if (message.type === 'log') {
               const { agent, message: logMsg, progress: logProgress, phase, step } = message.data;
 
@@ -380,26 +231,6 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
               if (agent && phase) {
                 setPhases(prevPhases => {
                   const newPhases = [...prevPhases];
-
-                  // 查找对应的阶段
-                  // 智能体到阶段的映射
-                  const agentToPhaseMap: { [key: string]: number } = {
-                    'system': 0,  // system 也显示在第一阶段
-                    'market': 0,
-                    'social': 0,
-                    'news': 0,
-                    'fundamentals': 0,
-                    'researcher': 1,
-                    'bull': 1,
-                    'bear': 1,
-                    'invest_judge': 1,    // Research Manager 结束研究辩论 band
-                    'trader': 2,
-                    'risky': 3,
-                    'neutral': 3,
-                    'safe': 3,
-                    'risk_manager': 4,    // Risk Judge 是独立的最终裁决 band（终末节点）
-                    'trading_executor': 4, // 已废弃；保留兜底
-                  };
 
                   // 阶段名称到索引的映射（兼容旧格式）
                   const phaseMap: { [key: string]: number } = {
@@ -418,11 +249,13 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                     '风险评估': 3,
                     '风险管理': 3,
                     '完成阶段': 4,
-                    'Trading Executor': 4  // 执行交易员在风险管理之后
                   };
 
                   // 优先使用智能体映射，其次使用阶段映射
-                  let phaseIdx = agentToPhaseMap[agent] ?? phaseMap[phase] ?? 0;
+                  let phaseIdx = phaseIndexForAgent(agent, newPhases);
+                  if (phaseIdx === 0 && agent !== 'system' && !['market', 'social', 'news', 'fundamentals'].includes(agent)) {
+                    phaseIdx = phaseMap[phase] ?? 0;
+                  }
 
                   // 确保 phaseIdx 在有效范围内
                   if (phaseIdx < 0) phaseIdx = 0;
@@ -454,7 +287,6 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                         'neutral': '中性风险分析师',
                         'safe': '保守风险分析师',
                         'risk_manager': '风险裁决',
-                        'trading_executor': '执行交易员'
                       };
 
                       const displayName = agentNameMap[agent] || agent;

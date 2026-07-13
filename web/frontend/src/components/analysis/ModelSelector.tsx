@@ -14,8 +14,9 @@ import { useUserLLMSettings } from '@/hooks/useUserLLMSettings';
  * This component deliberately reads ONLY:
  *   - the user's personal LLM settings (display_name + shallow/deep model values), and
  *   - the non-sensitive `config.models[*][shallow|deep]` labels (display labels only).
- * It never reads `config.system_default`, `config.llm_providers[].url`,
- * `AdminLLMProvider.api_key`, `hasLocalKey(...)` or any masked/raw key.
+ * It uses `config.system_default.provider_name` only as an internal lookup key
+ * for models already exposed in `config.models`; it never renders the system
+ * default's provider, endpoint, key state, or provenance.
  *
  * Provider / backend_url / api_key are resolved silently by the parent when it
  * builds the launch payload; they are not surfaced in this UI.
@@ -82,6 +83,29 @@ export function ModelSelector({ config, value, onChange, disabled, id = 'analysi
           ? `${shallowLabel} / ${deepLabel}`
           : deepLabel || shallowLabel;
       push({ provider, shallow, deep, label });
+    }
+
+    // A system model is a valid analysis fallback even when the user has no
+    // personal provider. The only trusted presentation source is the model
+    // catalogue; system_default is used strictly to locate its provider key.
+    const systemProvider = config?.system_default?.provider_name;
+    const systemModels = config?.models?.[String(systemProvider || '').toLowerCase()];
+    if (systemProvider && systemModels) {
+      const shallowModels = Array.isArray(systemModels.shallow) ? systemModels.shallow : [];
+      const deepModels = Array.isArray(systemModels.deep) ? systemModels.deep : [];
+      const count = Math.max(shallowModels.length, deepModels.length);
+
+      for (let index = 0; index < count; index += 1) {
+        const shallow = shallowModels[index]?.value || deepModels[index]?.value || '';
+        const deep = deepModels[index]?.value || shallow;
+        const shallowLabel = shallowModels[index]?.label || shallow;
+        const deepLabel = deepModels[index]?.label || deep;
+        const label =
+          shallowLabel && deepLabel && shallowLabel !== deepLabel
+            ? `${shallowLabel} / ${deepLabel}`
+            : deepLabel || shallowLabel;
+        push({ provider: systemProvider, shallow, deep, label });
+      }
     }
     return list;
   }, [llmSettings, config]);

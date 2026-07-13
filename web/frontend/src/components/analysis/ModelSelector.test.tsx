@@ -98,11 +98,48 @@ describe('ModelSelector — model-only privacy boundary', () => {
 
   it('shows the actionable recovery message when no usable model exists', () => {
     mockSettings({ providers: [] });
-    renderWithQuery(<ModelSelector config={sensitiveConfig} onChange={vi.fn()} />);
+    renderWithQuery(<ModelSelector config={{ models: {} }} onChange={vi.fn()} />);
 
     expect(screen.getByText(NO_MODEL_MESSAGE)).toBeInTheDocument();
     // Recovery message must not leak whether a system/default provider exists.
     expect(screen.queryByText(/系统默认/)).toBeNull();
     expect(screen.queryByRole('combobox')).toBeNull();
+  });
+
+  it('makes an administrator-provided system model selectable without exposing its provenance', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    mockSettings({ providers: [] });
+
+    renderWithQuery(
+      <ModelSelector
+        config={{
+          models: {
+            system: {
+              shallow: [{ value: 'system-fast', label: 'System Fast' }],
+              deep: [{ value: 'system-reasoning', label: 'System Reasoning' }],
+            },
+          },
+          system_default: {
+            provider_name: 'system',
+            display_name: 'Private administrator provider',
+            base_url: 'https://private.example.test',
+            api_key_masked: 'sk-system-secret',
+          },
+        }}
+        onChange={onChange}
+      />,
+    );
+
+    expect(screen.getByRole('option', { name: 'System Fast / System Reasoning' })).toBeInTheDocument();
+    expect(screen.queryByText(/系统默认|administrator provider|private\.example|sk-system-secret/i)).toBeNull();
+
+    await user.selectOptions(screen.getByRole('combobox'), 'System Fast / System Reasoning');
+    expect(onChange).toHaveBeenCalledWith({
+      provider: 'system',
+      shallow: 'system-fast',
+      deep: 'system-reasoning',
+      label: 'System Fast / System Reasoning',
+    });
   });
 });
