@@ -10,6 +10,8 @@ import { AppNavbar } from '@/components/common/AppNavbar';
 import { Footer } from '@/components/common/Footer';
 import { ProviderList } from '@/components/admin/llm-config/ProviderList';
 import { ModelList } from '@/components/admin/llm-config/ModelList';
+import { PageLoading } from '@/components/ui/PageLoading';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { ProviderForm } from '@/components/admin/llm-config/ProviderForm';
 import { ModelForm } from '@/components/admin/llm-config/ModelForm';
 import { ConfirmDialog } from '@/components/admin/llm-config/ConfirmDialog';
@@ -47,7 +49,7 @@ export default function LLMConfigPage() {
   }, [user, authLoading, router]);
 
   // 获取供应商列表
-  const { data: providers, isLoading: providersLoading, refetch: refetchProviders } = useQuery({
+  const { data: providers, isLoading: providersLoading, isError: providersError, error: providersLoadError, refetch: refetchProviders } = useQuery({
     queryKey: ['admin', 'llm-providers'],
     queryFn: async () => {
       const token = localStorage.getItem('access_token');
@@ -61,7 +63,7 @@ export default function LLMConfigPage() {
   });
 
   // 获取模型列表
-  const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useQuery({
+  const { data: models, isLoading: modelsLoading, isError: modelsError, error: modelsLoadError, refetch: refetchModels } = useQuery({
     queryKey: ['admin', 'llm-models'],
     queryFn: async () => {
       const token = localStorage.getItem('access_token');
@@ -164,14 +166,7 @@ export default function LLMConfigPage() {
   };
 
   if (authLoading || !user || user.role !== 'admin') {
-    return (
-      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
-        <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-          <p className="text-text-secondary">加载中...</p>
-        </div>
-      </div>
-    );
+    return <PageLoading message="正在验证管理员权限..." />;
   }
 
   return (
@@ -236,10 +231,13 @@ export default function LLMConfigPage() {
             </div>
 
             {providersLoading ? (
-              <div className="text-center py-12">
-                <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-                <p className="text-text-secondary">加载中...</p>
-              </div>
+              <PageLoading message="正在加载供应商目录..." />
+            ) : providersError ? (
+              <ErrorState
+                title="供应商目录加载失败"
+                description={providersLoadError instanceof Error ? providersLoadError.message : '无法读取供应商目录。'}
+                onRetry={() => refetchProviders()}
+              />
             ) : (
               <ProviderList
                 providers={providers || []}
@@ -269,10 +267,13 @@ export default function LLMConfigPage() {
             </div>
 
             {modelsLoading ? (
-              <div className="text-center py-12">
-                <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-                <p className="text-text-secondary">加载中...</p>
-              </div>
+              <PageLoading message="正在加载模型目录..." />
+            ) : modelsError ? (
+              <ErrorState
+                title="模型目录加载失败"
+                description={modelsLoadError instanceof Error ? modelsLoadError.message : '无法读取模型目录。'}
+                onRetry={() => refetchModels()}
+              />
             ) : (
               <ModelList
                 models={models || []}

@@ -82,6 +82,8 @@ export interface SystemDefaultProviderSummary {
   has_api_key: boolean;          // 系统 KEY，后端持有
   api_key_masked: string | null; // 脱敏尾号，如 "sk-***abcd"
   is_active: boolean;
+  shallow_model?: string | null;
+  deep_model?: string | null;
 }
 
 export interface AppConfigWithSystemDefault extends AppConfig {

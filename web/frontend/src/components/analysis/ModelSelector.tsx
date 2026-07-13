@@ -12,10 +12,11 @@ import { useUserLLMSettings } from '@/hooks/useUserLLMSettings';
  *              system-default status, backend credential source.
  *
  * This component deliberately reads ONLY:
- *   - the user's personal LLM settings (display_name + shallow/deep model values), and
+ *   - the user's personal LLM settings (display_name + shallow/deep model values),
+ *   - the system-default provider's non-sensitive model values, and
  *   - the non-sensitive `config.models[*][shallow|deep]` labels (display labels only).
- * It never reads `config.system_default`, `config.llm_providers[].url`,
- * `AdminLLMProvider.api_key`, `hasLocalKey(...)` or any masked/raw key.
+ * It never reads a provider display name, `base_url`, `api_key_masked`,
+ * `AdminLLMProvider.api_key`, `hasLocalKey(...)` or any raw key.
  *
  * Provider / backend_url / api_key are resolved silently by the parent when it
  * builds the launch payload; they are not surfaced in this UI.
@@ -75,6 +76,23 @@ export function ModelSelector({ config, value, onChange, disabled, id = 'analysi
       const provider = p.provider_name;
       const shallow = p.shallow_model || '';
       const deep = p.deep_model || shallow;
+      const shallowLabel = labelFor(config, provider, 'shallow', shallow);
+      const deepLabel = labelFor(config, provider, 'deep', deep);
+      const label =
+        shallowLabel && deepLabel && shallowLabel !== deepLabel
+          ? `${shallowLabel} / ${deepLabel}`
+          : deepLabel || shallowLabel;
+      push({ provider, shallow, deep, label });
+    }
+
+    // A user without a personal provider must still be able to launch with the
+    // backend-managed default. Only its model pair is used here; its provenance
+    // and credentials stay outside the rendered UI.
+    const systemDefault = config?.system_default;
+    if (systemDefault?.provider_name) {
+      const provider = systemDefault.provider_name;
+      const shallow = systemDefault.shallow_model || '';
+      const deep = systemDefault.deep_model || shallow;
       const shallowLabel = labelFor(config, provider, 'shallow', shallow);
       const deepLabel = labelFor(config, provider, 'deep', deep);
       const label =

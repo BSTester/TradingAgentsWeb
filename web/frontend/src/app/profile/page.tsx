@@ -7,6 +7,7 @@ import { AppNavbar } from '@/components/common/AppNavbar';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { Footer } from '@/components/common/Footer';
 import { AISettingsCard } from '@/components/profile/AISettingsCard';
+import { PageLoading } from '@/components/ui/PageLoading';
 
 export default function ProfilePage() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -68,14 +69,7 @@ export default function ProfilePage() {
   };
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
-        <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-          <p className="text-text-secondary">加载中...</p>
-        </div>
-      </div>
-    );
+    return <PageLoading message="正在加载个人中心..." />;
   }
 
   if (!user) {

@@ -11,6 +11,9 @@ import { AppNavbar } from '@/components/common/AppNavbar';
 import { Footer } from '@/components/common/Footer';
 import { ResponsiveUserCard } from '@/components/admin/ResponsiveUserCard';
 import { useIsMobile } from '@/hooks/useMediaQuery';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { PageLoading } from '@/components/ui/PageLoading';
 
 interface User {
   id: number;
@@ -278,14 +281,7 @@ export default function UserManagementPage() {
   };
 
   if (authLoading || !user || user.role !== 'admin') {
-    return (
-      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
-        <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-          <p className="text-text-secondary">加载中...</p>
-        </div>
-      </div>
-    );
+    return <PageLoading message="正在验证管理员权限..." />;
   }
 
   return (
@@ -367,21 +363,9 @@ export default function UserManagementPage() {
           </div>
 
           {isLoading ? (
-            <div className="p-12 text-center">
-              <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-              <p className="text-text-secondary">加载中...</p>
-            </div>
+            <PageLoading message="正在加载用户列表..." />
           ) : isError ? (
-            <div className="p-12 text-center">
-              <i className="fas fa-exclamation-triangle text-4xl text-danger-500 mb-4" />
-              <p className="text-text-secondary mb-4">加载失败</p>
-              <button
-                onClick={() => refetch()}
-                className="px-4 py-2 bg-accent-primary text-dark-primary rounded-lg hover:bg-accent-secondary"
-              >
-                重试
-              </button>
-            </div>
+            <ErrorState title="用户列表加载失败" onRetry={() => refetch()} />
           ) : data && data.users.length > 0 ? (
             <>
               {isMobile ? (
@@ -514,11 +498,7 @@ export default function UserManagementPage() {
               )}
             </>
           ) : (
-            <div className="p-12 text-center">
-              <div className="text-text-muted text-6xl mb-4">👥</div>
-              <h3 className="text-lg font-medium text-text-primary mb-2">暂无用户</h3>
-              <p className="text-text-secondary">系统中还没有注册用户</p>
-            </div>
+            <EmptyState icon="fa-users" title="暂无用户" description="系统中还没有注册用户。" />
           )}
         </div>
       </div>

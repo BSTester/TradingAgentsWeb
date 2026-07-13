@@ -45,6 +45,11 @@ interface WebSocketMessage {
   };
 }
 
+// These IDs are stable UI identities. The terminal Risk Judge band is always
+// present; the legacy optional executor may only occupy its own later ID.
+const RISK_JUDGE_PHASE_ID = 5;
+const TRADING_EXECUTOR_PHASE_ID = 6;
+
 export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onShowToast }: AnalysisProgressProps) {
   const [progress, setProgress] = useState(0);
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
@@ -136,7 +141,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
       ]
     },
     {
-      id: 5,
+      id: RISK_JUDGE_PHASE_ID,
       name: '最终裁决',
       description: '风险裁决（Risk Judge）输出最终交易建议',
       icon: 'fa-gavel',
@@ -200,13 +205,13 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
           if (status.enable_trading_executor) {
             setEnableTradingExecutor(true);
             setPhases(prevPhases => {
-              const hasTradingExecutorPhase = prevPhases.some(p => p.id === 5);
+              const hasTradingExecutorPhase = prevPhases.some(p => p.id === TRADING_EXECUTOR_PHASE_ID);
               if (!hasTradingExecutorPhase) {
                 console.log('✅ Adding trading executor phase from status');
                 return [
                   ...prevPhases,
                   {
-                    id: 5,
+                    id: TRADING_EXECUTOR_PHASE_ID,
                     name: '交易执行',
                     description: '执行交易操作',
                     icon: 'fa-robot',
@@ -344,11 +349,11 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
 
                   // 如果启用了执行交易，添加第5个阶段（交易执行）
                   if (enable_trading_executor) {
-                    const hasTradingExecutorPhase = newPhases.some(p => p.id === 5);
+                    const hasTradingExecutorPhase = newPhases.some(p => p.id === TRADING_EXECUTOR_PHASE_ID);
                     if (!hasTradingExecutorPhase) {
                       console.log('✅ 添加交易执行阶段');
                       newPhases.push({
-                        id: 5,
+                        id: TRADING_EXECUTOR_PHASE_ID,
                         name: '交易执行',
                         description: '执行交易操作',
                         icon: 'fa-robot',
@@ -360,7 +365,8 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                     }
                   } else {
                     // 如果未启用，移除交易执行阶段
-                    newPhases = newPhases.filter(p => p.id !== 5);
+                    // Never remove the independent terminal Risk Judge band.
+                    newPhases = newPhases.filter(p => p.id !== TRADING_EXECUTOR_PHASE_ID);
                   }
 
                   return newPhases;
@@ -382,6 +388,9 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                   const newPhases = [...prevPhases];
 
                   // 查找对应的阶段
+                  const executorPhaseIndex = newPhases.findIndex(
+                    (phase) => phase.id === TRADING_EXECUTOR_PHASE_ID,
+                  );
                   // 智能体到阶段的映射
                   const agentToPhaseMap: { [key: string]: number } = {
                     'system': 0,  // system 也显示在第一阶段
@@ -398,7 +407,9 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                     'neutral': 3,
                     'safe': 3,
                     'risk_manager': 4,    // Risk Judge 是独立的最终裁决 band（终末节点）
-                    'trading_executor': 4, // 已废弃；保留兜底
+                    // Ignore stale executor logs when the optional band is absent;
+                    // they must never be folded into the Risk Judge band.
+                    'trading_executor': executorPhaseIndex,
                   };
 
                   // 阶段名称到索引的映射（兼容旧格式）
@@ -418,7 +429,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
                     '风险评估': 3,
                     '风险管理': 3,
                     '完成阶段': 4,
-                    'Trading Executor': 4  // 执行交易员在风险管理之后
+                    'Trading Executor': executorPhaseIndex,
                   };
 
                   // 优先使用智能体映射，其次使用阶段映射

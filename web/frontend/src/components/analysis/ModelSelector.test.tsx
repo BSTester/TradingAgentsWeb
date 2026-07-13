@@ -48,6 +48,25 @@ const sensitiveConfig = {
   llm_providers: [{ value: 'openai', label: 'OpenAI', url: 'https://api.openai.com' }],
 };
 
+const systemDefaultOnlyConfig = {
+  models: {
+    oneinfinity: {
+      shallow: [{ value: 'gpt-5-mini', label: 'GPT-5 Mini' }],
+      deep: [{ value: 'gpt-5.5', label: 'GPT-5.5' }],
+    },
+  },
+  // Deliberately includes values that must remain absent from the DOM.
+  system_default: {
+    provider_name: 'oneinfinity',
+    display_name: 'OneInfinity',
+    shallow_model: 'gpt-5-mini',
+    deep_model: 'gpt-5.5',
+    base_url: 'https://internal.example/v1',
+    api_key_masked: 'sk-...system',
+    has_api_key: true,
+  },
+};
+
 describe('ModelSelector — model-only privacy boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -94,6 +113,27 @@ describe('ModelSelector — model-only privacy boundary', () => {
         label: 'GPT-4o Mini / GPT-4o',
       }),
     );
+  });
+
+  it('offers the system-default model when no personal provider is configured without exposing its source', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    mockSettings({ providers: [] });
+    const { container } = renderWithQuery(
+      <ModelSelector config={systemDefaultOnlyConfig} onChange={onChange} />,
+    );
+
+    expect(screen.getByText('GPT-5 Mini / GPT-5.5')).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/OneInfinity|oneinfinity|internal\.example|sk-\.\.\.system|系统默认/);
+
+    await user.selectOptions(screen.getByRole('combobox'), 'GPT-5 Mini / GPT-5.5');
+
+    expect(onChange).toHaveBeenCalledWith({
+      provider: 'oneinfinity',
+      shallow: 'gpt-5-mini',
+      deep: 'gpt-5.5',
+      label: 'GPT-5 Mini / GPT-5.5',
+    });
   });
 
   it('shows the actionable recovery message when no usable model exists', () => {

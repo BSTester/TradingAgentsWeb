@@ -12,6 +12,8 @@ import { ConfirmDialog } from '@/components/admin/llm-config/ConfirmDialog';
 import ProviderList from '@/components/profile/ProviderList';
 import ProviderFormDrawer from '@/components/profile/ProviderFormDrawer';
 import { UserLLMProviderSetting } from '@/lib/types';
+import { PageLoading } from '@/components/ui/PageLoading';
+import { ErrorState } from '@/components/ui/ErrorState';
 
 function providerKeyOf(p: { provider_name?: string; id?: string | number }): string {
   return String(p.provider_name || p.id || '').trim();
@@ -21,7 +23,7 @@ export default function AISettingsPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { toast, showToast, hideToast } = useToast();
-  const { data, isLoading, setDefault, deleteProvider } = useUserLLMSettings();
+  const { data, isLoading, isError, error, refetch, setDefault, deleteProvider } = useUserLLMSettings();
   const { clearLocalKey } = useLocalLLMKeys();
 
   const [showForm, setShowForm] = useState(false);
@@ -66,13 +68,20 @@ export default function AISettingsPage() {
   };
 
   if (authLoading || !user) {
+    return <PageLoading message="正在加载 AI 设置..." />;
+  }
+
+  if (isLoading) {
+    return <PageLoading message="正在加载个人模型..." />;
+  }
+
+  if (isError) {
     return (
-      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
-        <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-          <p className="text-text-secondary">加载中...</p>
-        </div>
-      </div>
+      <ErrorState
+        title="个人模型加载失败"
+        description={error instanceof Error ? error.message : '无法加载个人模型。'}
+        onRetry={() => refetch()}
+      />
     );
   }
 

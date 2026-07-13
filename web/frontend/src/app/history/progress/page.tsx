@@ -7,6 +7,8 @@ import { AnalysisProgress } from '@/components/analysis/AnalysisProgress';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { Footer } from '@/components/common/Footer';
 import { AppNavbar } from '@/components/common/AppNavbar';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { PageLoading } from '@/components/ui/PageLoading';
 
 function HistoryProgressContent() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -43,25 +45,11 @@ function HistoryProgressContent() {
   }, [user, authLoading, router]);
 
   if (!analysisId) {
-    return (
-      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
-        <div className="text-center">
-          <i className="fas fa-exclamation-triangle text-4xl text-danger-500 mb-4" />
-          <p className="text-text-secondary">缺少分析 ID</p>
-        </div>
-      </div>
-    );
+    return <ErrorState title="缺少分析 ID" description="请从分析历史重新打开进度。" onRetry={handleBackToHistory} />;
   }
 
   if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
-        <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-          <p className="text-text-secondary">加载中...</p>
-        </div>
-      </div>
-    );
+    return <PageLoading message="正在连接分析进度..." />;
   }
 
   return (
@@ -116,14 +104,7 @@ function HistoryProgressContent() {
 
 export default function HistoryProgressPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
-        <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-          <p className="text-text-secondary">加载中...</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<PageLoading message="正在连接分析进度..." />}>
       <HistoryProgressContent />
     </Suspense>
   );

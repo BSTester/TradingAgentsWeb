@@ -7,6 +7,8 @@ import { Toast, useToast } from '@/components/ui/Toast';
 import { ConfirmDialog } from '@/components/admin/llm-config/ConfirmDialog';
 import { useSystemDefaultProvider } from '@/hooks/useSystemDefaultProvider';
 import type { AdminLLMProvider, SystemDefaultProviderSummary } from '@/lib/types';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { PageLoading } from '@/components/ui/PageLoading';
 
 function ProviderSummaryCard({ provider }: { provider: SystemDefaultProviderSummary }) {
   return (
@@ -154,6 +156,7 @@ export function SystemDefaultForm() {
   }, [systemDefault, providers, selectedId]);
 
   const isLoading = systemDefaultQuery.isLoading || providersQuery.isLoading;
+  const loadError = systemDefaultQuery.error || providersQuery.error;
 
   const selectedProvider = useMemo(
     () => providers.find((p) => p.id === selectedId) ?? null,
@@ -179,11 +182,19 @@ export function SystemDefaultForm() {
   };
 
   if (isLoading) {
+    return <PageLoading message="正在加载系统默认模型..." />;
+  }
+
+  if (loadError) {
     return (
-      <div className="text-center py-12" aria-busy="true">
-        <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" aria-hidden="true" />
-        <p className="text-text-secondary">加载中...</p>
-      </div>
+      <ErrorState
+        title="系统默认模型加载失败"
+        description={loadError instanceof Error ? loadError.message : '无法读取系统默认模型。'}
+        onRetry={() => {
+          systemDefaultQuery.refetch();
+          providersQuery.refetch();
+        }}
+      />
     );
   }
 

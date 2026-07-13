@@ -7,6 +7,8 @@ import { AnalysisResults } from '@/components/analysis/AnalysisResults';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { Footer } from '@/components/common/Footer';
 import { AppNavbar } from '@/components/common/AppNavbar';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { PageLoading } from '@/components/ui/PageLoading';
 
 function AnalysisDetailContent() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -70,25 +72,11 @@ function AnalysisDetailContent() {
   }, []);
 
   if (!analysisId) {
-    return (
-      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
-        <div className="text-center">
-          <i className="fas fa-exclamation-triangle text-4xl text-danger-500 mb-4" />
-          <p className="text-text-secondary">缺少分析 ID</p>
-        </div>
-      </div>
-    );
+    return <ErrorState title="缺少分析 ID" description="请从分析历史或排行榜重新打开报告。" onRetry={handleBackToHome} />;
   }
 
   if (!fromLeaderboard && (authLoading || !user)) {
-    return (
-      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
-        <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-          <p className="text-text-secondary">加载中...</p>
-        </div>
-      </div>
-    );
+    return <PageLoading message="正在加载分析报告..." />;
   }
 
   const scrollToTop = () => {
@@ -167,14 +155,7 @@ function AnalysisDetailContent() {
 
 export default function AnalysisDetailPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
-        <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-          <p className="text-text-secondary">加载中...</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<PageLoading message="正在加载分析报告..." />}>
       <AnalysisDetailContent />
     </Suspense>
   );

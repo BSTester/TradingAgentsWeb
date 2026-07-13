@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 /**
  * 全局 404 页面（WS-4 M5-S3 旧路由收口）。
@@ -21,24 +22,18 @@ export default function NotFound() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-dark-primary px-4">
-      <div className="max-w-md w-full text-center">
-        <div className="mb-6">
-          <i className="fas fa-comments text-6xl text-accent-primary" />
-        </div>
-        <h1 className="text-3xl font-bold text-text-primary mb-2">页面已迁移</h1>
-        <p className="text-text-secondary mb-1">
-          您访问的页面已下线或已合并至对话式分析工作台。
-        </p>
-        <p className="text-text-tertiary text-sm mb-8">
-          即将在几秒后自动跳转到对话工作台…
-        </p>
-        <a
-          href="/"
-          className="inline-flex items-center justify-center px-6 py-3 rounded-lg bg-gradient-to-r from-accent-primary to-accent-secondary text-dark-primary font-semibold hover:shadow-glow-cyan transition-all"
-        >
-          <i className="fas fa-arrow-right mr-2" />
-          前往对话工作台
-        </a>
+      <div className="max-w-md w-full">
+        <EmptyState
+          icon="fa-comments"
+          title="页面已迁移"
+          description="您访问的页面已下线或已合并至对话式分析工作台，即将在几秒后自动跳转。"
+          action={
+            <a href="/" className="inline-flex items-center justify-center px-6 py-3 rounded-lg bg-gradient-to-r from-accent-primary to-accent-secondary text-dark-primary font-semibold hover:shadow-glow-cyan transition-all">
+              <i className="fas fa-arrow-right mr-2" />
+              前往对话工作台
+            </a>
+          }
+        />
       </div>
     </div>
   );

@@ -7,6 +7,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { logger } from '@/utils/logger';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { PageLoading } from '@/components/ui/PageLoading';
 
 interface AnalysisResultsProps {
   analysisId: string;
@@ -925,19 +927,16 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
   };
 
   if (loading) {
+    return <PageLoading message="正在加载分析结果..." />;
+  }
+
+  if (isError || !results) {
     return (
-      <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-12">
-        <div className="text-center">
-          <div className="relative inline-block mb-4">
-            {/* 外圈旋转 */}
-            <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-            {/* 内圈反向旋转 */}
-            <div className="absolute top-2 left-2 w-16 h-16 border-4 border-purple-200 border-b-purple-600 rounded-full animate-spin-reverse"></div>
-          </div>
-          <p className="text-text-primary font-medium text-lg">正在加载分析结果...</p>
-          <p className="text-sm text-text-tertiary mt-2">正在获取详细报告，请稍候</p>
-        </div>
-      </div>
+      <ErrorState
+        title="分析结果加载失败"
+        description={error instanceof Error ? error.message : '未能取得这份分析报告。'}
+        onRetry={() => window.location.reload()}
+      />
     );
   }
 
