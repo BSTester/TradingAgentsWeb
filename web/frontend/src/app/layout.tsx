@@ -28,16 +28,26 @@ export default function RootLayout({
             issues/WS-86). Now loaded non-blockingly: the inline script appends a
             <link media="print"> (never blocks rendering) and swaps to media="all"
             on load. createElement + onload is set synchronously, so the swap can't
-            be missed by framework hydration timing. <noscript> applies it eagerly. */}
-        <link rel="preload" href="/lib/font-awesome/css/all.min.css" as="style" />
+            be missed by framework hydration timing. <noscript> applies it eagerly.
+            ---
+            WS-97: we load the SUBSET (`icons.subset.css`), not the full
+            `all.min.css`. The non-blocking load applies the stylesheet after FCP,
+            and the full ~99 kB / ~2000-selector sheet forced one large
+            style-recalculation long task in the FCP→TTI window (= the homepage TBT
+            regression). The subset keeps only the ~90 icons actually used plus the
+            base/animation rules (~20 kB, ~200 selectors), so applying it after FCP
+            is no longer a long task, while FCP/LCP stay improved. Regenerate with
+            `npm run build:fa-subset`; the `font-awesome-subset` test guards that
+            every icon referenced in src/ is present in the subset. */}
+        <link rel="preload" href="/lib/font-awesome/css/icons.subset.css" as="style" />
         <script
           dangerouslySetInnerHTML={{
             __html:
-              '!function(){var l=document.createElement("link");l.rel="stylesheet";l.href="/lib/font-awesome/css/all.min.css";l.media="print";l.onload=function(){this.media="all"};document.head.appendChild(l);}();',
+              '!function(){var l=document.createElement("link");l.rel="stylesheet";l.href="/lib/font-awesome/css/icons.subset.css";l.media="print";l.onload=function(){this.media="all"};document.head.appendChild(l);}();',
           }}
         />
         <noscript>
-          <link rel="stylesheet" href="/lib/font-awesome/css/all.min.css" />
+          <link rel="stylesheet" href="/lib/font-awesome/css/icons.subset.css" />
         </noscript>
       </head>
       <body className="antialiased">
