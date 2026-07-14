@@ -11,6 +11,7 @@ import { AppNavbar } from '@/components/common/AppNavbar';
 import { Footer } from '@/components/common/Footer';
 import { ResponsiveUserCard } from '@/components/admin/ResponsiveUserCard';
 import { useIsMobile } from '@/hooks/useMediaQuery';
+import { RouteDataState } from '@/components/ui/RouteDataState';
 
 interface User {
   id: number;
@@ -366,22 +367,8 @@ export default function UserManagementPage() {
             </h3>
           </div>
 
-          {isLoading ? (
-            <div className="p-12 text-center">
-              <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-              <p className="text-text-secondary">加载中...</p>
-            </div>
-          ) : isError ? (
-            <div className="p-12 text-center">
-              <i className="fas fa-exclamation-triangle text-4xl text-danger-500 mb-4" />
-              <p className="text-text-secondary mb-4">加载失败</p>
-              <button
-                onClick={() => refetch()}
-                className="px-4 py-2 bg-accent-primary text-dark-primary rounded-lg hover:bg-accent-secondary"
-              >
-                重试
-              </button>
-            </div>
+          {isLoading || isError || !data?.users.length ? (
+            <RouteDataState loading={isLoading} loadingMessage="正在加载用户列表..." error={isError ? new Error('获取用户列表失败') : null} errorTitle="用户列表加载失败" onRetry={() => void refetch()} empty={!isLoading && !isError && !data?.users.length} emptyIcon="fa-users" emptyTitle="暂无用户" emptyDescription="系统中还没有注册用户。">{null}</RouteDataState>
           ) : data && data.users.length > 0 ? (
             <>
               {isMobile ? (

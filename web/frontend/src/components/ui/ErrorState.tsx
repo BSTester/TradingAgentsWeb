@@ -7,10 +7,10 @@ import React from 'react';
  * Use for failed fetches / data-source errors. Always offer a retry path.
  */
 export interface ErrorStateProps {
-  title?: string;
-  description?: string;
+  title?: string | undefined;
+  description?: string | undefined;
   /** Called when the user clicks "重试". Omit to hide the retry button. */
-  onRetry?: () => void;
+  onRetry?: (() => void) | undefined;
 }
 
 export function ErrorState({

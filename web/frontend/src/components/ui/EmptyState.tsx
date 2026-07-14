@@ -8,11 +8,11 @@ import React from 'react';
  */
 export interface EmptyStateProps {
   /** Short glyph (Font Awesome class) or short text symbol. */
-  icon?: string;
+  icon?: string | undefined;
   title: string;
-  description?: string;
+  description?: string | undefined;
   /** Optional call-to-action node (button / link). */
-  action?: React.ReactNode;
+  action?: React.ReactNode | undefined;
 }
 
 export function EmptyState({ icon = 'fa-circle-plus', title, description, action }: EmptyStateProps) {

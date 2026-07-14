@@ -3,12 +3,13 @@
 import React from 'react';
 
 interface PageLoadingProps {
-    message?: string;
+    message?: string | undefined;
+    fullScreen?: boolean | undefined;
 }
 
-export function PageLoading({ message = '加载中...' }: PageLoadingProps) {
+export function PageLoading({ message = '加载中...', fullScreen = true }: PageLoadingProps) {
     return (
-        <div className="fixed inset-0 bg-dark-primary/90 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className={`${fullScreen ? 'fixed inset-0 z-50' : 'min-h-[230px] rounded-xl border border-dark-border'} bg-dark-primary/90 backdrop-blur-sm flex items-center justify-center`}>
             <div className="text-center">
                 <div className="relative inline-block">
                     {/* Outer ring */}

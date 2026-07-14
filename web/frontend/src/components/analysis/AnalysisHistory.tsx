@@ -8,6 +8,7 @@ import { useDeleteAnalysis } from '@/hooks/useDeleteAnalysis';
 import { queryKeys } from '@/lib/react-query';
 import { ResponsiveAnalysisCard } from './ResponsiveAnalysisCard';
 import { useIsMobile } from '@/hooks/useMediaQuery';
+import { RouteDataState } from '@/components/ui/RouteDataState';
 
 
 interface AnalysisHistoryProps {
@@ -55,7 +56,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
   const deleteMutation = useDeleteAnalysis();
 
   // 使用 useQuery 获取分析历史
-  const { data, isLoading, isError, error } = useQuery<AnalysisListResponse>({
+  const { data, isLoading, isError, error, refetch } = useQuery<AnalysisListResponse>({
     queryKey: queryKeys.analysis.list({ page, limit }),
     queryFn: async () => {
       const token = localStorage.getItem('access_token');
@@ -193,22 +194,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-12">
-        <div className="text-center">
-          <div className="relative inline-block mb-4">
-            {/* 外圈旋转 */}
-            <div className="w-20 h-20 border-4 border-accent-primary/20 border-t-accent-primary rounded-full animate-spin"></div>
-            {/* 内圈反向旋转 */}
-            <div className="absolute top-2 left-2 w-16 h-16 border-4 border-accent-secondary/20 border-b-accent-secondary rounded-full animate-spin-reverse"></div>
-          </div>
-          <p className="text-text-primary font-medium text-lg">正在加载分析历史...</p>
-          <p className="text-sm text-text-tertiary mt-2">正在获取您的分析记录</p>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading || isError) return <RouteDataState loading={isLoading} loadingMessage="正在加载分析历史..." error={isError ? (error instanceof Error ? error : new Error('获取分析历史失败')) : null} errorTitle="分析历史加载失败" onRetry={() => void refetch()}>{null}</RouteDataState>;
 
   return (
     <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border">
@@ -229,17 +215,7 @@ export function AnalysisHistory({ onBackToConfig, onViewResults, onViewProgress,
 
       <div className="p-4 md:p-6">
         {analyses.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-text-muted text-6xl mb-4">📊</div>
-            <h3 className="text-lg font-medium text-text-primary mb-2">暂无分析记录</h3>
-            <p className="text-text-secondary mb-4">您还没有创建任何股票分析</p>
-            <button
-              onClick={onBackToConfig}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              创建新分析
-            </button>
-          </div>
+          <RouteDataState empty emptyIcon="fa-chart-line" emptyTitle="暂无分析记录" emptyDescription="您还没有创建任何股票分析" emptyAction={<button onClick={onBackToConfig} className="px-4 py-2 bg-accent-primary text-dark-primary rounded-md hover:bg-accent-secondary">创建新分析</button>}>{null}</RouteDataState>
         ) : isMobile ? (
           // Mobile: Card layout
           <div className="space-y-3">
