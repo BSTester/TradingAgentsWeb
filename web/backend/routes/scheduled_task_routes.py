@@ -66,12 +66,15 @@ async def _task_payload(db: AsyncSession, task: ScheduledTask) -> dict:
         "ticker": task.ticker,
         "market": task.market,
         "is_enabled": task.is_enabled,
+        "status": task.status,
         "execution_cycle": _cycle_for_contract(task.execution_cycle, task.interval_days),
         "execution_time": task.execution_time,
         "interval_days": task.interval_days,
+        "day_of_week": task.day_of_week,
         "end_date": task.end_date.date().isoformat() if task.end_date else None,
         "next_run": _iso(task.next_run_time),
         "last_run": _iso(task.last_run_time),
+        "total_executions": task.total_executions,
         "last_report": await _last_report(db, task),
         "analysts": task.analysts,
         "research_depth": task.research_depth,
@@ -225,6 +228,10 @@ async def scheduled_task_stats(
         AnalysisRecord.user_id == current_user.id,
         AnalysisRecord.status.in_(["error", "interrupted"]),
     ))
+    completed_result = await db.execute(select(func.count(ScheduledTask.id)).where(
+        ScheduledTask.user_id == current_user.id,
+        ScheduledTask.status == "completed",
+    ))
     today = datetime.utcnow().date().isoformat()
     today_result = await db.execute(select(func.count(ScheduledTask.id)).where(
         ScheduledTask.user_id == current_user.id,
@@ -236,6 +243,7 @@ async def scheduled_task_stats(
             "paused": paused_result.scalar() or 0,
             "scheduled_today": today_result.scalar() or 0,
             "failed": failed_result.scalar() or 0,
+            "completed": completed_result.scalar() or 0,
         }
     }
 

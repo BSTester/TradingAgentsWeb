@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { useScheduledTasks, useDeleteScheduledTask, useUpdateScheduledTask } from '@/hooks/useScheduledTasks';
+import { useScheduledTasks, useScheduledTaskStats, useDeleteScheduledTask, useUpdateScheduledTask } from '@/hooks/useScheduledTasks';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { AppNavbar } from '@/components/common/AppNavbar';
@@ -21,9 +21,16 @@ export default function ScheduledTasksPage() {
   const limit = 10; // 每页显示10条
   const isMobile = useIsMobile();
   
-  const { data, isLoading, error } = useScheduledTasks(page, limit);
+  const { data: listData, isLoading, error } = useScheduledTasks(page, limit);
+  const { data: statsData } = useScheduledTaskStats();
   const deleteTask = useDeleteScheduledTask();
   const updateTask = useUpdateScheduledTask();
+
+  // 列表接口返回 { data: [...任务], meta: { total, ... } }；启用/暂停/完成统计来自独立的 /stats 全量接口，
+  // 不再用当页数据冒充总计。
+  const tasks = listData?.data ?? [];
+  const total = listData?.meta?.total ?? 0;
+  const stats = statsData?.data;
 
   // 认证保护逻辑
   useEffect(() => {
@@ -62,7 +69,7 @@ export default function ScheduledTasksPage() {
       setShowDeleteDialog(null);
       
       // 如果当前页删除后为空且页码>1，则回退到上一页
-      if (data?.items && data.items.length === 1 && page > 1) {
+      if (tasks.length === 1 && page > 1) {
         setPage(p => p - 1);
       }
       
@@ -78,7 +85,7 @@ export default function ScheduledTasksPage() {
     }
   };
 
-  const getExecutionCycleLabel = (cycle: string, intervalDays?: number, dayOfWeek?: string) => {
+  const getExecutionCycleLabel = (cycle: string, intervalDays?: number | null, dayOfWeek?: string | null) => {
     const labels: Record<string, string> = {
       daily: '每天',
       weekly: '每周',
@@ -147,6 +154,8 @@ export default function ScheduledTasksPage() {
     );
   }
 
+  // 列表接口不返回 `stats` 汇总对象；启用/暂停/完成统计改用独立的全量 /stats 接口（见上方 stats）。
+
   return (
     <div className="min-h-screen bg-dark-primary flex flex-col">
       {/* 顶部导航栏 */}
@@ -192,7 +201,7 @@ export default function ScheduledTasksPage() {
               </div>
               <div className="ml-3 md:ml-4">
                 <p className="text-xs md:text-sm font-medium text-text-secondary">总任务数</p>
-                <p className="text-xl md:text-2xl font-bold text-text-primary">{data?.total || 0}</p>
+                <p className="text-xl md:text-2xl font-bold text-text-primary">{total}</p>
               </div>
             </div>
           </div>
@@ -205,7 +214,7 @@ export default function ScheduledTasksPage() {
               <div className="ml-3 md:ml-4">
                 <p className="text-xs md:text-sm font-medium text-text-secondary">启用中</p>
                 <p className="text-xl md:text-2xl font-bold text-text-primary">
-                  {data?.stats?.enabled || 0}
+                  {stats?.running ?? 0}
                 </p>
               </div>
             </div>
@@ -219,7 +228,7 @@ export default function ScheduledTasksPage() {
               <div className="ml-3 md:ml-4">
                 <p className="text-xs md:text-sm font-medium text-text-secondary">已暂停</p>
                 <p className="text-xl md:text-2xl font-bold text-text-primary">
-                  {data?.stats?.paused || 0}
+                  {stats?.paused ?? 0}
                 </p>
               </div>
             </div>
@@ -233,7 +242,7 @@ export default function ScheduledTasksPage() {
               <div className="ml-3 md:ml-4">
                 <p className="text-xs md:text-sm font-medium text-text-secondary">已完成</p>
                 <p className="text-xl md:text-2xl font-bold text-text-primary">
-                  {data?.stats?.completed || 0}
+                  {stats?.completed ?? 0}
                 </p>
               </div>
             </div>
@@ -242,7 +251,7 @@ export default function ScheduledTasksPage() {
 
         {/* Task List */}
         <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border overflow-hidden">
-          {!data?.items || data.items.length === 0 ? (
+          {tasks.length === 0 ? (
             <div className="text-center py-12 px-4">
               <i className="fas fa-calendar-times text-4xl md:text-6xl text-text-tertiary mb-4" />
               <h3 className="text-responsive-h4 text-text-primary mb-2">暂无定期报告</h3>
@@ -260,7 +269,7 @@ export default function ScheduledTasksPage() {
           ) : isMobile ? (
             // Mobile: Card layout
             <div className="p-4 space-y-3">
-              {data.items.map((task) => (
+              {tasks.map((task) => (
                 <ResponsiveTaskCard
                   key={task.id}
                   task={task}
@@ -299,7 +308,7 @@ export default function ScheduledTasksPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-dark-secondary divide-y divide-dark-border">
-                  {data.items.map((task) => (
+                  {tasks.map((task) => (
                     <tr key={task.id} className="hover:bg-dark-tertiary transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -327,13 +336,13 @@ export default function ScheduledTasksPage() {
                         <div className="text-sm text-text-secondary">{task.execution_time} 北京时间</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {task.next_run_time ? (
+                        {task.next_run ? (
                           <div>
                             <div className="text-sm text-text-primary">
-                              {new Date(task.next_run_time).toLocaleString('zh-CN')}
+                              {new Date(task.next_run).toLocaleString('zh-CN')}
                             </div>
                             <div className="text-sm text-text-secondary">
-                              {formatDistanceToNow(new Date(task.next_run_time), {
+                              {formatDistanceToNow(new Date(task.next_run), {
                                 addSuffix: true,
                                 locale: zhCN
                               })}
@@ -383,12 +392,12 @@ export default function ScheduledTasksPage() {
           )}
 
           {/* Pagination */}
-          {data && data.items.length > 0 && data.total > limit && (
+          {tasks.length > 0 && total > limit && (
             <div className="mt-6 p-4 border-t border-dark-border">
               <div className="flex items-center justify-between">
                 {/* 左侧：显示信息 */}
                 <div className="text-sm text-text-secondary">
-                  显示第 {(page - 1) * limit + 1} - {Math.min(page * limit, data.total)} 条，共 {data.total} 条记录
+                  显示第 {(page - 1) * limit + 1} - {Math.min(page * limit, total)} 条，共 {total} 条记录
                 </div>
 
                 {/* 右侧：分页按钮 */}
@@ -406,7 +415,7 @@ export default function ScheduledTasksPage() {
                   {/* 页码 */}
                   <div className="flex items-center space-x-1">
                     {(() => {
-                      const totalPages = Math.max(1, Math.ceil(data.total / limit));
+                      const totalPages = Math.max(1, Math.ceil(total / limit));
                       
                       // 第一页
                       if (page > 3) {
@@ -427,7 +436,7 @@ export default function ScheduledTasksPage() {
 
                     {/* 当前页附近的页码 */}
                     {(() => {
-                      const totalPages = Math.max(1, Math.ceil(data.total / limit));
+                      const totalPages = Math.max(1, Math.ceil(total / limit));
                       return Array.from({ length: totalPages }, (_, i) => i + 1)
                         .filter(p => p >= page - 2 && p <= page + 2)
                         .map(p => (
@@ -447,7 +456,7 @@ export default function ScheduledTasksPage() {
 
                     {/* 最后一页 */}
                     {(() => {
-                      const totalPages = Math.max(1, Math.ceil(data.total / limit));
+                      const totalPages = Math.max(1, Math.ceil(total / limit));
                       
                       if (page < totalPages - 2) {
                         return (
@@ -469,10 +478,10 @@ export default function ScheduledTasksPage() {
                   {/* 下一页 */}
                   <button
                     onClick={() => {
-                      const totalPages = Math.max(1, Math.ceil(data.total / limit));
+                      const totalPages = Math.max(1, Math.ceil(total / limit));
                       setPage(p => Math.min(totalPages, p + 1));
                     }}
-                    disabled={page === Math.max(1, Math.ceil(data.total / limit))}
+                    disabled={page === Math.max(1, Math.ceil(total / limit))}
                     className="px-3 py-2 text-sm font-medium text-text-primary bg-dark-tertiary border border-dark-border rounded-md hover:bg-dark-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     下一页

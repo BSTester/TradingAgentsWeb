@@ -59,12 +59,20 @@ export default function PromptEditor({ agentType = 'intraday_trader', onSave }: 
     setMessage(null);
 
     try {
-      const data = await updatePromptTemplate(agentType, {
+      // 仅在填写后才附带可选字段，避免向 exactOptionalPropertyTypes 形参传入 undefined。
+      const payload: {
+        system_prompt: string;
+        template_name?: string;
+        description?: string;
+        version: string;
+      } = {
         system_prompt: editedPrompt,
-        template_name: templateName || undefined,
-        description: description || undefined,
         version: `${template?.version || '1.0'}_edited`,
-      });
+      };
+      if (templateName) payload.template_name = templateName;
+      if (description) payload.description = description;
+
+      const data = await updatePromptTemplate(agentType, payload);
 
       setTemplate(data);
       setMessage({
