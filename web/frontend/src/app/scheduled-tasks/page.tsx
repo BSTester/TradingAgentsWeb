@@ -147,6 +147,12 @@ export default function ScheduledTasksPage() {
     );
   }
 
+  // 列表接口不返回 `stats` 汇总对象，这里基于已加载的当页任务派生计数。
+  const loadedItems = data?.items ?? [];
+  const enabledCount = loadedItems.filter(t => t.status !== 'completed' && t.is_enabled).length;
+  const pausedCount = loadedItems.filter(t => t.status !== 'completed' && !t.is_enabled).length;
+  const completedCount = loadedItems.filter(t => t.status === 'completed').length;
+
   return (
     <div className="min-h-screen bg-dark-primary flex flex-col">
       {/* 顶部导航栏 */}
@@ -205,7 +211,7 @@ export default function ScheduledTasksPage() {
               <div className="ml-3 md:ml-4">
                 <p className="text-xs md:text-sm font-medium text-text-secondary">启用中</p>
                 <p className="text-xl md:text-2xl font-bold text-text-primary">
-                  {data?.stats?.enabled || 0}
+                  {enabledCount}
                 </p>
               </div>
             </div>
@@ -219,7 +225,7 @@ export default function ScheduledTasksPage() {
               <div className="ml-3 md:ml-4">
                 <p className="text-xs md:text-sm font-medium text-text-secondary">已暂停</p>
                 <p className="text-xl md:text-2xl font-bold text-text-primary">
-                  {data?.stats?.paused || 0}
+                  {pausedCount}
                 </p>
               </div>
             </div>
@@ -233,7 +239,7 @@ export default function ScheduledTasksPage() {
               <div className="ml-3 md:ml-4">
                 <p className="text-xs md:text-sm font-medium text-text-secondary">已完成</p>
                 <p className="text-xl md:text-2xl font-bold text-text-primary">
-                  {data?.stats?.completed || 0}
+                  {completedCount}
                 </p>
               </div>
             </div>
