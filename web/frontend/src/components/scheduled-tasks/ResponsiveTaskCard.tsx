@@ -3,31 +3,16 @@
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-
-interface ScheduledTask {
-  id: number;
-  task_name: string;
-  ticker: string;
-  market?: string;
-  execution_cycle: string;
-  execution_time: string;
-  interval_days?: number;
-  day_of_week?: string;
-  next_run_time?: string;
-  total_executions: number;
-  is_enabled: boolean;
-  status: string;
-  created_at: string;
-}
+import type { ScheduledTaskItem } from '@/lib/api';
 
 interface ResponsiveTaskCardProps {
-  task: ScheduledTask;
+  task: ScheduledTaskItem;
   onToggleEnabled: (taskId: number, currentEnabled: boolean) => void;
   onDelete: (taskId: number) => void;
 }
 
 export function ResponsiveTaskCard({ task, onToggleEnabled, onDelete }: ResponsiveTaskCardProps) {
-  const getExecutionCycleLabel = (cycle: string, intervalDays?: number, dayOfWeek?: string) => {
+  const getExecutionCycleLabel = (cycle: string, intervalDays?: number | null, dayOfWeek?: string | null) => {
     const labels: Record<string, string> = {
       daily: '每天',
       weekly: '每周',
@@ -107,10 +92,10 @@ export function ResponsiveTaskCard({ task, onToggleEnabled, onDelete }: Responsi
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div>
           <p className="text-xs text-text-tertiary mb-1">下次执行</p>
-          {task.next_run_time ? (
+          {task.next_run ? (
             <>
               <p className="text-sm font-semibold text-text-primary">
-                {new Date(task.next_run_time).toLocaleString('zh-CN', { 
+                {new Date(task.next_run).toLocaleString('zh-CN', { 
                   month: '2-digit', 
                   day: '2-digit', 
                   hour: '2-digit', 
@@ -118,7 +103,7 @@ export function ResponsiveTaskCard({ task, onToggleEnabled, onDelete }: Responsi
                 })}
               </p>
               <p className="text-xs text-text-tertiary">
-                {formatDistanceToNow(new Date(task.next_run_time), {
+                {formatDistanceToNow(new Date(task.next_run), {
                   addSuffix: true,
                   locale: zhCN
                 })}
