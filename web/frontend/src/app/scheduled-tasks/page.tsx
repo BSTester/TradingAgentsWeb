@@ -11,6 +11,7 @@ import { Footer } from '@/components/common/Footer';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { ResponsiveTaskCard } from '@/components/scheduled-tasks/ResponsiveTaskCard';
 import { useIsMobile } from '@/hooks/useMediaQuery';
+import { RouteDataState } from '@/components/ui/RouteDataState';
 
 export default function ScheduledTasksPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -21,7 +22,7 @@ export default function ScheduledTasksPage() {
   const limit = 10; // 每页显示10条
   const isMobile = useIsMobile();
   
-  const { data, isLoading, error } = useScheduledTasks(page, limit);
+  const { data, isLoading, error, refetch } = useScheduledTasks(page, limit);
   const deleteTask = useDeleteScheduledTask();
   const updateTask = useUpdateScheduledTask();
 
@@ -121,12 +122,7 @@ export default function ScheduledTasksPage() {
     return (
       <div className="min-h-screen bg-dark-primary flex flex-col">
         <AppNavbar user={user} onLogout={logout} />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-            <p className="text-text-secondary">加载定期报告...</p>
-          </div>
-        </div>
+          <div className="flex-1 flex items-center justify-center"><RouteDataState loading loadingMessage="正在加载定期报告…">{null}</RouteDataState></div>
         <Footer />
       </div>
     );
@@ -136,12 +132,7 @@ export default function ScheduledTasksPage() {
     return (
       <div className="min-h-screen bg-dark-primary flex flex-col">
         <AppNavbar user={user} onLogout={logout} />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <i className="fas fa-exclamation-triangle text-4xl text-danger-500 mb-4" />
-            <p className="text-text-secondary">加载失败：{error.message}</p>
-          </div>
-        </div>
+          <div className="flex-1 flex items-center justify-center"><RouteDataState error={error instanceof Error ? error : new Error('加载定期报告失败')} errorTitle="定期报告加载失败" onRetry={() => void refetch()}>{null}</RouteDataState></div>
         <Footer />
       </div>
     );
@@ -243,20 +234,13 @@ export default function ScheduledTasksPage() {
         {/* Task List */}
         <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border overflow-hidden">
           {!data?.items || data.items.length === 0 ? (
-            <div className="text-center py-12 px-4">
-              <i className="fas fa-calendar-times text-4xl md:text-6xl text-text-tertiary mb-4" />
-              <h3 className="text-responsive-h4 text-text-primary mb-2">暂无定期报告</h3>
-              <p className="text-responsive-body text-text-secondary mb-6">
-                您还没有创建任何定期报告
-              </p>
-              <a
+            <RouteDataState empty emptyIcon="fa-calendar-times" emptyTitle="暂无定期报告" emptyDescription="您还没有创建任何定期报告" emptyAction={<a
                 href="/"
                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-accent-primary to-accent-secondary hover:shadow-glow-cyan hover:scale-105 transition-all"
               >
                 <i className="fas fa-plus mr-2" />
                 创建定期报告
-              </a>
-            </div>
+              </a>}>{null}</RouteDataState>
           ) : isMobile ? (
             // Mobile: Card layout
             <div className="p-4 space-y-3">
