@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import { Toast, useToast } from '@/components/ui/Toast';
 import { ConfirmDialog } from '@/components/admin/llm-config/ConfirmDialog';
+import { RouteDataState } from '@/components/ui/RouteDataState';
 import { useSystemDefaultProvider } from '@/hooks/useSystemDefaultProvider';
 import type { AdminLLMProvider, SystemDefaultProviderSummary } from '@/lib/types';
 
@@ -154,6 +155,13 @@ export function SystemDefaultForm() {
   }, [systemDefault, providers, selectedId]);
 
   const isLoading = systemDefaultQuery.isLoading || providersQuery.isLoading;
+  const queryError = systemDefaultQuery.error || providersQuery.error;
+  const hasQueryError = systemDefaultQuery.isError || providersQuery.isError;
+
+  const retryQueries = () => {
+    void systemDefaultQuery.refetch();
+    void providersQuery.refetch();
+  };
 
   const selectedProvider = useMemo(
     () => providers.find((p) => p.id === selectedId) ?? null,
@@ -178,16 +186,14 @@ export function SystemDefaultForm() {
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="text-center py-12" aria-busy="true">
-        <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" aria-hidden="true" />
-        <p className="text-text-secondary">加载中...</p>
-      </div>
-    );
-  }
-
   return (
+    <RouteDataState
+      loading={isLoading}
+      loadingMessage="正在加载系统默认配置…"
+      error={hasQueryError ? (queryError instanceof Error ? queryError : new Error('系统默认配置加载失败')) : null}
+      errorTitle="系统默认配置加载失败"
+      onRetry={retryQueries}
+    >
     <div className="space-y-6">
       {/* 当前默认摘要 / 空态 */}
       {systemDefault ? <ProviderSummaryCard provider={systemDefault} /> : <EmptyDefaultState />}
@@ -270,6 +276,7 @@ export function SystemDefaultForm() {
         iconColor="text-accent-primary"
       />
     </div>
+    </RouteDataState>
   );
 }
 

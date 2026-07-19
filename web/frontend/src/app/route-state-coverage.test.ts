@@ -6,6 +6,11 @@ const routeFiles = [
   'src/app/scheduled-tasks/page.tsx',
   'src/app/profile/ai-settings/page.tsx',
   'src/app/admin/llm-config/page.tsx',
+  'src/app/admin/users/page.tsx',
+  'src/components/admin/system-default-provider/SystemDefaultForm.tsx',
+  'src/components/analysis/AnalysisHistory.tsx',
+  'src/components/analysis/AnalysisProgress.tsx',
+  'src/components/analysis/AnalysisResults.tsx',
 ];
 
 describe('data routes use the shared four-state boundary', () => {

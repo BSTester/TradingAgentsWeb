@@ -505,7 +505,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
 
     // 模型密钥由“我的模型”中的浏览器本地 KEY 静默提供；发起分析页不暴露 KEY 输入或来源。
     if (requiresUserApiKey && !apiKeyProvided) {
-      onShowToast('该模型尚未在“我的模型”填写可用密钥，请先前往“我的模型”完成配置。', 'error');
+      onShowToast('当前模型暂不可用于分析，请选择其他模型或稍后重试。', 'error');
       return;
     }
 
@@ -816,16 +816,6 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
               value={selectedModelLabel}
               onChange={handleModelSelect}
             />
-            {formData.llm_provider && requiresUserApiKey && !localKeyForProvider && (
-              <div
-                role="status"
-                aria-live="polite"
-                className="rounded-lg border border-warning-500/40 bg-warning-500/10 px-4 py-3 text-sm text-warning-500"
-              >
-                <i className="fas fa-triangle-exclamation mr-2" aria-hidden="true" />
-                该模型尚未在“我的模型”填写可用密钥，请前往“我的模型”完成配置后再发起分析。
-              </div>
-            )}
           </div>
         </div>
 

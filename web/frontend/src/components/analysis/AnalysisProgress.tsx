@@ -2,12 +2,33 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { buildApiUrl, buildWebSocketUrl, API_ENDPOINTS } from '../../utils/api';
+import { RouteDataState } from '@/components/ui/RouteDataState';
 
 interface AnalysisProgressProps {
   analysisId: string;
   onComplete: () => void;
   onBackToConfig: () => void;
   onShowToast: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
+}
+
+type StatusFetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Pick<Response, 'ok' | 'status' | 'statusText' | 'json'>>;
+
+/** Load the initial status before opening the progress websocket. Non-2xx is recoverable. */
+export async function loadAnalysisProgressConfig(
+  analysisId: string,
+  token: string | null,
+  fetchStatus: StatusFetcher = fetch,
+): Promise<WebSocketMessage['data']> {
+  const response = await fetchStatus(buildApiUrl(`/api/analysis/${analysisId}/status`), {
+    headers: { 'Authorization': `Bearer ${token || ''}` },
+  });
+
+  if (!response.ok) {
+    const suffix = response.statusText ? ` ${response.statusText}` : '';
+    throw new Error(`无法加载分析状态（${response.status}${suffix}）`);
+  }
+
+  return response.json() as Promise<WebSocketMessage['data']>;
 }
 
 export interface PhaseAgent {
@@ -90,6 +111,9 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
   const [isCompleted, setIsCompleted] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+  const [statusState, setStatusState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [statusError, setStatusError] = useState<Error | null>(null);
+  const [statusRetry, setStatusRetry] = useState(0);
 
   const handleStopAnalysis = async () => {
     if (isStopping) return;
@@ -127,44 +151,37 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
   };
 
   const [phases, setPhases] = useState<AnalysisPhase[]>(createAnalysisPhases);
-  const [configInitialized, setConfigInitialized] = useState(false);
 
   // Fetch analysis status to get configuration on mount
   useEffect(() => {
-    const fetchAnalysisConfig = async () => {
-      try {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch(buildApiUrl(`/api/analysis/${analysisId}/status`), {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+    let active = true;
+    setStatusState('loading');
+    setStatusError(null);
 
-        if (response.ok) {
-          const status = await response.json();
-          console.log('📋 Fetched analysis config:', status);
-
-          setPhases(prevPhases => applyProgressConfig(prevPhases, status));
-
-          setConfigInitialized(true);
-        }
-      } catch (error) {
+    void loadAnalysisProgressConfig(analysisId, localStorage.getItem('access_token'))
+      .then((status) => {
+        if (!active) return;
+        console.log('📋 Fetched analysis config:', status);
+        setPhases(prevPhases => applyProgressConfig(prevPhases, status));
+        setStatusState('ready');
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
         console.warn('⚠️ Failed to fetch analysis config:', error);
-        // Continue anyway, will rely on config message from WebSocket
-        setConfigInitialized(true);
-      }
-    };
+        setStatusError(error instanceof Error ? error : new Error('加载分析状态失败'));
+        setStatusState('error');
+      });
 
-    fetchAnalysisConfig();
-  }, [analysisId]);
+    return () => { active = false; };
+  }, [analysisId, statusRetry]);
 
   // WebSocket 连接和消息处理
   useEffect(() => {
     console.log('=== AnalysisProgress mounted ===');
     console.log('Analysis ID:', analysisId);
 
-    // Wait for config initialization before connecting WebSocket
-    if (!configInitialized) {
+    // Wait for a successful config response before connecting WebSocket.
+    if (statusState !== 'ready') {
       console.log('⏳ Waiting for config initialization...');
       return;
     }
@@ -504,7 +521,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
         wsRef.current.close();
       }
     };
-  }, [analysisId, configInitialized]);
+  }, [analysisId, statusState]);
 
   // 当分析完成时调用 onComplete
   useEffect(() => {
@@ -527,6 +544,13 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
   };
 
   return (
+    <RouteDataState
+      loading={statusState === 'loading'}
+      loadingMessage="正在加载分析状态…"
+      error={statusState === 'error' ? statusError : null}
+      errorTitle="分析状态加载失败"
+      onRetry={() => setStatusRetry(value => value + 1)}
+    >
     <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-4 md:p-6">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-lg font-semibold text-text-primary">
@@ -666,5 +690,6 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
         </div>
       </div>
     </div>
+    </RouteDataState>
   );
 }

@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { applyProgressConfig, createAnalysisPhases, phaseIndexForAgent } from '@/components/analysis/AnalysisProgress';
+import { applyProgressConfig, createAnalysisPhases, loadAnalysisProgressConfig, phaseIndexForAgent } from '@/components/analysis/AnalysisProgress';
 
 describe('AnalysisProgress graph stages', () => {
   it('keeps Risk Judge as a separate terminal band when executor is disabled', () => {
@@ -18,5 +18,11 @@ describe('AnalysisProgress graph stages', () => {
 
     expect(phaseIndexForAgent('risk_manager', phases)).toBe(4);
     expect(phases[phaseIndexForAgent('risk_manager', phases)]?.name).toBe('最终裁决');
+  });
+
+  it('turns a non-2xx status response into a retryable error', async () => {
+    const fetchStatus = vi.fn().mockResolvedValue({ ok: false, status: 503, statusText: 'Service Unavailable' });
+
+    await expect(loadAnalysisProgressConfig('analysis-1', null, fetchStatus)).rejects.toThrow('503');
   });
 });

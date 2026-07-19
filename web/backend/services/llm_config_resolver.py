@@ -189,36 +189,62 @@ def _get_system_default_sync(db: Session) -> Optional[LLMProvider]:
     ).scalars().first()
 
 
-async def _model_hints(db: AsyncSession, provider_id: int) -> tuple[Optional[str], Optional[str]]:
+def select_system_models(
+    models: list[Any],
+    requested_shallow: Optional[str],
+    requested_deep: Optional[str],
+) -> tuple[Optional[str], Optional[str]]:
+    """Use the caller's active catalog selection, with first-model fallback only when absent."""
+    shallow_models = [model.model_name for model in models if model.model_type == "shallow_thinker"]
+    deep_models = [model.model_name for model in models if model.model_type == "deep_thinker"]
+    shallow_request = _clean(requested_shallow)
+    deep_request = _clean(requested_deep)
+
+    if shallow_request and shallow_request not in shallow_models:
+        _raise_error(
+            status.HTTP_400_BAD_REQUEST,
+            "REQUEST_MODEL_INVALID",
+            "所选快速模型不属于当前系统默认 provider 的可用模型目录。",
+        )
+    if deep_request and deep_request not in deep_models:
+        _raise_error(
+            status.HTTP_400_BAD_REQUEST,
+            "REQUEST_MODEL_INVALID",
+            "所选深度模型不属于当前系统默认 provider 的可用模型目录。",
+        )
+
+    return (
+        shallow_request or (shallow_models[0] if shallow_models else None),
+        deep_request or (deep_models[0] if deep_models else None),
+    )
+
+
+async def _model_hints(
+    db: AsyncSession,
+    provider_id: int,
+    requested_shallow: Optional[str] = None,
+    requested_deep: Optional[str] = None,
+) -> tuple[Optional[str], Optional[str]]:
     result = await db.execute(
         select(LLMModel)
         .where(LLMModel.provider_id == provider_id, LLMModel.is_active == True)
         .order_by(LLMModel.id)
     )
-    shallow = None
-    deep = None
-    for model in result.scalars().all():
-        if model.model_type == "shallow_thinker" and shallow is None:
-            shallow = model.model_name
-        elif model.model_type == "deep_thinker" and deep is None:
-            deep = model.model_name
-    return shallow, deep
+    return select_system_models(result.scalars().all(), requested_shallow, requested_deep)
 
 
-def _model_hints_sync(db: Session, provider_id: int) -> tuple[Optional[str], Optional[str]]:
+def _model_hints_sync(
+    db: Session,
+    provider_id: int,
+    requested_shallow: Optional[str] = None,
+    requested_deep: Optional[str] = None,
+) -> tuple[Optional[str], Optional[str]]:
     models = db.execute(
         select(LLMModel)
         .where(LLMModel.provider_id == provider_id, LLMModel.is_active == True)
         .order_by(LLMModel.id)
     ).scalars().all()
-    shallow = None
-    deep = None
-    for model in models:
-        if model.model_type == "shallow_thinker" and shallow is None:
-            shallow = model.model_name
-        elif model.model_type == "deep_thinker" and deep is None:
-            deep = model.model_name
-    return shallow, deep
+    return select_system_models(models, requested_shallow, requested_deep)
 
 
 def _resolve_with_system_default(
@@ -337,7 +363,11 @@ async def resolve_llm_config(
     if explicit_provider and catalog_provider is not None and not _is_same_provider(catalog_provider, system_default):
         _request_provider_key_required(provider_name, catalog_provider.display_name)
 
-    hints = await _model_hints(db, system_default.id) if system_default else (None, None)
+    hints = (
+        await _model_hints(db, system_default.id, shallow_thinker, deep_thinker)
+        if system_default
+        else (None, None)
+    )
     return _resolve_with_system_default(system_default, hints)
 
 
@@ -381,5 +411,9 @@ def resolve_llm_config_sync(
     if explicit_provider and catalog_provider is not None and not _is_same_provider(catalog_provider, system_default):
         _request_provider_key_required(provider_name, catalog_provider.display_name)
 
-    hints = _model_hints_sync(db, system_default.id) if system_default else (None, None)
+    hints = (
+        _model_hints_sync(db, system_default.id, shallow_thinker, deep_thinker)
+        if system_default
+        else (None, None)
+    )
     return _resolve_with_system_default(system_default, hints)
