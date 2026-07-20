@@ -7,30 +7,33 @@ module.exports = {
   ],
   theme: {
     extend: {
-      // Dark Fintech Theme Colors
+      // Workflow Desk — a precise research instrument.
+      // Deep blue-black surfaces, mint for the decisive action / current stage,
+      // sky blue for structural flow, amber/red for warning/error.
       colors: {
-        // Dark backgrounds (not pure black for reduced eye strain)
+        // Dark surfaces (mapped 1:1 onto the prior semantic tokens so the whole
+        // app re-skins without per-file edits).
         dark: {
-          primary: '#0a0e1a',    // Main background
-          secondary: '#141824',  // Card backgrounds
-          tertiary: '#1a1f2e',   // Input backgrounds
-          elevated: '#1f2937',   // Elevated surfaces
-          border: '#2d3748',     // Default borders
+          primary: '#0a0d12',   // ink — application background  (was #0a0e1a)
+          secondary: '#171f2b', // surface — panels / cards        (was #141824)
+          tertiary: '#202b39',  // raised — hover / secondary btns (was #1a1f2e)
+          elevated: '#27333f',  // elevated surfaces               (was #1f2937)
+          border: '#304154',    // structural line                 (was #2d3748)
         },
-        // Fintech accent colors (blue/cyan)
+        // Workflow Desk accents
         accent: {
-          primary: '#00d4ff',    // Primary cyan
-          secondary: '#0066ff',  // Secondary blue
-          tertiary: '#00a8e8',   // Tertiary blue
-          hover: '#00d4ff',      // Hover state
-          focus: '#0066ff',      // Focus state
+          primary: '#9bffbe',   // mint — primary action / current stage / success
+          secondary: '#8acbff', // sky blue — flow / node identity
+          tertiary: '#5fb6e8',  // tertiary blue
+          hover: '#9bffbe',     // hover state (mint)
+          focus: '#8acbff',     // focus state (blue)
         },
-        // Text colors for dark theme
+        // Text colors for the dark theme
         text: {
-          primary: '#ffffff',    // Primary text
-          secondary: '#a0aec0',  // Secondary text
-          tertiary: '#718096',   // Tertiary text
-          muted: '#4a5568',      // Muted text
+          primary: '#f1f5f7',   // primary text
+          secondary: '#9aa9b8', // secondary text
+          tertiary: '#68798a',  // tertiary text
+          muted: '#4a5568',     // muted text
         },
         // Keep existing color schemes for compatibility
         primary: {
@@ -63,7 +66,7 @@ module.exports = {
           200: '#bbf7d0',
           300: '#86efac',
           400: '#4ade80',
-          500: '#00ff88',      // Updated for dark theme
+          500: '#3ddc97',      // Workflow Desk mint-family success
           600: '#16a34a',
           700: '#15803d',
           800: '#166534',
@@ -75,7 +78,7 @@ module.exports = {
           200: '#fecaca',
           300: '#fca5a5',
           400: '#f87171',
-          500: '#ff3366',      // Updated for dark theme
+          500: '#ff6b81',      // Workflow Desk red-family danger
           600: '#dc2626',
           700: '#b91c1c',
           800: '#991b1b',
@@ -87,7 +90,7 @@ module.exports = {
           200: '#fde68a',
           300: '#fcd34d',
           400: '#fbbf24',
-          500: '#ffaa00',      // Updated for dark theme
+          500: '#ffc66c',      // Workflow Desk amber
           600: '#d97706',
           700: '#b45309',
           800: '#92400e',
@@ -99,12 +102,18 @@ module.exports = {
           200: '#bae6fd',
           300: '#7dd3fc',
           400: '#38bdf8',
-          500: '#00d4ff',      // Updated for dark theme
+          500: '#8acbff',      // Workflow Desk blue
           600: '#0284c7',
           700: '#0369a1',
           800: '#075985',
           900: '#0c4a6e',
         },
+      },
+      // Workflow Desk typography
+      fontFamily: {
+        sans: ['"Noto Sans SC"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+        serif: ['"Instrument Serif"', 'ui-serif', 'Georgia', '"Times New Roman"', 'serif'],
+        mono: ['"DM Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
       },
       // Bootstrap-compatible spacing
       spacing: {
@@ -130,6 +139,7 @@ module.exports = {
         'safe-left': 'env(safe-area-inset-left)',
         'safe-right': 'env(safe-area-inset-right)',
         'touch': '2.75rem', // 44px - minimum touch target
+        'rail': '15.5rem',  // 248px - desktop research rail width
       },
       // Bootstrap-compatible font sizes
       fontSize: {
@@ -156,34 +166,38 @@ module.exports = {
         '3xl': '1.5rem',
         'full': '9999px',
       },
-      // Custom box shadows for dark theme
+      // Workflow Desk shadows
       boxShadow: {
-        'glow-cyan': '0 0 20px rgba(0, 212, 255, 0.3), 0 0 40px rgba(0, 212, 255, 0.1)',
-        'glow-cyan-lg': '0 0 30px rgba(0, 212, 255, 0.5), 0 0 60px rgba(0, 212, 255, 0.2)',
+        // Name kept as glow-cyan so existing utilities keep working; value is now mint-tinted.
+        'glow-cyan': '0 0 20px rgba(155, 255, 190, 0.28), 0 0 40px rgba(155, 255, 190, 0.10)',
+        'glow-cyan-lg': '0 0 30px rgba(155, 255, 190, 0.45), 0 0 60px rgba(155, 255, 190, 0.18)',
+        'glow-blue': '0 0 20px rgba(138, 203, 255, 0.25), 0 0 40px rgba(138, 203, 255, 0.08)',
         'card-dark': '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
         'elevated-dark': '0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
+        'panel': '0 20px 55px rgba(0, 0, 0, 0.22)',
       },
       // Custom background images for gradients
       backgroundImage: {
-        'gradient-hero': 'linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 50%, #0f1419 100%)',
-        'gradient-card': 'linear-gradient(145deg, #141824 0%, #1a1f2e 100%)',
-        'gradient-button': 'linear-gradient(90deg, #00d4ff 0%, #0066ff 100%)',
+        'gradient-hero': 'linear-gradient(135deg, #0a0d12 0%, #111720 50%, #0a0d12 100%)',
+        'gradient-card': 'linear-gradient(145deg, #111720 0%, #171f2b 100%)',
+        'gradient-button': 'linear-gradient(90deg, #9bffbe 0%, #8acbff 100%)',
         'gradient-radial': 'radial-gradient(circle at center, var(--tw-gradient-stops))',
       },
       // Custom animations
       animation: {
         'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
         'shimmer': 'shimmer 2s infinite',
-        'float': 'float 3s ease-in-out infinite',
+        'float': 'float 3s ease-in-out',
         'spin-reverse': 'spin-reverse 1s linear infinite',
+        'workflow-in': 'workflow-in 0.22s ease-out',
       },
       keyframes: {
         'glow-pulse': {
           '0%, 100%': {
-            boxShadow: '0 0 20px rgba(0, 212, 255, 0.3), 0 0 40px rgba(0, 212, 255, 0.1)',
+            boxShadow: '0 0 20px rgba(155, 255, 190, 0.28), 0 0 40px rgba(155, 255, 190, 0.10)',
           },
           '50%': {
-            boxShadow: '0 0 30px rgba(0, 212, 255, 0.5), 0 0 60px rgba(0, 212, 255, 0.2)',
+            boxShadow: '0 0 30px rgba(155, 255, 190, 0.45), 0 0 60px rgba(155, 255, 190, 0.18)',
           },
         },
         'shimmer': {
@@ -209,6 +223,10 @@ module.exports = {
           'to': {
             transform: 'rotate(0deg)',
           },
+        },
+        'workflow-in': {
+          '0%': { opacity: '0', transform: 'translateY(7px)' },
+          '100%': { opacity: '1', transform: 'none' },
         },
       },
       // Custom backdrop blur

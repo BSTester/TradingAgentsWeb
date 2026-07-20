@@ -12,6 +12,7 @@ import { ConfirmDialog } from '@/components/admin/llm-config/ConfirmDialog';
 import ProviderList from '@/components/profile/ProviderList';
 import ProviderFormDrawer from '@/components/profile/ProviderFormDrawer';
 import { UserLLMProviderSetting } from '@/lib/types';
+import { RouteDataState } from '@/components/ui/RouteDataState';
 
 function providerKeyOf(p: { provider_name?: string; id?: string | number }): string {
   return String(p.provider_name || p.id || '').trim();
@@ -21,7 +22,7 @@ export default function AISettingsPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { toast, showToast, hideToast } = useToast();
-  const { data, isLoading, setDefault, deleteProvider } = useUserLLMSettings();
+  const { data, isLoading, isError, error, refetch, setDefault, deleteProvider } = useUserLLMSettings();
   const { clearLocalKey } = useLocalLLMKeys();
 
   const [showForm, setShowForm] = useState(false);
@@ -115,20 +116,22 @@ export default function AISettingsPage() {
             <h2 className="text-responsive-h3 text-text-primary">Provider 列表 ({providers.length})</h2>
             <button
               onClick={handleNew}
-              className="px-4 py-2.5 bg-accent-primary text-white rounded-lg hover:bg-accent-secondary transition-colors"
+              className="px-4 py-2.5 bg-accent-primary text-dark-primary rounded-lg hover:bg-accent-secondary transition-colors"
             >
               <i className="fas fa-plus mr-2" />
               新增 provider
             </button>
           </div>
 
+          <RouteDataState loading={isLoading} loadingMessage="正在加载 AI 设置…" error={isError ? (error instanceof Error ? error : new Error('加载 AI 设置失败')) : null} errorTitle="AI 设置加载失败" onRetry={() => void refetch()} empty={!isLoading && !isError && providers.length === 0} emptyIcon="fa-brain" emptyTitle="暂无个人 Provider" emptyDescription="新增 Provider 后即可管理个人模型与本地密钥。">
           <ProviderList
             providers={providers}
-            loading={isLoading}
+            loading={false}
             onEdit={handleEdit}
             onSetDefault={handleSetDefault}
             onDelete={(p) => setDeleteTarget(p)}
           />
+          </RouteDataState>
         </div>
       </div>
 

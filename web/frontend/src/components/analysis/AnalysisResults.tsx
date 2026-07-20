@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import { logger } from '@/utils/logger';
+import { RouteDataState } from '@/components/ui/RouteDataState';
 
 interface AnalysisResultsProps {
   analysisId: string;
@@ -924,22 +925,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
     return colors[color] || 'from-gray-500 to-gray-600';
   };
 
-  if (loading) {
-    return (
-      <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-12">
-        <div className="text-center">
-          <div className="relative inline-block mb-4">
-            {/* 外圈旋转 */}
-            <div className="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-            {/* 内圈反向旋转 */}
-            <div className="absolute top-2 left-2 w-16 h-16 border-4 border-purple-200 border-b-purple-600 rounded-full animate-spin-reverse"></div>
-          </div>
-          <p className="text-text-primary font-medium text-lg">正在加载分析结果...</p>
-          <p className="text-sm text-text-tertiary mt-2">正在获取详细报告，请稍候</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading || isError || !results) return <RouteDataState loading={loading} loadingMessage="正在加载分析结果..." error={isError ? (error instanceof Error ? error : new Error('获取分析结果失败')) : null} errorTitle="分析结果加载失败" onRetry={() => window.location.reload()} empty={!isError && !loading && !results} emptyIcon="fa-file-lines" emptyTitle="暂无可查看的分析结果" emptyDescription="该分析尚未完成或结果已不可用。">{null}</RouteDataState>;
 
   return (
     <>
@@ -2212,7 +2198,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                     await handleExport('markdown');
                     setShowExportPreview(false);
                   }}
-                  className="px-8 py-3 bg-gradient-to-r from-accent-primary to-accent-secondary text-white rounded-lg hover:shadow-glow-cyan transition-all flex items-center font-medium shadow-lg hover:scale-105"
+                  className="px-8 py-3 bg-gradient-to-r from-accent-primary to-accent-secondary text-dark-primary rounded-lg hover:shadow-glow-cyan transition-all flex items-center font-medium shadow-lg hover:scale-105"
                 >
                   <i className="fas fa-file-code mr-2" />
                   导出为 Markdown

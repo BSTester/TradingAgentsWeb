@@ -13,6 +13,7 @@ import { ModelList } from '@/components/admin/llm-config/ModelList';
 import { ProviderForm } from '@/components/admin/llm-config/ProviderForm';
 import { ModelForm } from '@/components/admin/llm-config/ModelForm';
 import { ConfirmDialog } from '@/components/admin/llm-config/ConfirmDialog';
+import { RouteDataState } from '@/components/ui/RouteDataState';
 
 export default function LLMConfigPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -47,7 +48,7 @@ export default function LLMConfigPage() {
   }, [user, authLoading, router]);
 
   // 获取供应商列表
-  const { data: providers, isLoading: providersLoading, refetch: refetchProviders } = useQuery({
+  const { data: providers, isLoading: providersLoading, isError: providersError, error: providersQueryError, refetch: refetchProviders } = useQuery({
     queryKey: ['admin', 'llm-providers'],
     queryFn: async () => {
       const token = localStorage.getItem('access_token');
@@ -61,7 +62,7 @@ export default function LLMConfigPage() {
   });
 
   // 获取模型列表
-  const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useQuery({
+  const { data: models, isLoading: modelsLoading, isError: modelsError, error: modelsQueryError, refetch: refetchModels } = useQuery({
     queryKey: ['admin', 'llm-models'],
     queryFn: async () => {
       const token = localStorage.getItem('access_token');
@@ -228,25 +229,20 @@ export default function LLMConfigPage() {
                   setEditingProvider(null);
                   setShowProviderForm(true);
                 }}
-                className="px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-secondary transition-colors"
+                className="px-4 py-2 bg-accent-primary text-dark-primary rounded-lg hover:bg-accent-secondary transition-colors"
               >
                 <i className="fas fa-plus mr-2" />
                 添加供应商
               </button>
             </div>
 
-            {providersLoading ? (
-              <div className="text-center py-12">
-                <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-                <p className="text-text-secondary">加载中...</p>
-              </div>
-            ) : (
+            <RouteDataState loading={providersLoading} loadingMessage="正在加载供应商…" error={providersError ? (providersQueryError instanceof Error ? providersQueryError : new Error('获取供应商列表失败')) : null} errorTitle="供应商列表加载失败" onRetry={() => void refetchProviders()} empty={!providersLoading && !providersError && !providers?.length} emptyIcon="fa-server" emptyTitle="暂无供应商" emptyDescription="新增供应商后即可维护系统模型。">
               <ProviderList
                 providers={providers || []}
                 onEdit={handleEditProvider}
                 onDelete={handleDeleteProvider}
               />
-            )}
+            </RouteDataState>
           </div>
         )}
 
@@ -261,25 +257,20 @@ export default function LLMConfigPage() {
                   setEditingModel(null);
                   setShowModelForm(true);
                 }}
-                className="px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-secondary transition-colors"
+                className="px-4 py-2 bg-accent-primary text-dark-primary rounded-lg hover:bg-accent-secondary transition-colors"
               >
                 <i className="fas fa-plus mr-2" />
                 添加模型
               </button>
             </div>
 
-            {modelsLoading ? (
-              <div className="text-center py-12">
-                <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-                <p className="text-text-secondary">加载中...</p>
-              </div>
-            ) : (
+            <RouteDataState loading={modelsLoading} loadingMessage="正在加载模型…" error={modelsError ? (modelsQueryError instanceof Error ? modelsQueryError : new Error('获取模型列表失败')) : null} errorTitle="模型列表加载失败" onRetry={() => void refetchModels()} empty={!modelsLoading && !modelsError && !models?.length} emptyIcon="fa-cube" emptyTitle="暂无模型" emptyDescription="新增模型后即可供用户选择。">
               <ModelList
                 models={models || []}
                 onEdit={handleEditModel}
                 onDelete={handleDeleteModel}
               />
-            )}
+            </RouteDataState>
           </div>
         )}
       </div>

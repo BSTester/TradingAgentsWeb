@@ -227,7 +227,7 @@ export function ProviderFormDrawer({ provider, onClose, onSuccess }: ProviderFor
             <button
               onClick={handleSubmit}
               disabled={saving}
-              className="px-5 py-2.5 bg-accent-primary text-white rounded-lg hover:bg-accent-secondary disabled:opacity-50 transition-colors"
+              className="px-5 py-2.5 bg-accent-primary text-dark-primary rounded-lg hover:bg-accent-secondary disabled:opacity-50 transition-colors"
             >
               {saving ? <i className="fas fa-spinner fa-spin mr-1" /> : null}
               {isEdit ? '保存修改' : '创建'}

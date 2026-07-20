@@ -149,7 +149,7 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
           onClick={() => setLoginMode('password')}
           className={`flex-1 py-2 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-medium transition-all ${
             loginMode === 'password'
-              ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white shadow-glow-cyan'
+              ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-dark-primary shadow-glow-cyan'
               : 'text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -162,7 +162,7 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
           onClick={() => setLoginMode('email')}
           className={`flex-1 py-2 px-2 sm:px-4 rounded-md text-xs sm:text-sm font-medium transition-all ${
             loginMode === 'email'
-              ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-white shadow-glow-cyan'
+              ? 'bg-gradient-to-r from-accent-primary to-accent-secondary text-dark-primary shadow-glow-cyan'
               : 'text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -246,7 +246,7 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-gradient-to-r from-accent-primary to-accent-secondary text-white py-3 px-4 rounded-lg hover:shadow-glow-cyan hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-dark-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-full bg-gradient-to-r from-accent-primary to-accent-secondary text-dark-primary py-3 px-4 rounded-lg hover:shadow-glow-cyan hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-dark-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {isLoading ? (
               <>
@@ -347,7 +347,7 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-gradient-to-r from-accent-primary to-accent-secondary text-white py-3 px-4 rounded-lg hover:shadow-glow-cyan hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-dark-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-full bg-gradient-to-r from-accent-primary to-accent-secondary text-dark-primary py-3 px-4 rounded-lg hover:shadow-glow-cyan hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-offset-2 focus:ring-offset-dark-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {isLoading ? (
               <>

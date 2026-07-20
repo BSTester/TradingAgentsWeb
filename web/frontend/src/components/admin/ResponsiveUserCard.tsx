@@ -31,7 +31,7 @@ export function ResponsiveUserCard({
           <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
             user.role === 'admin' 
               ? 'bg-gradient-to-br from-warning-500 to-warning-600 text-white' 
-              : 'bg-gradient-to-br from-accent-primary to-accent-secondary text-white'
+              : 'bg-gradient-to-br from-accent-primary to-accent-secondary text-dark-primary'
           }`}>
             {user.username.substring(0, 2).toUpperCase()}
           </div>

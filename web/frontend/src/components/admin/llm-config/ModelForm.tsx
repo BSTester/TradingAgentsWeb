@@ -271,7 +271,7 @@ export function ModelForm({ model, providers, onClose, onSuccess }: ModelFormPro
             <button
               type="submit"
               disabled={isSubmitting || activeProviders.length === 0}
-              className="flex-1 px-4 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-secondary transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-accent-primary text-dark-primary rounded-lg hover:bg-accent-secondary transition-colors disabled:opacity-50"
             >
               {isSubmitting ? (
                 <>

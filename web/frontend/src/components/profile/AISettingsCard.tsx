@@ -53,7 +53,7 @@ export function AISettingsCard() {
         </div>
         <button
           onClick={() => router.push('/profile/ai-settings')}
-          className="px-6 py-3 bg-accent-primary text-white rounded-lg hover:bg-accent-secondary focus:outline-none focus:ring-2 focus:ring-accent-primary transition-colors whitespace-nowrap ml-6"
+          className="px-6 py-3 bg-accent-primary text-dark-primary rounded-lg hover:bg-accent-secondary focus:outline-none focus:ring-2 focus:ring-accent-primary transition-colors whitespace-nowrap ml-6"
         >
           <i className="fas fa-cog mr-2" />
           管理

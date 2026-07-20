@@ -8,28 +8,35 @@
   }
   
   :root {
-    /* Dark Fintech Theme CSS Variables */
-    --bg-primary: #0a0e1a;
-    --bg-secondary: #141824;
-    --bg-tertiary: #1a1f2e;
-    --bg-elevated: #1f2937;
-    --border-default: #2d3748;
-    --accent-primary: #00d4ff;
-    --accent-secondary: #0066ff;
-    --text-primary: #ffffff;
-    --text-secondary: #a0aec0;
-    --text-tertiary: #718096;
+    /* Workflow Desk CSS Variables — kept in sync with tailwind.config.js */
+    --bg-primary: #0a0d12;     /* ink */
+    --bg-secondary: #171f2b;   /* surface */
+    --bg-tertiary: #202b39;    /* raised */
+    --bg-elevated: #27333f;    /* elevated */
+    --bg-input: #0d131b;       /* recessed inputs */
+    --bg-rail: #111720;        /* research rail */
+    --border-default: #304154; /* structural line */
+    --accent-primary: #9bffbe; /* mint */
+    --accent-secondary: #8acbff;/* sky blue */
+    --text-primary: #f1f5f7;
+    --text-secondary: #9aa9b8;
+    --text-tertiary: #68798a;
   }
-  
+
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-      sans-serif;
+    font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background-color: var(--bg-primary);
     color: var(--text-primary);
+  }
+
+  /* Workflow Desk focus ring for keyboard users */
+  :focus-visible {
+    outline: 3px solid var(--accent-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 }
 
@@ -67,7 +74,7 @@
   }
 
   .btn-primary {
-    @apply bg-gradient-to-r from-accent-primary to-accent-secondary text-white hover:shadow-glow-cyan hover:scale-105 active:scale-95;
+    @apply bg-accent-primary text-dark-primary font-bold hover:brightness-95 hover:shadow-glow-cyan active:scale-95;
   }
 
   .btn-secondary {
@@ -84,7 +91,7 @@
 
   /* Forms */
   .form-control {
-    @apply flex h-10 w-full rounded-lg border border-dark-border bg-dark-tertiary text-white placeholder-text-tertiary px-4 py-3 text-sm focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 transition-all duration-200;
+    @apply flex h-10 w-full rounded-lg border border-dark-border bg-[#0d131b] text-white placeholder-text-tertiary px-4 py-3 text-sm focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 transition-all duration-200;
   }
 
   .form-label {
@@ -214,6 +221,14 @@
     /* 适配刘海屏等安全区 */
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     touch-action: manipulation;
+  }
+  /* Reserve space for the fixed desktop research rail (248px = 15.5rem).
+     The rail and top bar are position:fixed, so they are not shifted by this;
+     only in-flow page content moves right of the rail on lg+ screens. */
+  @media (min-width: 1024px) {
+    body {
+      padding-left: calc(env(safe-area-inset-left) + 15.5rem);
+    }
   }
   /* 媒体默认自适应容器宽度 */
   img, video, canvas, svg {

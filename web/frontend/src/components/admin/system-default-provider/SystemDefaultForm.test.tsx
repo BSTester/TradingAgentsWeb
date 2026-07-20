@@ -181,6 +181,21 @@ describe('SystemDefaultForm', () => {
     ).toBeInTheDocument();
   });
 
+  it('配置请求失败时显示可重试错误态，并可恢复到正常内容', async () => {
+    vi.mocked(configAPI.getSystemDefault)
+      .mockRejectedValueOnce(new Error('系统默认配置加载失败'))
+      .mockResolvedValueOnce(openaiDefault);
+
+    const user = userEvent.setup();
+    renderWithQuery(<SystemDefaultForm />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('系统默认配置加载失败');
+    await user.click(screen.getByRole('button', { name: /重试/i }));
+
+    expect(await screen.findByText('当前系统默认')).toBeInTheDocument();
+    expect(configAPI.getSystemDefault).toHaveBeenCalledTimes(2);
+  });
+
   it('提供到 Provider/Model 目录管理页的入口', async () => {
     vi.mocked(configAPI.getSystemDefault).mockResolvedValue(openaiDefault);
 

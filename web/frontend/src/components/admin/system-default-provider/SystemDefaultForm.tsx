@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import { Toast, useToast } from '@/components/ui/Toast';
 import { ConfirmDialog } from '@/components/admin/llm-config/ConfirmDialog';
+import { RouteDataState } from '@/components/ui/RouteDataState';
 import { useSystemDefaultProvider } from '@/hooks/useSystemDefaultProvider';
 import type { AdminLLMProvider, SystemDefaultProviderSummary } from '@/lib/types';
 
@@ -17,7 +18,7 @@ function ProviderSummaryCard({ provider }: { provider: SystemDefaultProviderSumm
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-3">
-          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-accent-primary to-accent-secondary text-white text-xl">
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-accent-primary to-accent-secondary text-dark-primary text-xl">
             <i className="fas fa-star" aria-hidden="true" />
           </div>
           <div>
@@ -154,6 +155,13 @@ export function SystemDefaultForm() {
   }, [systemDefault, providers, selectedId]);
 
   const isLoading = systemDefaultQuery.isLoading || providersQuery.isLoading;
+  const queryError = systemDefaultQuery.error || providersQuery.error;
+  const hasQueryError = systemDefaultQuery.isError || providersQuery.isError;
+
+  const retryQueries = () => {
+    void systemDefaultQuery.refetch();
+    void providersQuery.refetch();
+  };
 
   const selectedProvider = useMemo(
     () => providers.find((p) => p.id === selectedId) ?? null,
@@ -178,16 +186,14 @@ export function SystemDefaultForm() {
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="text-center py-12" aria-busy="true">
-        <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" aria-hidden="true" />
-        <p className="text-text-secondary">加载中...</p>
-      </div>
-    );
-  }
-
   return (
+    <RouteDataState
+      loading={isLoading}
+      loadingMessage="正在加载系统默认配置…"
+      error={hasQueryError ? (queryError instanceof Error ? queryError : new Error('系统默认配置加载失败')) : null}
+      errorTitle="系统默认配置加载失败"
+      onRetry={retryQueries}
+    >
     <div className="space-y-6">
       {/* 当前默认摘要 / 空态 */}
       {systemDefault ? <ProviderSummaryCard provider={systemDefault} /> : <EmptyDefaultState />}
@@ -210,7 +216,7 @@ export function SystemDefaultForm() {
             type="button"
             disabled={!canSave}
             onClick={() => setConfirmOpen(true)}
-            className="px-4 py-2 bg-gradient-to-r from-accent-primary to-accent-secondary text-white rounded-lg hover:shadow-glow-cyan transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-gradient-to-r from-accent-primary to-accent-secondary text-dark-primary rounded-lg hover:shadow-glow-cyan transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <i className="fas fa-save mr-2" aria-hidden="true" />
             保存为系统默认
@@ -270,6 +276,7 @@ export function SystemDefaultForm() {
         iconColor="text-accent-primary"
       />
     </div>
+    </RouteDataState>
   );
 }
 

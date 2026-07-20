@@ -30,7 +30,7 @@ export function MessageBubble({ message, reports }: MessageBubbleProps) {
         {/* Avatar */}
         <div
           className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-            isUser ? 'bg-gradient-to-br from-accent-primary to-accent-secondary text-white' : 'bg-dark-tertiary text-accent-primary'
+            isUser ? 'bg-gradient-to-br from-accent-primary to-accent-secondary text-dark-primary' : 'bg-dark-tertiary text-accent-primary'
           }`}
           aria-hidden="true"
         >
@@ -42,7 +42,7 @@ export function MessageBubble({ message, reports }: MessageBubbleProps) {
           <div
             className={`rounded-2xl px-4 py-3 ${
               isUser
-                ? 'bg-gradient-to-br from-accent-primary to-accent-secondary text-white rounded-tr-sm'
+                ? 'bg-gradient-to-br from-accent-primary to-accent-secondary text-dark-primary rounded-tr-sm'
                 : 'bg-dark-secondary text-text-primary rounded-tl-sm border border-dark-border'
             }`}
           >

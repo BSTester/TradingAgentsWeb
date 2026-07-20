@@ -8,6 +8,7 @@ import { useUserConfig } from '@/hooks/useUserConfig';
 import { useAuth } from '@/lib/auth';
 import { useLocalLLMKeys } from '@/hooks/useLocalLLMKeys';
 import { useUserLLMSettings } from '@/hooks/useUserLLMSettings';
+import { ModelSelector, ModelOption } from './ModelSelector';
 
 interface AnalysisConfigFormProps {
   config: any;
@@ -84,6 +85,8 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
   const [saveApiKeyToBrowser, setSaveApiKeyToBrowser] = useState(false);
   const [tickerError, setTickerError] = useState<string>('');
   const [showPrivacyDialog, setShowPrivacyDialog] = useState(false);
+  // Model-only selection: the user only ever sees model display names.
+  const [selectedModelLabel, setSelectedModelLabel] = useState('');
 
   // 执行交易状态
   const [enableTradingExecutor, setEnableTradingExecutor] = useState(false);
@@ -146,6 +149,35 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     config?.llm_providers?.find((p: any) => p.value === formData.llm_provider)?.url ||
     '';
 
+  // ---- Model-only selection (Workflow Desk privacy boundary) ----
+  // The launch form shows model display names only. Provider / backend_url / api_key
+  // are resolved silently (effectiveBackendUrl + localKeyForProvider above) when the
+  // payload is built; they are never rendered here.
+  const resolveModelLabel = (provider: string, shallow: string, deep: string): string => {
+    const labelOf = (type: 'shallow' | 'deep', value: string) => {
+      if (!value) return '';
+      const arr = config?.models?.[String(provider || '').toLowerCase()]?.[type];
+      const found = Array.isArray(arr) ? arr.find((m: any) => m?.value === value) : undefined;
+      return found?.label || value;
+    };
+    const sh = labelOf('shallow', shallow);
+    const dp = labelOf('deep', deep);
+    if (sh && dp && sh !== dp) return `${sh} / ${dp}`;
+    return dp || sh || '';
+  };
+
+  const handleModelSelect = (selection: ModelOption | null) => {
+    setSelectedModelLabel(selection?.label || '');
+    setApiKeyValidated(false);
+    setFormData((prev) => ({
+      ...prev,
+      llm_provider: selection?.provider || '',
+      shallow_thinker: selection?.shallow || '',
+      deep_thinker: selection?.deep || '',
+      api_key: '', // never carry a UI-entered key in the launch surface
+    }));
+  };
+
   // 从服务器加载配置（只加载一次）
   const [configLoaded, setConfigLoaded] = useState(false);
   
@@ -194,6 +226,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       }
       
       console.log('✅ 配置加载完成');
+      setSelectedModelLabel(resolveModelLabel(initialProvider, initialShallow, initialDeep));
       setConfigLoaded(true);
       onShowToast('已加载上次配置', 'info');
     } else if (!configLoading && !llmSettingsLoading && !userConfig && !configLoaded) {
@@ -470,9 +503,9 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       return;
     }
 
-    // 检查API密钥验证
+    // 模型密钥由“我的模型”中的浏览器本地 KEY 静默提供；发起分析页不暴露 KEY 输入或来源。
     if (requiresUserApiKey && !apiKeyProvided) {
-      onShowToast('当前浏览器未保存该个人 provider 的 KEY，请补充 KEY、保存到当前浏览器，或切换到系统默认 provider', 'error');
+      onShowToast('当前模型暂不可用于分析，请选择其他模型或稍后重试。', 'error');
       return;
     }
 
@@ -769,220 +802,20 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
           </div>
         </div>
 
-        {/* 步骤5: LLM服务商 */}
+        {/* 步骤5: 模型（Workflow Desk — 只展示模型名，Provider/Endpoint/密钥状态不在此暴露） */}
         <div className="space-y-4">
           <div className="flex items-center space-x-3">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
+            <div className="flex-shrink-0 w-8 h-8 bg-accent-primary text-dark-primary rounded-full flex items-center justify-center text-sm font-bold">
               5
             </div>
-            <h4 className="text-lg font-medium text-text-primary">LLM服务商</h4>
+            <h4 className="text-lg font-medium text-text-primary">模型</h4>
           </div>
-          <div className="ml-11 space-y-4">
-            <div>
-              <label htmlFor="llm_provider" className="block text-sm font-medium text-text-secondary mb-2">
-                选择要使用的服务商
-              </label>
-              <select
-                id="llm_provider"
-                name="llm_provider"
-                value={formData.llm_provider}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 bg-dark-tertiary border border-dark-border text-white rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
-                required
-              >
-                <option value="">请选择LLM服务商...</option>
-                {llmProviders.map((provider: LLMProvider) => (
-                  <option key={provider.value} value={provider.value}>
-                    {provider.label} - {provider.description}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {formData.llm_provider && (
-              <div role="status" aria-live="polite" className="rounded-md border border-dark-border bg-dark-tertiary px-3 py-2 text-sm">
-                {selectedUserProvider ? (
-                  localKeyForProvider ? (
-                    <span className="text-success-500">
-                      <i className="fas fa-key mr-1" />
-                      来源：个人配置（本浏览器 KEY）· {effectiveProviderLabel}
-                    </span>
-                  ) : (
-                    <span className="text-warning-500">
-                      <i className="fas fa-exclamation-triangle mr-1" />
-                      来源：个人配置 · {effectiveProviderLabel}，当前浏览器未保存 KEY
-                    </span>
-                  )
-                ) : isUsingSystemDefault ? (
-                  <span className="text-accent-primary">
-                    <i className="fas fa-building mr-1" />
-                    来源：系统默认 Provider · {effectiveProviderLabel}
-                  </span>
-                ) : formData.api_key.trim() ? (
-                  <span className="text-text-secondary">
-                    <i className="fas fa-user-edit mr-1" />
-                    来源：本次一次性输入
-                  </span>
-                ) : (
-                  <span className="text-warning-500">
-                    <i className="fas fa-exclamation-triangle mr-1" />
-                    未找到个人配置或系统默认来源；请填写本次 KEY
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* API密钥输入 */}
-            {requiresUserApiKey && (
-              <div>
-                <label htmlFor="api_key" className="block text-sm font-medium text-text-secondary mb-2">
-                  <i className="fas fa-key mr-1" />
-                  API密钥
-                </label>
-                <div className="flex space-x-2">
-                  <div className="relative flex-1">
-                    <input
-                      type={showApiKey ? 'text' : 'password'}
-                      id="api_key"
-                      name="api_key"
-                      value={formData.api_key}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 bg-dark-tertiary border border-dark-border text-white rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
-                      placeholder={getApiKeyPlaceholder(formData.llm_provider)}
-                      required={requiresUserApiKey}
-                    />
-                    <button
-                      type="button"
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                    >
-                      <i className={`fas ${showApiKey ? 'fa-eye-slash' : 'fa-eye'} text-text-tertiary hover:text-accent-primary transition-colors`} />
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={validateApiKey}
-                    disabled={validatingKey || !formData.api_key}
-                    className={`px-4 py-2 rounded-md border font-medium transition-colors ${apiKeyValidated
-                      ? 'bg-success-500/20 border-success-500 text-success-500'
-                      : 'bg-dark-tertiary border-dark-border text-text-secondary hover:bg-dark-secondary'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {validatingKey ? (
-                      <>
-                        <i className="fas fa-spinner fa-spin mr-1" />
-                        验证中
-                      </>
-                    ) : apiKeyValidated ? (
-                      <>
-                        <i className="fas fa-check mr-1" />
-                        已验证
-                      </>
-                    ) : (
-                      <>
-                        <i className="fas fa-check mr-1" />
-                        验证
-                      </>
-                    )}
-                  </button>
-                </div>
-                <div
-                  role="status"
-                  aria-live="polite"
-                  className="text-sm mb-2"
-                >
-                  {localKeyForProvider ? (
-                    <span className="text-success-500">
-                      <i className="fas fa-key mr-1" />
-                      来源：个人配置（本浏览器已存 KEY）· {formData.llm_provider}
-                    </span>
-                  ) : formData.api_key.trim() ? (
-                    <span className="text-text-secondary">
-                      <i className="fas fa-user-edit mr-1" />
-                      来源：本次一次性输入（不保存到浏览器）
-                    </span>
-                  ) : (
-                    <span className="text-warning-500">
-                      <i className="fas fa-exclamation-triangle mr-1" />
-                      当前浏览器未保存该个人 provider 的 KEY；请补充 KEY 或切换到系统默认 provider
-                    </span>
-                  )}
-                </div>
-
-                {formData.api_key.trim() && (
-                  <label className="mt-2 flex items-start gap-2 text-sm text-text-secondary">
-                    <input
-                      type="checkbox"
-                      checked={saveApiKeyToBrowser}
-                      onChange={(e) => setSaveApiKeyToBrowser(e.target.checked)}
-                      className="mt-1 h-4 w-4 text-accent-primary focus:ring-accent-primary border-dark-border rounded cursor-pointer bg-dark-secondary"
-                    />
-                    <span>保存到当前浏览器，后续自动随该 provider 请求下发</span>
-                  </label>
-                )}
-
-                <p className="text-sm text-text-tertiary mt-1">
-                  <i className="fas fa-info-circle mr-1" />
-                  访问个人 provider 需要您的 API 密钥；不勾选保存时仅本次使用，不会持久化到后端
-                </p>
-              </div>
-            )}
-
-            {/* 思维智能体选择 */}
-            {(!requiresUserApiKey || apiKeyValidated || !!localKeyForProvider || !!formData.api_key.trim() || formData.llm_provider === 'ollama') && (
-              <div className="border-t pt-4">
-                <div className="flex items-center space-x-2 mb-4">
-                  <i className="fas fa-lightbulb text-green-600" />
-                  <span className="font-medium text-green-700">为您的分析选择思维智能体</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="shallow_thinker" className="block text-sm font-medium text-text-secondary mb-2">
-                      <i className="fas fa-bolt mr-1" />
-                      快速思维LLM引擎
-                    </label>
-                    <select
-                      id="shallow_thinker"
-                      name="shallow_thinker"
-                      value={formData.shallow_thinker}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 bg-dark-tertiary border border-dark-border text-white rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
-                      required
-                    >
-                      <option value="">选择模型...</option>
-                      {getModelsForProvider(formData.llm_provider, 'shallow').map((model: Model) => (
-                        <option key={model.value} value={model.value}>
-                          {model.label}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-sm text-text-tertiary mt-1">用于快速初始分析和快速决策</p>
-                  </div>
-                  <div>
-                    <label htmlFor="deep_thinker" className="block text-sm font-medium text-text-secondary mb-2">
-                      <i className="fas fa-brain mr-1" />
-                      深度思维LLM引擎
-                    </label>
-                    <select
-                      id="deep_thinker"
-                      name="deep_thinker"
-                      value={formData.deep_thinker}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 bg-dark-tertiary border border-dark-border text-white rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
-                      required
-                    >
-                      <option value="">选择模型...</option>
-                      {getModelsForProvider(formData.llm_provider, 'deep').map((model: Model) => (
-                        <option key={model.value} value={model.value}>
-                          {model.label}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="text-sm text-text-tertiary mt-1">用于全面分析和复杂推理</p>
-                  </div>
-                </div>
-              </div>
-            )}
+          <div className="ml-11 space-y-3">
+            <ModelSelector
+              config={config}
+              value={selectedModelLabel}
+              onChange={handleModelSelect}
+            />
           </div>
         </div>
 
@@ -1240,7 +1073,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
               </button>
               <button
                 onClick={confirmStartAnalysis}
-                className="w-full md:flex-1 px-4 py-3 md:py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-secondary transition-colors font-medium min-h-touch"
+                className="w-full md:flex-1 px-4 py-3 md:py-2 bg-accent-primary text-dark-primary rounded-lg hover:bg-accent-secondary transition-colors font-medium min-h-touch"
               >
                 确认并开始分析
               </button>
