@@ -3,9 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { buildApiUrl, API_ENDPOINTS } from '../../utils/api';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkBreaks from 'remark-breaks';
+import LazyMarkdown from '@/components/common/LazyMarkdown';
+import { AnalysisResultsSkeleton } from './AnalysisResultsSkeleton';
 import { logger } from '@/utils/logger';
 import { RouteDataState } from '@/components/ui/RouteDataState';
 
@@ -346,8 +345,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
               color: '#78350f',
               fontFamily: 'system-ui, -apple-system, sans-serif'
             }}>
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkBreaks]}
+              <LazyMarkdown
+                preset="gfm"
                 components={{
                   p: ({ children }) => <p style={{ marginBottom: '0.75rem' }}>{children}</p>,
                   strong: ({ children }) => <strong style={{ fontWeight: 'bold' }}>{children}</strong>,
@@ -357,7 +356,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                 }}
               >
                 {results.final_analysis}
-              </ReactMarkdown>
+              </LazyMarkdown>
             </div>
           </div>
         )}
@@ -415,8 +414,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                   color: '#374151',
                   fontFamily: 'system-ui, -apple-system, sans-serif'
                 }}>
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkBreaks]}
+                  <LazyMarkdown
+                    preset="gfm"
                     components={{
                       h2: ({ children }) => (
                         <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1f2937', marginTop: '1.5rem', marginBottom: '0.75rem', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -521,7 +520,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                         </a>
                       ),
                     }}
-                  >{agent.result}</ReactMarkdown>
+                  >{agent.result}</LazyMarkdown>
                 </div>
               </div>
             ))}
@@ -1450,8 +1449,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                       </h2>
                     </div>
                     <div className="p-4 md:p-6 bg-dark-tertiary">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm, remarkBreaks]}
+                      <LazyMarkdown
+                        preset="gfm"
                         components={{
                           // 一级标题 - 大标题，带渐变背景和图标
                           h1: ({ children }) => (
@@ -1612,7 +1611,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                             </a>
                           ),
                         }}
-                      >{content}</ReactMarkdown>
+                      >{content}</LazyMarkdown>
                     </div>
                   </div>
                 );
@@ -1632,8 +1631,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                     </div>
                     <div className="p-4 md:p-6 bg-dark-tertiary">
                       <div className="markdown-content">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm, remarkBreaks]}
+                        <LazyMarkdown
+                          preset="gfm"
                           components={{
                             // 标题
                             h1: ({ children }) => (
@@ -1787,7 +1786,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                               </a>
                             ),
                           }}
-                        >{agent.result}</ReactMarkdown>
+                        >{agent.result}</LazyMarkdown>
                       </div>
                     </div>
                   </div>
@@ -1928,8 +1927,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                               </h3>
                             </div>
                             <div className="p-4 bg-white">
-                              <ReactMarkdown
-                                remarkPlugins={[remarkGfm, remarkBreaks]}
+                              <LazyMarkdown
+                                preset="gfm"
                                 components={{
                                   h1: ({ children }) => (
                                     <h1 className="text-xl font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 rounded-lg mb-3 shadow-sm flex items-center">
@@ -2023,7 +2022,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                                     <a href={href} className="text-blue-600 hover:text-blue-800 underline font-medium" target="_blank" rel="noopener noreferrer">{children}</a>
                                   ),
                                 }}
-                              >{agent.result}</ReactMarkdown>
+                              >{agent.result}</LazyMarkdown>
                             </div>
                           </div>
                         ))}
@@ -2049,8 +2048,8 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                               <h3 className="font-bold text-base">{title}</h3>
                             </div>
                             <div className="p-4 bg-white">
-                              <ReactMarkdown
-                                remarkPlugins={[remarkGfm, remarkBreaks]}
+                              <LazyMarkdown
+                                preset="gfm"
                                 components={{
                                   h1: ({ children }) => (
                                     <h1 className="text-xl font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 rounded-lg mb-3 shadow-sm flex items-center">
@@ -2126,7 +2125,7 @@ export function AnalysisResults({ analysisId, onBackToConfig, onBackToHistory, o
                                     <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{children}</td>
                                   ),
                                 }}
-                              >{content}</ReactMarkdown>
+                              >{content}</LazyMarkdown>
                             </div>
                           </div>
                         );

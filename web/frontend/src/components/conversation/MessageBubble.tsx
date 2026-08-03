@@ -1,8 +1,7 @@
 'use client';
 
 import React from 'react';
-import ReactMarkdown from 'react-markdown';
-import rehypeSanitize from 'rehype-sanitize';
+import LazyMarkdown from '@/components/common/LazyMarkdown';
 import type { Message, Report } from '@/types/conversation';
 import { StageProgress } from '@/components/analysis/StageProgress';
 import { ReportCard } from '@/components/analysis/ReportCard';
@@ -49,7 +48,7 @@ export function MessageBubble({ message, reports }: MessageBubbleProps) {
             {message.content_blocks && message.content_blocks.length > 0 ? (
               <Blocks blocks={message.content_blocks} reports={reports} user={isUser} />
             ) : (
-              <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{message.content}</ReactMarkdown>
+              <LazyMarkdown preset="sanitize">{message.content}</LazyMarkdown>
             )}
           </div>
         </div>
@@ -74,7 +73,7 @@ function Blocks({
         if (b.type === 'text') {
           return (
             <div key={i} className={user ? 'text-white' : 'text-text-primary'}>
-              <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{b.content}</ReactMarkdown>
+              <LazyMarkdown preset="sanitize">{b.content}</LazyMarkdown>
             </div>
           );
         }

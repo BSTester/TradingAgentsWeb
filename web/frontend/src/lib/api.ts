@@ -272,6 +272,45 @@ export class AnalysisWebSocket {
 
 
 // Scheduled Tasks APIs
+
+// 单个定期任务，与后端 _task_payload 对齐（/api/scheduled-tasks/ 列表/详情均返回此结构）。
+export interface ScheduledTaskItem {
+  id: number;
+  task_name: string;
+  ticker: string;
+  market: string | null;
+  is_enabled: boolean;
+  status: string;
+  execution_cycle: string;
+  execution_time: string;
+  interval_days: number | null;
+  day_of_week: string | null;
+  end_date: string | null;
+  next_run: string | null;
+  last_run: string | null;
+  total_executions: number;
+  last_report: { report_id: string | null; status: string | null; rating: number | null };
+  analysts: string[];
+  research_depth: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// 列表响应：后端返回 { data: [...任务], meta: { page, limit, total, has_next } }。
+export interface ScheduledTaskListResponse {
+  data: ScheduledTaskItem[];
+  meta: { page: number; limit: number; total: number; has_next: boolean };
+}
+
+// 全量统计响应（/api/scheduled-tasks/stats）：覆盖全部任务，不依赖当页数据。
+export interface ScheduledTaskStats {
+  running: number;
+  paused: number;
+  scheduled_today: number;
+  failed: number;
+  completed: number;
+}
+
 export const scheduledTasksAPI = {
   // Create a new scheduled task
   create: (data: {
@@ -289,7 +328,7 @@ export const scheduledTasksAPI = {
     interval_days?: number;
     end_date?: string;
   }) =>
-    apiRequest<any>('/api/scheduled-tasks/', {
+    apiRequest<{ data: ScheduledTaskItem }>('/api/scheduled-tasks/', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -300,28 +339,20 @@ export const scheduledTasksAPI = {
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
 
-    return apiRequest<{
-      items: any[];
-      total: number;
-      page: number;
-      limit: number;
-      has_next: boolean;
-      has_prev: boolean;
-      stats?: {
-        enabled: number;
-        paused: number;
-        completed: number;
-      };
-    }>(`/api/scheduled-tasks/?${queryParams.toString()}`);
+    return apiRequest<ScheduledTaskListResponse>(`/api/scheduled-tasks/?${queryParams.toString()}`);
   },
+
+  // Full-set statistics across all of the user's tasks
+  stats: () =>
+    apiRequest<{ data: ScheduledTaskStats }>('/api/scheduled-tasks/stats'),
 
   // Get a specific scheduled task
   get: (taskId: number) =>
-    apiRequest<any>(`/api/scheduled-tasks/${taskId}`),
+    apiRequest<{ data: ScheduledTaskItem }>(`/api/scheduled-tasks/${taskId}`),
 
   // Update a scheduled task
   update: (taskId: number, data: { is_enabled?: boolean; task_name?: string }) =>
-    apiRequest<any>(`/api/scheduled-tasks/${taskId}`, {
+    apiRequest<{ data: ScheduledTaskItem }>(`/api/scheduled-tasks/${taskId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),

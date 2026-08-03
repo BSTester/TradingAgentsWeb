@@ -9,7 +9,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (username: string, password: string, captcha?: { id: string; answer: string }) => Promise<void>;
-  loginWithEmailCode: (email: string, code: string, captcha?: { id: string; answer: string }) => Promise<void>;
+  loginWithEmailCode: (email: string, code: string, captcha: { id: string; answer: string }) => Promise<void>;
   register: (username: string, email: string, password?: string, captcha?: { id: string; answer: string }, emailCode?: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loginWithEmailCode = async (email: string, code: string, captcha?: { id: string; answer: string }) => {
+  const loginWithEmailCode = async (email: string, code: string, captcha: { id: string; answer: string }) => {
     try {
       const response: AuthResponse = await authAPI.loginWithEmailCode(email, code, captcha);
       

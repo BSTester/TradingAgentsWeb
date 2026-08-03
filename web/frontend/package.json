@@ -10,7 +10,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:fa-subset": "node scripts/build-fa-subset.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

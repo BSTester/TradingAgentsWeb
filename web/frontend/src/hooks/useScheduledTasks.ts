@@ -8,6 +8,7 @@ import { scheduledTasksAPI } from '@/lib/api';
 // Query keys
 export const scheduledTasksKeys = {
   all: ['scheduled-tasks'] as const,
+  stats: () => [...scheduledTasksKeys.all, 'stats'] as const,
   lists: () => [...scheduledTasksKeys.all, 'list'] as const,
   list: (page: number, limit: number) => [...scheduledTasksKeys.lists(), { page, limit }] as const,
   details: () => [...scheduledTasksKeys.all, 'detail'] as const,
@@ -21,6 +22,15 @@ export function useScheduledTasks(page: number = 1, limit: number = 20) {
     queryFn: () => scheduledTasksAPI.list({ page, limit }),
     staleTime: 30 * 1000, // 30秒缓存，减少不必要的请求
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+  });
+}
+
+// Hook to fetch full-set statistics across all of the user's tasks
+export function useScheduledTaskStats() {
+  return useQuery({
+    queryKey: scheduledTasksKeys.stats(),
+    queryFn: () => scheduledTasksAPI.stats(),
+    staleTime: 30 * 1000,
   });
 }
 
@@ -41,8 +51,9 @@ export function useCreateScheduledTask() {
   return useMutation({
     mutationFn: scheduledTasksAPI.create,
     onSuccess: () => {
-      // Invalidate and refetch scheduled tasks list
+      // Invalidate and refetch scheduled tasks list and full-set stats
       queryClient.invalidateQueries({ queryKey: scheduledTasksKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: scheduledTasksKeys.stats() });
     },
   });
 }
@@ -72,11 +83,11 @@ export function useUpdateScheduledTask() {
 
       // Optimistically update all list queries
       queryClient.setQueriesData({ queryKey: scheduledTasksKeys.lists() }, (old: any) => {
-        if (!old || !old.items) return old;
-        
+        if (!old || !old.data) return old;
+
         return {
           ...old,
-          items: old.items.map((task: any) => 
+          data: old.data.map((task: any) =>
             task.id === taskId ? { ...task, ...data } : task
           ),
         };
@@ -100,6 +111,7 @@ export function useUpdateScheduledTask() {
       // Always refetch after error or success to sync with server
       queryClient.invalidateQueries({ queryKey: scheduledTasksKeys.detail(taskId) });
       queryClient.invalidateQueries({ queryKey: scheduledTasksKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: scheduledTasksKeys.stats() });
     },
   });
 }
@@ -121,15 +133,15 @@ export function useDeleteScheduledTask() {
 
       // Optimistically update all list queries - remove the task
       queryClient.setQueriesData({ queryKey: scheduledTasksKeys.lists() }, (old: any) => {
-        if (!old || !old.items) return old;
-        
-        const filteredItems = old.items.filter((task: any) => task.id !== taskId);
-        console.log(`🗑️ Optimistically removed task from cache: ${old.items.length} → ${filteredItems.length}`);
-        
+        if (!old || !old.data) return old;
+
+        const filteredItems = old.data.filter((task: any) => task.id !== taskId);
+        console.log(`🗑️ Optimistically removed task from cache: ${old.data.length} → ${filteredItems.length}`);
+
         return {
           ...old,
-          items: filteredItems,
-          total: Math.max(0, old.total - 1),
+          data: filteredItems,
+          meta: { ...old.meta, total: Math.max(0, (old.meta?.total ?? 0) - 1) },
         };
       });
 
@@ -138,7 +150,7 @@ export function useDeleteScheduledTask() {
     },
     onError: (_err, _taskId, context) => {
       console.error('❌ Delete failed, rolling back optimistic update');
-      
+
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousLists) {
         context.previousLists.forEach(([queryKey, data]) => {
@@ -148,12 +160,13 @@ export function useDeleteScheduledTask() {
     },
     onSettled: () => {
       console.log('🔄 Refetching task list to sync with server');
-      
+
       // Always refetch after error or success to ensure sync with server
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: scheduledTasksKeys.lists(),
         refetchType: 'active'
       });
+      queryClient.invalidateQueries({ queryKey: scheduledTasksKeys.stats() });
     },
   });
 }

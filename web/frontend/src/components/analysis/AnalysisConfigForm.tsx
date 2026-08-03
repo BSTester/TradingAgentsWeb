@@ -602,7 +602,7 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
         
         console.log('=== Scheduled Task Created ===');
         console.log('Response:', response);
-        console.log('Task ID:', response.id);
+        console.log('Task ID:', response.data.id);
 
         onShowToast('✅ 定期报告创建成功！', 'success');
         
