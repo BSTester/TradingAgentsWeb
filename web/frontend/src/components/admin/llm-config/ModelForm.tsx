@@ -42,12 +42,15 @@ export function ModelForm({ model, providers, onClose, onSuccess }: ModelFormPro
     if (model) {
       // 编辑模式：使用现有模型数据
       setFormData(model);
-    } else if (providers.length > 0) {
+    } else {
       // 新建模式：设置默认供应商
-      setFormData(prev => ({ 
-        ...prev, 
-        provider_id: providers[0]!.id 
-      }));
+      const firstProvider = providers[0];
+      if (firstProvider) {
+        setFormData(prev => ({
+          ...prev,
+          provider_id: firstProvider.id
+        }));
+      }
     }
   }, [model, providers]);
 

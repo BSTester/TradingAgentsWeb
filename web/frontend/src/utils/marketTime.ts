@@ -40,13 +40,12 @@ function getTimeInTimezone(timezone: string): Date {
   
   // 构造本地时间的Date对象
   const localDate = new Date(
-    parseInt(dateParts.year ?? ''),
-    parseInt(dateParts.month ?? '') - 1,
-    parseInt(dateParts.day ?? ''),
-    parseInt(dateParts.hour ?? ''),
-    parseInt(dateParts.minute ?? ''),
-    parseInt(dateParts.second ?? '')
-  );
+    parseInt(dateParts.year ?? '0'),
+    parseInt(dateParts.month ?? '0') - 1,
+    parseInt(dateParts.day ?? '0'),
+    parseInt(dateParts.hour ?? '0'),
+    parseInt(dateParts.minute ?? '0'),
+    parseInt(dateParts.second ?? '0')  );
   
   return localDate;
 }
@@ -86,9 +85,8 @@ function checkUSMarketStatus(): MarketStatus {
   };
   const day = weekdayMap[dateParts.weekday ?? ''] || 0;
 
-  const hour = parseInt(dateParts.hour ?? '');
-  const minute = parseInt(dateParts.minute ?? '');
-  const time = hour * 60 + minute;
+  const hour = parseInt(dateParts.hour ?? '0');
+  const minute = parseInt(dateParts.minute ?? '0');  const time = hour * 60 + minute;
 
   const timeStr = `${dateParts.hour}:${dateParts.minute}`;
 
@@ -145,9 +143,8 @@ function checkHKMarketStatus(): MarketStatus {
   };
   const day = weekdayMap[dateParts.weekday ?? ''] || 0;
 
-  const hour = parseInt(dateParts.hour ?? '');
-  const minute = parseInt(dateParts.minute ?? '');
-  const time = hour * 60 + minute;
+  const hour = parseInt(dateParts.hour ?? '0');
+  const minute = parseInt(dateParts.minute ?? '0');  const time = hour * 60 + minute;
 
   const timeStr = `${dateParts.hour}:${dateParts.minute}`;
 
@@ -207,9 +204,8 @@ function checkCNMarketStatus(): MarketStatus {
   };
   const day = weekdayMap[dateParts.weekday ?? ''] || 0;
 
-  const hour = parseInt(dateParts.hour ?? '');
-  const minute = parseInt(dateParts.minute ?? '');
-  const time = hour * 60 + minute;
+  const hour = parseInt(dateParts.hour ?? '0');
+  const minute = parseInt(dateParts.minute ?? '0');  const time = hour * 60 + minute;
 
   const timeStr = `${dateParts.hour}:${dateParts.minute}`;
 

@@ -7,6 +7,7 @@ import { AnalysisHistory } from '@/components/analysis/AnalysisHistory';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { Footer } from '@/components/common/Footer';
 import { AppNavbar } from '@/components/common/AppNavbar';
+import { PageLoading } from '@/components/ui/PageLoading';
 
 export default function HistoryPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -29,14 +30,7 @@ export default function HistoryPage() {
 
   // 如果正在认证检查，显示加载状态
   if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
-        <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-          <p className="text-text-secondary">加载中...</p>
-        </div>
-      </div>
-    );
+    return <PageLoading message="正在加载分析历史..." />;
   }
 
   return (
