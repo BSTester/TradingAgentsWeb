@@ -8,6 +8,8 @@ import { AnalysisResultsSkeleton } from '@/components/analysis/AnalysisResultsSk
 import { useToast, Toast } from '@/components/ui/Toast';
 import { Footer } from '@/components/common/Footer';
 import { AppNavbar } from '@/components/common/AppNavbar';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { PageLoading } from '@/components/ui/PageLoading';
 
 // Code-split the heavy AnalysisResults (≈2k-line report view + markdown deps) so
 // the route shell + skeleton paint on navigation instead of a white screen while
@@ -63,25 +65,11 @@ function HistoryDetailContent() {
   }, []);
 
   if (!analysisId) {
-    return (
-      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
-        <div className="text-center">
-          <i className="fas fa-exclamation-triangle text-4xl text-danger-500 mb-4" />
-          <p className="text-text-secondary">缺少分析 ID</p>
-        </div>
-      </div>
-    );
+    return <ErrorState title="缺少分析 ID" description="请从分析历史重新打开报告。" onRetry={handleBackToHistory} />;
   }
 
   if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
-        <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-          <p className="text-text-secondary">加载中...</p>
-        </div>
-      </div>
-    );
+    return <PageLoading message="正在加载分析详情..." />;
   }
 
   const scrollToTop = () => {
@@ -151,14 +139,7 @@ function HistoryDetailContent() {
 
 export default function HistoryDetailPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
-        <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" />
-          <p className="text-text-secondary">加载中...</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<PageLoading message="正在加载分析详情..." />}>
       <HistoryDetailContent />
     </Suspense>
   );

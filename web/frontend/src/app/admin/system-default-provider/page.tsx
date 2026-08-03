@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { AppNavbar } from '@/components/common/AppNavbar';
 import { Footer } from '@/components/common/Footer';
 import { SystemDefaultForm } from '@/components/admin/system-default-provider/SystemDefaultForm';
+import { PageLoading } from '@/components/ui/PageLoading';
 
 export default function SystemDefaultProviderPage() {
   const { user, logout, isLoading: authLoading } = useAuth();
@@ -20,14 +21,7 @@ export default function SystemDefaultProviderPage() {
   }, [user, authLoading, router]);
 
   if (authLoading || !user || user.role !== 'admin') {
-    return (
-      <div className="min-h-screen bg-dark-primary flex items-center justify-center">
-        <div className="text-center">
-          <i className="fas fa-spinner fa-spin text-4xl text-accent-primary mb-4" aria-hidden="true" />
-          <p className="text-text-secondary">加载中...</p>
-        </div>
-      </div>
-    );
+    return <PageLoading message="正在验证管理员权限..." />;
   }
 
   return (
