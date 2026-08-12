@@ -22,7 +22,7 @@ export default function ScheduledTasksPage() {
   const limit = 10; // 每页显示10条
   const isMobile = useIsMobile();
   
-  const { data: listData, isLoading, error } = useScheduledTasks(page, limit);
+  const { data: listData, isLoading, error, refetch } = useScheduledTasks(page, limit);
   const { data: statsData } = useScheduledTaskStats();
   const deleteTask = useDeleteScheduledTask();
   const updateTask = useUpdateScheduledTask();

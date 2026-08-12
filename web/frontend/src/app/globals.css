@@ -7,17 +7,22 @@
     box-sizing: border-box;
   }
   
-  :root {
-    /* Workflow Desk CSS Variables — kept in sync with tailwind.config.js */
-    --bg-primary: #0a0d12;     /* ink */
-    --bg-secondary: #171f2b;   /* surface */
-    --bg-tertiary: #202b39;    /* raised */
-    --bg-elevated: #27333f;    /* elevated */
-    --bg-input: #0d131b;       /* recessed inputs */
-    --bg-rail: #111720;        /* research rail */
-    --border-default: #304154; /* structural line */
-    --accent-primary: #9bffbe; /* mint */
-    --accent-secondary: #8acbff;/* sky blue */
+ :root {
+    /* Dark-finance CSS Variables — kept in sync with tailwind.config.js */
+    --bg-primary: #060a10;     /* ink — deep finance base */
+    --bg-secondary: #0e1620;   /* surface */
+    --bg-tertiary: #16202d;    /* raised */
+    --bg-elevated: #1d2937;    /* elevated */
+    --bg-input: #0a1119;       /* recessed inputs */
+    --bg-rail: #0b131c;        /* side rail */
+    --bg-hover: #1a2636;       /* generic hover */
+    --border-default: #243243; /* structural line */
+    --accent-primary: #9ee5c9; /* mint — bull / primary action */
+    --accent-secondary: #81bbed;/* sky blue — safe / info */
+    --verdict-bull: #9ee5c9;   /* 看多 */
+    --verdict-hold: #e5bd72;   /* 持有 */
+    --verdict-bear: #f48b8b;   /* 看空 */
+    --verdict-safe: #81bbed;   /* 稳健 */
     --text-primary: #f1f5f7;
     --text-secondary: #9aa9b8;
     --text-tertiary: #68798a;
@@ -314,6 +319,92 @@
 
 .animate-fade-in {
   animation: fade-in 0.5s ease-out;
+}
+
+/* ===== Dark-finance research design system ===== */
+
+/* Surface helpers */
+.surface-panel {
+  @apply bg-dark-secondary border border-dark-border rounded-2xl;
+}
+.surface-card {
+  @apply bg-dark-secondary border border-dark-border rounded-xl transition-colors;
+}
+.surface-card:hover {
+  @apply border-dark-hover;
+}
+
+/* Verdict pill — semantic color from stance/verdict */
+.verdict-pill {
+  @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium font-mono;
+}
+.verdict-bull  { color: var(--verdict-bull);  background: rgba(158, 229, 201, 0.10); border: 1px solid rgba(158, 229, 201, 0.28); }
+.verdict-hold  { color: var(--verdict-hold);  background: rgba(229, 189, 114, 0.10); border: 1px solid rgba(229, 189, 114, 0.28); }
+.verdict-bear  { color: var(--verdict-bear);  background: rgba(244, 139, 139, 0.10); border: 1px solid rgba(244, 139, 139, 0.28); }
+.verdict-safe  { color: var(--verdict-safe);  background: rgba(129, 187, 237, 0.10); border: 1px solid rgba(129, 187, 237, 0.28); }
+.verdict-neutral{ color: var(--text-secondary); background: rgba(154, 169, 184, 0.08); border: 1px solid rgba(154, 169, 184, 0.22); }
+
+/* "示例 / 延迟" badge for non-actionable data */
+.data-sample-badge {
+  @apply inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium;
+  color: var(--text-tertiary);
+  background: rgba(154, 169, 184, 0.08);
+  border: 1px solid rgba(154, 169, 184, 0.18);
+}
+
+/* Headline (Chinese serif) */
+.h-serif {
+  @apply font-heading font-semibold tracking-tight;
+  color: var(--text-primary);
+}
+
+/* Tabular numbers for prices / confidence */
+.num {
+  @apply font-mono tabular-nums;
+}
+
+/* Primary action button */
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all;
+  background: var(--accent-primary);
+  color: #04130d;
+}
+.btn-primary:hover { filter: brightness(1.06); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+  background: transparent;
+}
+.btn-ghost:hover { color: var(--text-primary); border-color: var(--bg-hover); background: var(--bg-tertiary); }
+
+/* Search-first home hero */
+.hero-search {
+  background:
+    radial-gradient(900px 360px at 50% -10%, rgba(158, 229, 201, 0.10), transparent 70%),
+    radial-gradient(700px 300px at 80% 10%, rgba(129, 187, 237, 0.08), transparent 70%);
+}
+
+/* Role-chain connector line */
+.chain-rail {
+  position: relative;
+}
+.chain-rail::before {
+  content: "";
+  position: absolute;
+  left: 1.05rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--border-default), transparent);
+}
+
+/* Global non-execution disclaimer strip */
+.disclaimer-strip {
+  @apply text-[11px];
+  color: var(--text-tertiary);
 }
 
 /* Reduced motion support */
