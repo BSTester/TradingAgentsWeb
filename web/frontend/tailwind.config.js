@@ -13,20 +13,31 @@ module.exports = {
       colors: {
         // Dark surfaces (mapped 1:1 onto the prior semantic tokens so the whole
         // app re-skins without per-file edits).
-        dark: {
-          primary: '#0a0d12',   // ink — application background  (was #0a0e1a)
-          secondary: '#171f2b', // surface — panels / cards        (was #141824)
-          tertiary: '#202b39',  // raised — hover / secondary btns (was #1a1f2e)
-          elevated: '#27333f',  // elevated surfaces               (was #1f2937)
-          border: '#304154',    // structural line                 (was #2d3748)
+       dark: {
+          primary: '#060a10',   // ink — deep finance base
+          secondary: '#0e1620', // surface — panels / cards
+          tertiary: '#16202d',  // raised — hover / secondary btns
+          elevated: '#1d2937',  // elevated surfaces
+          border: '#243243',    // structural line
+          input: '#0a1119',     // recessed inputs
+          rail: '#0b131c',      // side rail
+          hover: '#1a2636',     // generic hover
         },
         // Workflow Desk accents
         accent: {
-          primary: '#9bffbe',   // mint — primary action / current stage / success
-          secondary: '#8acbff', // sky blue — flow / node identity
+          primary: '#9ee5c9',   // mint — bull / primary action / success
+          secondary: '#81bbed', // sky blue — safe / flow / info
           tertiary: '#5fb6e8',  // tertiary blue
-          hover: '#9bffbe',     // hover state (mint)
+          hover: '#9ee5c9',     // hover state (mint)
           focus: '#8acbff',     // focus state (blue)
+        },
+        // Verdict / stance semantic palette for the research report
+        verdict: {
+          bull: '#9ee5c9',      // 看多 / 买入 / 积极
+          hold: '#e5bd72',      // 持有 / 审慎 / 中性偏多
+          bear: '#f48b8b',      // 看空 / 减持 / 偏空
+          safe: '#81bbed',      // Safe / 稳健 / 信息
+          neutral: '#9aa9b8',   // 中性
         },
         // Text colors for the dark theme
         text: {
@@ -110,11 +121,15 @@ module.exports = {
         },
       },
       // Workflow Desk typography
-      fontFamily: {
-        sans: ['"Noto Sans SC"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
-        serif: ['"Instrument Serif"', 'ui-serif', 'Georgia', '"Times New Roman"', 'serif'],
-        mono: ['"DM Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
-      },
+     fontFamily: {
+       sans: ['"Noto Sans SC"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+        // Noto Serif SC for Chinese financial headlines (authoritative, editorial)
+        serif: ['"Noto Serif SC"', '"Songti SC"', 'ui-serif', 'Georgia', '"Times New Roman"', 'serif'],
+        // Tabular monospace for tickers / prices / verdicts / confidence
+        mono: ['"DM Mono"', '"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
+        num: ['"DM Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
+        heading: ['"Noto Serif SC"', '"Noto Sans SC"', 'ui-serif', 'Georgia', 'serif'],
+     },
       // Bootstrap-compatible spacing
       spacing: {
         '0.5': '0.125rem', // 2px

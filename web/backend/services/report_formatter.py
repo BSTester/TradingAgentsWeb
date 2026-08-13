@@ -6,6 +6,12 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List
 
+try:  # role_chain lives in the tradingagents package; keep formatter import-safe
+    from tradingagents.utils.role_chain import build_role_chain, role_chain_is_empty
+except Exception:  # pragma: no cover - import guard for environments without the package
+    build_role_chain = None  # type: ignore
+    role_chain_is_empty = None  # type: ignore
+
 
 RATING_LABELS = {
     1: "高风险",
@@ -74,12 +80,37 @@ def _section_list(record: Any) -> List[Dict[str, Any]]:
 def report_id(record: Any) -> str:
     return record.analysis_id
 
+def _role_chain(record: Any, source_session_id: str | None = None) -> Dict[str, Any] | None:
+    """Build the structured role-chain view from the stored final_state.
+    
+    Returns None when the role-chain module is unavailable or the analysis
+    produced no agent content yet (so the frontend can fall back to the legacy
+    section view without rendering empty scaffolding).
+    """
+    if build_role_chain is None:
+        return None
+    final_state = _final_state(record)
+    chain = build_role_chain(
+        final_state,
+        ticker=record.ticker,
+        company=record.company_name or record.ticker,
+        market=record.market,
+        published_at=_iso(record.created_at),
+        model_id=getattr(record, "deep_thinker", "") or getattr(record, "shallow_thinker", ""),
+        summary=record.final_summary or record.trading_decision or "",
+    )
+    chain["id"] = report_id(record)
+    chain["source"] = {"type": "conversation" if source_session_id else "scheduled_task", "session_id": source_session_id}
+    if role_chain_is_empty and role_chain_is_empty(chain):
+        return None
+    return chain
+
 
 def report_preview(record: Any, source_session_id: str | None = None) -> Dict[str, Any]:
     structured = _structured(record)
     rating = int(structured.get("rating") or 3)
     sections = structured.get("sections") if isinstance(structured.get("sections"), dict) else {}
-    return {
+    preview = {
         "id": report_id(record),
         "ticker": record.ticker,
         "company_name": record.company_name or record.ticker,
@@ -95,13 +126,18 @@ def report_preview(record: Any, source_session_id: str | None = None) -> Dict[st
         "status": _status(record.status),
         "created_at": _iso(record.created_at),
     }
+    chain = _role_chain(record, source_session_id)
+    if chain:
+        preview["role_chain"] = {"decision": chain.get("decision"), "analysts": chain.get("analysts")}
+        preview["trading_decision"] = chain.get("decision", {}).get("verdictLabel")
+    return preview
 
 
 def report_detail(record: Any, source_session_id: str | None = None, task_id: int | None = None) -> Dict[str, Any]:
     structured = _structured(record)
     rating = int(structured.get("rating") or 3)
     reflection = structured.get("reflection") if isinstance(structured.get("reflection"), dict) else {}
-    return {
+    detail = {
         "id": report_id(record),
         "ticker": record.ticker,
         "company_name": record.company_name or record.ticker,
@@ -128,6 +164,10 @@ def report_detail(record: Any, source_session_id: str | None = None, task_id: in
         "created_at": _iso(record.created_at),
         "updated_at": _iso(record.updated_at),
     }
+    chain = _role_chain(record, source_session_id)
+    if chain:
+        detail["role_chain"] = chain
+    return detail
 
 
 def report_markdown(record: Any) -> str:

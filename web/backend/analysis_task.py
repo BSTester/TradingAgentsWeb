@@ -1107,6 +1107,22 @@ def run_analysis_task(
             "structured_report": structured_report,
         }
         
+        # Build the role-chain view once and persist it alongside the structured
+        # report so the report API can serve it without re-running the builder.
+        try:
+            from tradingagents.utils.role_chain import build_role_chain
+            final_state["role_chain"] = build_role_chain(
+                report_sections,
+                ticker=ticker,
+                company=company_of_interest,
+                market=request_data.get("market"),
+                published_at=now_beijing.isoformat(),
+                model_id=request_data.get("deep_thinker") or request_data.get("shallow_thinker"),
+                summary=structured_report.get("summary") or str(decision),
+            )
+        except Exception as role_chain_err:  # pragma: no cover - never block persistence
+            print(f"⚠️  role_chain 构建失败（不影响分析结果）: {role_chain_err}")
+        
         # 保存状态到文件(按用户、股票代码和分析ID分开，避免覆盖)
         user_ticker_dir = safe_join(
             "eval_results",
