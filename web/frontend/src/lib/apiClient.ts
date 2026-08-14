@@ -86,45 +86,47 @@ apiClient.interceptors.response.use(
 
 /**
  * Auth API（公共客户端，不需要认证）
- * 后端已强制校验验证码：/api/auth/login 和 /api/auth/register
+ * 后端已强制校验 Cloudflare Turnstile 人机验证：/api/auth/login 和 /api/auth/register
  */
 export const authAPI = {
-  getCaptcha: async () => {
-    const res = await publicApiClient.post('/api/auth/captcha/new', {});
-    // seed 方案：后端只返回 seed，前端据此派生并绘制验证码
-    return res.data as { captcha_id: string; seed: string };
+  getTurnstileSiteKey: async () => {
+    try {
+      const response = await publicApiClient.get('/api/auth/turnstile/sitekey');
+      return response.data as { sitekey: string };
+    } catch {
+      // 后端不可用时，前端回退到本地测试 sitekey（联调友好）
+      return { sitekey: '1x00000000000000000000AA' };
+    }
   },
 
-  login: async (username: string, password: string, captcha?: { id: string; answer: string }) => {
+  login: async (username: string, password: string, turnstileToken?: string) => {
     try {
       const payload: any = { username, password };
-      if (captcha?.id && captcha?.answer) {
-        payload.captcha_id = captcha.id;
-        payload.captcha_answer = captcha.answer;
+      if (turnstileToken) {
+        payload.turnstile_token = turnstileToken;
       }
       const response = await publicApiClient.post('/api/auth/login', payload);
       return response.data;
     } catch (error: any) {
-      let errorMessage = error.response?.data?.detail || 
-                         error.response?.data?.message || 
-                         error.message || 
+      let errorMessage = error.response?.data?.detail ||
+                         error.response?.data?.message ||
+                         error.message ||
                          '登录失败，请稍后重试';
-      if (typeof errorMessage === 'string' && /Invalid or expired captcha/i.test(errorMessage)) {
-        errorMessage = '验证码无效或已过期';
+      if (typeof errorMessage === 'string' && /人机验证/i.test(errorMessage)) {
+        errorMessage = '人机验证失败，请刷新后重试';
       }
       throw new Error(errorMessage);
     }
   },
 
-  register: async (username: string, email: string, password?: string, captcha?: { id: string; answer: string }, emailCode?: string) => {
+  register: async (username: string, email: string, password?: string, turnstileToken?: string, emailCode?: string) => {
     try {
       const payload: any = { username, email };
       if (password) {
         payload.password = password;
       }
-      if (captcha?.id && captcha?.answer) {
-        payload.captcha_id = captcha.id;
-        payload.captcha_answer = captcha.answer;
+      if (turnstileToken) {
+        payload.turnstile_token = turnstileToken;
       }
       if (emailCode) {
         payload.email_code = emailCode;
@@ -132,12 +134,12 @@ export const authAPI = {
       const response = await publicApiClient.post('/api/auth/register', payload);
       return response.data;
     } catch (error: any) {
-      let errorMessage = error.response?.data?.detail || 
-                         error.response?.data?.message || 
-                         error.message || 
+      let errorMessage = error.response?.data?.detail ||
+                         error.response?.data?.message ||
+                         error.message ||
                          '注册失败，请稍后重试';
-      if (typeof errorMessage === 'string' && /Invalid or expired captcha/i.test(errorMessage)) {
-        errorMessage = '验证码无效或已过期';
+      if (typeof errorMessage === 'string' && /人机验证/i.test(errorMessage)) {
+        errorMessage = '人机验证失败，请刷新后重试';
       }
       throw new Error(errorMessage);
     }
@@ -152,9 +154,9 @@ export const authAPI = {
       const response = await apiClient.post('/api/auth/set-password', payload);
       return response.data;
     } catch (error: any) {
-      let errorMessage = error.response?.data?.detail || 
-                         error.response?.data?.message || 
-                         error.message || 
+      let errorMessage = error.response?.data?.detail ||
+                         error.response?.data?.message ||
+                         error.message ||
                          '设置密码失败，请稍后重试';
       throw new Error(errorMessage);
     }
@@ -165,62 +167,59 @@ export const authAPI = {
     return response.data;
   },
 
-  sendEmailCode: async (email: string, captcha: { id: string; answer: string }) => {
+  sendEmailCode: async (email: string, turnstileToken?: string) => {
     try {
       const response = await publicApiClient.post('/api/auth/email-code/send', {
         email,
-        captcha_id: captcha.id,
-        captcha_answer: captcha.answer,
+        turnstile_token: turnstileToken,
       });
       return response.data;
     } catch (error: any) {
-      let errorMessage = error.response?.data?.detail || 
-                         error.response?.data?.message || 
-                         error.message || 
+      let errorMessage = error.response?.data?.detail ||
+                         error.response?.data?.message ||
+                         error.message ||
                          '发送验证码失败，请稍后重试';
-      if (typeof errorMessage === 'string' && /Invalid or expired captcha/i.test(errorMessage)) {
-        errorMessage = '验证码无效或已过期';
+      if (typeof errorMessage === 'string' && /人机验证/i.test(errorMessage)) {
+        errorMessage = '人机验证失败，请刷新后重试';
       }
       throw new Error(errorMessage);
     }
   },
 
-  sendEmailCodeForRegister: async (email: string, captcha: { id: string; answer: string }) => {
+  sendEmailCodeForRegister: async (email: string, turnstileToken?: string) => {
     try {
       const response = await publicApiClient.post('/api/auth/email-code/send-for-register', {
         email,
-        captcha_id: captcha.id,
-        captcha_answer: captcha.answer,
+        turnstile_token: turnstileToken,
       });
       return response.data;
     } catch (error: any) {
-      let errorMessage = error.response?.data?.detail || 
-                         error.response?.data?.message || 
-                         error.message || 
+      let errorMessage = error.response?.data?.detail ||
+                         error.response?.data?.message ||
+                         error.message ||
                          '发送验证码失败，请稍后重试';
-      if (typeof errorMessage === 'string' && /Invalid or expired captcha/i.test(errorMessage)) {
-        errorMessage = '验证码无效或已过期';
+      if (typeof errorMessage === 'string' && /人机验证/i.test(errorMessage)) {
+        errorMessage = '人机验证失败，请刷新后重试';
       }
       throw new Error(errorMessage);
     }
   },
 
-  loginWithEmailCode: async (email: string, code: string, captcha?: { id: string; answer: string }) => {
+  loginWithEmailCode: async (email: string, code: string, turnstileToken?: string) => {
     try {
       const payload: any = { email, code };
-      if (captcha?.id && captcha?.answer) {
-        payload.captcha_id = captcha.id;
-        payload.captcha_answer = captcha.answer;
+      if (turnstileToken) {
+        payload.turnstile_token = turnstileToken;
       }
       const response = await publicApiClient.post('/api/auth/email-code/login', payload);
       return response.data;
     } catch (error: any) {
-      let errorMessage = error.response?.data?.detail || 
-                         error.response?.data?.message || 
-                         error.message || 
+      let errorMessage = error.response?.data?.detail ||
+                         error.response?.data?.message ||
+                         error.message ||
                          '登录失败，请稍后重试';
-      if (typeof errorMessage === 'string' && /Invalid or expired captcha/i.test(errorMessage)) {
-        errorMessage = '验证码无效或已过期';
+      if (typeof errorMessage === 'string' && /人机验证/i.test(errorMessage)) {
+        errorMessage = '人机验证失败，请刷新后重试';
       }
       throw new Error(errorMessage);
     }

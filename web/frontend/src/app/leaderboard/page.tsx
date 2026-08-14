@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { SiteLayout } from '@/components/site/SiteLayout';
 import { reportAPI } from '@/lib/api/reports';
-import { ResearchCard } from '@/app/page';
+import { ResearchCard } from '@/components/site/ResearchCard';
 import { SearchBar } from '@/components/site/SearchBar';
 
 export default function LeaderboardPage() {

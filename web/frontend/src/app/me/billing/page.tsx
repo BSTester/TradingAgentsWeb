@@ -1,7 +1,7 @@
 'use client';
 
-import { SiteLayout } from '@/components/site/SiteLayout';
-import { MeNav } from '@/app/me/page';
+import { AccountLayout } from '@/components/site/AccountLayout';
+import Link from 'next/link';
 
 // 示例数据：订阅计费表尚未在后端落地，先用示例展示形态。
 const SAMPLE_LEDGER = [
@@ -12,16 +12,16 @@ const SAMPLE_LEDGER = [
 
 export default function BillingPage() {
   return (
-    <SiteLayout maxWidth="max-w-4xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="h-serif text-2xl">订阅明细</h1>
-          <p className="mt-1 text-sm text-text-secondary">订阅次数的购买与消耗记录。</p>
-        </div>
-        <MeNav active="billing" />
-      </div>
-
-      <div className="mt-6 surface-panel flex items-center gap-4 p-5">
+    <AccountLayout
+      active="billing"
+      eyebrow="个人工作区"
+      title="订阅明细"
+      subtitle="订阅次数的购买与消耗记录。"
+      actions={
+        <Link href="/subscription" className="btn-secondary text-xs">购买次数</Link>
+      }
+    >
+      <div className="surface-panel mt-6 flex items-center gap-4 p-5">
         <i className="fa-solid fa-bolt text-2xl text-verdict-hold" />
         <div>
           <div className="text-xs text-text-tertiary">当前可用次数（示例）</div>
@@ -30,7 +30,7 @@ export default function BillingPage() {
         <span className="data-sample-badge ml-auto">示例数据</span>
       </div>
 
-      <div className="mt-6 surface-panel overflow-hidden">
+      <div className="surface-panel mt-6 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="border-b border-dark-border text-left text-xs text-text-tertiary">
             <tr>
@@ -55,7 +55,6 @@ export default function BillingPage() {
         </table>
       </div>
       <p className="disclaimer-strip mt-3">计费明细为示例数据；后端订阅配额表（SubscriptionProduct / UserQuota / QuotaLedger）落地后将对接真实记录。</p>
-    </SiteLayout>
+    </AccountLayout>
   );
 }
-

@@ -1,10 +1,10 @@
 ﻿'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 
-import CaptchaImage from './CaptchaImage';
+import { Turnstile, TurnstileRef } from './Turnstile';
 
 interface RegisterFormProps {
   onSubmit?: (data: { username: string; email: string; password: string }) => void;
@@ -19,10 +19,9 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
     email: '',
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [captchaId, setCaptchaId] = useState('');
-  const [captchaInput, setCaptchaInput] = useState('');
-  const [captchaKey, setCaptchaKey] = useState(0);
-  
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const turnstileRef = useRef<TurnstileRef | null>(null);
+
   const [emailVerificationCode, setEmailVerificationCode] = useState('');
   const [countdown, setCountdown] = useState(0);
   const [isSendingCode, setIsSendingCode] = useState(false);
@@ -38,34 +37,35 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
     return undefined;
   }, [countdown]);
 
+  const resetTurnstile = () => {
+    setTurnstileToken('');
+    turnstileRef.current?.reset();
+  };
+
   const handleSendEmailCode = async () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!formData.email || !emailRegex.test(formData.email)) {
       onShowToast('请先输入有效的邮箱地址', 'warning');
       return;
     }
-    
-    if (!captchaId || !captchaInput.trim()) {
-      onShowToast('请输入图形验证码', 'warning');
+
+    if (!turnstileToken) {
+      onShowToast('请先完成人机验证', 'warning');
       return;
     }
-    
+
     setIsSendingCode(true);
-    
+
     try {
       const { authAPI } = await import('@/lib/apiClient');
-      
-      await authAPI.sendEmailCodeForRegister(formData.email, {
-        id: captchaId,
-        answer: captchaInput.trim(),
-      });
-      
+
+      await authAPI.sendEmailCodeForRegister(formData.email, turnstileToken);
+
       onShowToast('验证码已发送到您的邮箱，请查收', 'success');
       setCountdown(60);
     } catch (error: any) {
       onShowToast(error.message || '发送验证码失败，请稍后重试', 'error');
-      setCaptchaKey((k) => k + 1);
-      setCaptchaInput('');
+      resetTurnstile();
     } finally {
       setIsSendingCode(false);
     }
@@ -83,8 +83,8 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
       return false;
     }
 
-    if (!captchaId || !captchaInput.trim()) {
-      onShowToast('请输入图形验证码', 'warning');
+    if (!turnstileToken) {
+      onShowToast('请先完成人机验证', 'warning');
       return false;
     }
 
@@ -102,23 +102,22 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
 
     try {
       await register(
-        formData.username, 
-        formData.email, 
+        formData.username,
+        formData.email,
         undefined,
-        { id: captchaId, answer: captchaInput.trim() },
+        turnstileToken,
         emailVerificationCode
       );
-      
+
       onShowToast('注册成功！正在跳转...', 'success');
-      
+
       await new Promise(resolve => setTimeout(resolve, 500));
       router.replace('/?setup_password=true');
     } catch (error: any) {
       const errorMessage = error.message || '注册失败，请稍后重试';
       onShowToast(errorMessage, 'error');
       setIsLoading(false);
-      setCaptchaKey((k) => k + 1);
-      setCaptchaInput('');
+      resetTurnstile();
       setEmailVerificationCode('');
     }
   };
@@ -224,21 +223,13 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
 
         <div>
           <label className="block text-sm font-medium text-text-secondary mb-2">
-            图形验证码
+            人机验证
           </label>
-          <div className="flex flex-row items-center gap-3">
-            <input
-              type="text"
-              value={captchaInput}
-              onChange={(e) => setCaptchaInput(e.target.value)}
-              placeholder="请输入验证码"
-              className="flex-1 min-w-0 h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
-              required
-            />
-            <div className="flex items-center flex-shrink-0 max-w-[140px]">
-              <CaptchaImage key={captchaKey} onIdChange={setCaptchaId} height={48} />
-            </div>
-          </div>
+          <Turnstile
+            ref={turnstileRef}
+            onTokenChange={setTurnstileToken}
+            className="min-h-[65px]"
+          />
         </div>
 
         <button
@@ -262,4 +253,3 @@ export function RegisterForm({ onSubmit: _onSubmit, externalLoading: _externalLo
     </>
   );
 }
-

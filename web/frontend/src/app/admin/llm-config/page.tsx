@@ -6,8 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { buildApiUrl } from '@/utils/api';
 import { useToast, Toast } from '@/components/ui/Toast';
-import { AppNavbar } from '@/components/common/AppNavbar';
-import { Footer } from '@/components/common/Footer';
+import { SiteLayout } from '@/components/site/SiteLayout';
 import { ProviderList } from '@/components/admin/llm-config/ProviderList';
 import { ModelList } from '@/components/admin/llm-config/ModelList';
 import { ProviderForm } from '@/components/admin/llm-config/ProviderForm';
@@ -16,7 +15,7 @@ import { ConfirmDialog } from '@/components/admin/llm-config/ConfirmDialog';
 import { RouteDataState } from '@/components/ui/RouteDataState';
 
 export default function LLMConfigPage() {
-  const { user, logout, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { toast, showToast, hideToast } = useToast();
   const queryClient = useQueryClient();
@@ -176,17 +175,18 @@ export default function LLMConfigPage() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-primary flex flex-col">
-      <AppNavbar user={user} onLogout={logout} />
-
-      <div className="flex-1 max-w-7xl mx-auto px-4 py-8 pt-20 sm:px-6 lg:px-8 w-full">
+    <SiteLayout maxWidth="max-w-7xl">
         {/* 页面标题 */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-text-primary">
-            <i className="fas fa-brain mr-3 text-accent-primary" />
-            LLM 配置管理
-          </h2>
-          <p className="mt-2 text-text-secondary">管理 LLM 供应商和模型配置</p>
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <div className="num text-[11px] uppercase tracking-[0.16em] text-accent-primary">管理控制台</div>
+            <h1 className="h-serif mt-1 text-2xl">
+              <i className="fas fa-brain mr-2 text-accent-primary" />
+              LLM 配置管理
+            </h1>
+            <p className="mt-1.5 text-sm text-text-secondary">管理 LLM 供应商和模型配置</p>
+          </div>
+          <span className="verdict-pill verdict-hold">管理员</span>
         </div>
 
         {/* 标签页 */}
@@ -273,9 +273,6 @@ export default function LLMConfigPage() {
             </RouteDataState>
           </div>
         )}
-      </div>
-
-      <Footer />
 
       {/* 供应商表单模态框 */}
       {showProviderForm && (
@@ -328,6 +325,6 @@ export default function LLMConfigPage() {
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
       />
-    </div>
+    </SiteLayout>
   );
 }

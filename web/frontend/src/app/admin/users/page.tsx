@@ -7,8 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { buildApiUrl } from '@/utils/api';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
-import { AppNavbar } from '@/components/common/AppNavbar';
-import { Footer } from '@/components/common/Footer';
+import { SiteLayout } from '@/components/site/SiteLayout';
 import { ResponsiveUserCard } from '@/components/admin/ResponsiveUserCard';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { RouteDataState } from '@/components/ui/RouteDataState';
@@ -54,7 +53,7 @@ interface SystemStats {
 }
 
 export default function UserManagementPage() {
-  const { user, logout, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { toast, showToast, hideToast } = useToast();
   const [page, setPage] = useState(1);
@@ -290,14 +289,9 @@ export default function UserManagementPage() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-primary flex flex-col">
-      {/* 顶部导航栏 */}
-      <AppNavbar user={user} onLogout={logout} />
-
-      {/* 主要内容 */}
-      <div className="flex-1 max-w-7xl mx-auto px-4 py-8 pt-20 sm:px-6 lg:px-8 w-full">
-        {/* 页面标题 */}
-        <div className="mb-8">
+    <SiteLayout maxWidth="max-w-7xl">
+      {/* 页面标题 */}
+      <div className="mb-8">
           <h2 className="text-3xl font-bold text-text-primary">
             <i className="fas fa-users-cog mr-3 text-accent-primary" />
             用户管理
@@ -508,9 +502,6 @@ export default function UserManagementPage() {
             </div>
           )}
         </div>
-      </div>
-
-      <Footer />
 
       {/* Toast组件 */}
       <Toast
@@ -519,6 +510,6 @@ export default function UserManagementPage() {
         isVisible={toast.isVisible}
         onClose={hideToast}
       />
-    </div>
+    </SiteLayout>
   );
 }

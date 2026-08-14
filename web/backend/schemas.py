@@ -15,9 +15,8 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: Optional[str] = None  # Password is now optional
-    # 服务端验证码（防绕过前端）
-    captcha_id: Optional[str] = None
-    captcha_answer: Optional[str] = None
+    # Cloudflare Turnstile 人机验证 token（前端 widget 回传）
+    turnstile_token: Optional[str] = None
     # 邮箱验证码
     email_code: Optional[str] = None
     
@@ -55,9 +54,8 @@ class PasswordSetRequest(BaseModel):
 class UserLogin(BaseModel):
     username: str
     password: str
-    # 服务端验证码（防绕过前端）
-    captcha_id: Optional[str] = None
-    captcha_answer: Optional[str] = None
+    # Cloudflare Turnstile 人机验证 token（前端 widget 回传）
+    turnstile_token: Optional[str] = None
 
 class User(UserBase):
     id: int
@@ -72,7 +70,7 @@ class User(UserBase):
 class UserInDB(User):
     hashed_password: str
 
-# Captcha
+# Captcha（已废弃：图形验证码已替换为 Cloudflare Turnstile，保留仅为向后兼容引用）
 class CaptchaResponse(BaseModel):
     captcha_id: str
     seed: str
@@ -81,8 +79,7 @@ class CaptchaResponse(BaseModel):
 class EmailCodeSendRequest(BaseModel):
     """Request schema for sending verification code"""
     email: EmailStr
-    captcha_id: str
-    captcha_answer: str
+    turnstile_token: Optional[str] = None
 
 class EmailCodeSendResponse(BaseModel):
     """Response schema for send verification code"""
@@ -93,8 +90,7 @@ class EmailCodeLoginRequest(BaseModel):
     """Request schema for email code login"""
     email: EmailStr
     code: str
-    captcha_id: str
-    captcha_answer: str
+    turnstile_token: Optional[str] = None
     
     @validator('code')
     def validate_code(cls, v):

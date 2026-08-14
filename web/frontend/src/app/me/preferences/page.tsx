@@ -1,9 +1,9 @@
 'use client';
 
-import { SiteLayout } from '@/components/site/SiteLayout';
-import { MeNav } from '@/app/me/page';
+import { AccountLayout } from '@/components/site/AccountLayout';
 import { useAuth } from '@/lib/auth';
 import { useState } from 'react';
+import Link from 'next/link';
 
 export default function PreferencesPage() {
   const { user } = useAuth();
@@ -11,16 +11,13 @@ export default function PreferencesPage() {
   const [emailNotify, setEmailNotify] = useState(true);
 
   return (
-    <SiteLayout maxWidth="max-w-3xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="h-serif text-2xl">账户偏好</h1>
-          <p className="mt-1 text-sm text-text-secondary">分析结果的默认公开与通知设置。</p>
-        </div>
-        <MeNav active="preferences" />
-      </div>
-
-      <div className="mt-6 surface-panel divide-y divide-dark-border">
+    <AccountLayout
+      active="preferences"
+      eyebrow="个人工作区"
+      title="账户偏好"
+      subtitle="分析结果的默认公开与通知设置。"
+    >
+      <div className="surface-panel mt-6 divide-y divide-dark-border">
         <PrefRow title="账户" desc={user ? user.username : '未登录'}>
           <span className="num text-xs text-text-tertiary">{user?.email ?? '—'}</span>
         </PrefRow>
@@ -33,11 +30,11 @@ export default function PreferencesPage() {
         <PrefRow title="分析完成邮件通知" desc="研究完成后向你的注册邮箱发送提醒（示例开关）。">
           <Toggle on={emailNotify} onChange={setEmailNotify} />
         </PrefRow>
-        <PrefRow title="本地模型 Key" desc="在「本地模型」页管理，仅存浏览器，服务端不保存。">
-          <a href="/settings" className="text-xs text-accent-secondary hover:underline">前往设置 →</a>
+        <PrefRow title="本地模型 Key" desc="在「自定义模型」页管理，仅存浏览器，服务端不保存。">
+          <Link href="/settings" className="text-xs text-accent-secondary hover:underline">前往设置 →</Link>
         </PrefRow>
       </div>
-    </SiteLayout>
+    </AccountLayout>
   );
 }
 
@@ -69,4 +66,3 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
     </button>
   );
 }
-
