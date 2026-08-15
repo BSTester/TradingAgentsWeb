@@ -14,7 +14,7 @@ export function SiteFooter() {
             <Link href="/" className="hover:text-text-secondary">研究</Link>
             <Link href="/leaderboard" className="hover:text-text-secondary">公开榜单</Link>
             <Link href="/subscription" className="hover:text-text-secondary">订阅</Link>
-            <Link href="/settings" className="hover:text-text-secondary">本地模型</Link>
+            <Link href="/settings" className="hover:text-text-secondary">自定义模型</Link>
           </nav>
         </div>
         <p className="disclaimer-strip mt-6 leading-relaxed">

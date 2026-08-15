@@ -16,7 +16,7 @@ export default function SubscriptionPage() {
     <SiteLayout maxWidth="max-w-4xl">
       <h1 className="h-serif text-2xl">订阅中心</h1>
       <p className="mt-1 text-sm text-text-secondary">
-        按次订阅。没有配置本地模型 Key 时，可消耗订阅次数使用系统大模型完成研究分析。
+        按次订阅。没有配置自定义模型 Key 时，可消耗订阅次数使用系统大模型完成研究分析。
       </p>
 
       <div className="mt-5 surface-panel flex flex-wrap items-center justify-between gap-3 p-4">
@@ -48,7 +48,7 @@ export default function SubscriptionPage() {
         <h3 className="text-sm font-medium text-text-primary">计费说明</h3>
         <ul className="mt-2 space-y-1.5 text-xs text-text-secondary">
           <li>· 系统模型分析按完成报告扣除订阅次数，启动前预扣，失败自动回补。</li>
-          <li>· 配置并使用本地模型 Key 时，不消耗订阅次数。</li>
+          <li>· 配置并使用自定义模型 Key 时，不消耗订阅次数。</li>
           <li>· 所有行情与价格为示例 / 延迟数据，研究结论非投资建议。</li>
         </ul>
         {!user && (

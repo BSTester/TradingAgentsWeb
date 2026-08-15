@@ -9,7 +9,7 @@ const NAV = [
   { href: '/', label: '研究' },
   { href: '/leaderboard', label: '公开榜单' },
   { href: '/subscription', label: '订阅' },
-  { href: '/settings', label: '本地模型' },
+  { href: '/settings', label: '自定义模型' },
 ];
 
 export function SiteHeader() {

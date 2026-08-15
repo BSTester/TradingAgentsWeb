@@ -30,7 +30,7 @@ export default function PreferencesPage() {
         <PrefRow title="分析完成邮件通知" desc="研究完成后向你的注册邮箱发送提醒（示例开关）。">
           <Toggle on={emailNotify} onChange={setEmailNotify} />
         </PrefRow>
-        <PrefRow title="本地模型 Key" desc="在「自定义模型」页管理，仅存浏览器，服务端不保存。">
+        <PrefRow title="自定义模型 Key" desc="在「自定义模型」页管理，仅存浏览器，服务端不保存。">
           <Link href="/settings" className="text-xs text-accent-secondary hover:underline">前往设置 →</Link>
         </PrefRow>
       </div>

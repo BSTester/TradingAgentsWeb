@@ -31,7 +31,7 @@ export default function SettingsPage() {
 
   return (
     <SiteLayout maxWidth="max-w-3xl">
-      <h1 className="h-serif text-2xl">本地模型设置</h1>
+      <h1 className="h-serif text-2xl">自定义模型设置</h1>
       <p className="mt-1 text-sm text-text-secondary">
         配置自定义 LLM 接口与密钥。这些信息仅保存在你的浏览器本地，服务端不存储、不传输持久化。
       </p>
@@ -40,7 +40,7 @@ export default function SettingsPage() {
         <i className="fa-solid fa-lock mt-0.5 text-verdict-hold" />
         <span>
           本地 Key 仅写入浏览器 localStorage（按账户隔离），不会随分析请求持久化到服务端，也不会出现在公开报告中。
-          清除浏览器数据将一并清除。配置后，分析将优先使用你的本地模型。
+          清除浏览器数据将一并清除。配置后，分析将优先使用你的自定义模型。
         </span>
       </div>
 
