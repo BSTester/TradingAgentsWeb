@@ -32,7 +32,7 @@ export function SearchBar({ size = 'lg' }: { size?: 'lg' | 'md' }) {
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="输入股票代码、公司名称，或一句研究指令，如「把 minimax 加入港股通对后市的影响」"
+          placeholder="输入股票代码、公司名称，或一句研究指令，如「宁德时代海外扩张对未来 12 个月利润的影响」"
           className={`w-full rounded-xl border border-dark-border bg-dark-input ${height} ${textSize} pl-11 pr-28 text-text-primary placeholder:text-text-tertiary focus:border-accent-primary focus:outline-none focus:ring-1 focus:ring-accent-primary/40`}
           autoFocus={size === 'lg'}
         />

@@ -1,6 +1,11 @@
+'use client';
+
 import Link from 'next/link';
+import { useAuth } from '@/lib/auth';
 
 export function SiteFooter() {
+  const { user } = useAuth();
+
   return (
     <footer className="border-t border-dark-border bg-dark-primary">
       <div className="mx-auto max-w-6xl px-4 py-8 text-xs text-text-tertiary">
@@ -14,7 +19,9 @@ export function SiteFooter() {
             <Link href="/" className="hover:text-text-secondary">研究</Link>
             <Link href="/leaderboard" className="hover:text-text-secondary">公开榜单</Link>
             <Link href="/subscription" className="hover:text-text-secondary">订阅</Link>
-            <Link href="/settings" className="hover:text-text-secondary">自定义模型</Link>
+            {/* 未登录时设置入口在顶部导航（登录按钮左侧的齿轮图标）；
+                登录后顶部不再显示，只保留这里 —— 任何状态全站只有一个入口 */}
+            {user && <Link href="/settings" className="hover:text-text-secondary">自定义模型</Link>}
           </nav>
         </div>
         <p className="disclaimer-strip mt-6 leading-relaxed">
@@ -25,4 +32,3 @@ export function SiteFooter() {
     </footer>
   );
 }
-
