@@ -1,10 +1,10 @@
 ﻿'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 
-import CaptchaImage from './CaptchaImage';
+import { Turnstile, TurnstileRef } from './Turnstile';
 
 interface LoginFormProps {
   onShowToast: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
@@ -12,26 +12,25 @@ interface LoginFormProps {
 
 export function LoginForm({ onShowToast }: LoginFormProps) {
   const [loginMode, setLoginMode] = useState<'password' | 'email'>('password');
-  
+
   const [formData, setFormData] = useState({
     username: '',
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
-  
+
   const [emailForCode, setEmailForCode] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [countdown, setCountdown] = useState(0);
   const [isSendingCode, setIsSendingCode] = useState(false);
-  
+
   const [isLoading, setIsLoading] = useState(false);
-  const [captchaId, setCaptchaId] = useState<string>('');
-  const [captchaInput, setCaptchaInput] = useState('');
-  const [captchaKey, setCaptchaKey] = useState(0);
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const turnstileRef = useRef<TurnstileRef | null>(null);
 
   const { login, loginWithEmailCode } = useAuth();
   const router = useRouter();
-  
+
   useEffect(() => {
     if (countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
@@ -40,33 +39,34 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
     return undefined;
   }, [countdown]);
 
+  const resetTurnstile = () => {
+    setTurnstileToken('');
+    turnstileRef.current?.reset();
+  };
+
   const handleSendCode = async () => {
     if (!emailForCode || !emailForCode.includes('@')) {
       onShowToast('请输入有效的邮箱地址', 'warning');
       return;
     }
-    
-    if (!captchaId || !captchaInput.trim()) {
-      onShowToast('请输入图形验证码', 'warning');
+
+    if (!turnstileToken) {
+      onShowToast('请先完成人机验证', 'warning');
       return;
     }
-    
+
     setIsSendingCode(true);
-    
+
     try {
       const { authAPI } = await import('@/lib/apiClient');
-      
-      await authAPI.sendEmailCode(emailForCode, {
-        id: captchaId,
-        answer: captchaInput.trim(),
-      });
-      
+
+      await authAPI.sendEmailCode(emailForCode, turnstileToken);
+
       onShowToast('验证码已发送到您的邮箱', 'success');
       setCountdown(60);
     } catch (error: any) {
       onShowToast(error.message || '发送验证码失败，请稍后重试', 'error');
-      setCaptchaKey((k) => k + 1);
-      setCaptchaInput('');
+      resetTurnstile();
     } finally {
       setIsSendingCode(false);
     }
@@ -75,60 +75,58 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!captchaId || !captchaInput.trim()) {
-      onShowToast('请输入图形验证码', 'warning');
+    if (!turnstileToken) {
+      onShowToast('请先完成人机验证', 'warning');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      await login(formData.username, formData.password, { id: captchaId, answer: captchaInput.trim() });
+      await login(formData.username, formData.password, turnstileToken);
       onShowToast('登录成功！正在跳转...', 'success');
-      
+
       await new Promise(resolve => setTimeout(resolve, 500));
       router.replace('/');
     } catch (error: any) {
       const errorMessage = error.message || '登录失败，请检查用户名和密码';
       onShowToast(errorMessage, 'error');
       setIsLoading(false);
-      setCaptchaKey((k) => k + 1);
-      setCaptchaInput('');
+      resetTurnstile();
     }
   };
-  
+
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!emailForCode || !emailForCode.includes('@')) {
       onShowToast('请输入有效的邮箱地址', 'warning');
       return;
     }
-    
+
     if (!verificationCode || verificationCode.length !== 6) {
       onShowToast('请输入6位验证码', 'warning');
       return;
     }
-    
-    if (!captchaId || !captchaInput.trim()) {
-      onShowToast('请输入图形验证码', 'warning');
+
+    if (!turnstileToken) {
+      onShowToast('请先完成人机验证', 'warning');
       return;
     }
-    
+
     setIsLoading(true);
-    
+
     try {
-      await loginWithEmailCode(emailForCode, verificationCode, { id: captchaId, answer: captchaInput.trim() });
+      await loginWithEmailCode(emailForCode, verificationCode, turnstileToken);
       onShowToast('登录成功！正在跳转...', 'success');
-      
+
       await new Promise(resolve => setTimeout(resolve, 500));
       router.replace('/');
     } catch (error: any) {
       const errorMessage = error.message || '登录失败，请检查验证码';
       onShowToast(errorMessage, 'error');
       setIsLoading(false);
-      setCaptchaKey((k) => k + 1);
-      setCaptchaInput('');
+      resetTurnstile();
       setVerificationCode('');
     }
   };
@@ -226,21 +224,13 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
 
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              图形验证码
+              人机验证
             </label>
-            <div className="flex flex-row items-center gap-3">
-              <input
-                type="text"
-                value={captchaInput}
-                onChange={(e) => setCaptchaInput(e.target.value)}
-                placeholder="请输入验证码"
-                className="flex-1 min-w-0 h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary transition-all"
-                required
-              />
-              <div className="flex items-center flex-shrink-0 max-w-[140px]">
-                <CaptchaImage key={captchaKey} onIdChange={setCaptchaId} height={48} />
-              </div>
-            </div>
+            <Turnstile
+              ref={turnstileRef}
+              onTokenChange={setTurnstileToken}
+              className="min-h-[65px]"
+            />
           </div>
 
           <button
@@ -327,21 +317,13 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
 
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              图形验证码
+              人机验证
             </label>
-            <div className="flex flex-row items-center gap-3">
-              <input
-                type="text"
-                value={captchaInput}
-                onChange={(e) => setCaptchaInput(e.target.value)}
-                placeholder="请输入验证码"
-                className="flex-1 min-w-0 h-12 px-4 bg-dark-tertiary border border-dark-border text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-primary transition-all"
-                required
-              />
-              <div className="flex items-center flex-shrink-0 max-w-[140px]">
-                <CaptchaImage key={captchaKey} onIdChange={setCaptchaId} height={48} />
-              </div>
-            </div>
+            <Turnstile
+              ref={turnstileRef}
+              onTokenChange={setTurnstileToken}
+              className="min-h-[65px]"
+            />
           </div>
 
           <button
@@ -366,5 +348,3 @@ export function LoginForm({ onShowToast }: LoginFormProps) {
     </>
   );
 }
-
-
