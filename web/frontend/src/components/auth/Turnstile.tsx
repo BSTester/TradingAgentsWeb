@@ -123,7 +123,7 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(function Turns
   }, []);
 
   return (
-    <div className={className}>
+    <div className={`flex flex-col items-center ${className ?? ''}`}>
       <div ref={containerRef} />
       {loadError && (
         <p className="mt-1 text-xs text-verdict-bear">

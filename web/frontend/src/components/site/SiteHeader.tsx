@@ -9,7 +9,6 @@ const NAV = [
   { href: '/', label: '研究' },
   { href: '/leaderboard', label: '公开榜单' },
   { href: '/subscription', label: '订阅' },
-  { href: '/settings', label: '自定义模型' },
 ];
 
 export function SiteHeader() {
@@ -67,9 +66,19 @@ export function SiteHeader() {
               </button>
             </div>
           ) : (
-            <Link href="/auth" className="btn-primary px-3 py-1.5 text-xs">
-              登录
-            </Link>
+            <>
+              <Link
+                href="/settings"
+                className="rounded-md p-1.5 text-text-secondary transition-colors hover:text-text-primary"
+                aria-label="自定义模型设置"
+                title="自定义模型设置"
+              >
+                <i className="fa-solid fa-gear" />
+              </Link>
+              <Link href="/auth" className="btn-primary px-3 py-1.5 text-xs">
+                登录
+              </Link>
+            </>
           )}
           <button
             className="rounded-md p-1.5 text-text-secondary md:hidden"
