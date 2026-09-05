@@ -455,7 +455,12 @@ def run_analysis_task(
         elif config["llm_provider"] == "google":
             config["google_api_key"] = api_key
         else:
+            # OpenAI-compatible (incl. DeepSeek / OpenRouter / …): the memory
+            # client reads `embedding_api_key` + `embedding_backend_url`, so mirror
+            # the same key/url there or it will fail with "Missing credentials".
             config["openai_api_key"] = api_key
+            config["embedding_api_key"] = api_key or config.get("embedding_api_key") or os.getenv("OPENAI_API_KEY", "")
+            config["embedding_backend_url"] = config["backend_url"]
 
         previous_record = db.query(AnalysisRecord).filter(
             AnalysisRecord.user_id == user_id,

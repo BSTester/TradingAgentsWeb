@@ -57,7 +57,7 @@ function HistoryProgressContent() {
       <AppNavbar user={user} onLogout={logout} />
 
       <nav className="bg-dark-secondary/80 backdrop-blur-lg border-b border-dark-border shadow-lg pt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-10 overflow-hidden">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-10 overflow-hidden">
           <div className="flex items-center space-x-2 text-sm whitespace-nowrap">
             <button
               onClick={handleBackToHome}
@@ -81,7 +81,7 @@ function HistoryProgressContent() {
         </div>
       </nav>
 
-      <div className="flex-1 max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 w-full">
+      <div className="flex-1 max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8 w-full">
         <AnalysisProgress
           analysisId={analysisId}
           onComplete={handleComplete}

@@ -7,6 +7,7 @@ import { Toast, useToast } from '@/components/ui/Toast';
 import { ConfirmDialog } from '@/components/admin/llm-config/ConfirmDialog';
 import { RouteDataState } from '@/components/ui/RouteDataState';
 import { useSystemDefaultProvider } from '@/hooks/useSystemDefaultProvider';
+import { adminAPI } from '@/lib/api';
 import type { AdminLLMProvider, SystemDefaultProviderSummary } from '@/lib/types';
 
 function ProviderSummaryCard({ provider }: { provider: SystemDefaultProviderSummary }) {
@@ -112,8 +113,8 @@ function ProviderSelect({
             </option>
           )}
           {activeProviders.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.display_name}（{p.provider_name}）
+            <option key={p.id} value={p.id} disabled={!p.api_key}>
+              {p.display_name}（{p.provider_name}）{!p.api_key ? ' — 需配置 Key' : ''}
             </option>
           ))}
         </optgroup>
@@ -132,6 +133,11 @@ function ProviderSelect({
           已禁用的 provider 显示为置灰且不可选择；若需将其设为默认，请先到 LLM 管理启用。
         </p>
       )}
+      {activeProviders.some((p) => !p.api_key) && (
+        <p className="mt-2 text-xs text-text-muted">
+          未配置 API Key 的 provider 不可设为系统默认；请先到「LLM 配置」为其录入 Key。
+        </p>
+      )}
     </div>
   );
 }
@@ -142,9 +148,47 @@ export function SystemDefaultForm() {
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [shallowModel, setShallowModel] = useState('');
+  const [deepModel, setDeepModel] = useState('');
+  const [modelOptions, setModelOptions] = useState<string[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const systemDefault = systemDefaultQuery.data ?? null;
   const providers = useMemo(() => providersQuery.data ?? [], [providersQuery.data]);
+
+  // 初始化选中项与模型为当前系统默认
+  useEffect(() => {
+    if (systemDefault) {
+      setSelectedId((prev) => (prev ?? systemDefault.provider_id));
+      setShallowModel(systemDefault.shallow_model ?? '');
+      setDeepModel(systemDefault.deep_model ?? '');
+    }
+  }, [systemDefault]);
+
+  // 切换 provider 时重置模型下拉
+  useEffect(() => {
+    setModelOptions([]);
+    setFetchError(null);
+  }, [selectedId]);
+
+  // 从该供应商 API 拉取可用模型
+  const handleFetchModels = async () => {
+    if (selectedId === null) {
+      setFetchError('请先选择供应商');
+      return;
+    }
+    setFetchingModels(true);
+    setFetchError(null);
+    try {
+      const res = await adminAPI.fetchProviderModels(selectedId);
+      setModelOptions(res.models ?? []);
+    } catch (err: any) {
+      setFetchError(err?.message ?? '获取模型列表失败');
+    } finally {
+      setFetchingModels(false);
+    }
+  };
 
   // 初始化选中项为当前默认 provider（若存在且仍在列表中）
   useEffect(() => {
@@ -168,15 +212,18 @@ export function SystemDefaultForm() {
     [providers, selectedId],
   );
   const isSelectedActive = selectedProvider?.is_active ?? false;
+  const isSelectedCredentialed = selectedProvider ? !!selectedProvider.api_key : false;
   const isSameAsCurrent =
     !!systemDefault && selectedId !== null && selectedId === systemDefault.provider_id;
 
-  const canSave = isSelectedActive && !isSameAsCurrent && !setDefaultMutation.isPending;
+  const canSave = isSelectedActive && isSelectedCredentialed && !isSameAsCurrent && !setDefaultMutation.isPending;
 
   const handleConfirmSave = () => {
     if (selectedId === null) return;
     setConfirmOpen(false);
-    setDefaultMutation.mutate(selectedId, {
+    setDefaultMutation.mutate(
+      { providerId: selectedId, shallow_model: shallowModel, deep_model: deepModel },
+      {
       onSuccess: () => {
         showToast('已更新系统默认 Provider', 'success');
       },
@@ -211,6 +258,58 @@ export function SystemDefaultForm() {
           onChange={(id) => setSelectedId(id)}
         />
 
+        {/* 系统默认模型（浅层 / 深度）配置，可拉取该供应商模型列表直接选择 */}
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-2">浅层模型（快速）</label>
+            <input
+              type="text"
+              list="sys-default-shallow"
+              value={shallowModel}
+              onChange={(e) => setShallowModel(e.target.value)}
+              className="w-full px-4 py-2 bg-dark-tertiary border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-accent-primary font-mono"
+              placeholder="例如 gpt-5.5 / deepseek-chat"
+            />
+            <datalist id="sys-default-shallow">
+              {modelOptions.map((m) => <option key={m} value={m} />)}
+            </datalist>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-2">深度模型（推理）</label>
+            <input
+              type="text"
+              list="sys-default-deep"
+              value={deepModel}
+              onChange={(e) => setDeepModel(e.target.value)}
+              className="w-full px-4 py-2 bg-dark-tertiary border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-accent-primary font-mono"
+              placeholder="例如 gpt-5.5 / deepseek-reasoner"
+            />
+            <datalist id="sys-default-deep">
+              {modelOptions.map((m) => <option key={m} value={m} />)}
+            </datalist>
+          </div>
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleFetchModels}
+            disabled={fetchingModels || selectedId === null}
+            className="px-3 py-2 rounded-lg border border-accent-primary/50 text-accent-primary text-sm hover:bg-accent-primary/10 disabled:opacity-50"
+          >
+            <i className="fas fa-sync mr-1" aria-hidden="true" />
+            {fetchingModels ? '获取中…' : '获取模型列表'}
+          </button>
+          {modelOptions.length > 0 && (
+            <span className="text-xs text-text-muted">已拉取 {modelOptions.length} 个模型，可直接在输入框选择。</span>
+          )}
+          {fetchError && (
+            <span className="text-xs text-danger-500">
+              <i className="fas fa-exclamation-circle mr-1" aria-hidden="true" />
+              {fetchError}
+            </span>
+          )}
+        </div>
+
         <div className="mt-4 flex items-center gap-3">
           <button
             type="button"
@@ -228,6 +327,12 @@ export function SystemDefaultForm() {
             <span className="text-xs text-warning">
               <i className="fas fa-exclamation-triangle mr-1" aria-hidden="true" />
               该 provider 已禁用，不可设为系统默认。
+            </span>
+          )}
+          {selectedProvider && isSelectedActive && !selectedProvider.api_key && (
+            <span className="text-xs text-warning">
+              <i className="fas fa-exclamation-triangle mr-1" aria-hidden="true" />
+              该 provider 未配置 API Key，不可设为系统默认；请先到「LLM 配置」录入 Key。
             </span>
           )}
         </div>

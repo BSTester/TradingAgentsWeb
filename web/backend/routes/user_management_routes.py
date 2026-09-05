@@ -34,35 +34,35 @@ def require_admin(current_user: User = Depends(get_current_active_user)) -> User
 async def get_all_users(
     page: int = 1,
     limit: int = 20,
+    search: str = "",
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """
     获取所有用户列表（仅管理员）
-    
-    Args:
-        page: 页码（从1开始）
-        limit: 每页数量
-        current_user: 当前用户（必须是管理员）
-        db: 数据库会话
-        
-    Returns:
-        用户列表和分页信息
     """
     # 计算偏移量
     offset = (page - 1) * limit
-    
-    # 查询总数
+
+    # 查询总数（支持搜索）
     count_stmt = select(func.count()).select_from(User)
+    if search:
+        like = f"%{search.strip()}%"
+        count_stmt = count_stmt.where(
+            User.username.ilike(like) | User.email.ilike(like)
+        )
     total_result = await db.execute(count_stmt)
     total = total_result.scalar()
-    
+
     # 查询用户列表
     stmt = select(User).order_by(desc(User.created_at)).offset(offset).limit(limit)
+    if search:
+        like = f"%{search.strip()}%"
+        stmt = stmt.where(User.username.ilike(like) | User.email.ilike(like))
     result = await db.execute(stmt)
     users = result.scalars().all()
-    
-    # 转换为字典列表
+
+    # 转换为字典列表（含剩余分析次数 balance）
     user_list = []
     for user in users:
         user_list.append({
@@ -73,19 +73,18 @@ async def get_all_users(
             "is_active": user.is_active,
             "created_at": user.created_at.isoformat() if user.created_at else None,
             "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+            "balance": user.credit_balance or 0,
         })
-    
-    # 计算分页信息
-    total_pages = (total + limit - 1) // limit
-    
+
+    has_next = page * limit < total
     return {
-        "users": user_list,
-        "total": total,
-        "page": page,
-        "limit": limit,
-        "total_pages": total_pages,
-        "has_next": page < total_pages,
-        "has_prev": page > 1
+        "data": user_list,
+        "meta": {
+            "page": page,
+            "limit": limit,
+            "total": total,
+            "has_next": has_next,
+        },
     }
 
 

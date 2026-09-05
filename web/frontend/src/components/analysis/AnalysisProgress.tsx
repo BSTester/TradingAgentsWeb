@@ -60,7 +60,7 @@ export function createAnalysisPhases(): AnalysisPhase[] {
     { id: 'research', name: '研究辩论', description: 'Bull ↔ Bear 多空研究辩论，研究经理裁决', icon: 'fa-comments', status: 'pending', agents: ['多头研究员', '空头研究员', '研究经理'].map(name => ({ name, status: 'pending', logs: [] })) },
     { id: 'trader', name: '交易计划', description: '交易员生成交易建议（不执行订单）', icon: 'fa-chart-line', status: 'pending', agents: [{ name: '交易员', status: 'pending', logs: [] }] },
     { id: 'risk-debate', name: '风险审议', description: 'Risky → Safe → Neutral 三方风险审议', icon: 'fa-shield-halved', status: 'pending', agents: ['激进风险分析师', '保守风险分析师', '中性风险分析师'].map(name => ({ name, status: 'pending', logs: [] })) },
-    { id: 'risk-judge', name: '最终裁决', description: '风险裁决（Risk Judge）输出最终交易建议', icon: 'fa-gavel', status: 'pending', agents: [{ name: '风险裁决', status: 'pending', logs: [] }] },
+    { id: 'risk-judge', name: '最终裁决', description: '风险裁决输出最终交易建议', icon: 'fa-gavel', status: 'pending', agents: [{ name: '风险裁决', status: 'pending', logs: [] }] },
   ];
 }
 

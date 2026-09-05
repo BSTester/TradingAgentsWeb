@@ -8,9 +8,9 @@ import { queryClient } from './react-query';
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (username: string, password: string, captcha?: { id: string; answer: string }) => Promise<void>;
+  login: (username: string, password: string, captcha?: { id: string; answer: string }, turnstileToken?: string) => Promise<void>;
   loginWithEmailCode: (email: string, code: string, captcha: { id: string; answer: string }) => Promise<void>;
-  register: (username: string, email: string, password?: string, captcha?: { id: string; answer: string }, emailCode?: string) => Promise<void>;
+  register: (username: string, email: string, password?: string, captcha?: { id: string; answer: string }, emailCode?: string, turnstileToken?: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
   token: string | null;
@@ -48,9 +48,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (username: string, password: string, captcha?: { id: string; answer: string }) => {
+  const login = async (username: string, password: string, captcha?: { id: string; answer: string }, turnstileToken?: string) => {
     try {
-      const response: AuthResponse = await authAPI.login(username, password, captcha);
+      const response: AuthResponse = await authAPI.login(username, password, captcha, turnstileToken);
       
       // 立即设置用户状态和token
       setUser(response.user);
@@ -88,9 +88,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (username: string, email: string, password?: string, captcha?: { id: string; answer: string }, emailCode?: string) => {
+  const register = async (username: string, email: string, password?: string, captcha?: { id: string; answer: string }, emailCode?: string, turnstileToken?: string) => {
     try {
-      const response: AuthResponse = await authAPI.register(username, email, password, captcha, emailCode);
+      const response: AuthResponse = await authAPI.register(username, email, password, captcha, emailCode, turnstileToken);
       
       // 立即设置用户状态和token
       setUser(response.user);

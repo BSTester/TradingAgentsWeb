@@ -6,8 +6,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { buildApiUrl } from '@/utils/api';
 import { useToast, Toast } from '@/components/ui/Toast';
-import { AppNavbar } from '@/components/common/AppNavbar';
-import { Footer } from '@/components/common/Footer';
 import { ProviderList } from '@/components/admin/llm-config/ProviderList';
 import { ModelList } from '@/components/admin/llm-config/ModelList';
 import { ProviderForm } from '@/components/admin/llm-config/ProviderForm';
@@ -16,7 +14,7 @@ import { ConfirmDialog } from '@/components/admin/llm-config/ConfirmDialog';
 import { RouteDataState } from '@/components/ui/RouteDataState';
 
 export default function LLMConfigPage() {
-  const { user, logout, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const { toast, showToast, hideToast } = useToast();
   const queryClient = useQueryClient();
@@ -177,9 +175,7 @@ export default function LLMConfigPage() {
 
   return (
     <div className="min-h-screen bg-dark-primary flex flex-col">
-      <AppNavbar user={user} onLogout={logout} />
-
-      <div className="flex-1 max-w-7xl mx-auto px-4 py-8 pt-20 sm:px-6 lg:px-8 w-full">
+      <div className="flex-1 max-w-6xl mx-auto px-4 py-8 pt-6 sm:px-6 lg:px-8 w-full">
         {/* 页面标题 */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-text-primary">
@@ -274,8 +270,6 @@ export default function LLMConfigPage() {
           </div>
         )}
       </div>
-
-      <Footer />
 
       {/* 供应商表单模态框 */}
       {showProviderForm && (

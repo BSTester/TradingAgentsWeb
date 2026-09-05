@@ -95,12 +95,15 @@ export const authAPI = {
     return res.data as { captcha_id: string; seed: string };
   },
 
-  login: async (username: string, password: string, captcha?: { id: string; answer: string }) => {
+  login: async (username: string, password: string, captcha?: { id: string; answer: string }, turnstileToken?: string) => {
     try {
       const payload: any = { username, password };
       if (captcha?.id && captcha?.answer) {
         payload.captcha_id = captcha.id;
         payload.captcha_answer = captcha.answer;
+      }
+      if (turnstileToken) {
+        payload.turnstile_token = turnstileToken;
       }
       const response = await publicApiClient.post('/api/auth/login', payload);
       return response.data;
@@ -116,7 +119,7 @@ export const authAPI = {
     }
   },
 
-  register: async (username: string, email: string, password?: string, captcha?: { id: string; answer: string }, emailCode?: string) => {
+  register: async (username: string, email: string, password?: string, captcha?: { id: string; answer: string }, emailCode?: string, turnstileToken?: string) => {
     try {
       const payload: any = { username, email };
       if (password) {
@@ -128,6 +131,9 @@ export const authAPI = {
       }
       if (emailCode) {
         payload.email_code = emailCode;
+      }
+      if (turnstileToken) {
+        payload.turnstile_token = turnstileToken;
       }
       const response = await publicApiClient.post('/api/auth/register', payload);
       return response.data;
@@ -294,10 +300,12 @@ export const adminLLMAPI = {
 
 // 管理员设置系统默认 provider（E7，后端 KEY，脱敏摘要返回）
 export const adminDefaultProviderAPI = {
-  setSystemDefault: async (providerId: number): Promise<SystemDefaultProviderSummary> => {
+  setSystemDefault: async (vars: { providerId: number; shallow_model?: string; deep_model?: string }): Promise<SystemDefaultProviderSummary> => {
     try {
       const response = await apiClient.put('/api/admin/llm/system-default', {
-        provider_id: providerId,
+        provider_id: vars.providerId,
+        shallow_model: vars.shallow_model ?? undefined,
+        deep_model: vars.deep_model ?? undefined,
       });
       return response.data as SystemDefaultProviderSummary;
     } catch (error: any) {

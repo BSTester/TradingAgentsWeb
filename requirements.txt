@@ -71,3 +71,4 @@ tqdm
 pytest>=6.0.0           # Testing framework
 pytest-cov>=2.10.0      # Coverage testing
 ta-lib
+reportlab>=4.0,<6

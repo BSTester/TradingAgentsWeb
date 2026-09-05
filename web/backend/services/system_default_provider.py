@@ -41,6 +41,17 @@ def mask_api_key(api_key: Optional[str]) -> Optional[str]:
 
 
 async def _get_model_hints(db: AsyncSession, provider_id: int) -> dict[str, Optional[str]]:
+    # Prefer provider-stored system-default model overrides, then derive from the active catalog.
+    provider = (await db.execute(select(LLMProvider).where(LLMProvider.id == provider_id))).scalars().first()
+    cfg = dict(provider.config_json or {}) if provider is not None else {}
+    hints: dict[str, Optional[str]] = {
+        "shallow_model": (cfg.get("default_shallow_model") or None),
+        "deep_model": (cfg.get("default_deep_model") or None),
+    }
+
+    if hints["shallow_model"] and hints["deep_model"]:
+        return hints
+
     result = await db.execute(
         select(LLMModel)
         .where(
@@ -49,11 +60,6 @@ async def _get_model_hints(db: AsyncSession, provider_id: int) -> dict[str, Opti
         )
         .order_by(LLMModel.id)
     )
-    hints: dict[str, Optional[str]] = {
-        "shallow_model": None,
-        "deep_model": None,
-    }
-
     for model in result.scalars().all():
         if model.model_type == "shallow_thinker" and hints["shallow_model"] is None:
             hints["shallow_model"] = model.model_name
@@ -115,7 +121,12 @@ async def get_public_system_default_provider(db: AsyncSession) -> Optional[dict[
     return await _public_summary(db, provider)
 
 
-async def set_system_default_provider(db: AsyncSession, provider_id: int) -> dict[str, Any]:
+async def set_system_default_provider(
+    db: AsyncSession,
+    provider_id: int,
+    shallow_model: Optional[str] = None,
+    deep_model: Optional[str] = None,
+) -> dict[str, Any]:
     result = await db.execute(select(LLMProvider).where(LLMProvider.id == provider_id))
     provider = result.scalars().first()
 
@@ -142,6 +153,14 @@ async def set_system_default_provider(db: AsyncSession, provider_id: int) -> dic
             status.HTTP_409_CONFLICT,
             "The selected provider has no base URL configured.",
         )
+
+    # Store the chosen system-default shallow/deep models on the provider config.
+    cfg = dict(provider.config_json or {})
+    if shallow_model is not None:
+        cfg["default_shallow_model"] = shallow_model or None
+    if deep_model is not None:
+        cfg["default_deep_model"] = deep_model or None
+    provider.config_json = cfg
 
     await db.execute(update(LLMProvider).values(is_default=False))
     provider.is_default = True

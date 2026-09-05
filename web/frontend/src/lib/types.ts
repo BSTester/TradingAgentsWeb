@@ -271,3 +271,124 @@ export interface TestUserLLMProviderResponse {
   message?: string;
   last_validated_at: string;
 }
+
+// ===== TradingAgents Web 重设计 · 报告 / 订阅 / 管理契约（WS-133）=====
+
+export type Market = 'US' | 'HK' | 'CN';
+
+// 风险等级：固定文字 + 图标，不与涨跌语义混淆
+export type RiskLevel = 'low' | 'medium' | 'high';
+
+// 榜单 / 报告列表卡片字段
+export interface ReportPreview {
+  id: string;               // = report id
+  analysis_id: string;      // = report id
+  ticker: string;
+  company_name: string | null;
+  market: Market | null;
+  analysis_date: string | null;
+  status: string;           // completed | running | error | interrupted ...
+  is_public: boolean;
+  created_at: string;
+  // 角色链裁决摘要（榜单卡片补齐字段：收盘价/分析模型/推荐区间/买卖持仓建议）
+  model: string | null;                 // 分析使用的模型
+  close_price: number | null;           // 当天收盘价
+  realtime_price: number | null;        // 实时价格
+  recommendation: 'buy' | 'hold' | 'sell' | null;  // 买卖/持仓建议
+  price_range: [number, number] | null; // 参考交易价格区间
+  risk_level: RiskLevel | null;
+  rating: number | null;                // 1-5 星
+  confidence: number | null;            // 置信度 0-1 或 0-100
+}
+
+// 角色链中的一个可展开节点
+export interface RoleChainNode {
+  id: string;
+  type: 'analysts' | 'bull' | 'bear' | 'trader' | 'risk-review' | 'summary' | 'risk-judge';
+  title: string;
+  summary: string;        // 简短结论
+  content: string;        // markdown 正文（可展开日志）
+  agent?: { name: string; result: string } | null;
+  agents?: { name: string; result: string }[];  // 分析师团队：分角色子卡片
+  decision?: string;
+  price_range?: [number, number] | null;
+  holding_period?: string | null;
+}
+
+// 报告详情：含完整角色链
+export interface ReportDetail extends ReportPreview {
+  trading_decision: string | null;
+  final_summary: string | null;
+  confidence: number | null;
+  holding_period: string | null;    // 建议持有期限
+  data_source_count: number | null; // 数据来源数量
+  role_chain: RoleChainNode[];
+  // 原始分析阶段数据（兼容）
+  phases?: Record<string, unknown>[] | null;
+  final_state?: Record<string, unknown> | null;
+}
+
+// 订阅 / 按次
+export interface SubscriptionPlan {
+  id: number;
+  name: string;
+  credits: number;         // 本次获得次数
+  price: number;           // 价格（分或元，按 display 统一）
+  is_active: boolean;
+  description?: string | null;
+  sort_order: number;
+}
+
+export type CreditTxnType = 'purchase' | 'consume' | 'refund' | 'grant';
+export type CreditTxnStatus = 'paid' | 'pending' | 'refunded' | 'consumed';
+
+export interface CreditTransaction {
+  id: number;
+  type: CreditTxnType;
+  amount: number;          // 增减量（+/-）
+  balance: number;         // 剩余量
+  status: CreditTxnStatus;
+  description: string | null;
+  plan_name?: string | null;
+  created_at: string;
+}
+
+export interface SubscriptionInfo {
+  balance: number;                         // 当前可用次数
+  transactions: CreditTransaction[];
+}
+
+// 管理控制台
+export interface AdminUser {
+  id: number;
+  username: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  balance: number;                         // 剩余分析次数
+}
+
+export interface AdminPublicReportItem extends ReportPreview {
+  owner: string | null;
+}
+
+export interface AdminSubscriptionPlan extends SubscriptionPlan {
+  created_at: string;
+  updated_at: string;
+}
+
+// 管理后台 · 订单列表（所有用户的次数流水）
+export interface AdminOrder {
+  id: number;
+  user_id: number;
+  username: string;
+  type: 'purchase' | 'consume' | 'refund' | 'grant';
+  amount: number;
+  balance: number;
+  status: string;
+  description: string | null;
+  plan_name: string | null;
+  created_at: string;
+}
+

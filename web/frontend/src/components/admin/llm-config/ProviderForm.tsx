@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { buildApiUrl } from '@/utils/api';
+import { COMMON_PROVIDERS } from '@/lib/providers';
 
 interface Provider {
   id?: number;
@@ -192,21 +193,42 @@ export function ProviderForm({ provider, onClose, onSuccess }: ProviderFormProps
             </div>
           )}
 
-          {/* Provider Name */}
+          {/* Provider / 厂商（WS-133：只提供常用厂商，不允许自定义） */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              供应商标识 *
-              <span className="text-text-muted ml-2 text-xs">(仅支持字母、数字、下划线和连字符)</span>
+              {provider ? '供应商标识 *' : 'LLM 厂商 *'}
             </label>
-            <input
-              type="text"
-              required
-              disabled={!!provider}
-              value={formData.provider_name}
-              onChange={(e) => setFormData({ ...formData, provider_name: e.target.value.toLowerCase() })}
-              className="w-full px-4 py-2 bg-dark-tertiary border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-accent-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              placeholder="例如: openai, anthropic, custom"
-            />
+            {provider ? (
+              <input
+                type="text"
+                required
+                disabled
+                value={formData.provider_name}
+                className="w-full px-4 py-2 bg-dark-tertiary border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-accent-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            ) : (
+              <select
+                required
+                value={formData.provider_name}
+                onChange={(e) => {
+                  const p = COMMON_PROVIDERS.find((x) => x.value === e.target.value);
+                  setFormData({
+                    ...formData,
+                    provider_name: p?.value ?? '',
+                    display_name: p?.label ?? '',
+                    base_url: p?.base_url ?? '',
+                  });
+                }}
+                className="w-full px-4 py-2 bg-dark-tertiary border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-accent-primary"
+              >
+                <option value="">请选择常用厂商</option>
+                {COMMON_PROVIDERS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            )}
             {provider && (
               <p className="mt-1 text-xs text-text-muted">供应商标识不可修改</p>
             )}

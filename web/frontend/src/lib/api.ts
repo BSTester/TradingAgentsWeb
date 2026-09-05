@@ -60,13 +60,13 @@ async function apiRequest<T>(
 
 // Auth APIs
 export const authAPI = {
-  register: (data: { username: string; email: string; password: string }) =>
+  register: (data: { username: string; email: string; password: string; turnstile_token?: string }) =>
     apiRequest<{ access_token: string; token_type: string; user: any }>('/api/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  login: (data: { username: string; password: string }) =>
+  login: (data: { username: string; password: string; turnstile_token?: string }) =>
     apiRequest<{ access_token: string; token_type: string; user: any }>('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -97,6 +97,7 @@ export const analysisAPI = {
     backend_url: string;
     shallow_thinker: string;
     deep_thinker: string;
+    api_key?: string;
     openai_api_key?: string;
     anthropic_api_key?: string;
     google_api_key?: string;
@@ -369,4 +370,166 @@ export const scheduledTasksAPI = {
     }>(`/api/scheduled-tasks/${taskId}`, {
       method: 'DELETE',
     }),
+};
+
+// ===== TradingAgents Web 重设计 · 报告 / 订阅 / 管理 API（WS-133）=====
+
+// 报告（公开榜单 / 我的分析 / 详情）
+export const reportsAPI = {
+  // 公开榜单（免登录）
+  publicList: (params?: { limit?: number; market?: string; page?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.limit) q.append('limit', params.limit.toString());
+    if (params?.market) q.append('market', params.market);
+    if (params?.page) q.append('page', params.page.toString());
+    return apiRequest<{ data: import('./types').ReportPreview[]; meta: any }>(
+      `/api/reports/public?${q.toString()}`
+    );
+  },
+
+  // 我的分析列表（登录后）
+  listMine: (params?: { page?: number; limit?: number; market?: string; status?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.append('page', params.page.toString());
+    if (params?.limit) q.append('limit', params.limit.toString());
+    if (params?.market) q.append('market', params.market);
+    if (params?.status) q.append('status', params.status);
+    return apiRequest<{ data: import('./types').ReportPreview[]; meta: any }>(
+      `/api/reports?${q.toString()}`
+    );
+  },
+
+  // 报告详情（含完整角色链）
+  get: (reportId: string) =>
+    apiRequest<{ data: import('./types').ReportDetail }>(`/api/reports/${reportId}`),
+
+  // 一键切换公开状态
+  setPublic: (reportId: string, is_public: boolean) =>
+    apiRequest<{ data: import('./types').ReportPreview }>(`/api/reports/${reportId}/public`, {
+      method: 'POST',
+      body: JSON.stringify({ is_public }),
+    }),
+
+  // 导出 PDF（带封面研报）
+  exportPdf: async (reportId: string) => {
+    const token = getAuthToken();
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    const response = await fetch(buildApiUrl(`/api/reports/${reportId}/export?format=pdf`), { headers });
+    if (!response.ok) throw new Error('导出失败，请稍后重试');
+    return response.blob();
+  },
+};
+
+// 用临时 API Key 获取某提供商的可用模型列表（自定义模型设置页用，Key 不持久化）
+export const llmAPI = {
+  fetchModelsTransient: (data: { base_url: string; api_key: string; provider_type?: string }) =>
+    apiRequest<{ models: string[]; count: number }>('/api/llm/fetch-models', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
+// 订阅 / 按次
+export const subscriptionAPI = {
+  plans: () =>
+    apiRequest<{ data: import('./types').SubscriptionPlan[] }>('/api/subscription/plans'),
+
+  me: () =>
+    apiRequest<{ data: import('./types').SubscriptionInfo }>('/api/subscription/me'),
+
+  purchase: (planId: number) =>
+    apiRequest<{ data: import('./types').SubscriptionInfo }>('/api/subscription/purchase', {
+      method: 'POST',
+      body: JSON.stringify({ plan_id: planId }),
+    }),
+};
+
+// 管理控制台
+export const adminAPI = {
+  users: (params?: { page?: number; limit?: number; search?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.append('page', params.page.toString());
+    if (params?.limit) q.append('limit', params.limit.toString());
+    if (params?.search) q.append('search', params.search);
+    return apiRequest<{ data: import('./types').AdminUser[]; meta: any }>(
+      `/api/admin/users?${q.toString()}`
+    );
+  },
+
+  setUserActive: (userId: number, is_active: boolean) =>
+    apiRequest<{ data: import('./types').AdminUser }>(`/api/admin/users/${userId}/active`, {
+      method: 'POST',
+      body: JSON.stringify({ is_active }),
+    }),
+
+  setUserRole: (userId: number, role: 'user' | 'admin') =>
+    apiRequest<{ data: import('./types').AdminUser }>(`/api/admin/users/${userId}/role`, {
+      method: 'POST',
+      body: JSON.stringify({ role }),
+    }),
+
+  subscriptionProducts: () =>
+    apiRequest<{ data: import('./types').AdminSubscriptionPlan[] }>('/api/admin/subscription-products'),
+
+  createSubscriptionProduct: (data: {
+    name: string;
+    credits: number;
+    price: number;
+    description?: string;
+    is_active?: boolean;
+  }) =>
+    apiRequest<{ data: import('./types').AdminSubscriptionPlan }>('/api/admin/subscription-products', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateSubscriptionProduct: (
+    planId: number,
+    data: { name?: string; credits?: number; price?: number; description?: string; is_active?: boolean }
+  ) =>
+    apiRequest<{ data: import('./types').AdminSubscriptionPlan }>(
+      `/api/admin/subscription-products/${planId}`,
+      { method: 'PATCH', body: JSON.stringify(data) }
+    ),
+
+  deleteSubscriptionProduct: (planId: number) =>
+    apiRequest<{ data: { id: number; deleted: boolean } }>(
+      `/api/admin/subscription-products/${planId}`,
+      { method: 'DELETE' }
+    ),
+
+  // 公开报告管理（治理 / 可见性）
+  publicReports: (params?: { page?: number; limit?: number; market?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.append('page', params.page.toString());
+    if (params?.limit) q.append('limit', params.limit.toString());
+    if (params?.market) q.append('market', params.market);
+    return apiRequest<{ data: import('./types').AdminPublicReportItem[]; meta: any }>(
+      `/api/admin/public-reports?${q.toString()}`
+    );
+  },
+
+  setReportPublic: (reportId: string, is_public: boolean) =>
+    apiRequest<{ data: any }>(`/api/admin/reports/${reportId}/public`, {
+      method: 'POST',
+      body: JSON.stringify({ is_public }),
+    }),
+
+  // 获取某个供应商的可用模型列表（调用其 /v1/models）
+  fetchProviderModels: (providerId: number) =>
+    apiRequest<{ provider_id: number; provider_name: string; base_url: string; count: number; models: string[] }>(
+      `/api/admin/llm/providers/${providerId}/fetch-models`,
+      { method: 'POST' }
+    ),
+
+  // 订单列表（所有用户的次数流水）
+  orders: (params?: { page?: number; limit?: number; type?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.append('page', params.page.toString());
+    if (params?.limit) q.append('limit', params.limit.toString());
+    if (params?.type) q.append('type', params.type);
+    return apiRequest<{ data: import('./types').AdminOrder[]; meta: any }>(
+      `/api/admin/orders?${q.toString()}`
+    );
+  },
 };

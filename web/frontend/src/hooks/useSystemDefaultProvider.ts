@@ -28,8 +28,12 @@ export function useSystemDefaultProvider() {
     queryFn: () => adminLLMAPI.listProviders(true),
   });
 
-  const setDefaultMutation = useMutation<SystemDefaultProviderSummary, Error, number>({
-    mutationFn: (providerId: number) => adminDefaultProviderAPI.setSystemDefault(providerId),
+  const setDefaultMutation = useMutation<
+    SystemDefaultProviderSummary,
+    Error,
+    { providerId: number; shallow_model?: string; deep_model?: string }
+  >({
+    mutationFn: (vars) => adminDefaultProviderAPI.setSystemDefault(vars),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'system-default'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'llm-providers-all'] });

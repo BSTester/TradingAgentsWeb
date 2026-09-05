@@ -106,7 +106,7 @@ export const WORKFLOW_BANDS: WorkflowBand[] = [
     id: 5,
     code: '05 / FINAL',
     name: '最终裁决',
-    description: 'Risk Judge 汇总三方意见，输出最终交易建议与风险边界（终末节点）。',
+    description: '风险评审汇总三方意见，输出最终交易建议与风险边界（终末节点）。',
     agents: ['risk_manager'],
     nodes: [
       { agent: 'risk_manager', node: 'Risk Judge', label: '风险裁决', summary: '产出最终交易决策与投资计划。' },

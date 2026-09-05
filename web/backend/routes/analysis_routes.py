@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Optional
 
 from web.backend.database import get_db
-from web.backend.models import User, AnalysisRecord
+from web.backend.models import User, AnalysisRecord, CreditTransaction
 from web.backend.schemas import (
     AnalysisRequest, 
     AnalysisResponse, 
@@ -142,7 +142,28 @@ async def start_analysis(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="无法启用邮件通知：您的账户未绑定邮箱地址。请先在账户设置中添加邮箱。"
         )
-    
+
+    # WS-133: 发起分析需要 LLM Key 或订阅次数。
+    # 用户自带 Key 则无需消耗次数；否则消耗 1 次（订阅/按次）。
+    if not request.api_key:
+        if (current_user.credit_balance or 0) < 1:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="可用分析次数不足，请在订阅中心购买次数或配置自有模型",
+            )
+        user_row = (await db.execute(select(User).where(User.id == current_user.id))).scalars().first()
+        new_balance = (user_row.credit_balance or 0) - 1
+        user_row.credit_balance = new_balance
+        db.add(CreditTransaction(
+            user_id=user_row.id,
+            type="consume",
+            amount=-1,
+            balance=new_balance,
+            status="consumed",
+            description=f"分析 {ticker} 消耗 1 次",
+        ))
+        await db.commit()
+
     # Create analysis record
     analysis_record = AnalysisRecord(
         analysis_id=analysis_id,

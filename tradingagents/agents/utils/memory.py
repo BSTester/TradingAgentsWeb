@@ -28,12 +28,26 @@ class FinancialSituationMemory:
             pass
 
     def get_embedding(self, text):
-        """Get OpenAI embedding for a text"""
-        
-        response = self.client.embeddings.create(
-            model=self.embedding, input=text[:8192] if self.embedding == "text-embedding-v4" else text
-        )
-        return response.data[0].embedding
+        """Get OpenAI embedding for a text.
+
+        Falls back to a deterministic bag-of-hash vector when the configured
+        endpoint/model does not provide embeddings (e.g. DeepSeek, local LLM).
+        The fallback keeps a fixed dimension so ChromaDB can still store+search.
+        """
+        try:
+            response = self.client.embeddings.create(
+                model=self.embedding, input=text[:8192] if self.embedding == "text-embedding-v4" else text
+            )
+            return response.data[0].embedding
+        except Exception:
+            import hashlib, math
+            dim = 256
+            vec = [0.0] * dim
+            for i, ch in enumerate(text):
+                h = int(hashlib.md5((str(i) + ch).encode("utf-8")).hexdigest(), 16)
+                vec[h % dim] += 1.0
+            norm = math.sqrt(sum(v * v for v in vec)) or 1.0
+            return [v / norm for v in vec]
 
     def add_situations(self, situations_and_advice):
         """Add financial situations and their corresponding advice. Parameter is a list of tuples (situation, rec)"""

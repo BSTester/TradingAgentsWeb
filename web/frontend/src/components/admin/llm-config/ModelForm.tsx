@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { buildApiUrl } from '@/utils/api';
+import { adminAPI } from '@/lib/api';
 
 interface Model {
   id?: number;
@@ -37,6 +38,29 @@ export function ModelForm({ model, providers, onClose, onSuccess }: ModelFormPro
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [modelOptions, setModelOptions] = useState<string[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [fetchedForProvider, setFetchedForProvider] = useState<number | null>(null);
+
+  // 调用提供商的 /v1/models 获取可用模型列表
+  const handleFetchModels = async () => {
+    if (!formData.provider_id || formData.provider_id === 0) {
+      setFetchError('请先选择供应商');
+      return;
+    }
+    setFetchingModels(true);
+    setFetchError(null);
+    try {
+      const res = await adminAPI.fetchProviderModels(formData.provider_id);
+      setModelOptions(res.models ?? []);
+      setFetchedForProvider(formData.provider_id);
+    } catch (err: any) {
+      setFetchError(err?.message ?? '获取模型列表失败');
+    } finally {
+      setFetchingModels(false);
+    }
+  };
 
   useEffect(() => {
     if (model) {
@@ -132,7 +156,12 @@ export function ModelForm({ model, providers, onClose, onSuccess }: ModelFormPro
             <select
               required
               value={formData.provider_id || ''}
-              onChange={(e) => setFormData({ ...formData, provider_id: parseInt(e.target.value) })}
+              onChange={(e) => {
+                setFormData({ ...formData, provider_id: parseInt(e.target.value) });
+                setModelOptions([]);
+                setFetchError(null);
+                setFetchedForProvider(null);
+              }}
               className="w-full px-4 py-2 bg-dark-tertiary border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-accent-primary"
             >
               <option value="">选择供应商...</option>
@@ -207,14 +236,43 @@ export function ModelForm({ model, providers, onClose, onSuccess }: ModelFormPro
             <label className="block text-sm font-medium text-text-secondary mb-2">
               模型名称 *
             </label>
-            <input
-              type="text"
-              required
-              value={formData.model_name}
-              onChange={(e) => setFormData({ ...formData, model_name: e.target.value })}
-              className="w-full px-4 py-2 bg-dark-tertiary border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-accent-primary font-mono"
-              placeholder="例如: gpt-4o, claude-3-5-sonnet-20241022"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                required
+                list="model-options"
+                value={formData.model_name}
+                onChange={(e) => setFormData({ ...formData, model_name: e.target.value })}
+                className="w-full px-4 py-2 bg-dark-tertiary border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-accent-primary font-mono"
+                placeholder="例如: gpt-4o, claude-3-5-sonnet-20241022，或点击「获取模型列表」选择"
+              />
+              <button
+                type="button"
+                onClick={handleFetchModels}
+                disabled={fetchingModels}
+                className="shrink-0 px-3 py-2 rounded-lg border border-accent-primary/50 text-accent-primary text-sm hover:bg-accent-primary/10 disabled:opacity-50"
+                title="从该供应商 API 拉取可用模型"
+              >
+                <i className="fas fa-sync mr-1" aria-hidden="true" />
+                {fetchingModels ? '获取中…' : '获取模型列表'}
+              </button>
+            </div>
+            <datalist id="model-options">
+              {modelOptions.map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
+            {modelOptions.length > 0 && (
+              <p className="mt-1 text-xs text-text-muted">
+                已从供应商拉取 {modelOptions.length} 个模型，可在输入框中选择。
+              </p>
+            )}
+            {fetchError && (
+              <p className="mt-1 text-xs text-danger-500">
+                <i className="fas fa-exclamation-circle mr-1" aria-hidden="true" />
+                {fetchError}
+              </p>
+            )}
             <p className="mt-1 text-xs text-text-muted">
               实际调用时使用的模型标识符
             </p>

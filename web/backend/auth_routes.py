@@ -75,6 +75,26 @@ def _note_email_code_request(email: str):
     _prune(dq, EMAIL_CODE_RATE_WINDOW)
     dq.append(time.time())
 
+
+async def _human_check_ok(captcha_id: str | None, captcha_answer: str | None, turnstile_token: str | None) -> bool:
+    """Combined human verification (WS-133).
+
+    Accepts a valid Cloudflare Turnstile token when Turnstile is enabled;
+    otherwise falls back to the legacy graphic captcha. When Turnstile is
+    disabled and no captcha is supplied, returns True (dev/test bypass).
+    """
+    from web.backend.services.turnstile import verify_turnstile
+
+    if await verify_turnstile(turnstile_token):
+        return True
+    if captcha_id and captcha_answer:
+        try:
+            from web.backend.captcha import verify_captcha
+            return verify_captcha(captcha_id, captcha_answer)
+        except Exception:
+            return False
+    return False
+
 @router.post("/captcha/new", response_model=CaptchaResponse)
 async def new_captcha(request: Request):
     """
@@ -93,6 +113,7 @@ async def new_captcha(request: Request):
 
 # Security scheme
 security = HTTPBearer()
+security_optional = HTTPBearer(auto_error=False)
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -124,6 +145,24 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
         )
     return current_user
 
+
+async def get_optional_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_optional),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    """Dependency for anonymous-or-authenticated access.
+
+    Returns the authenticated User when a valid token is supplied, otherwise
+    None (so guests can read public reports without a token/invalid token).
+    """
+    if credentials is None:
+        return None
+    try:
+        user = await get_current_user_from_token(credentials.credentials, db)
+        return user
+    except Exception:
+        return None
+
 @router.post("/register", response_model=AuthResponse)
 async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db), request: Request = None):
     """
@@ -137,10 +176,12 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db), re
         client_ip = request.client.host if request and request.client else "unknown"
         if _too_many_fails(client_ip):
             raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="尝试次数过多，请稍后再试")
-        if not user_data.captcha_id or not user_data.captcha_answer or not verify_captcha(user_data.captcha_id, user_data.captcha_answer):
+
+        # 人机验证（WS-133）：优先 Turnstile，回退图形验证码；禁用时放行
+        if not await _human_check_ok(user_data.captcha_id, user_data.captcha_answer, user_data.turnstile_token):
             _note_fail(client_ip)
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="图形验证码无效或已过期")
-        
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="人机验证失败")
+
         # Verify email code
         if not user_data.email_code:
             _note_fail(client_ip)
@@ -199,14 +240,13 @@ async def login(user_data: UserLogin, db: AsyncSession = Depends(get_db), reques
     """
     Login user and return access token (requires captcha)
     """
-    # 验证服务端验证码（防止绕过前端）
-    from web.backend.captcha import verify_captcha
+    # 人机验证（WS-133）：优先 Turnstile，回退图形验证码；禁用时放行
     client_ip = request.client.host if request and request.client else "unknown"
     if _too_many_fails(client_ip):
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="尝试次数过多，请稍后再试")
-    if not user_data.captcha_id or not user_data.captcha_answer or not verify_captcha(user_data.captcha_id, user_data.captcha_answer):
+    if not await _human_check_ok(user_data.captcha_id, user_data.captcha_answer, user_data.turnstile_token):
         _note_fail(client_ip)
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="验证码无效或已过期")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="人机验证失败")
 
     # Authenticate user
     user = await authenticate_user(db, user_data.username, user_data.password)
@@ -563,4 +603,4 @@ async def login_with_email_code(
     )
 
 # Export dependencies for use in other modules
-__all__ = ["get_current_user", "get_current_active_user", "require_intraday_access", "router"]
+__all__ = ["get_current_user", "get_current_active_user", "get_optional_current_user", "require_intraday_access", "router"]

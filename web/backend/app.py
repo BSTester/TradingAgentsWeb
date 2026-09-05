@@ -77,7 +77,7 @@ from web.backend.auth_routes import router as auth_router, get_current_active_us
 from web.backend.middleware import LoggingMiddleware
 
 # Import API routes
-from web.backend.routes import analysis_routes, config_routes, task_routes, page_routes, websocket_routes, export_routes, user_management_routes, scheduled_task_routes, user_config_routes, user_llm_settings_routes, skills_routes, conversation_routes, report_routes, home_routes
+from web.backend.routes import analysis_routes, config_routes, task_routes, page_routes, websocket_routes, export_routes, user_management_routes, scheduled_task_routes, user_config_routes, user_llm_settings_routes, skills_routes, conversation_routes, report_routes, home_routes, subscription_routes, admin_routes
 
 
 @asynccontextmanager
@@ -119,7 +119,12 @@ async def lifespan(app: FastAPI):
             from web.backend.utils.admin_helper import ensure_first_user_is_admin_async
             async with AsyncSessionLocal() as db:
                 await ensure_first_user_is_admin_async(db)
-            
+
+            # Seed default subscription plans (WS-133)
+            from web.backend.utils.admin_helper import ensure_subscription_plans_async
+            async with AsyncSessionLocal() as db:
+                await ensure_subscription_plans_async(db)
+
             await cleanup_running_tasks()
             print("✅ Running tasks cleaned up")
             
@@ -784,6 +789,10 @@ app.include_router(websocket_routes.router)
 from web.backend.routes import llm_config_routes
 app.include_router(llm_config_routes.router)
 
+# Include WS-133 redesign routes (subscription / admin)
+app.include_router(subscription_routes.router)
+app.include_router(admin_routes.router)
+
 # Include page routes
 app.include_router(page_routes.router)
 
@@ -916,8 +925,8 @@ app.mount("/static", StaticFiles(directory="web/backend/static"), name="static")
 if __name__ == "__main__":
     uvicorn.run(
         "web.backend.app:app",
-        host="0.0.0.0",
-        port=8000,
+        host=os.getenv("BACKEND_HOST", "0.0.0.0"),
+        port=int(os.getenv("BACKEND_PORT", "8000")),
         reload=os.getenv("NODE_ENV", "production") != "production",
         log_level="info"
     )

@@ -67,8 +67,13 @@ async def update_system_default(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """Set one active, credentialed provider as the only system default."""
-    return await set_system_default_provider(db, request.provider_id)
+    """Set one active, credentialed provider as the only system default, optionally pinning shallow/deep models."""
+    return await set_system_default_provider(
+        db,
+        request.provider_id,
+        shallow_model=request.shallow_model,
+        deep_model=request.deep_model,
+    )
 
 @router.get("/providers", response_model=List[LLMProviderResponse])
 async def get_all_providers(
@@ -519,6 +524,62 @@ async def delete_model(
 # ============================================================================
 # Connection Testing
 # ============================================================================
+
+@router.post("/providers/{provider_id}/fetch-models")
+async def fetch_provider_models(
+    provider_id: int,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Fetch the model list from a provider's own API (e.g. GET /v1/models).
+
+    Uses the provider's stored base_url + backend-managed api_key. Returns
+    the model ids so the admin can pick directly, e.g. for shallow/deep models.
+    """
+    provider = (await db.execute(select(LLMProvider).where(LLMProvider.id == provider_id))).scalars().first()
+    if not provider:
+        raise HTTPException(status_code=404, detail="供应商不存在")
+    if not provider.base_url:
+        raise HTTPException(status_code=400, detail="该供应商未配置 Base URL")
+    if not provider.api_key:
+        raise HTTPException(status_code=409, detail="该供应商未配置后端托管 API Key，请先在 LLM 配置录入 Key")
+
+    base = provider.base_url.rstrip("/")
+    # Anthropic uses /v1/models; others (OpenAI-compatible) expose /models (base_url usually ends with /v1).
+    url = f"{base}/v1/models" if provider.provider_name == "anthropic" else f"{base}/models"
+    headers = {"Authorization": f"Bearer {provider.api_key}", "Content-Type": "application/json"}
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(url, headers=headers)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"获取模型列表失败: {e}")
+
+    if resp.status_code == 401:
+        raise HTTPException(status_code=401, detail="API Key 无效或已过期")
+    if resp.status_code == 403:
+        raise HTTPException(status_code=403, detail="API Key 权限不足")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"模型接口返回 {resp.status_code}")
+
+    try:
+        data = resp.json().get("data", [])
+    except Exception:
+        raise HTTPException(status_code=502, detail="模型接口返回格式异常")
+
+    models = [
+        m.get("id") or m.get("name")
+        for m in data
+        if isinstance(m, dict) and (m.get("id") or m.get("name"))
+    ]
+    return {
+        "provider_id": provider.id,
+        "provider_name": provider.provider_name,
+        "base_url": provider.base_url,
+        "count": len(models),
+        "models": models,
+    }
+
 
 @router.post("/test-connection", response_model=LLMConnectionTestResponse)
 async def test_llm_connection(

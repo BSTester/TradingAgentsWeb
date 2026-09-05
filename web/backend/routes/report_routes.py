@@ -11,9 +11,10 @@ from fastapi.responses import Response
 from sqlalchemy import desc, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from web.backend.auth_routes import get_current_active_user
+from web.backend.auth_routes import get_current_active_user, get_optional_current_user
 from web.backend.database import get_db
 from web.backend.models import AnalysisRecord, ConversationMessage, User
+from web.backend.schemas import ReportPublicIn
 from web.backend.services.report_formatter import (
     report_detail,
     report_json_bytes,
@@ -33,11 +34,16 @@ async def _source_session_id(db: AsyncSession, analysis_id: str) -> str | None:
     return result.scalar()
 
 
-async def _record_or_404(report_id: str, current_user: User, db: AsyncSession) -> AnalysisRecord:
-    result = await db.execute(select(AnalysisRecord).where(
-        AnalysisRecord.analysis_id == report_id,
-        (AnalysisRecord.user_id == current_user.id) | (AnalysisRecord.is_public == True),
-    ))
+async def _record_or_404(report_id: str, current_user: User | None, db: AsyncSession) -> AnalysisRecord:
+    filters = [AnalysisRecord.analysis_id == report_id]
+    if current_user is not None:
+        filters.append(
+            (AnalysisRecord.user_id == current_user.id) | (AnalysisRecord.is_public == True)
+        )
+    else:
+        # Anonymously readable only if the report is public.
+        filters.append(AnalysisRecord.is_public == True)
+    result = await db.execute(select(AnalysisRecord).where(*filters))
     record = result.scalars().first()
     if not record:
         raise HTTPException(status_code=404, detail="报告不存在")
@@ -96,28 +102,48 @@ async def list_reports(
 @router.get("/public")
 async def public_reports(
     limit: int = Query(6, ge=1, le=20),
+    market: Optional[str] = Query(None, description="按市场过滤：US / HK / CN"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Public report feed for the home/conversation entry experience."""
+    """Public report feed for the home/conversation entry experience (WS-133 market filter)."""
+    filters = [AnalysisRecord.is_public == True, AnalysisRecord.status == "completed"]
+    if market:
+        filters.append(AnalysisRecord.market == market.upper())
     result = await db.execute(select(AnalysisRecord).where(
-        AnalysisRecord.is_public == True,
-        AnalysisRecord.status == "completed",
+        *filters
     ).order_by(desc(AnalysisRecord.created_at)).limit(limit))
     records = result.scalars().all()
     return {"data": [report_preview(record) for record in records], "meta": {"limit": limit, "total": len(records), "has_next": False}}
 
 
 @router.get("/{report_id}")
-async def get_report(report_id: str, current_user: User = Depends(get_current_active_user), db: AsyncSession = Depends(get_db)):
+async def get_report(report_id: str, current_user: User | None = Depends(get_optional_current_user), db: AsyncSession = Depends(get_db)):
     record = await _record_or_404(report_id, current_user, db)
     return {"data": report_detail(record, await _source_session_id(db, record.analysis_id))}
+
+
+@router.post("/{report_id}/public")
+async def set_public(
+    report_id: str,
+    body: ReportPublicIn,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Toggle whether the (own) report is public. Owner only."""
+    result = await db.execute(select(AnalysisRecord).where(AnalysisRecord.analysis_id == report_id))
+    record = result.scalars().first()
+    if not record or record.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="报告不存在或无权操作")
+    record.is_public = body.is_public
+    await db.commit()
+    return {"data": report_preview(record)}
 
 
 @router.get("/{report_id}/export")
 async def export_report(
     report_id: str,
     format: str = Query(..., pattern="^(md|json|pdf)$"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User | None = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     record = await _record_or_404(report_id, current_user, db)

@@ -11,6 +11,7 @@ from web.backend.models import User, LLMProvider, LLMModel
 from web.backend.auth_routes import get_current_active_user
 from web.backend.database import get_db
 from web.backend.services.system_default_provider import get_public_system_default_provider
+from web.backend.services.turnstile import turnstile_site_key, turnstile_enabled
 
 router = APIRouter(prefix="/api", tags=["config"])
 
@@ -88,6 +89,8 @@ async def get_config(db: AsyncSession = Depends(get_db)):
         "llm_providers": llm_providers,
         "models": models,
         "system_default": await get_public_system_default_provider(db),
+        "turnstile_site_key": turnstile_site_key(),
+        "turnstile_enabled": turnstile_enabled(),
     }
 
 
@@ -342,6 +345,53 @@ async def validate_google(api_key: str, base_url: str):
     except Exception as e:
         logger.error(f"Unexpected error validating Google API key: {str(e)}", exc_info=True)
         return {"valid": False, "message": f"Google API验证失败：{str(e)}"}
+
+
+@router.post("/llm/fetch-models")
+async def fetch_llm_models(request: dict):
+    """Fetch the available model list from a provider using a transient api_key.
+
+    Used by the frontend "自定义模型" page so a user can pull the real model list
+    for their own (local, non-persisted) API key and pick a custom model. The key
+    is only used for this request and is NOT stored.
+    """
+    base_url = (request.get("base_url") or "").strip()
+    api_key = (request.get("api_key") or "").strip()
+    provider_type = (request.get("provider_type") or "").strip().lower()
+
+    if not base_url:
+        raise HTTPException(status_code=400, detail="缺少 Base URL")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="缺少 API Key")
+
+    base = base_url.rstrip("/")
+    url = f"{base}/v1/models" if provider_type == "anthropic" else f"{base}/models"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(url, headers=headers)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"获取模型列表失败: {e}")
+
+    if resp.status_code == 401:
+        raise HTTPException(status_code=401, detail="API Key 无效或已过期")
+    if resp.status_code == 403:
+        raise HTTPException(status_code=403, detail="API Key 权限不足")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"模型接口返回 {resp.status_code}")
+
+    try:
+        data = resp.json().get("data", [])
+    except Exception:
+        raise HTTPException(status_code=502, detail="模型接口返回格式异常")
+
+    models = [
+        m.get("id") or m.get("name")
+        for m in data
+        if isinstance(m, dict) and (m.get("id") or m.get("name"))
+    ]
+    return {"models": models, "count": len(models)}
 
 
 # Ollama validation is handled by validate_openai_compatible as it's OpenAI-compatible

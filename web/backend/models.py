@@ -23,6 +23,7 @@ class User(Base):
     has_set_password = Column(Boolean, default=False, nullable=False)  # Whether user has explicitly set a password
     role = Column(String(20), default="user", nullable=False, index=True)  # admin, user
     is_active = Column(Boolean, default=True, nullable=False)
+    credit_balance = Column(Integer, default=0, nullable=False)  # 剩余分析次数（订阅/按次）
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     
@@ -33,6 +34,7 @@ class User(Base):
     conversation_sessions = relationship("ConversationSession", back_populates="user", cascade="all, delete-orphan")
     user_config = relationship("UserConfig", back_populates="user", uselist=False, cascade="all, delete-orphan")
     llm_provider_settings = relationship("UserLLMProviderSetting", back_populates="user", cascade="all, delete-orphan")
+    credit_transactions = relationship("CreditTransaction", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"
@@ -530,3 +532,45 @@ class LLMModel(Base):
     
     def __repr__(self):
         return f"<LLMModel(id={self.id}, name='{self.model_name}', type='{self.model_type}', provider_id={self.provider_id}, active={self.is_active})>"
+
+
+class SubscriptionPlan(Base):
+    """
+    订阅套餐（按次）：购买后可获得分析次数。
+    """
+    __tablename__ = "subscription_plans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    credits = Column(Integer, nullable=False, default=1)  # 本次获得的分析次数
+    price = Column(Float, nullable=False, default=0.0)    # 价格（元）
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    def __repr__(self):
+        return f"<SubscriptionPlan(id={self.id}, name='{self.name}', credits={self.credits}, price={self.price})>"
+
+
+class CreditTransaction(Base):
+    """
+    分析次数流水：purchase / consume / refund / grant。
+    """
+    __tablename__ = "credit_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    type = Column(String(20), nullable=False)  # purchase / consume / refund / grant
+    amount = Column(Integer, nullable=False)   # 增减量（+/-）
+    balance = Column(Integer, nullable=False)  # 该笔流水之后用户的剩余次数
+    status = Column(String(20), nullable=False, default="paid")  # paid / pending / refunded / consumed
+    description = Column(String(255), nullable=True)
+    plan_name = Column(String(100), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="credit_transactions")
+
+    def __repr__(self):
+        return f"<CreditTransaction(id={self.id}, user_id={self.user_id}, type={self.type}, amount={self.amount}, balance={self.balance})>"

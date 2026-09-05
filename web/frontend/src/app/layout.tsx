@@ -3,8 +3,8 @@ import './globals.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'TradingAgents · Workflow Desk',
-  description: '基于 TradingAgents 多智能体研究图的现代化分析工作台',
+  title: 'TradingAgents · 多智能体股票研究',
+  description: '由 TradingAgents 多智能体团队生成的可追溯股票研究报告 — 支持美股、港股、A 股。',
 };
 
 export default function RootLayout({
@@ -26,7 +26,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Noto+Sans+SC:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Noto+Sans+SC:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
         />
         {/* Font Awesome 6.4.0 — self-hosted under /lib/font-awesome.
             Previously a render-blocking external <link> to cdnjs.cloudflare.com

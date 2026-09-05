@@ -77,6 +77,44 @@ def evidence_snapshot(ticker: str, as_of: str, report: str, sources: Iterable[st
     ]
 
 
+def _extract_price_range(text: str) -> Optional[List[float]]:
+    """Extract a buy/sell price range from trader/risk text (X–Y / X~Y / PRICE RANGE: X-Y)."""
+    import re
+    if not text:
+        return None
+    num = r"\d[\d,]*\.?\d*"
+    # 只在明确「价格区间 / 参考区间 / PRICE RANGE」或「X–Y 单位」语境下提取
+    pats = [
+        re.compile(r"(?:价格区间|参考区间|入场区间|交易区间|价格带|建议区间|PRICE\s*RANGE)\s*[:：]?\s*" + num + r"\s*[~\-–—]\s*" + num),
+        re.compile(num + r"\s*[~\-–—]\s*" + num + r"\s*(?:元|股|USD|HKD|CNY|美元|港币|人民币|/股|per share)"),
+    ]
+    for pat in pats:
+        for m in pat.finditer(text):
+            if "%" in m.group(0):
+                continue
+            nums = re.findall(num, m.group(0))
+            if len(nums) >= 2:
+                a = float(nums[-2].replace(",", ""))
+                b = float(nums[-1].replace(",", ""))
+                if 1800 <= a <= 2100 and 1 <= b <= 12:
+                    continue
+                if 1800 <= b <= 2100:
+                    continue
+                return [a, b]
+    return None
+
+
+def _extract_holding_period(text: str) -> Optional[str]:
+    """Extract a holding period like 持有 6-12 个月 / time horizon N months."""
+    import re
+    if not text:
+        return None
+    m = re.search(r"(?:持有|期限|horizon|holding)[^\n]{0,16}?(\d{1,3})(?:\s*[~\-–—]\s*(\d{1,3}))?\s*(?:个)?月", text, re.I)
+    if m:
+        return f"{m.group(1)}-{m.group(2)}" if m.group(2) else m.group(1)
+    return None
+
+
 def build_structured_report(report_sections: Dict[str, Any], decision_text: str) -> Dict[str, Any]:
     """Normalize collected agent outputs into the frontend report contract shape."""
     recommendation = recommendation_from_text(decision_text)
@@ -90,9 +128,24 @@ def build_structured_report(report_sections: Dict[str, Any], decision_text: str)
     )
     stage_log = report_sections.get("stage_log") or []
     reflection = report_sections.get("reflection") or {}
+
+    # WS-133：从 trader / 风险文本提取「价格区间 / 持有期限 / 置信度」，落到契约字段
+    trade_text = " ".join([
+        str(report_sections.get("trader_investment_plan") or ""),
+        str(report_sections.get("investment_plan") or ""),
+        str(report_sections.get("final_trade_decision") or ""),
+        str(decision_text or ""),
+    ])
+    price_range = _extract_price_range(trade_text)
+    holding_period = _extract_holding_period(trade_text)
+    confidence = round(overall_rating / 5, 2) if overall_rating else 0.0
+
     return {
         "rating": overall_rating,
         "recommendation": recommendation,
+        "confidence": confidence,
+        "price_range": price_range,
+        "holding_period": holding_period,
         "summary": _clip(decision_text, 800),
         "sections": {
             "market_technical": section("市场/技术面", report_sections.get("market_report", ""), overall_rating),
