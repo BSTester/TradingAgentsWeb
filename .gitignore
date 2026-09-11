@@ -25,3 +25,5 @@ tradingagents/dataflows/data_cache/
 # 前端构建产物
 .next
 tsconfig.tsbuildinfo
+# 迁移前自动备份的数据库文件
+db/*.bak-*

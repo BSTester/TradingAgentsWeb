@@ -100,7 +100,7 @@ def _role_chain(record: Any, source_session_id: str | None = None) -> Dict[str, 
         summary=record.final_summary or record.trading_decision or "",
     )
     chain["id"] = report_id(record)
-    chain["source"] = {"type": "conversation" if source_session_id else "scheduled_task", "session_id": source_session_id}
+    chain["source"] = {"type": "conversation", "session_id": source_session_id}
     if role_chain_is_empty and role_chain_is_empty(chain):
         return None
     return chain
@@ -122,7 +122,7 @@ def report_preview(record: Any, source_session_id: str | None = None) -> Dict[st
             key: (sections.get(key) or {}).get("summary", "")
             for key in SECTION_TITLES
         },
-        "source": {"type": "conversation" if source_session_id else "scheduled_task", "session_id": source_session_id},
+        "source": {"type": "conversation", "session_id": source_session_id},
         "status": _status(record.status),
         "created_at": _iso(record.created_at),
     }
@@ -142,7 +142,7 @@ def report_detail(record: Any, source_session_id: str | None = None, task_id: in
         "ticker": record.ticker,
         "company_name": record.company_name or record.ticker,
         "market": record.market,
-        "source": {"type": "conversation" if source_session_id else "scheduled_task", "session_id": source_session_id, "task_id": task_id},
+        "source": {"type": "conversation", "session_id": source_session_id, "task_id": task_id},
         "conclusion": {
             "rating": rating,
             "rating_label": RATING_LABELS.get(rating, "中性"),

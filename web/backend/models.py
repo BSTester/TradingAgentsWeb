@@ -23,18 +23,14 @@ class User(Base):
     has_set_password = Column(Boolean, default=False, nullable=False)  # Whether user has explicitly set a password
     role = Column(String(20), default="user", nullable=False, index=True)  # admin, user
     is_active = Column(Boolean, default=True, nullable=False)
-    credit_balance = Column(Integer, default=0, nullable=False)  # 剩余分析次数（订阅/按次）
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     
     # Relationships
     analysis_records = relationship("AnalysisRecord", back_populates="user", cascade="all, delete-orphan")
     export_records = relationship("ExportRecord", back_populates="user", cascade="all, delete-orphan")
-    scheduled_tasks = relationship("ScheduledTask", back_populates="user", cascade="all, delete-orphan")
     conversation_sessions = relationship("ConversationSession", back_populates="user", cascade="all, delete-orphan")
     user_config = relationship("UserConfig", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    llm_provider_settings = relationship("UserLLMProviderSetting", back_populates="user", cascade="all, delete-orphan")
-    credit_transactions = relationship("CreditTransaction", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"
@@ -58,8 +54,6 @@ class UserConfig(Base):
     last_deep_thinker = Column(String(100), nullable=True)  # Last deep thinker model
     last_backend_url = Column(String(255), nullable=True)  # Last backend URL
     
-    # Legacy API key cache. Kept only for compatibility/migration prompts; do not return, update, or use for LLM resolution.
-    last_api_key = Column(String(1000), nullable=True)
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -70,100 +64,6 @@ class UserConfig(Base):
     
     def __repr__(self):
         return f"<UserConfig(id={self.id}, user_id={self.user_id})>"
-
-
-class UserLLMProviderSetting(Base):
-    """
-    User-owned LLM provider metadata.
-    User API keys are intentionally not modeled here.
-    """
-    __tablename__ = "user_llm_provider_settings"
-    __table_args__ = (
-        UniqueConstraint("user_id", "provider_name", name="uq_user_llm_provider_settings_user_provider"),
-        Index("ix_user_llm_provider_settings_user_enabled", "user_id", "is_enabled"),
-        Index("ix_user_llm_provider_settings_user_default", "user_id", "is_default"),
-    )
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    provider_name = Column(String(100), nullable=False)
-    provider_type = Column(String(20), default="custom", nullable=False)
-    catalog_provider_id = Column(Integer, ForeignKey("llm_providers.id", ondelete="SET NULL"), nullable=True, index=True)
-    display_name = Column(String(200), nullable=False)
-    base_url = Column(String(500), nullable=False)
-    shallow_model = Column(String(200), nullable=False)
-    deep_model = Column(String(200), nullable=False)
-    is_enabled = Column(Boolean, default=True, nullable=False, index=True)
-    is_default = Column(Boolean, default=False, nullable=False, index=True)
-    last_validated_at = Column(DateTime(timezone=True), nullable=True)
-    last_validation_status = Column(String(20), default="untested", nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-
-    user = relationship("User", back_populates="llm_provider_settings")
-    catalog_provider = relationship("LLMProvider")
-
-    def __repr__(self):
-        return (
-            f"<UserLLMProviderSetting(id={self.id}, user_id={self.user_id}, "
-            f"provider_name='{self.provider_name}', default={self.is_default})>"
-        )
-
-class ScheduledTask(Base):
-    """
-    Scheduled analysis task model for recurring analysis execution
-    """
-    __tablename__ = "scheduled_tasks"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    
-    # Task identification
-    task_name = Column(String(255), nullable=False)
-    
-    # Analysis configuration (saved from AnalysisRequest)
-    ticker = Column(String(20), nullable=False, index=True)
-    market = Column(String(10), nullable=True)
-    analysts = Column(JSON, nullable=False)
-    research_depth = Column(Integer, nullable=False)
-    llm_provider = Column(String(50), nullable=False)
-    shallow_thinker = Column(String(100), nullable=False)
-    deep_thinker = Column(String(100), nullable=False)
-    backend_url = Column(String(255), nullable=False)
-    api_key = Column(String(1000), nullable=True)  # LLM API key for this scheduled task (supports JWT tokens)
-    is_public = Column(Boolean, default=False)
-    
-    # Email notification settings
-    email_notification_enabled = Column(Boolean, default=False, nullable=False)  # Whether to send email notification
-    
-    # Schedule configuration
-    execution_cycle = Column(String(20), nullable=False)  # daily, weekly, every_n_days, workdays
-    execution_time = Column(String(5), nullable=False)  # HH:MM format (Beijing time)
-    interval_days = Column(Integer, nullable=True)  # For every_n_days cycle
-    day_of_week = Column(String(1), nullable=True)  # For weekly cycle (0-6, 0=Sunday)
-    end_date = Column(DateTime(timezone=True), nullable=True)  # Optional task end date
-    
-    # Task status
-    is_enabled = Column(Boolean, default=True, nullable=False, index=True)
-    status = Column(String(20), default="pending", nullable=False, index=True)  # pending, completed
-    
-    # Execution tracking
-    next_run_time = Column(DateTime(timezone=True), nullable=True)
-    last_run_time = Column(DateTime(timezone=True), nullable=True)
-    total_executions = Column(Integer, default=0, nullable=False)
-    
-    # APScheduler job ID
-    scheduler_job_id = Column(String(255), unique=True, nullable=False)
-    
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-    
-    # Relationships
-    user = relationship("User", back_populates="scheduled_tasks")
-    
-    def __repr__(self):
-        return f"<ScheduledTask(id={self.id}, task_name='{self.task_name}', ticker='{self.ticker}', status='{self.status}')>"
 
 
 class ConversationSession(Base):
@@ -441,140 +341,3 @@ class TemplateTools(Base):
         return f"<TemplateTools(id={self.id}, template_id={self.template_id}, tool='{self.tool_name}', enabled={self.is_enabled})>"
 
 
-class LLMProvider(Base):
-    """
-    LLM Provider model for managing LLM service providers
-    管理LLM服务供应商
-    """
-    __tablename__ = "llm_providers"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    provider_name = Column(String(100), unique=True, nullable=False, index=True)  # 供应商名称（唯一标识）
-    display_name = Column(String(200), nullable=False)  # 显示名称
-    api_key = Column(String(1000), nullable=True)  # API密钥（加密存储）- 支持JWT token
-    base_url = Column(String(500), nullable=True)  # API基础URL
-    description = Column(Text, nullable=True)  # 供应商描述
-    is_active = Column(Boolean, default=True, nullable=False, index=True)  # 是否启用
-    is_default = Column(Boolean, default=False, nullable=False, index=True)  # 是否为系统默认供应商
-    config_json = Column(JSON, nullable=True)  # 额外配置参数（JSON格式）
-    
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-    
-    # Relationships
-    models = relationship("LLMModel", back_populates="provider", cascade="all, delete-orphan")
-    
-    def to_dict(self, include_api_key=False):
-        """Convert to dictionary, optionally masking API key"""
-        # 获取实际值而不是Column对象
-        api_key_value = self.api_key
-        
-        # 根据include_api_key参数决定是否返回完整密钥
-        if include_api_key:
-            # 返回完整API密钥（用于编辑时显示）
-            masked_api_key = api_key_value if api_key_value else None
-        else:
-            # 返回脱敏的API密钥（用于列表显示）
-            if api_key_value and len(str(api_key_value)) > 4:
-                masked_api_key = "***" + str(api_key_value)[-4:]
-            else:
-                masked_api_key = None
-        
-        return {
-            "id": self.id,
-            "provider_name": self.provider_name,
-            "display_name": self.display_name,
-            "api_key": masked_api_key,
-            "base_url": self.base_url,
-            "description": self.description,
-            "is_active": self.is_active,
-            "is_default": self.is_default,
-            "config_json": self.config_json,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-        }
-    
-    def __repr__(self):
-        return f"<LLMProvider(id={self.id}, name='{self.provider_name}', display='{self.display_name}', active={self.is_active})>"
-
-
-class LLMModel(Base):
-    """
-    LLM Model model for managing specific models under providers
-    管理供应商下的具体模�?    """
-    __tablename__ = "llm_models"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    provider_id = Column(Integer, ForeignKey("llm_providers.id", ondelete="CASCADE"), nullable=False, index=True)
-    model_name = Column(String(200), nullable=False, index=True)  # 模型名称
-    model_type = Column(String(50), nullable=False, index=True)  # 模型类型：shallow_thinker/deep_thinker
-    display_name = Column(String(200), nullable=False)  # 显示名称
-    description = Column(Text, nullable=True)  # 模型描述
-    is_active = Column(Boolean, default=True, nullable=False, index=True)  # 是否启用
-    config_json = Column(JSON, nullable=True)  # 模型配置参数（JSON格式�?    
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-    
-    # Relationships
-    provider = relationship("LLMProvider", back_populates="models")
-    
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "provider_id": self.provider_id,
-            "model_name": self.model_name,
-            "model_type": self.model_type,
-            "display_name": self.display_name,
-            "description": self.description,
-            "is_active": self.is_active,
-            "config_json": self.config_json,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-        }
-    
-    def __repr__(self):
-        return f"<LLMModel(id={self.id}, name='{self.model_name}', type='{self.model_type}', provider_id={self.provider_id}, active={self.is_active})>"
-
-
-class SubscriptionPlan(Base):
-    """
-    订阅套餐（按次）：购买后可获得分析次数。
-    """
-    __tablename__ = "subscription_plans"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(100), nullable=False)
-    credits = Column(Integer, nullable=False, default=1)  # 本次获得的分析次数
-    price = Column(Float, nullable=False, default=0.0)    # 价格（元）
-    description = Column(Text, nullable=True)
-    is_active = Column(Boolean, nullable=False, default=True)
-    sort_order = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-
-    def __repr__(self):
-        return f"<SubscriptionPlan(id={self.id}, name='{self.name}', credits={self.credits}, price={self.price})>"
-
-
-class CreditTransaction(Base):
-    """
-    分析次数流水：purchase / consume / refund / grant。
-    """
-    __tablename__ = "credit_transactions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    type = Column(String(20), nullable=False)  # purchase / consume / refund / grant
-    amount = Column(Integer, nullable=False)   # 增减量（+/-）
-    balance = Column(Integer, nullable=False)  # 该笔流水之后用户的剩余次数
-    status = Column(String(20), nullable=False, default="paid")  # paid / pending / refunded / consumed
-    description = Column(String(255), nullable=True)
-    plan_name = Column(String(100), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-    user = relationship("User", back_populates="credit_transactions")
-
-    def __repr__(self):
-        return f"<CreditTransaction(id={self.id}, user_id={self.user_id}, type={self.type}, amount={self.amount}, balance={self.balance})>"

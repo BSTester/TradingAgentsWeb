@@ -171,7 +171,7 @@ def compare_and_sync_schema(engine, verbose=True):
     Returns:
         tuple: (columns_added, errors)
     """
-    from web.backend.models import User, UserConfig, UserLLMProviderSetting, AnalysisRecord, AnalysisLog, ExportRecord, ScheduledTask
+    from web.backend.models import User, UserConfig, AnalysisRecord, AnalysisLog, ExportRecord
     from web.backend.database import Base
     
     inspector = inspect(engine)

@@ -18,7 +18,10 @@ from web.backend.analysis_task import run_analysis_task
 from web.backend.auth_routes import get_current_active_user
 from web.backend.database import get_db
 from web.backend.models import AnalysisRecord, ConversationMessage, ConversationSession, User, UserConfig
-from web.backend.services.llm_config_resolver import resolve_llm_config
+from web.backend.services.llm_config_resolver import (
+    LLMConfigResolutionError,
+    resolve_llm_config_from_request,
+)
 from web.backend.utils.market_detector import detect_market, normalize_ticker, normalize_ticker_with_suffix, validate_ticker
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
@@ -44,6 +47,12 @@ class ConversationUpdate(BaseModel):
 class MessageCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=4000)
     client_message_id: Optional[str] = None
+    # 请求即配置：LLM 配置随消息提交（密钥来自浏览器 keyVault，后端不持久化）
+    llm_provider: Optional[str] = None
+    backend_url: Optional[str] = None
+    shallow_thinker: Optional[str] = None
+    deep_thinker: Optional[str] = None
+    api_key: Optional[str] = None
 
 
 class FollowUpCreate(BaseModel):
@@ -134,7 +143,14 @@ async def _get_user_config(db: AsyncSession, user_id: int) -> UserConfig:
     return config
 
 
-async def _trigger_analysis(db: AsyncSession, user: User, session: ConversationSession, assistant_message: ConversationMessage, content: str) -> AnalysisRecord:
+async def _trigger_analysis(
+    db: AsyncSession,
+    user: User,
+    session: ConversationSession,
+    assistant_message: ConversationMessage,
+    content: str,
+    llm_config: Optional[dict] = None,
+) -> AnalysisRecord:
     ticker_raw = _extract_ticker(content)
     if not ticker_raw:
         raise HTTPException(status_code=400, detail="未识别到标的代码，请在消息中包含如 AAPL、0700.HK 或 600519.SH 的代码")
@@ -143,14 +159,14 @@ async def _trigger_analysis(db: AsyncSession, user: User, session: ConversationS
         raise HTTPException(status_code=400, detail=f"无效的股票代码格式: {ticker_raw}")
 
     user_config = await _get_user_config(db, user.id)
-    resolved_llm = await resolve_llm_config(
-        db,
-        user_id=user.id,
-        llm_provider=user_config.last_llm_provider,
-        backend_url=user_config.last_backend_url,
-        shallow_thinker=user_config.last_shallow_thinker,
-        deep_thinker=user_config.last_deep_thinker,
-        api_key=None,
+    llm = llm_config or {}
+    # 请求即配置：LLM 配置由前端随消息提交，缺失时返回结构化 400
+    resolved_llm = resolve_llm_config_from_request(
+        llm_provider=llm.get("llm_provider"),
+        backend_url=llm.get("backend_url"),
+        shallow_thinker=llm.get("shallow_thinker"),
+        deep_thinker=llm.get("deep_thinker"),
+        api_key=llm.get("api_key"),
     )
     now = datetime.utcnow()
     analysis_id = f"conv_{now.strftime('%Y%m%d_%H%M%S')}_{ticker}_{user.id}_{assistant_message.id[:8]}"
@@ -167,7 +183,7 @@ async def _trigger_analysis(db: AsyncSession, user: User, session: ConversationS
         shallow_thinker=resolved_llm.shallow_thinker,
         deep_thinker=resolved_llm.deep_thinker,
         backend_url=resolved_llm.backend_url,
-        api_key=None,
+        api_key=resolved_llm.api_key,
         is_public=False,
         status="queued",
         current_step="对话触发分析已入队",
@@ -333,7 +349,20 @@ async def create_message(session_id: str, payload: MessageCreate, current_user: 
     db.add_all([user_message, assistant_message])
     session.updated_at = datetime.utcnow()
     await db.flush()
-    await _trigger_analysis(db, current_user, session, assistant_message, payload.content)
+    await _trigger_analysis(
+        db,
+        current_user,
+        session,
+        assistant_message,
+        payload.content,
+        {
+            "llm_provider": payload.llm_provider,
+            "backend_url": payload.backend_url,
+            "shallow_thinker": payload.shallow_thinker,
+            "deep_thinker": payload.deep_thinker,
+            "api_key": payload.api_key,
+        },
+    )
     await db.commit()
     await db.refresh(user_message)
     return {"data": _message_payload(user_message)}

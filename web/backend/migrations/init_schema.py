@@ -46,7 +46,7 @@ def run_migration():
     
     # Import models to register them with Base
     from web.backend.models import (
-        User, UserConfig, ScheduledTask, AnalysisRecord, 
+        User, UserConfig, AnalysisRecord,
         AnalysisLog, ExportRecord
     )
     from web.backend.database import Base

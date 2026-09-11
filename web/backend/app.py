@@ -77,7 +77,7 @@ from web.backend.auth_routes import router as auth_router, get_current_active_us
 from web.backend.middleware import LoggingMiddleware
 
 # Import API routes
-from web.backend.routes import analysis_routes, config_routes, task_routes, page_routes, websocket_routes, export_routes, user_management_routes, scheduled_task_routes, user_config_routes, user_llm_settings_routes, skills_routes, conversation_routes, report_routes, home_routes, subscription_routes, admin_routes
+from web.backend.routes import analysis_routes, config_routes, task_routes, page_routes, websocket_routes, export_routes, user_management_routes, user_config_routes, skills_routes, conversation_routes, report_routes, home_routes, admin_routes
 
 
 @asynccontextmanager
@@ -120,25 +120,8 @@ async def lifespan(app: FastAPI):
             async with AsyncSessionLocal() as db:
                 await ensure_first_user_is_admin_async(db)
 
-            # Seed default subscription plans (WS-133)
-            from web.backend.utils.admin_helper import ensure_subscription_plans_async
-            async with AsyncSessionLocal() as db:
-                await ensure_subscription_plans_async(db)
-
             await cleanup_running_tasks()
             print("✅ Running tasks cleaned up")
-            
-            # Initialize and start scheduler service
-            from web.backend.services.scheduler_service import init_scheduler_service
-            from web.backend.database import DATABASE_URL
-            scheduler = init_scheduler_service(DATABASE_URL)
-            scheduler.start()
-            app.state.scheduler = scheduler
-            print("✅ Scheduler service started")
-            
-            # Load existing enabled scheduled tasks
-            await load_scheduled_tasks(scheduler)
-            print("✅ Scheduled tasks loaded")
             
             # Initialize email service
             from web.backend.services.email_service import init_email_service
@@ -169,12 +152,6 @@ async def lifespan(app: FastAPI):
     # Shutdown (cleanup if needed)
     print("🔌 Shutting down...")
     if getattr(app.state, "is_leader", False):
-        # Stop scheduler
-        scheduler = getattr(app.state, "scheduler", None)
-        if scheduler:
-            scheduler.shutdown(wait=True)
-            print("✅ Scheduler service stopped")
-        
         # Stop task monitor
         monitor_task = getattr(app.state, "monitor_task", None)
         if monitor_task:
@@ -187,228 +164,42 @@ async def lifespan(app: FastAPI):
                 leader_sock.close()
             except Exception:
                 pass
-
-
 async def cleanup_running_tasks():
-    """Clean up running tasks on server restart and restore queued tasks"""
+    """Clean up unfinished tasks on server restart.
+
+    排队任务的后端重放已随定时任务/订阅体系下线移除（分析改为请求即配置，
+    进程重启后不再自动重放未完成任务，统一标记为中断）。
+    """
     async with AsyncSessionLocal() as db:
         try:
             from sqlalchemy import select
-            
-            # 1. 查找所有运行中或初始化中的任务
+
             result = await db.execute(
                 select(AnalysisRecord).where(
-                    AnalysisRecord.status.in_(["initializing", "running"])
+                    AnalysisRecord.status.in_(["initializing", "running", "queued"])
                 )
             )
-            running_tasks = result.scalars().all()
-            
-            if running_tasks:
-                print(f"🔄 发现 {len(running_tasks)} 个运行中的任务，准备中断...")
-                
-                for task in running_tasks:
+            stale_tasks = result.scalars().all()
+
+            if stale_tasks:
+                print(f"🔄 发现 {len(stale_tasks)} 个未完成任务，准备中断...")
+                for task in stale_tasks:
                     task.status = "interrupted"
                     task.current_step = "服务重启，任务已中断"
                     task.error_message = "服务重启导致任务中断"
                     print(f"  🛑 中断任务: {task.analysis_id}")
-                
                 await db.commit()
-                print(f"✅ 已中断 {len(running_tasks)} 个任务")
+                print(f"✅ 已中断 {len(stale_tasks)} 个任务")
             else:
-                print("✅ 没有需要清理的运行中任务")
-            
-            # 2. 查找所有排队中的任务并恢复
-            result = await db.execute(
-                select(AnalysisRecord).where(
-                    AnalysisRecord.status == "queued"
-                ).order_by(AnalysisRecord.created_at)  # 按创建时间排序
-            )
-            queued_tasks = result.scalars().all()
-            
-            if queued_tasks:
-                print(f"🔄 发现 {len(queued_tasks)} 个排队中的任务，准备恢复...")
-                
-                # 导入必要的模块
-                from web.backend.analysis_task import run_analysis_task
-                
-                restored_count = 0
-                for task in queued_tasks:
-                    try:
-                        from web.backend.services.llm_config_resolver import resolve_llm_config
-                        resolved_llm = await resolve_llm_config(
-                            db,
-                            user_id=task.user_id,
-                            llm_provider=task.llm_provider,
-                            backend_url=task.backend_url,
-                            shallow_thinker=task.shallow_thinker,
-                            deep_thinker=task.deep_thinker,
-                            api_key=task.api_key,
-                        )
-                        
-                        # 准备请求数据（严格使用任务保存的配置）
-                        request_data = {
-                            'ticker': task.ticker,
-                            'analysis_date': task.analysis_date,
-                            'analysts': task.analysts if task.analysts else [],
-                            'research_depth': task.research_depth or 1,
-                            'llm_provider': resolved_llm.llm_provider,
-                            'deep_thinker': resolved_llm.deep_thinker,
-                            'shallow_thinker': resolved_llm.shallow_thinker,
-                            'api_key': resolved_llm.api_key,
-                            'backend_url': resolved_llm.backend_url,
-                        }
-                        
-                        # 提交任务到任务管理器
-                        from web.backend.app import task_manager, manager as ws_manager
-                        
-                        success = task_manager.submit_task(
-                            task.analysis_id,
-                            task.user_id,
-                            run_analysis_task,
-                            task.analysis_id,
-                            task.user_id,
-                            request_data,
-                            ws_manager,
-                            task_manager
-                        )
-                        
-                        if success:
-                            print(f"  ✅ 恢复任务: {task.analysis_id} ({task.ticker})")
-                            restored_count += 1
-                        else:
-                            print(f"  ⏳ 任务已加入队列: {task.analysis_id} ({task.ticker})")
-                            restored_count += 1
-                            
-                    except Exception as e:
-                        print(f"  ❌ 恢复任务失败 {task.analysis_id}: {e}")
-                        # 将失败的任务标记为错误
-                        task.status = "error"
-                        task.error_message = f"服务重启后恢复失败: {str(e)}"
-                        await db.commit()
-                
-                print(f"✅ 已恢复 {restored_count}/{len(queued_tasks)} 个排队任务")
-            else:
-                print("✅ 没有需要恢复的排队任务")
-                
+                print("✅ 没有需要清理的未完成任务")
+
         except Exception as e:
-            print(f"❌ 清理和恢复任务失败: {e}")
+            print(f"❌ 清理任务失败: {e}")
             import traceback
             traceback.print_exc()
             await db.rollback()
 
 
-async def load_scheduled_tasks(scheduler):
-    """Load existing enabled scheduled tasks from database and register with scheduler"""
-    async with AsyncSessionLocal() as db:
-        try:
-            from sqlalchemy import select
-            from web.backend.models import ScheduledTask
-            
-            # Find all enabled pending tasks
-            result = await db.execute(
-                select(ScheduledTask).where(
-                    ScheduledTask.is_enabled == True,
-                    ScheduledTask.status == 'pending'
-                )
-            )
-            tasks = result.scalars().all()
-            
-            if tasks:
-                print(f"📋 Loading {len(tasks)} scheduled tasks...")
-                
-                loaded_count = 0
-                expired_count = 0
-                
-                for task in tasks:
-                    try:
-                        # Check if task has passed end date before loading
-                        if task.end_date:
-                            from pytz import timezone as pytz_timezone
-                            from datetime import datetime
-                            beijing_tz = pytz_timezone('Asia/Shanghai')
-                            now_beijing = datetime.now(beijing_tz)
-                            
-                            # Ensure end_date is timezone-aware
-                            if task.end_date.tzinfo is None:
-                                end_date_aware = beijing_tz.localize(task.end_date)
-                            else:
-                                end_date_aware = task.end_date.astimezone(beijing_tz)
-                            
-                            # If current time is past end date, mark as completed and skip
-                            if now_beijing > end_date_aware:
-                                print(f"  ⏰ Task {task.id} ({task.task_name}) has passed end date, marking as completed")
-                                task.status = 'completed'
-                                task.next_run_time = None
-                                expired_count += 1
-                                continue
-                        
-                        # Register with scheduler
-                        scheduler.add_scheduled_task(
-                            task_id=task.id,
-                            job_id=task.scheduler_job_id,
-                            execution_cycle=task.execution_cycle,
-                            execution_time=task.execution_time,
-                            interval_days=task.interval_days,
-                            day_of_week=task.day_of_week,
-                            start_date=task.next_run_time,
-                            end_date=task.end_date
-                        )
-                        
-                        # Update next run time
-                        next_run = scheduler.get_next_run_time(task.scheduler_job_id)
-                        if next_run:
-                            # Check if next run is after end date
-                            if task.end_date:
-                                from pytz import timezone as pytz_timezone
-                                from datetime import datetime
-                                beijing_tz = pytz_timezone('Asia/Shanghai')
-                                
-                                # Ensure end_date is timezone-aware
-                                if task.end_date.tzinfo is None:
-                                    end_date_aware = beijing_tz.localize(task.end_date)
-                                else:
-                                    end_date_aware = task.end_date.astimezone(beijing_tz)
-                                
-                                # Ensure next_run is timezone-aware
-                                if next_run.tzinfo is None:
-                                    next_run_aware = beijing_tz.localize(next_run)
-                                else:
-                                    next_run_aware = next_run.astimezone(beijing_tz)
-                                
-                                if next_run_aware > end_date_aware:
-                                    print(f"  ⏰ Task {task.id} ({task.task_name}) next run is after end date, marking as completed")
-                                    task.status = 'completed'
-                                    task.next_run_time = None
-                                    scheduler.remove_scheduled_task(task.scheduler_job_id)
-                                    expired_count += 1
-                                    continue
-                            
-                            task.next_run_time = next_run
-                            loaded_count += 1
-                            print(f"  ✅ Loaded task {task.id}: {task.task_name} (next run: {next_run})")
-                        else:
-                            # No next run scheduled
-                            print(f"  ⏰ Task {task.id} ({task.task_name}) has no more runs, marking as completed")
-                            task.status = 'completed'
-                            task.next_run_time = None
-                            scheduler.remove_scheduled_task(task.scheduler_job_id)
-                            expired_count += 1
-                        
-                    except Exception as e:
-                        print(f"  ❌ Failed to load task {task.id}: {e}")
-                
-                await db.commit()
-                print(f"✅ Loaded {loaded_count} scheduled tasks, {expired_count} tasks marked as completed")
-            else:
-                print("✅ No scheduled tasks to load")
-                
-        except Exception as e:
-            print(f"❌ Failed to load scheduled tasks: {e}")
-            await db.rollback()
-
-
-async def task_monitor():
-    """Monitor tasks for stalled execution"""
     while True:
         try:
             await asyncio.sleep(60)  # 每 60 秒检查一次
@@ -792,9 +583,7 @@ app.include_router(export_routes.router)
 app.include_router(report_routes.router)
 app.include_router(home_routes.router)
 app.include_router(user_management_routes.router)
-app.include_router(scheduled_task_routes.router)
 app.include_router(skills_routes.router)
-app.include_router(user_llm_settings_routes.router)
 
 # Include user config routes
 from web.backend.routes import user_config_routes
@@ -808,12 +597,7 @@ app.include_router(prompt_routes.router)
 websocket_routes.init_websocket_routes(manager)
 app.include_router(websocket_routes.router)
 
-# Include LLM configuration routes
-from web.backend.routes import llm_config_routes
-app.include_router(llm_config_routes.router)
-
-# Include WS-133 redesign routes (subscription / admin)
-app.include_router(subscription_routes.router)
+# Include admin routes
 app.include_router(admin_routes.router)
 
 # Include page routes

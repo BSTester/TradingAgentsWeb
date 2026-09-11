@@ -73,7 +73,6 @@ async def get_all_users(
             "is_active": user.is_active,
             "created_at": user.created_at.isoformat() if user.created_at else None,
             "updated_at": user.updated_at.isoformat() if user.updated_at else None,
-            "balance": user.credit_balance or 0,
         })
 
     has_next = page * limit < total
