@@ -13,35 +13,37 @@ module.exports = {
       colors: {
         // Dark surfaces (mapped 1:1 onto the prior semantic tokens so the whole
         // app re-skins without per-file edits).
-        dark: {
-          primary: '#0a0f14',   // deep graphite — application background
-          secondary: '#131a22', // surface — panels / cards
-          tertiary: '#1b2430',  // raised — hover / secondary btns
-          elevated: '#222d3b',  // elevated surfaces
-          border: '#2b3646',    // structural line
+       dark: {
+          primary: '#060a10',   // ink — deep finance base
+          secondary: '#0e1620', // surface — panels / cards
+          tertiary: '#16202d',  // raised — hover / secondary btns
+          elevated: '#1d2937',  // elevated surfaces
+          border: '#243243',    // structural line
+          input: '#0a1119',     // recessed inputs
+          rail: '#0b131c',      // side rail
+          hover: '#1a2636',     // generic hover
         },
-        // Dark financial accents — financial blue
+        // Workflow Desk accents
         accent: {
-          primary: '#2f6bff',   // financial blue — primary action / focus
-          secondary: '#4d84ff', // lighter blue — flow / node identity
-          tertiary: '#6b9bff',  // tertiary blue
-          hover: '#4d84ff',     // hover state (blue)
-          focus: '#4d84ff',     // focus state (blue)
+          primary: '#9ee5c9',   // mint — bull / primary action / success
+          secondary: '#81bbed', // sky blue — safe / flow / info
+          tertiary: '#5fb6e8',  // tertiary blue
+          hover: '#9ee5c9',     // hover state (mint)
+          focus: '#8acbff',     // focus state (blue)
         },
-        // Market up/down semantics (resolved per market by components)
-        up: {
-          DEFAULT: '#f6465d',   // red — A-share up / US-HK down
-          alt: '#2ebd85',       // green
-        },
-        down: {
-          DEFAULT: '#2ebd85',   // green — A-share down / US-HK up
-          alt: '#f6465d',       // red
+        // Verdict / stance semantic palette for the research report
+        verdict: {
+          bull: '#9ee5c9',      // 看多 / 买入 / 积极
+          hold: '#e5bd72',      // 持有 / 审慎 / 中性偏多
+          bear: '#f48b8b',      // 看空 / 减持 / 偏空
+          safe: '#81bbed',      // Safe / 稳健 / 信息
+          neutral: '#9aa9b8',   // 中性
         },
         // Text colors for the dark theme
         text: {
-          primary: '#f4f6f8',   // primary text
-          secondary: '#a3aebf', // secondary text
-          tertiary: '#6b7688',  // tertiary text
+          primary: '#f1f5f7',   // primary text
+          secondary: '#9aa9b8', // secondary text
+          tertiary: '#68798a',  // tertiary text
           muted: '#4a5568',     // muted text
         },
         // Keep existing color schemes for compatibility
@@ -118,14 +120,16 @@ module.exports = {
           900: '#0c4a6e',
         },
       },
-      // Dark financial typography (WS-133): Chinese body Noto Sans SC,
-      // data/quotes use Inter (equal-width tabular numerals via .num/.data-value).
-      fontFamily: {
-        sans: ['"Noto Sans SC"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
-        data: ['"Inter"', '"Noto Sans SC"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
-        serif: ['"Instrument Serif"', 'ui-serif', 'Georgia', '"Times New Roman"', 'serif'],
-        mono: ['"DM Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
-      },
+      // Workflow Desk typography
+     fontFamily: {
+       sans: ['"Noto Sans SC"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+        // Noto Serif SC for Chinese financial headlines (authoritative, editorial)
+        serif: ['"Noto Serif SC"', '"Songti SC"', 'ui-serif', 'Georgia', '"Times New Roman"', 'serif'],
+        // Tabular monospace for tickers / prices / verdicts / confidence
+        mono: ['"DM Mono"', '"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
+        num: ['"DM Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
+        heading: ['"Noto Serif SC"', '"Noto Sans SC"', 'ui-serif', 'Georgia', 'serif'],
+     },
       // Bootstrap-compatible spacing
       spacing: {
         '0.5': '0.125rem', // 2px
@@ -177,20 +181,21 @@ module.exports = {
         '3xl': '1.5rem',
         'full': '9999px',
       },
-      // Dark financial shadows
+      // Workflow Desk shadows
       boxShadow: {
-        'glow-cyan': '0 0 20px rgba(47, 107, 255, 0.28), 0 0 40px rgba(47, 107, 255, 0.10)',
-        'glow-cyan-lg': '0 0 30px rgba(47, 107, 255, 0.45), 0 0 60px rgba(47, 107, 255, 0.18)',
-        'glow-blue': '0 0 20px rgba(77, 132, 255, 0.25), 0 0 40px rgba(77, 132, 255, 0.08)',
-        'card-dark': '0 10px 15px -3px rgba(0, 0, 0, 0.35), 0 4px 6px -2px rgba(0, 0, 0, 0.25)',
-        'elevated-dark': '0 20px 25px -5px rgba(0, 0, 0, 0.45), 0 10px 10px -5px rgba(0, 0, 0, 0.25)',
-        'panel': '0 20px 55px rgba(0, 0, 0, 0.28)',
+        // Name kept as glow-cyan so existing utilities keep working; value is now mint-tinted.
+        'glow-cyan': '0 0 20px rgba(155, 255, 190, 0.28), 0 0 40px rgba(155, 255, 190, 0.10)',
+        'glow-cyan-lg': '0 0 30px rgba(155, 255, 190, 0.45), 0 0 60px rgba(155, 255, 190, 0.18)',
+        'glow-blue': '0 0 20px rgba(138, 203, 255, 0.25), 0 0 40px rgba(138, 203, 255, 0.08)',
+        'card-dark': '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
+        'elevated-dark': '0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
+        'panel': '0 20px 55px rgba(0, 0, 0, 0.22)',
       },
       // Custom background images for gradients
       backgroundImage: {
-        'gradient-hero': 'linear-gradient(135deg, #0a0f14 0%, #10161e 50%, #0a0f14 100%)',
-        'gradient-card': 'linear-gradient(145deg, #131a22 0%, #1b2430 100%)',
-        'gradient-button': 'linear-gradient(90deg, #2f6bff 0%, #4d84ff 100%)',
+        'gradient-hero': 'linear-gradient(135deg, #0a0d12 0%, #111720 50%, #0a0d12 100%)',
+        'gradient-card': 'linear-gradient(145deg, #111720 0%, #171f2b 100%)',
+        'gradient-button': 'linear-gradient(90deg, #9bffbe 0%, #8acbff 100%)',
         'gradient-radial': 'radial-gradient(circle at center, var(--tw-gradient-stops))',
       },
       // Custom animations

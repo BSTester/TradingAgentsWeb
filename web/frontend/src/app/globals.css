@@ -7,28 +7,25 @@
     box-sizing: border-box;
   }
   
-  :root {
-    /* Dark Financial theme — deep graphite + financial blue (WS-133 redesign).
-       Kept in sync with tailwind.config.js. */
-    --bg-primary: #0a0f14;     /* deep graphite app background */
-    --bg-secondary: #131a22;   /* surface / panels */
-    --bg-tertiary: #1b2430;    /* raised / hover */
-    --bg-elevated: #222d3b;    /* elevated surfaces */
-    --bg-input: #0d141c;       /* recessed inputs */
-    --bg-rail: #10161e;        /* sidebar rail */
-    --border-default: #2b3646; /* structural line */
-    --accent-primary: #2f6bff; /* financial blue */
-    --accent-secondary: #4d84ff;/* lighter blue */
-    --accent-hover: #4d84ff;
-    --text-primary: #f4f6f8;   /* high-contrast white */
-    --text-secondary: #a3aebf;
-    --text-tertiary: #6b7688;
-    /* Up/down semantics. A-share: red up / green down; US/HK: green up / red down.
-       Components resolve the per-market pair; these are the raw hues. */
-    --up: #f6465d;             /* red (A-share up / US-HK down) */
-    --down: #2ebd85;           /* green (A-share down / US-HK up) */
-    --up-alt: #2ebd85;         /* green */
-    --down-alt: #f6465d;       /* red */
+ :root {
+    /* Dark-finance CSS Variables — kept in sync with tailwind.config.js */
+    --bg-primary: #060a10;     /* ink — deep finance base */
+    --bg-secondary: #0e1620;   /* surface */
+    --bg-tertiary: #16202d;    /* raised */
+    --bg-elevated: #1d2937;    /* elevated */
+    --bg-input: #0a1119;       /* recessed inputs */
+    --bg-rail: #0b131c;        /* side rail */
+    --bg-hover: #1a2636;       /* generic hover */
+    --border-default: #243243; /* structural line */
+    --accent-primary: #9ee5c9; /* mint — bull / primary action */
+    --accent-secondary: #81bbed;/* sky blue — safe / info */
+    --verdict-bull: #9ee5c9;   /* 看多 */
+    --verdict-hold: #e5bd72;   /* 持有 */
+    --verdict-bear: #f48b8b;   /* 看空 */
+    --verdict-safe: #81bbed;   /* 稳健 */
+    --text-primary: #f1f5f7;
+    --text-secondary: #9aa9b8;
+    --text-tertiary: #68798a;
   }
 
   body {
@@ -40,17 +37,9 @@
     color: var(--text-primary);
   }
 
-  /* Data / quotes use tabular numerals (equal-width digits) via .num / .tabular-nums */
-  .num, .tabular-nums,
-  .data-value {
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: 'tnum' 1, 'lnum' 1;
-    letter-spacing: -0.01em;
-  }
-
-  /* Focus ring for keyboard users */
+  /* Workflow Desk focus ring for keyboard users */
   :focus-visible {
-    outline: 3px solid var(--accent-secondary);
+    outline: 3px solid var(--accent-primary);
     outline-offset: 2px;
     border-radius: 4px;
   }
@@ -109,66 +98,6 @@
   .form-control {
     @apply flex h-10 w-full rounded-lg border border-dark-border bg-[#0d131b] text-white placeholder-text-tertiary px-4 py-3 text-sm focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 transition-all duration-200;
   }
-
-  /* `<select>` 专用：避免 form-control 的 flex/py 导致选项文字被裁切，直连自定义下拉箭头 */
-  .form-select {
-    @apply block h-10 w-full appearance-none rounded-lg border border-dark-border bg-[#0d131b] px-3 pr-9 text-sm text-white focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 transition-all duration-200;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa9b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.75rem center;
-    background-size: 14px;
-  }
-
-  /* select 内的 option 确保完整显示 */
-  .form-select option {
-    @apply bg-dark-secondary text-text-primary;
-    padding: 0.5rem 0.75rem;
-    white-space: nowrap;
-  }
-
-  /* ===== 金融报告主题 · markdown（表格/主次标题/列表/引用等） ===== */
-  .report-markdown {
-    @apply text-sm leading-relaxed text-text-secondary;
-    overflow-wrap: break-word;
-  }
-  .report-markdown > :first-child { @apply mt-0; }
-  .report-markdown h1, .report-markdown h2, .report-markdown h3, .report-markdown h4 {
-    @apply font-bold tracking-tight text-text-primary;
-  }
-  .report-markdown h1 { @apply mt-6 mb-3 border-b border-dark-border pb-2 text-2xl leading-tight; }
-  .report-markdown h2 { @apply mt-6 mb-3 flex items-center gap-2 text-xl leading-snug; }
-  .report-markdown h2::before { content: ""; @apply inline-block h-4 w-1 rounded bg-accent-primary; }
-  .report-markdown h3 { @apply mt-5 mb-2 text-lg leading-snug; }
-  .report-markdown h4 { @apply mt-4 mb-2 font-semibold text-base; }
-  .report-markdown p { @apply my-3; }
-  .report-markdown ul { @apply my-3 list-disc pl-6; }
-  .report-markdown ol { @apply my-3 list-decimal pl-6; }
-  .report-markdown li { @apply my-1; }
-  .report-markdown blockquote {
-    @apply my-3 border-l-2 border-accent-primary bg-dark-tertiary/40 px-4 py-2 italic text-text-secondary;
-  }
-  .report-markdown code { @apply rounded bg-dark-tertiary px-1.5 py-0.5 font-mono text-[0.85em] text-accent-secondary; }
-  .report-markdown pre { @apply my-3 overflow-x-auto rounded-lg border border-dark-border bg-dark-tertiary p-4 text-sm; }
-  .report-markdown pre code { @apply bg-transparent p-0 text-text-primary; }
-  .report-markdown a { @apply text-accent-primary underline hover:text-accent-secondary; }
-  .report-markdown strong { @apply font-semibold text-text-primary; }
-  .report-markdown hr { @apply my-6 border-dark-border; }
-  /* 表格 */
-  .report-markdown table { @apply my-4 w-full border-collapse overflow-hidden rounded-lg text-sm; }
-  .report-markdown thead th {
-    @apply border-b border-dark-border bg-dark-tertiary px-3 py-2 text-left font-semibold text-text-primary;
-  }
-  .report-markdown tbody td {
-    @apply border-b border-dark-border px-3 py-2 align-top text-text-secondary;
-  }
-  .report-markdown tbody tr:nth-child(even) { @apply bg-dark-tertiary/40; }
-
-  /* 角色链卡片头部：解析 markdown 但以内联方式呈现（不显示 ** / ## 等标记） */
-  .report-md-inline p { display: inline; margin: 0; }
-  .report-md-inline strong { @apply font-semibold; }
-  .report-md-inline em { @apply italic; }
-  .report-md-inline a { @apply text-accent-primary underline; }
-  .report-md-inline code { @apply rounded bg-dark-tertiary px-1 py-0.5 font-mono text-[0.85em] text-accent-secondary; }
 
   .form-label {
     @apply text-sm font-medium leading-none text-text-secondary;
@@ -294,10 +223,17 @@
     -webkit-text-size-adjust: 100%;
   }
   body {
-    /* 适配刘海屏等安全区。WS-133: 去掉旧的 Workflow Desk 侧栏 15.5rem 左内边距，
-       使所有页面在桌面端真正水平居中。 */
+    /* 适配刘海屏等安全区 */
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     touch-action: manipulation;
+  }
+  /* Reserve space for the fixed desktop research rail (248px = 15.5rem).
+     The rail and top bar are position:fixed, so they are not shifted by this;
+     only in-flow page content moves right of the rail on lg+ screens. */
+  @media (min-width: 1024px) {
+    body {
+      padding-left: calc(env(safe-area-inset-left) + 15.5rem);
+    }
   }
   /* 媒体默认自适应容器宽度 */
   img, video, canvas, svg {
@@ -383,6 +319,92 @@
 
 .animate-fade-in {
   animation: fade-in 0.5s ease-out;
+}
+
+/* ===== Dark-finance research design system ===== */
+
+/* Surface helpers */
+.surface-panel {
+  @apply bg-dark-secondary border border-dark-border rounded-2xl;
+}
+.surface-card {
+  @apply bg-dark-secondary border border-dark-border rounded-xl transition-colors;
+}
+.surface-card:hover {
+  @apply border-dark-hover;
+}
+
+/* Verdict pill — semantic color from stance/verdict */
+.verdict-pill {
+  @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium font-mono;
+}
+.verdict-bull  { color: var(--verdict-bull);  background: rgba(158, 229, 201, 0.10); border: 1px solid rgba(158, 229, 201, 0.28); }
+.verdict-hold  { color: var(--verdict-hold);  background: rgba(229, 189, 114, 0.10); border: 1px solid rgba(229, 189, 114, 0.28); }
+.verdict-bear  { color: var(--verdict-bear);  background: rgba(244, 139, 139, 0.10); border: 1px solid rgba(244, 139, 139, 0.28); }
+.verdict-safe  { color: var(--verdict-safe);  background: rgba(129, 187, 237, 0.10); border: 1px solid rgba(129, 187, 237, 0.28); }
+.verdict-neutral{ color: var(--text-secondary); background: rgba(154, 169, 184, 0.08); border: 1px solid rgba(154, 169, 184, 0.22); }
+
+/* "示例 / 延迟" badge for non-actionable data */
+.data-sample-badge {
+  @apply inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium;
+  color: var(--text-tertiary);
+  background: rgba(154, 169, 184, 0.08);
+  border: 1px solid rgba(154, 169, 184, 0.18);
+}
+
+/* Headline (Chinese serif) */
+.h-serif {
+  @apply font-heading font-semibold tracking-tight;
+  color: var(--text-primary);
+}
+
+/* Tabular numbers for prices / confidence */
+.num {
+  @apply font-mono tabular-nums;
+}
+
+/* Primary action button */
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all;
+  background: var(--accent-primary);
+  color: #04130d;
+}
+.btn-primary:hover { filter: brightness(1.06); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+  background: transparent;
+}
+.btn-ghost:hover { color: var(--text-primary); border-color: var(--bg-hover); background: var(--bg-tertiary); }
+
+/* Search-first home hero */
+.hero-search {
+  background:
+    radial-gradient(900px 360px at 50% -10%, rgba(158, 229, 201, 0.10), transparent 70%),
+    radial-gradient(700px 300px at 80% 10%, rgba(129, 187, 237, 0.08), transparent 70%);
+}
+
+/* Role-chain connector line */
+.chain-rail {
+  position: relative;
+}
+.chain-rail::before {
+  content: "";
+  position: absolute;
+  left: 1.05rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--border-default), transparent);
+}
+
+/* Global non-execution disclaimer strip */
+.disclaimer-strip {
+  @apply text-[11px];
+  color: var(--text-tertiary);
 }
 
 /* Reduced motion support */

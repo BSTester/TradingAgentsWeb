@@ -12,6 +12,10 @@ http {
   include       /etc/nginx/mime.types;
   default_type  application/octet-stream;
 
+  # 非 80 端口部署（如本地 :8000 预览）时，目录 301 重定向不能丢端口：
+  # 默认 absolute_redirect 会把 /auth 重写成不带端口的绝对地址，导致连接被拒。
+  absolute_redirect off;
+
   log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
                     '$status $body_bytes_sent "$http_referer" '
                     '"$http_user_agent" "$http_x_forwarded_for"';

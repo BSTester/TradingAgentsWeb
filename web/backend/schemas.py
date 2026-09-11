@@ -15,10 +15,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: Optional[str] = None  # Password is now optional
-    # 服务端验证码（防绕过前端）
-    captcha_id: Optional[str] = None
-    captcha_answer: Optional[str] = None
-    # Cloudflare Turnstile（人机验证）
+    # Cloudflare Turnstile 人机验证 token（前端 widget 回传）
     turnstile_token: Optional[str] = None
     # 邮箱验证码
     email_code: Optional[str] = None
@@ -57,10 +54,7 @@ class PasswordSetRequest(BaseModel):
 class UserLogin(BaseModel):
     username: str
     password: str
-    # 服务端验证码（防绕过前端）
-    captcha_id: Optional[str] = None
-    captcha_answer: Optional[str] = None
-    # Cloudflare Turnstile（人机验证）
+    # Cloudflare Turnstile 人机验证 token（前端 widget 回传）
     turnstile_token: Optional[str] = None
 
 class User(UserBase):
@@ -76,7 +70,7 @@ class User(UserBase):
 class UserInDB(User):
     hashed_password: str
 
-# Captcha
+# Captcha（已废弃：图形验证码已替换为 Cloudflare Turnstile，保留仅为向后兼容引用）
 class CaptchaResponse(BaseModel):
     captcha_id: str
     seed: str
@@ -85,8 +79,7 @@ class CaptchaResponse(BaseModel):
 class EmailCodeSendRequest(BaseModel):
     """Request schema for sending verification code"""
     email: EmailStr
-    captcha_id: str
-    captcha_answer: str
+    turnstile_token: Optional[str] = None
 
 class EmailCodeSendResponse(BaseModel):
     """Response schema for send verification code"""
@@ -97,8 +90,7 @@ class EmailCodeLoginRequest(BaseModel):
     """Request schema for email code login"""
     email: EmailStr
     code: str
-    captcha_id: str
-    captcha_answer: str
+    turnstile_token: Optional[str] = None
     
     @validator('code')
     def validate_code(cls, v):
@@ -698,8 +690,6 @@ class LLMProviderResponse(BaseModel):
 
 class SetSystemDefaultProviderRequest(BaseModel):
     provider_id: int = Field(..., ge=1, description="Provider ID to use as system fallback")
-    shallow_model: Optional[str] = Field(None, max_length=200, description="系统默认浅层模型")
-    deep_model: Optional[str] = Field(None, max_length=200, description="系统默认深度模型")
 
 
 class SystemDefaultProviderResponse(BaseModel):
@@ -800,93 +790,3 @@ class LLMConnectionTestResponse(BaseModel):
     success: bool
     message: str
     details: Optional[Dict[str, Any]] = None
-
-
-# ============================================================================
-# WS-133 重设计 · 订阅 / 按次 / 管理 / Turnstile Schemas
-# ============================================================================
-
-class SubscriptionPlanOut(BaseModel):
-    model_config = {"from_attributes": True}
-    id: int
-    name: str
-    credits: int
-    price: float
-    description: Optional[str] = None
-    is_active: bool
-    sort_order: int
-
-
-class CreditTransactionOut(BaseModel):
-    model_config = {"from_attributes": True}
-    id: int
-    type: str
-    amount: int
-    balance: int
-    status: str
-    description: Optional[str] = None
-    plan_name: Optional[str] = None
-    created_at: datetime
-
-
-class SubscriptionInfoOut(BaseModel):
-    balance: int
-    transactions: List[CreditTransactionOut]
-
-
-class SubscriptionPurchaseIn(BaseModel):
-    plan_id: int = Field(..., ge=1, description="要购买的套餐 ID")
-
-
-class AdminUserOut(BaseModel):
-    id: int
-    username: str
-    email: str
-    role: str
-    is_active: bool
-    created_at: datetime
-    balance: int  # 剩余分析次数
-
-
-class ReportPublicIn(BaseModel):
-    is_public: bool
-
-
-class UserRoleUpdateIn(BaseModel):
-    role: str = Field(..., pattern="^(user|admin)$")
-
-
-class AdminSubscriptionPlanIn(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
-    credits: int = Field(..., ge=1)
-    price: float = Field(..., ge=0)
-    description: Optional[str] = Field(None, max_length=500)
-    is_active: bool = True
-    sort_order: int = 0
-
-
-class AdminSubscriptionPlanOut(SubscriptionPlanOut):
-    created_at: datetime
-    updated_at: datetime
-
-
-class AdminSubscriptionPlanUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    credits: Optional[int] = Field(None, ge=1)
-    price: Optional[float] = Field(None, ge=0)
-    description: Optional[str] = Field(None, max_length=500)
-    is_active: Optional[bool] = None
-    sort_order: Optional[int] = None
-
-
-class AdminOrderOut(BaseModel):
-    id: int
-    user_id: int
-    username: str
-    type: str
-    amount: int
-    balance: int
-    status: str
-    description: Optional[str] = None
-    plan_name: Optional[str] = None
-    created_at: datetime

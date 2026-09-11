@@ -9,7 +9,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from web.backend.database import get_db
 from web.backend.schemas import (
-    UserCreate, UserLogin, AuthResponse, User as UserSchema, Token, CaptchaResponse,
+    UserCreate, UserLogin, AuthResponse, User as UserSchema, Token,
     EmailCodeSendRequest, EmailCodeSendResponse, EmailCodeLoginRequest, PasswordSetRequest
 )
 from web.backend.auth import (
@@ -29,12 +29,9 @@ from collections import defaultdict, deque
 from typing import Deque, Dict
 import time
 
-_CAPTCHA_REQUESTS: Dict[str, Deque[float]] = defaultdict(deque)  # 每IP的验证码请求时间戳
 _FAILED_ATTEMPTS: Dict[str, Deque[float]] = defaultdict(deque)   # 每IP的失败时间戳
 _EMAIL_CODE_REQUESTS: Dict[str, Deque[float]] = defaultdict(deque)  # 每邮箱的验证码请求时间戳
 
-CAPTCHA_RATE_LIMIT = 20          # 每分钟最多获取20次验证码/每IP
-CAPTCHA_RATE_WINDOW = 60         # 秒
 FAIL_WINDOW = 600                # 10分钟
 FAIL_LIMIT = 5                   # 10分钟内最多失败5次
 EMAIL_CODE_RATE_LIMIT = 1        # 每邮箱每60秒最多请求1次
@@ -44,16 +41,6 @@ def _prune(dq: Deque[float], window: int):
     now = time.time()
     while dq and now - dq[0] > window:
         dq.popleft()
-
-def _check_rate(ip: str) -> bool:
-    dq = _CAPTCHA_REQUESTS[ip]
-    _prune(dq, CAPTCHA_RATE_WINDOW)
-    return len(dq) < CAPTCHA_RATE_LIMIT
-
-def _note_captcha_request(ip: str):
-    dq = _CAPTCHA_REQUESTS[ip]
-    _prune(dq, CAPTCHA_RATE_WINDOW)
-    dq.append(time.time())
 
 def _note_fail(ip: str):
     dq = _FAILED_ATTEMPTS[ip]
@@ -75,45 +62,18 @@ def _note_email_code_request(email: str):
     _prune(dq, EMAIL_CODE_RATE_WINDOW)
     dq.append(time.time())
 
-
-async def _human_check_ok(captcha_id: str | None, captcha_answer: str | None, turnstile_token: str | None) -> bool:
-    """Combined human verification (WS-133).
-
-    Accepts a valid Cloudflare Turnstile token when Turnstile is enabled;
-    otherwise falls back to the legacy graphic captcha. When Turnstile is
-    disabled and no captcha is supplied, returns True (dev/test bypass).
+@router.get("/turnstile/sitekey")
+async def get_turnstile_sitekey():
     """
-    from web.backend.services.turnstile import verify_turnstile
-
-    if await verify_turnstile(turnstile_token):
-        return True
-    if captcha_id and captcha_answer:
-        try:
-            from web.backend.captcha import verify_captcha
-            return verify_captcha(captcha_id, captcha_answer)
-        except Exception:
-            return False
-    return False
-
-@router.post("/captcha/new", response_model=CaptchaResponse)
-async def new_captcha(request: Request):
+    Return the Cloudflare Turnstile site key (public, safe to expose).
+    Frontend uses it to render the human-verification widget.
+    Defaults to Cloudflare's always-pass test key for debugging.
     """
-    Create new captcha challenge and return seed and id (frontend draws image via Canvas using seed)
-    """
-    client_ip = request.client.host if request.client else "unknown"
-    if not _check_rate(client_ip):
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="验证码请求过于频繁，请稍后再试")
-    try:
-        from web.backend.captcha import create_captcha
-        cid, seed = create_captcha()
-        _note_captcha_request(client_ip)
-        return {"captcha_id": cid, "seed": seed}
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"生成验证码失败: {str(e)}")
+    from web.backend.turnstile import TURNSTILE_SITE_KEY
+    return {"sitekey": TURNSTILE_SITE_KEY}
 
 # Security scheme
 security = HTTPBearer()
-security_optional = HTTPBearer(auto_error=False)
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -145,43 +105,23 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
         )
     return current_user
 
-
-async def get_optional_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(security_optional),
-    db: AsyncSession = Depends(get_db),
-) -> User | None:
-    """Dependency for anonymous-or-authenticated access.
-
-    Returns the authenticated User when a valid token is supplied, otherwise
-    None (so guests can read public reports without a token/invalid token).
-    """
-    if credentials is None:
-        return None
-    try:
-        user = await get_current_user_from_token(credentials.credentials, db)
-        return user
-    except Exception:
-        return None
-
 @router.post("/register", response_model=AuthResponse)
 async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db), request: Request = None):
     """
     Register a new user (requires captcha and email verification code)
     """
     try:
-        # 验证服务端验证码（防止绕过前端）
-        from web.backend.captcha import verify_captcha
+        # 校验 Cloudflare Turnstile 人机验证 token
+        from web.backend.turnstile import verify_turnstile_token
         from web.backend.services.verification_code_service import get_verification_code_service
         
         client_ip = request.client.host if request and request.client else "unknown"
         if _too_many_fails(client_ip):
             raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="尝试次数过多，请稍后再试")
-
-        # 人机验证（WS-133）：优先 Turnstile，回退图形验证码；禁用时放行
-        if not await _human_check_ok(user_data.captcha_id, user_data.captcha_answer, user_data.turnstile_token):
+        if not await verify_turnstile_token(user_data.turnstile_token, client_ip):
             _note_fail(client_ip)
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="人机验证失败")
-
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="人机验证失败，请刷新后重试")
+        
         # Verify email code
         if not user_data.email_code:
             _note_fail(client_ip)
@@ -240,13 +180,14 @@ async def login(user_data: UserLogin, db: AsyncSession = Depends(get_db), reques
     """
     Login user and return access token (requires captcha)
     """
-    # 人机验证（WS-133）：优先 Turnstile，回退图形验证码；禁用时放行
+    # 校验 Cloudflare Turnstile 人机验证 token
+    from web.backend.turnstile import verify_turnstile_token
     client_ip = request.client.host if request and request.client else "unknown"
     if _too_many_fails(client_ip):
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="尝试次数过多，请稍后再试")
-    if not await _human_check_ok(user_data.captcha_id, user_data.captcha_answer, user_data.turnstile_token):
+    if not await verify_turnstile_token(user_data.turnstile_token, client_ip):
         _note_fail(client_ip)
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="人机验证失败")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="人机验证失败，请刷新后重试")
 
     # Authenticate user
     user = await authenticate_user(db, user_data.username, user_data.password)
@@ -354,9 +295,9 @@ async def send_email_code(
 ):
     """
     Send verification code to user's email
-    Requires CAPTCHA validation and rate limiting
+    Requires Cloudflare Turnstile validation and rate limiting
     """
-    from web.backend.captcha import verify_captcha
+    from web.backend.turnstile import verify_turnstile_token
     from web.backend.services.verification_code_service import get_verification_code_service
     from sqlalchemy import select
     
@@ -369,12 +310,12 @@ async def send_email_code(
             detail="尝试次数过多，请稍后再试"
         )
     
-    # Validate CAPTCHA
-    if not verify_captcha(request_data.captcha_id, request_data.captcha_answer):
+    # Validate Turnstile token
+    if not await verify_turnstile_token(request_data.turnstile_token, client_ip):
         _note_fail(client_ip)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="验证码无效或已过期"
+            detail="人机验证失败，请刷新后重试"
         )
     
     # Check email rate limiting
@@ -426,10 +367,10 @@ async def send_email_code_for_register(
 ):
     """
     Send verification code for registration
-    Requires CAPTCHA validation and rate limiting
+    Requires Cloudflare Turnstile validation and rate limiting
     Checks that email is NOT already registered
     """
-    from web.backend.captcha import verify_captcha
+    from web.backend.turnstile import verify_turnstile_token
     from web.backend.services.verification_code_service import VerificationCodeService
     from sqlalchemy import select
     
@@ -442,12 +383,12 @@ async def send_email_code_for_register(
             detail="尝试次数过多，请稍后再试"
         )
     
-    # Validate CAPTCHA
-    if not verify_captcha(request_data.captcha_id, request_data.captcha_answer):
+    # Validate Turnstile token
+    if not await verify_turnstile_token(request_data.turnstile_token, client_ip):
         _note_fail(client_ip)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="验证码无效或已过期"
+            detail="人机验证失败，请刷新后重试"
         )
     
     # Check email rate limiting
@@ -529,9 +470,9 @@ async def login_with_email_code(
 ):
     """
     Login user with email and verification code
-    Requires CAPTCHA validation
+    Requires Cloudflare Turnstile validation
     """
-    from web.backend.captcha import verify_captcha
+    from web.backend.turnstile import verify_turnstile_token
     from web.backend.services.verification_code_service import get_verification_code_service
     from sqlalchemy import select
     
@@ -544,12 +485,12 @@ async def login_with_email_code(
             detail="尝试次数过多，请稍后再试"
         )
     
-    # Validate CAPTCHA
-    if not verify_captcha(request_data.captcha_id, request_data.captcha_answer):
+    # Validate Turnstile token
+    if not await verify_turnstile_token(request_data.turnstile_token, client_ip):
         _note_fail(client_ip)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="验证码无效或已过期"
+            detail="人机验证失败，请刷新后重试"
         )
     
     # Verify email code
@@ -603,4 +544,4 @@ async def login_with_email_code(
     )
 
 # Export dependencies for use in other modules
-__all__ = ["get_current_user", "get_current_active_user", "get_optional_current_user", "require_intraday_access", "router"]
+__all__ = ["get_current_user", "get_current_active_user", "require_intraday_access", "router"]

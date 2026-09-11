@@ -217,7 +217,7 @@ docker-compose up --build -d
   - 数据库：16 张表（用户 / 配置 / LLM Provider / 分析记录与日志 / 会话消息 / 导出记录 /
     Agent 提示词模板 / 定时任务 / 订阅计划与积分流水等，见 `models.py`）
   - WebSocket：`/ws/{task_id}` 实时推送分析进度与日志
-  - 导出：PDF 使用内置 NotoSansSC 子集字体（`assets/fonts/`），无系统字体依赖
+  - 导出：PDF 由 `services/report_formatter.py` 直接构造（UTF-16BE hex 文本 + 标准 CID 字体 STSong-Light），不打包字体文件、不依赖系统字体
 - AI 核心（tradingagents/）
   - LangGraph 多智能体图：4 类分析师（市场 / 基本面 / 新闻 / 舆情）并行 → 多空研究员 →
     风控辩论（保守/中性/激进）→ 交易决策

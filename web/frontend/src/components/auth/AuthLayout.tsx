@@ -21,7 +21,7 @@ export function AuthLayout({
   toggleLinkText 
 }: AuthLayoutProps) {
   return (
-    <div className="min-h-screen bg-gradient-hero flex flex-col justify-center py-4 px-4 sm:py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="min-h-screen bg-dark-primary flex flex-col justify-center py-4 px-4 sm:py-12 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-64 h-64 sm:w-96 sm:h-96 bg-accent-primary/5 rounded-full blur-3xl animate-float" />

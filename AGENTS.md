@@ -53,7 +53,6 @@ TradingAgentsWeb/
 │   │   ├── routes/         # 路由模块（19 个 *_routes.py，见下表）
 │   │   ├── services/       # 业务逻辑（analysis_task、llm_config_resolver、report_formatter …）
 │   │   ├── migrations/     # 数据库迁移脚本
-│   │   ├── assets/fonts/   # PDF 导出内置字体（NotoSansSC 子集，reportlab 直接加载）
 │   │   └── tests/          # 后端 pytest 测试
 │   │
 │   └── frontend/           # Next.js 15 App Router 应用
@@ -215,9 +214,10 @@ make up       # docker-compose up -d
 
 ### 导出
 
-- PDF 由 `services/report_formatter.py` 生成，使用内置字体
-  `assets/fonts/NotoSansSC-subset.ttf`（静态实例化 + 子集化，reportlab `TTFont` 直接加载，
-  不依赖系统字体）。**不要**把可变字体（VF）放回该目录 —— reportlab 不支持。
+- PDF 由 `services/report_formatter.py` 直接构造 PDF 对象生成：文本以
+  `<FEFF...>`（UTF-16BE hex）写入内容流，中文使用标准 CID 字体 `STSong-Light`，
+  **不打包任何字体文件、不依赖 reportlab 与系统字体**（`assets/fonts/` 已移除）。
+  如需改为嵌入字体（离线/CID 支持不全的阅读器），需另做字体嵌入实现。
 
 ---
 
