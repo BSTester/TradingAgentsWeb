@@ -49,7 +49,8 @@ def create_fundamentals_analyst(llm):
 
         chain = prompt | llm.bind_tools(tools)
 
-        result = chain.invoke(state["messages"])
+        # 并行分支：使用独立的 fundamentals_messages 通道，避免与其他分析师共享 messages
+        result = chain.invoke(state["fundamentals_messages"])
 
         report = ""
 
@@ -57,7 +58,7 @@ def create_fundamentals_analyst(llm):
             report = result.content
 
         return {
-            "messages": [result],
+            "fundamentals_messages": [result],
             "fundamentals_report": report,
         }
 

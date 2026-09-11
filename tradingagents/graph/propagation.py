@@ -31,6 +31,12 @@ class Propagator:
         """
         state = {
             "messages": [("human", company_name)],
+            # 并行分析师分支的独立消息通道：每个分析师在自己的通道内
+            # 完成 LLM/工具循环，初始内容与共享 messages 相同
+            "market_messages": [("human", company_name)],
+            "social_messages": [("human", company_name)],
+            "news_messages": [("human", company_name)],
+            "fundamentals_messages": [("human", company_name)],
             "company_of_interest": company_name,
             "ticker": company_name,  # Initially same as company_name, will be updated by risk_manager
             "trade_date": str(trade_date),

@@ -72,6 +72,7 @@ from .baostock import (
 
 # Configuration and routing logic
 from .config import get_config
+from .ttl_cache import cache_get, cache_set
 
 # Tools organized by category
 TOOLS_CATEGORIES = {
@@ -295,11 +296,21 @@ def get_vendor(category: str, method: str = None) -> str:
     return config.get("data_vendors", {}).get(category, "default")
 
 def route_to_vendor(method: str, *args, **kwargs):
-    """Route method calls to appropriate vendor implementation with market-aware fallback support."""
+    """Route method calls to appropriate vendor implementation with market-aware fallback support.
+
+    结果会写入数据层 TTL 缓存（ttl_cache.py）：相同 (method, args) 在 TTL 内
+    直接命中缓存，避免重复的供应商 HTTP 请求。缓存可用
+    `DATA_CACHE_TTL_SECONDS=0` 全局禁用。
+    """
     category = get_category_for_method(method)
     
     if method not in VENDOR_METHODS:
         raise ValueError(f"Method '{method}' not supported")
+
+    # 缓存短路：命中则直接返回，完全跳过供应商调用
+    cached = cache_get(method, *args, **kwargs)
+    if cached is not None:
+        return cached
 
     # Try to extract symbol/ticker from arguments for market identification
     symbol = None
@@ -407,7 +418,11 @@ def route_to_vendor(method: str, *args, **kwargs):
 
     # Return single result if only one, otherwise concatenate as string
     if len(results) == 1:
-        return results[0]
+        final_result = results[0]
     else:
         # Convert all results to strings and concatenate
-        return '\n'.join(str(result) for result in results)
+        final_result = '\n'.join(str(result) for result in results)
+
+    # 成功结果写入 TTL 缓存（写失败静默，不影响返回）
+    cache_set(method, final_result, *args, **kwargs)
+    return final_result

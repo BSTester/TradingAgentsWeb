@@ -74,16 +74,35 @@ class TradingAgentsGraph:
             exist_ok=True,
         )
 
-        # Initialize LLMs
+        # Initialize LLMs.
+        # 每个 LLM 调用显式设置请求超时与重试上限（环境变量可覆盖），
+        # 避免挂死的模型 HTTP 请求长时间占用任务线程池 slot：
+        #   LLM_REQUEST_TIMEOUT  单次 LLM 请求超时（秒），默认 120
+        #   LLM_MAX_RETRIES      单次调用失败重试次数，默认 2
+        try:
+            llm_timeout = float(os.getenv("LLM_REQUEST_TIMEOUT", "120"))
+        except ValueError:
+            llm_timeout = 120.0
+        try:
+            llm_max_retries = int(os.getenv("LLM_MAX_RETRIES", "2"))
+        except ValueError:
+            llm_max_retries = 2
+
         if self.config["llm_provider"].lower() == "anthropic":
-            self.deep_thinking_llm = ChatAnthropic(model_name=self.config["deep_think_llm"], base_url=self.config["backend_url"], api_key=self.config.get("anthropic_api_key") or None)
-            self.quick_thinking_llm = ChatAnthropic(model_name=self.config["quick_think_llm"], base_url=self.config["backend_url"], api_key=self.config.get("anthropic_api_key") or None)
+            self.deep_thinking_llm = ChatAnthropic(model_name=self.config["deep_think_llm"], base_url=self.config["backend_url"], api_key=self.config.get("anthropic_api_key") or None, timeout=llm_timeout, max_retries=llm_max_retries)
+            self.quick_thinking_llm = ChatAnthropic(model_name=self.config["quick_think_llm"], base_url=self.config["backend_url"], api_key=self.config.get("anthropic_api_key") or None, timeout=llm_timeout, max_retries=llm_max_retries)
         elif self.config["llm_provider"].lower() == "google":
-            self.deep_thinking_llm = ChatGoogleGenerativeAI(model=self.config["deep_think_llm"], google_api_key=self.config.get("google_api_key") or None)
-            self.quick_thinking_llm = ChatGoogleGenerativeAI(model=self.config["quick_think_llm"], google_api_key=self.config.get("google_api_key") or None)
+            google_extra = {"max_retries": llm_max_retries}
+            try:
+                from google.genai import types as _genai_types
+                google_extra["http_options"] = _genai_types.HttpOptions(timeout=int(llm_timeout * 1000))
+            except Exception:
+                pass  # 无 google-genai 类型时退化为仅 max_retries
+            self.deep_thinking_llm = ChatGoogleGenerativeAI(model=self.config["deep_think_llm"], google_api_key=self.config.get("google_api_key") or None, **google_extra)
+            self.quick_thinking_llm = ChatGoogleGenerativeAI(model=self.config["quick_think_llm"], google_api_key=self.config.get("google_api_key") or None, **google_extra)
         else:
-            self.deep_thinking_llm = ChatOpenAI(model=self.config["deep_think_llm"], base_url=self.config["backend_url"], api_key=self.config.get("openai_api_key") or None)
-            self.quick_thinking_llm = ChatOpenAI(model=self.config["quick_think_llm"], base_url=self.config["backend_url"], api_key=self.config.get("openai_api_key") or None)
+            self.deep_thinking_llm = ChatOpenAI(model=self.config["deep_think_llm"], base_url=self.config["backend_url"], api_key=self.config.get("openai_api_key") or None, timeout=llm_timeout, max_retries=llm_max_retries)
+            self.quick_thinking_llm = ChatOpenAI(model=self.config["quick_think_llm"], base_url=self.config["backend_url"], api_key=self.config.get("openai_api_key") or None, timeout=llm_timeout, max_retries=llm_max_retries)
         
         # Initialize memories with unique names per analysis to avoid conflicts in multi-user scenarios
         # Use analysis_id from config if available, otherwise use timestamp-based unique ID
@@ -137,7 +156,12 @@ class TradingAgentsGraph:
                 os.environ[env_name] = value
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
-        """Create tool nodes for different data sources using abstract methods."""
+        """Create tool nodes for different data sources using abstract methods.
+
+        分析师并行化后，各分析师的工具循环运行在自己的消息通道
+        （market_messages / social_messages / ...）内，因此 ToolNode
+        必须用 messages_key 指向对应通道；trader 仍使用共享 messages。
+        """
         return {
             "market": ToolNode(
                 [
@@ -146,13 +170,15 @@ class TradingAgentsGraph:
                     get_realtime_quote,
                     # Technical indicators
                     get_indicators,
-                ]
+                ],
+                messages_key="market_messages",
             ),
             "social": ToolNode(
                 [
                     # News tools for social media analysis
                     get_news,
-                ]
+                ],
+                messages_key="social_messages",
             ),
             "news": ToolNode(
                 [
@@ -161,7 +187,8 @@ class TradingAgentsGraph:
                     get_global_news,
                     get_insider_sentiment,
                     get_insider_transactions,
-                ]
+                ],
+                messages_key="news_messages",
             ),
             "fundamentals": ToolNode(
                 [
@@ -170,7 +197,8 @@ class TradingAgentsGraph:
                     get_balance_sheet,
                     get_cashflow,
                     get_income_statement,
-                ]
+                ],
+                messages_key="fundamentals_messages",
             ),
             "trader": ToolNode(
                 [
@@ -197,10 +225,14 @@ class TradingAgentsGraph:
             # Debug mode with tracing
             trace = []
             for chunk in self.graph.stream(init_agent_state, **args):
-                if len(chunk["messages"]) == 0:
+                # 并行化后分析师分支写入各自的 *_messages 通道，
+                # 共享 messages 可能不在更新里，需安全取值
+                _update = next(iter(chunk.values()), None) if isinstance(chunk, dict) else None
+                _msgs = _update.get("messages", []) if isinstance(_update, dict) else []
+                if len(_msgs) == 0:
                     pass
                 else:
-                    chunk["messages"][-1].pretty_print()
+                    _msgs[-1].pretty_print()
                     trace.append(chunk)
 
             final_state = trace[-1]

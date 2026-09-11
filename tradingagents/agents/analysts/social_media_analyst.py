@@ -47,7 +47,8 @@ Grounding requirement: explicitly include a section named "数据快照" listing
 
         chain = prompt | llm.bind_tools(tools)
 
-        result = chain.invoke(state["messages"])
+        # 并行分支：使用独立的 social_messages 通道，避免与其他分析师共享 messages
+        result = chain.invoke(state["social_messages"])
 
         report = ""
 
@@ -55,7 +56,7 @@ Grounding requirement: explicitly include a section named "数据快照" listing
             report = result.content
 
         return {
-            "messages": [result],
+            "social_messages": [result],
             "sentiment_report": report,
             "grounded_evidence": evidence_snapshot(
                 ticker=ticker,

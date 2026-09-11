@@ -84,7 +84,8 @@ Write a very detailed and nuanced report of the trends you observe. Do not simpl
 
         chain = prompt | llm.bind_tools(tools)
 
-        result = chain.invoke(state["messages"])
+        # 并行分支：使用独立的 market_messages 通道，避免与其他分析师共享 messages
+        result = chain.invoke(state["market_messages"])
 
         report = ""
 
@@ -92,7 +93,7 @@ Write a very detailed and nuanced report of the trends you observe. Do not simpl
             report = result.content
        
         return {
-            "messages": [result],
+            "market_messages": [result],
             "market_report": report,
         }
 

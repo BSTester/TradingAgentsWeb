@@ -44,7 +44,8 @@ def create_news_analyst(llm):
         prompt = prompt.partial(ticker=ticker)
 
         chain = prompt | llm.bind_tools(tools)
-        result = chain.invoke(state["messages"])
+        # 并行分支：使用独立的 news_messages 通道，避免与其他分析师共享 messages
+        result = chain.invoke(state["news_messages"])
 
         report = ""
 
@@ -52,7 +53,7 @@ def create_news_analyst(llm):
             report = result.content
 
         return {
-            "messages": [result],
+            "news_messages": [result],
             "news_report": report,
         }
 

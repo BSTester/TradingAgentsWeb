@@ -5,6 +5,7 @@ from langchain_openai import ChatOpenAI
 from tradingagents.agents import *
 from langgraph.prebuilt import ToolNode
 from langgraph.graph import END, StateGraph, START, MessagesState
+from langgraph.graph.message import add_messages
 
 
 # Researcher team state
@@ -59,6 +60,14 @@ class AgentState(MessagesState):
     previous_decision_reflection: Annotated[Optional[dict], "Previous same-ticker decision context"]
 
     sender: Annotated[str, "Agent that sent this message"]
+
+    # Per-analyst branch message channels（并行分析师 fan-out 隔离用）：
+    # 每个分析师在自己的消息通道内完成 LLM/工具循环，避免并行分支共享
+    # 全局 messages 导致的互删与误判。
+    market_messages: Annotated[list, add_messages]
+    social_messages: Annotated[list, add_messages]
+    news_messages: Annotated[list, add_messages]
+    fundamentals_messages: Annotated[list, add_messages]
 
     # research step
     market_report: Annotated[str, "Report from the Market Analyst"]

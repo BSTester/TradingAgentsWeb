@@ -42,6 +42,11 @@ class GraphSetup:
     ):
         """Set up and compile the agent workflow graph.
 
+        分析师阶段为并行执行：所有选中的分析师从 START 同时 fan-out，
+        各自在独立的消息通道（*_messages）内完成 LLM/工具循环，
+        全部完成后 fan-in 汇入 Bull Researcher。研究员/交易/风险团队
+        保持原有串行辩论结构。
+
         Args:
             selected_analysts (list): List of analyst types to include. Options are:
                 - "market": Market analyst
@@ -61,28 +66,28 @@ class GraphSetup:
             analyst_nodes["market"] = create_market_analyst(
                 self.quick_thinking_llm
             )
-            delete_nodes["market"] = create_msg_delete()
+            delete_nodes["market"] = create_msg_delete("market_messages")
             tool_nodes["market"] = self.tool_nodes["market"]
 
         if "social" in selected_analysts:
             analyst_nodes["social"] = create_social_media_analyst(
                 self.quick_thinking_llm
             )
-            delete_nodes["social"] = create_msg_delete()
+            delete_nodes["social"] = create_msg_delete("social_messages")
             tool_nodes["social"] = self.tool_nodes["social"]
 
         if "news" in selected_analysts:
             analyst_nodes["news"] = create_news_analyst(
                 self.quick_thinking_llm
             )
-            delete_nodes["news"] = create_msg_delete()
+            delete_nodes["news"] = create_msg_delete("news_messages")
             tool_nodes["news"] = self.tool_nodes["news"]
 
         if "fundamentals" in selected_analysts:
             analyst_nodes["fundamentals"] = create_fundamentals_analyst(
                 self.quick_thinking_llm
             )
-            delete_nodes["fundamentals"] = create_msg_delete()
+            delete_nodes["fundamentals"] = create_msg_delete("fundamentals_messages")
             tool_nodes["fundamentals"] = self.tool_nodes["fundamentals"]
 
         # Create researcher and manager nodes
@@ -136,17 +141,17 @@ class GraphSetup:
         workflow.add_node("Risk Judge", risk_manager_node)
 
         # Define edges
-        # Start with the first analyst
-        first_analyst = selected_analysts[0]
-        workflow.add_edge(START, f"{first_analyst.capitalize()} Analyst")
+        # 并行 fan-out：所有选中的分析师从 START 同时启动，
+        # 每个分析师分支在自己的消息通道内独立完成工具循环
+        for analyst_type in selected_analysts:
+            workflow.add_edge(START, f"{analyst_type.capitalize()} Analyst")
 
-        # Connect analysts in sequence
-        for i, analyst_type in enumerate(selected_analysts):
+        for analyst_type in selected_analysts:
             current_analyst = f"{analyst_type.capitalize()} Analyst"
             current_tools = f"tools_{analyst_type}"
             current_clear = f"Msg Clear {analyst_type.capitalize()}"
 
-            # Add conditional edges for current analyst
+            # Add conditional edges for current analyst（分支内路由）
             workflow.add_conditional_edges(
                 current_analyst,
                 getattr(self.conditional_logic, f"should_continue_{analyst_type}"),
@@ -154,12 +159,8 @@ class GraphSetup:
             )
             workflow.add_edge(current_tools, current_analyst)
 
-            # Connect to next analyst or to Bull Researcher if this is the last analyst
-            if i < len(selected_analysts) - 1:
-                next_analyst = f"{selected_analysts[i+1].capitalize()} Analyst"
-                workflow.add_edge(current_clear, next_analyst)
-            else:
-                workflow.add_edge(current_clear, "Bull Researcher")
+            # 并行 fan-in：所有分析师分支完成后一起汇入 Bull Researcher
+            workflow.add_edge(current_clear, "Bull Researcher")
 
         # Add remaining edges
         workflow.add_conditional_edges(
