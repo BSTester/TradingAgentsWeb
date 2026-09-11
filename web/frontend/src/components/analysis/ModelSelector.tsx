@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { useUserLLMSettings } from '@/hooks/useUserLLMSettings';
+import { useLocalModelProviders } from '@/hooks/useLocalModelProviders';
 
 /**
  * Workflow Desk — model-only selector for the analysis launch surface.
@@ -11,12 +11,9 @@ import { useUserLLMSettings } from '@/hooks/useUserLLMSettings';
  *   Forbidden: provider name, base URL, API key state, local-storage status,
  *              system-default status, backend credential source.
  *
- * This component deliberately reads ONLY:
- *   - the user's personal LLM settings (display_name + shallow/deep model values), and
- *   - the non-sensitive `config.models[*][shallow|deep]` labels (display labels only).
- * It uses `config.system_default.provider_name` only as an internal lookup key
- * for models already exposed in `config.models`; it never renders the system
- * default's provider, endpoint, key state, or provenance.
+ * Data sources (all local to the browser):
+ *   - `@/lib/providers` COMMON_PROVIDERS catalogue (model values + labels), and
+ *   - keyVault presence via useLocalModelProviders (no key material rendered).
  *
  * Provider / backend_url / api_key are resolved silently by the parent when it
  * builds the launch payload; they are not surfaced in this UI.
@@ -45,7 +42,7 @@ export interface ModelSelectorProps {
 }
 
 export const NO_MODEL_MESSAGE =
-  '当前没有可用模型。请在“我的模型”添加个人模型，或联系管理员。';
+  '当前没有可用模型。请先在「设置」页保存本地 API Key（密钥只保存在本浏览器，不上传服务器）。';
 
 /** Look up a friendly display label for a model value, falling back to the raw value. */
 function labelFor(config: any, provider: string, type: 'shallow' | 'deep', value: string): string {
@@ -56,9 +53,9 @@ function labelFor(config: any, provider: string, type: 'shallow' | 'deep', value
 }
 
 export function ModelSelector({ config, value, onChange, disabled, id = 'analysis_model' }: ModelSelectorProps) {
-  // Personal models only — the privacy-clean source. The hook response contains
-  // no api_key (keys live browser-local and are managed in 我的模型).
-  const { data: llmSettings } = useUserLLMSettings();
+  // 本地模型：provider 目录来自 @/lib/providers，密钥来自浏览器 keyVault
+  // （hook 只输出模型名与展示名，不含 api_key / base_url 等敏感信息）。
+  const { data: llmSettings } = useLocalModelProviders();
 
   const options = useMemo<ModelOption[]>(() => {
     const list: ModelOption[] = [];
@@ -85,30 +82,8 @@ export function ModelSelector({ config, value, onChange, disabled, id = 'analysi
       push({ provider, shallow, deep, label });
     }
 
-    // A system model is a valid analysis fallback even when the user has no
-    // personal provider. The only trusted presentation source is the model
-    // catalogue; system_default is used strictly to locate its provider key.
-    const systemProvider = config?.system_default?.provider_name;
-    const systemModels = config?.models?.[String(systemProvider || '').toLowerCase()];
-    if (systemProvider && systemModels) {
-      const shallowModels = Array.isArray(systemModels.shallow) ? systemModels.shallow : [];
-      const deepModels = Array.isArray(systemModels.deep) ? systemModels.deep : [];
-      const count = Math.max(shallowModels.length, deepModels.length);
-
-      for (let index = 0; index < count; index += 1) {
-        const shallow = shallowModels[index]?.value || deepModels[index]?.value || '';
-        const deep = deepModels[index]?.value || shallow;
-        const shallowLabel = shallowModels[index]?.label || shallow;
-        const deepLabel = deepModels[index]?.label || deep;
-        const label =
-          shallowLabel && deepLabel && shallowLabel !== deepLabel
-            ? `${shallowLabel} / ${deepLabel}`
-            : deepLabel || shallowLabel;
-        push({ provider: systemProvider, shallow, deep, label });
-      }
-    }
     return list;
-  }, [llmSettings, config]);
+  }, [llmSettings]);
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const label = e.target.value;

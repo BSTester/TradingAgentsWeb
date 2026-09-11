@@ -119,7 +119,8 @@ export interface ModelOption {
 export interface ConfigResponse {
   analysts: AnalystOption[]
   research_depths: ResearchDepthOption[]
-  llm_providers: LLMProviderOption[]
+  /** 已下线：后端不再返回 provider 目录（前端使用本地 COMMON_PROVIDERS） */
+  llm_providers?: LLMProviderOption[]
   models: {
     [provider: string]: {
       shallow: ModelOption[]
@@ -174,65 +175,6 @@ export interface ToastMessage {
   title: string
   message: string
   duration?: number
-}
-
-// Scheduled Task Types
-export interface ScheduledTaskCreate {
-  task_name: string
-  ticker: string
-  analysts: string[]
-  research_depth: number
-  llm_provider: string
-  backend_url: string
-  shallow_thinker: string
-  deep_thinker: string
-  is_public: boolean
-  execution_cycle: 'daily' | 'weekly' | 'every_n_days' | 'workdays'
-  execution_time: string
-  interval_days?: number
-  day_of_week?: string
-  end_date?: string
-}
-
-export interface ScheduledTask {
-  id: number
-  user_id: number
-  task_name: string
-  ticker: string
-  market?: string
-  analysts: string[]
-  research_depth: number
-  llm_provider: string
-  shallow_thinker: string
-  deep_thinker: string
-  backend_url: string
-  is_public: boolean
-  execution_cycle: string
-  execution_time: string
-  interval_days?: number
-  day_of_week?: string
-  end_date?: string
-  is_enabled: boolean
-  status: 'pending' | 'completed'
-  next_run_time?: string
-  last_run_time?: string
-  total_executions: number
-  created_at: string
-  updated_at?: string
-}
-
-export interface ScheduledTaskUpdate {
-  is_enabled?: boolean
-  task_name?: string
-}
-
-export interface ScheduledTaskListResponse {
-  items: ScheduledTask[]
-  total: number
-  page: number
-  limit: number
-  has_next: boolean
-  has_prev: boolean
 }
 
 // API Types

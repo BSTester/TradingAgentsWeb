@@ -2,19 +2,9 @@
 
 import React from 'react';
 import { useAuth } from '@/lib/auth';
-import { useQuery } from '@tanstack/react-query';
-import { subscriptionAPI } from '@/lib/api';
-import type { SubscriptionInfo } from '@/lib/types';
 
 export default function MeSettingsPage() {
   const { user } = useAuth();
-  const { data } = useQuery({
-    queryKey: ['subscription-me'],
-    queryFn: () => subscriptionAPI.me(),
-    enabled: !!user,
-  });
-  const me = data?.data as SubscriptionInfo | undefined;
-
   return (
     <div>
       <div className="mb-6">
@@ -28,7 +18,6 @@ export default function MeSettingsPage() {
           <Row label="邮箱" value={user?.email ?? '—'} />
           <Row label="角色" value={user?.role === 'admin' ? '管理员' : '普通用户'} />
           <Row label="注册时间" value={user?.created_at ? new Date(user.created_at).toLocaleDateString() : '—'} />
-          <Row label="剩余分析次数" value={`${me?.balance ?? 0} 次`} />
         </Section>
       </div>
     </div>

@@ -1,26 +1,16 @@
 /**
- * 订阅 / 后台管理 / 报告 API（工作区线，合并上游主干后保留）。
+ * 报告与公开报告治理 API（工作区线）。
  *
  * 背景：上游把前端 HTTP 层重构为 `@/lib/http-client`（HttpClient 类）+
  * `@/lib/apiClient`（axios 实例与域 API）+ `@/lib/api/*` 模块。本模块承接
- * 工作区线页面（`/subscribe`、`/me/subscription`、`/admin/orders`、
- * `/admin/subscription-products`、`/admin/public-reports`、`/public`、
- * `/reports/[id]`）所依赖的四个 API 对象，统一构建在上游的 axios 实例之上，
- * 以保证两条线的页面都能工作、HTTP 层只有一份实现。
+ * 工作区线页面所需的报告接口（`/public`、`/reports/[id]`）与管理员公开报告
+ * 治理接口（`/admin/public-reports`），统一构建在上游 axios 实例之上。
  *
- * 端点与返回结构沿用工作区线实现（后端路由已合并保留），逐字未改。
+ * 注意：订阅/积分/订单与后台 LLM 配置已随相关功能下线移除；
+ * LLM 配置只来自前端本地（keyVault + 自定义 Base URL/模型），随分析请求提交。
  */
 
-import type {
-  AdminOrder,
-  AdminPublicReportItem,
-  AdminSubscriptionPlan,
-  AdminUser,
-  ReportDetail,
-  ReportPreview,
-  SubscriptionInfo,
-  SubscriptionPlan,
-} from '@/lib/types';
+import type { AdminPublicReportItem, ReportDetail, ReportPreview } from '@/lib/types';
 import { apiClient, publicApiClient } from '@/lib/apiClient';
 
 function errMessage(error: unknown, fallback: string): string {
@@ -111,159 +101,8 @@ export const reportsAPI = {
   },
 };
 
-// 用临时 API Key 获取某提供商的可用模型列表（自定义模型设置页用，Key 不持久化）
-export const llmAPI = {
-  fetchModelsTransient: async (data: {
-    base_url: string;
-    api_key: string;
-    provider_type?: string;
-  }) => {
-    try {
-      const res = await apiClient.post<{ models: string[]; count: number }>(
-        '/api/llm/fetch-models',
-        data,
-      );
-      return res.data;
-    } catch (error: unknown) {
-      throw new Error(errMessage(error, '获取模型列表失败'));
-    }
-  },
-};
-
-// 订阅 / 按次
-export const subscriptionAPI = {
-  plans: async () => {
-    try {
-      const res = await apiClient.get<{ data: SubscriptionPlan[] }>('/api/subscription/plans');
-      return res.data;
-    } catch (error: unknown) {
-      throw new Error(errMessage(error, '获取订阅套餐失败'));
-    }
-  },
-
-  me: async () => {
-    try {
-      const res = await apiClient.get<{ data: SubscriptionInfo }>('/api/subscription/me');
-      return res.data;
-    } catch (error: unknown) {
-      throw new Error(errMessage(error, '获取订阅信息失败'));
-    }
-  },
-
-  purchase: async (planId: number) => {
-    try {
-      const res = await apiClient.post<{ data: SubscriptionInfo }>(
-        '/api/subscription/purchase',
-        { plan_id: planId },
-      );
-      return res.data;
-    } catch (error: unknown) {
-      throw new Error(errMessage(error, '购买失败'));
-    }
-  },
-};
-
-// 管理控制台（用户 / 订阅商品 / 公开报告 / 供应商模型 / 订单）
+// 管理控制台 —— 仅保留公开报告治理（订阅商品/订单/LLM 配置已下线）
 export const adminAPI = {
-  users: async (params?: { page?: number; limit?: number; search?: string }) => {
-    try {
-      const q: Record<string, unknown> = {};
-      if (params?.page) q.page = params.page;
-      if (params?.limit) q.limit = params.limit;
-      if (params?.search) q.search = params.search;
-      const res = await apiClient.get<{ data: AdminUser[]; meta: ListMeta }>('/api/admin/users', {
-        params: q,
-      });
-      return res.data;
-    } catch (error: unknown) {
-      throw new Error(errMessage(error, '获取用户列表失败'));
-    }
-  },
-
-  setUserActive: async (userId: number, isActive: boolean) => {
-    try {
-      const res = await apiClient.post<{ data: AdminUser }>(`/api/admin/users/${userId}/active`, {
-        is_active: isActive,
-      });
-      return res.data;
-    } catch (error: unknown) {
-      throw new Error(errMessage(error, '更新用户状态失败'));
-    }
-  },
-
-  setUserRole: async (userId: number, role: 'user' | 'admin') => {
-    try {
-      const res = await apiClient.post<{ data: AdminUser }>(`/api/admin/users/${userId}/role`, {
-        role,
-      });
-      return res.data;
-    } catch (error: unknown) {
-      throw new Error(errMessage(error, '更新用户角色失败'));
-    }
-  },
-
-  subscriptionProducts: async () => {
-    try {
-      const res = await apiClient.get<{ data: AdminSubscriptionPlan[] }>(
-        '/api/admin/subscription-products',
-      );
-      return res.data;
-    } catch (error: unknown) {
-      throw new Error(errMessage(error, '获取订阅商品失败'));
-    }
-  },
-
-  createSubscriptionProduct: async (data: {
-    name: string;
-    credits: number;
-    price: number;
-    description?: string;
-    is_active?: boolean;
-  }) => {
-    try {
-      const res = await apiClient.post<{ data: AdminSubscriptionPlan }>(
-        '/api/admin/subscription-products',
-        data,
-      );
-      return res.data;
-    } catch (error: unknown) {
-      throw new Error(errMessage(error, '创建订阅商品失败'));
-    }
-  },
-
-  updateSubscriptionProduct: async (
-    planId: number,
-    data: {
-      name?: string;
-      credits?: number;
-      price?: number;
-      description?: string;
-      is_active?: boolean;
-    },
-  ) => {
-    try {
-      const res = await apiClient.patch<{ data: AdminSubscriptionPlan }>(
-        `/api/admin/subscription-products/${planId}`,
-        data,
-      );
-      return res.data;
-    } catch (error: unknown) {
-      throw new Error(errMessage(error, '更新订阅商品失败'));
-    }
-  },
-
-  deleteSubscriptionProduct: async (planId: number) => {
-    try {
-      const res = await apiClient.delete<{ data: { id: number; deleted: boolean } }>(
-        `/api/admin/subscription-products/${planId}`,
-      );
-      return res.data;
-    } catch (error: unknown) {
-      throw new Error(errMessage(error, '删除订阅商品失败'));
-    }
-  },
-
-  // 公开报告管理（治理 / 可见性）
   publicReports: async (params?: { page?: number; limit?: number; market?: string }) => {
     try {
       const q: Record<string, unknown> = {};
@@ -288,38 +127,6 @@ export const adminAPI = {
       return res.data;
     } catch (error: unknown) {
       throw new Error(errMessage(error, '更新报告公开状态失败'));
-    }
-  },
-
-  // 获取某个供应商的可用模型列表（调用其 /v1/models）
-  fetchProviderModels: async (providerId: number) => {
-    try {
-      const res = await apiClient.post<{
-        provider_id: number;
-        provider_name: string;
-        base_url: string;
-        count: number;
-        models: string[];
-      }>(`/api/admin/llm/providers/${providerId}/fetch-models`);
-      return res.data;
-    } catch (error: unknown) {
-      throw new Error(errMessage(error, '获取供应商模型失败'));
-    }
-  },
-
-  // 订单列表（所有用户的次数流水）
-  orders: async (params?: { page?: number; limit?: number; type?: string }) => {
-    try {
-      const q: Record<string, unknown> = {};
-      if (params?.page) q.page = params.page;
-      if (params?.limit) q.limit = params.limit;
-      if (params?.type) q.type = params.type;
-      const res = await apiClient.get<{ data: AdminOrder[]; meta: ListMeta }>('/api/admin/orders', {
-        params: q,
-      });
-      return res.data;
-    } catch (error: unknown) {
-      throw new Error(errMessage(error, '获取订单列表失败'));
     }
   },
 };

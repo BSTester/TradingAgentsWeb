@@ -39,23 +39,22 @@ const adminUser = {
 const normalUser = { ...adminUser, id: 2, username: 'bob', role: 'user' };
 
 describe('AppNavbar 管理员菜单', () => {
-  it('管理员下拉菜单包含“系统默认 Provider”入口', async () => {
+  it('管理员下拉菜单包含“用户管理”入口', async () => {
     const user = userEvent.setup();
     render(<AppNavbar user={adminUser} onLogout={vi.fn()} />);
 
     // 打开用户下拉菜单
     await user.click(screen.getByRole('button', { name: /admin/i }));
-    expect(await screen.findByText('系统默认 Provider')).toBeInTheDocument();
+    expect(await screen.findByText('用户')).toBeInTheDocument();
   });
 
-  it('普通用户下拉菜单不包含“系统默认 Provider”入口', async () => {
+  it('普通用户下拉菜单不包含任何管理员入口', async () => {
     const user = userEvent.setup();
     render(<AppNavbar user={normalUser} onLogout={vi.fn()} />);
 
     await user.click(screen.getByRole('button', { name: /bob/i }));
     // 普通用户仅见个人中心 / 退出登录，不应见任何管理员入口
     expect(await screen.findByText('个人中心')).toBeInTheDocument();
-    expect(screen.queryByText('LLM管理')).not.toBeInTheDocument();
-    expect(screen.queryByText('系统默认 Provider')).not.toBeInTheDocument();
+    expect(screen.queryByText('用户')).not.toBeInTheDocument();
   });
 });

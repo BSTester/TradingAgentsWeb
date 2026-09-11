@@ -8,7 +8,6 @@ import { useAuth } from '@/lib/auth';
 const NAV = [
   { href: '/', label: '研究' },
   { href: '/leaderboard', label: '公开榜单' },
-  { href: '/subscription', label: '订阅' },
 ];
 
 export function SiteHeader() {

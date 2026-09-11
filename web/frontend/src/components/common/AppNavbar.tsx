@@ -28,18 +28,14 @@ interface NavItem {
 const RESEARCH_NAV: NavItem[] = [
   { label: '发起分析', path: '/', icon: 'fas fa-circle-plus' },
   { label: '分析历史', path: '/history', icon: 'fas fa-clock-rotate-left' },
-  { label: '定期任务', path: '/scheduled-tasks', icon: 'fas fa-calendar-day' },
 ];
 
 const ACCOUNT_NAV: NavItem[] = [
   { label: '个人中心', path: '/profile', icon: 'fas fa-user' },
-  { label: '我的模型', path: '/profile/ai-settings', icon: 'fas fa-sliders' },
 ];
 
 const ADMIN_NAV: NavItem[] = [
   { label: '用户', path: '/admin/users', icon: 'fas fa-users' },
-  { label: '系统模型', path: '/admin/llm-config', icon: 'fas fa-brain' },
-  { label: '系统默认 Provider', path: '/admin/system-default-provider', icon: 'fas fa-star' },
 ];
 
 const ROUTE_LABEL: Record<string, string> = {
@@ -48,12 +44,8 @@ const ROUTE_LABEL: Record<string, string> = {
   '/history/detail': '分析报告',
   '/history/progress': '实时工作流',
   '/analysis': '分析报告',
-  '/scheduled-tasks': '定期任务',
   '/profile': '个人中心',
-  '/profile/ai-settings': '我的模型',
   '/admin/users': '用户',
-  '/admin/llm-config': '系统模型',
-  '/admin/system-default-provider': '系统默认 Provider',
 };
 
 function BrandMark() {

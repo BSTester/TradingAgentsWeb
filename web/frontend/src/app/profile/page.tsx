@@ -6,7 +6,6 @@ import { useAuth } from '@/lib/auth';
 import { AppNavbar } from '@/components/common/AppNavbar';
 import { useToast, Toast } from '@/components/ui/Toast';
 import { Footer } from '@/components/common/Footer';
-import { AISettingsCard } from '@/components/profile/AISettingsCard';
 import { PageLoading } from '@/components/ui/PageLoading';
 
 export default function ProfilePage() {
@@ -137,8 +136,23 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* AI Settings Card */}
-          <AISettingsCard />
+          {/* 本地模型配置（前端本地：keyVault 密钥 + 自定义 Base URL/模型） */}
+          <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">
+            <h2 className="text-responsive-h3 text-text-primary mb-2">
+              <i className="fas fa-microchip mr-2" />
+              自定义模型
+            </h2>
+            <p className="text-sm text-text-secondary mb-4">
+              模型与 API Key 均保存在本浏览器（不上传服务器）：在设置页填写接口类型、Base URL 与密钥后即可发起分析。
+            </p>
+            <a
+              href="/settings"
+              className="inline-flex items-center rounded-lg bg-accent-primary px-4 py-2 text-sm font-medium text-white hover:bg-accent-secondary"
+            >
+              <i className="fas fa-sliders mr-2" />
+              前往设置
+            </a>
+          </div>
 
           {/* Password Settings Card */}
           <div className="bg-dark-secondary rounded-lg shadow-lg border border-dark-border p-6">

@@ -6,17 +6,17 @@ import userEvent from '@testing-library/user-event';
 import { ModelSelector, NO_MODEL_MESSAGE } from '@/components/analysis/ModelSelector';
 import { renderWithQuery } from '@/test/renderWithQuery';
 
-vi.mock('@/hooks/useUserLLMSettings', () => ({
-  useUserLLMSettings: vi.fn(),
+vi.mock('@/hooks/useLocalModelProviders', () => ({
+  useLocalModelProviders: vi.fn(),
 }));
 
-import { useUserLLMSettings } from '@/hooks/useUserLLMSettings';
+import { useLocalModelProviders } from '@/hooks/useLocalModelProviders';
 
 const mockSettings = (data: any) => {
-  vi.mocked(useUserLLMSettings).mockReturnValue({ data, isLoading: false } as any);
+  vi.mocked(useLocalModelProviders).mockReturnValue({ data, isLoading: false } as any);
 };
 
-// Personal providers as returned by the (key-less) settings endpoint.
+// 本地 provider 列表（由 useLocalModelProviders 提供，仅含模型名与展示名）。
 const personalProviders = [
   {
     id: '1',
@@ -48,24 +48,6 @@ const sensitiveConfig = {
   llm_providers: [{ value: 'openai', label: 'OpenAI', url: 'https://api.openai.com' }],
 };
 
-const systemDefaultOnlyConfig = {
-  models: {
-    oneinfinity: {
-      shallow: [{ value: 'gpt-5-mini', label: 'GPT-5 Mini' }],
-      deep: [{ value: 'gpt-5.5', label: 'GPT-5.5' }],
-    },
-  },
-  // Deliberately includes values that must remain absent from the DOM.
-  system_default: {
-    provider_name: 'oneinfinity',
-    display_name: 'OneInfinity',
-    shallow_model: 'gpt-5-mini',
-    deep_model: 'gpt-5.5',
-    base_url: 'https://internal.example/v1',
-    api_key_masked: 'sk-...system',
-    has_api_key: true,
-  },
-};
 
 describe('ModelSelector — model-only privacy boundary', () => {
   beforeEach(() => {
@@ -115,71 +97,15 @@ describe('ModelSelector — model-only privacy boundary', () => {
     );
   });
 
-  it('offers the system-default model when no personal provider is configured without exposing its source', async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    mockSettings({ providers: [] });
-    const { container } = renderWithQuery(
-      <ModelSelector config={systemDefaultOnlyConfig} onChange={onChange} />,
-    );
-
-    expect(screen.getByText('GPT-5 Mini / GPT-5.5')).toBeInTheDocument();
-    expect(container.textContent).not.toMatch(/OneInfinity|oneinfinity|internal\.example|sk-\.\.\.system|系统默认/);
-
-    await user.selectOptions(screen.getByRole('combobox'), 'GPT-5 Mini / GPT-5.5');
-
-    expect(onChange).toHaveBeenCalledWith({
-      provider: 'oneinfinity',
-      shallow: 'gpt-5-mini',
-      deep: 'gpt-5.5',
-      label: 'GPT-5 Mini / GPT-5.5',
-    });
-  });
 
   it('shows the actionable recovery message when no usable model exists', () => {
     mockSettings({ providers: [] });
     renderWithQuery(<ModelSelector config={{ models: {} }} onChange={vi.fn()} />);
 
     expect(screen.getByText(NO_MODEL_MESSAGE)).toBeInTheDocument();
-    // Recovery message must not leak whether a system/default provider exists.
+    // 恢复文案只提示去「设置」页配置本地密钥，不泄露任何后端配置信息。
     expect(screen.queryByText(/系统默认/)).toBeNull();
     expect(screen.queryByRole('combobox')).toBeNull();
   });
 
-  it('makes an administrator-provided system model selectable without exposing its provenance', async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    mockSettings({ providers: [] });
-
-    renderWithQuery(
-      <ModelSelector
-        config={{
-          models: {
-            system: {
-              shallow: [{ value: 'system-fast', label: 'System Fast' }],
-              deep: [{ value: 'system-reasoning', label: 'System Reasoning' }],
-            },
-          },
-          system_default: {
-            provider_name: 'system',
-            display_name: 'Private administrator provider',
-            base_url: 'https://private.example.test',
-            api_key_masked: 'sk-system-secret',
-          },
-        }}
-        onChange={onChange}
-      />,
-    );
-
-    expect(screen.getByRole('option', { name: 'System Fast / System Reasoning' })).toBeInTheDocument();
-    expect(screen.queryByText(/系统默认|administrator provider|private\.example|sk-system-secret/i)).toBeNull();
-
-    await user.selectOptions(screen.getByRole('combobox'), 'System Fast / System Reasoning');
-    expect(onChange).toHaveBeenCalledWith({
-      provider: 'system',
-      shallow: 'system-fast',
-      deep: 'system-reasoning',
-      label: 'System Fast / System Reasoning',
-    });
-  });
 });

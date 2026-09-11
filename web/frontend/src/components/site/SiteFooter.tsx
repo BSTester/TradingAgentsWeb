@@ -18,7 +18,6 @@ export function SiteFooter() {
           <nav className="flex flex-wrap gap-4">
             <Link href="/" className="hover:text-text-secondary">研究</Link>
             <Link href="/leaderboard" className="hover:text-text-secondary">公开榜单</Link>
-            <Link href="/subscription" className="hover:text-text-secondary">订阅</Link>
             {/* 未登录时设置入口在顶部导航（登录按钮左侧的齿轮图标）；
                 登录后顶部不再显示，只保留这里 —— 任何状态全站只有一个入口 */}
             {user && <Link href="/settings" className="hover:text-text-secondary">自定义模型</Link>}

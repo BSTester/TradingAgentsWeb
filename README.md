@@ -71,7 +71,9 @@ TradingAgentsWeb 是原版 TradingAgents 的 Web 化改造与扩展：
   - 用户注册/登录、JWT 认证、分析记录/日志与导出记录持久化到 SQLite（默认，WAL 模式 + 连接池；也可通过 `DATABASE_URL` 切换 MySQL 等）
   - 首个注册用户自动成为管理员
 - 平台运营能力：
-  - 订阅计划与积分（credits）体系、定时任务（scheduled tasks）、管理后台（用户管理 / LLM Provider 管理 / 系统默认 Provider）、提示词与模板（prompts / skills）
+  - 管理后台（用户管理 / 公开报告治理）、提示词与模板（prompts / skills）
+  - LLM 配置完全前端本地化：浏览器 keyVault 保存密钥、localStorage 保存自定义 Base URL/模型，
+    发起分析时随请求提交（后端不保存任何全局/用户级 LLM 配置）
 - 部署与工程化：
   - Dockerfile 与 docker-compose.yml 提供一键构建与编排（前端 Nginx 静态托管并反代后端 `/api`）
   - 环境变量驱动配置：`CORS_ORIGINS` 显式声明跨域来源，`LLM_*` / `TASK_*` / `DATA_CACHE_TTL_SECONDS` 等均有合理默认值
@@ -199,23 +201,21 @@ docker-compose up --build -d
 - 前端（web/frontend，Next.js 15 App Router + React 19 + Tailwind）
   - 页面：分析配置 `/analysis`、实时进度 `/history/progress`、结果 `/history/detail`、
     历史 `/history`、研究报告 `/reports/[id]`、研究排行 `/research`、
-    定时任务 `/scheduled-tasks`、订阅 `/subscribe`、个人中心 `/me`（设置 / 订阅）、
-    个人设置 `/profile`（AI 设置 / 公开主页）、管理后台 `/admin`（用户 / LLM Provider /
-    系统默认 Provider）、登录注册
+    个人中心 `/me`（偏好 / 个人信息）、个人主页 `/profile`、
+    设置 `/settings`（自定义模型与本地密钥）、管理后台 `/admin`（用户 / 公开报告）、登录注册
   - 能力：WebSocket 实时进度与日志、Markdown 渲染、结果导出（PDF / Markdown / JSON / 图片）
   - 门禁：`npm run lint | typecheck | test:run | build`
 - 后端（web/backend，FastAPI）
-  - 应用入口：`app.py`（lifespan 自动建表、env 驱动 CORS、日志中间件、19 个路由模块）
+  - 应用入口：`app.py`（lifespan 自动建表、env 驱动 CORS、日志中间件、15 个路由模块）
   - 路由模块（`routes/`）：auth、analysis、conversation、config、task、export、report、
-    home、user_management、scheduled_task、skills、user_llm_settings、user_config、prompt、
-    websocket、llm_config、subscription、admin、page
+    home、user_management、skills、user_config、prompt、websocket、admin、page
   - 任务调度：`TaskManager`（线程池 max_workers=50、用户级排队）+ `HeartbeatMonitor`
     （默认 600s 心跳超时）+ 总时长熔断（`TASK_MAX_RUNTIME_SECONDS`）
   - token 计量：`TokenUsageCollector`（注入图 `config["callbacks"]`）累计全部 LLM 调用的
     输入/输出 token，任务结束后写入一条 `AnalysisLog`（`agent='usage'`，`step='Token用量'`）
   - 认证：JWT（access + refresh），首个注册用户自动成为管理员
-  - 数据库：16 张表（用户 / 配置 / LLM Provider / 分析记录与日志 / 会话消息 / 导出记录 /
-    Agent 提示词模板 / 定时任务 / 订阅计划与积分流水等，见 `models.py`）
+  - 数据库：10 张表（用户 / 用户配置 / 分析记录与日志 / 会话消息 / 导出记录 /
+    Agent 提示词模板与工具，见 `models.py`）
   - WebSocket：`/ws/{task_id}` 实时推送分析进度与日志
   - 导出：PDF 由 `services/report_formatter.py` 直接构造（UTF-16BE hex 文本 + 标准 CID 字体 STSong-Light），不打包字体文件、不依赖系统字体
 - AI 核心（tradingagents/）
@@ -235,11 +235,9 @@ docker-compose up --build -d
     可选项配置、导出 PDF/Markdown/JSON
   - `/api/reports`：研究报告查看
   - `/api/conversations`：分析会话消息
-  - `/api/scheduled-tasks`：定时任务 CRUD
-  - `/api/subscription`：订阅计划与积分
-  - `/api/admin`、`/api/admin/llm`：用户管理、LLM Provider 与系统默认 Provider
+  - `/api/admin`：用户管理、公开报告治理
   - `/api/prompts`、`/api/skills`：Agent 提示词模板与技能
-  - `/api/user`、`/api/user/llm-settings`、`/api/home`：个人配置、用户级 LLM 设置、首页聚合
+  - `/api/user`、`/api/home`：个人配置（非敏感偏好）、首页聚合
   - `/ws/{task_id}`：WebSocket 实时进度/日志
 - 页面（与前端路由一一对应，见 4.2）
   - 配置页：选择标的、日期、分析师团队、研究深度、LLM 与模型

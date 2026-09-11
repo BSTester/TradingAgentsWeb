@@ -1,17 +1,6 @@
 import axios from 'axios';
 
 import { API_BASE_URL } from '@/utils/api';
-import type {
-  AdminLLMProvider,
-  AppConfigWithSystemDefault,
-  CreateUserLLMProviderRequest,
-  SystemDefaultProviderSummary,
-  TestUserLLMProviderRequest,
-  TestUserLLMProviderResponse,
-  UpdateUserLLMProviderRequest,
-  UserLLMProviderSetting,
-  UserLLMSettingsResponse,
-} from '@/lib/types';
 
 
 
@@ -241,54 +230,7 @@ export const configAPI = {
     }
   },
 
-  validateAPIKey: async (provider: string, apiKey: string) => {
-    try {
-      const response = await apiClient.post('/api/validate-key', {
-        provider,
-        api_key: apiKey,
-      });
-      return response.data;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          'API密钥验证失败';
-      throw new Error(errorMessage);
-    }
-  },
 
-  // 仅取 system_default 脱敏摘要（E6 扩展字段），普通用户也可读
-  getSystemDefault: async (): Promise<SystemDefaultProviderSummary | null> => {
-    try {
-      const response = await apiClient.get('/api/config');
-      const data = response.data as AppConfigWithSystemDefault;
-      return data?.system_default ?? null;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail ||
-                          error.response?.data?.message ||
-                          error.message ||
-                          '获取系统默认 provider 失败';
-      throw new Error(errorMessage);
-    }
-  },
-};
-
-// 管理员 LLM 供应商目录（Provider/Model CRUD 源），供系统默认页选择
-export const adminLLMAPI = {
-  listProviders: async (includeInactive = true): Promise<AdminLLMProvider[]> => {
-    try {
-      const response = await apiClient.get(
-        `/api/admin/llm/providers?include_inactive=${includeInactive}`,
-      );
-      return response.data as AdminLLMProvider[];
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail ||
-                          error.response?.data?.message ||
-                          error.message ||
-                          '获取供应商列表失败';
-      throw new Error(errorMessage);
-    }
-  },
 };
 
 // 管理员设置系统默认 provider（E7，后端 KEY，脱敏摘要返回）
@@ -297,32 +239,6 @@ export const adminLLMAPI = {
 // provider_id 与可选的 shallow_model / deep_model）：
 //   - setSystemDefault(2)                                   // 仅切换默认 provider
 //   - setSystemDefault({ providerId: 2, shallow_model, deep_model })  // 同时覆盖模型
-export type SetSystemDefaultArg =
-  | number
-  | { providerId: number; shallow_model?: string; deep_model?: string };
-
-export const adminDefaultProviderAPI = {
-  setSystemDefault: async (arg: SetSystemDefaultArg): Promise<SystemDefaultProviderSummary> => {
-    try {
-      const payload: { provider_id: number; shallow_model?: string; deep_model?: string } =
-        typeof arg === 'number' ? { provider_id: arg } : { provider_id: arg.providerId };
-      if (typeof arg !== 'number') {
-        if (arg.shallow_model !== undefined) payload.shallow_model = arg.shallow_model;
-        if (arg.deep_model !== undefined) payload.deep_model = arg.deep_model;
-      }
-      const response = await apiClient.put('/api/admin/llm/system-default', payload);
-      return response.data as SystemDefaultProviderSummary;
-    } catch (error: any) {
-      // 优先取后端 detail（如 "cannot set inactive provider as system default"）
-      const errorMessage = error.response?.data?.detail ||
-                          error.response?.data?.message ||
-                          error.message ||
-                          '设置系统默认 provider 失败';
-      throw new Error(errorMessage);
-    }
-  },
-};
-
 // Analysis API (需要认证)
 export const analysisAPI = {
   startAnalysis: async (data: any) => {
@@ -402,11 +318,6 @@ export const analysisAPI = {
       throw new Error(errorMessage);
     }
   },
-
-  // Reuse configAPI's validateAPIKey
-  validateKey: async (data: { provider: string; api_key: string }) => {
-    return configAPI.validateAPIKey(data.provider, data.api_key);
-  },
 };
 
 // User Config API (需要认证)
@@ -436,81 +347,6 @@ export const userConfigAPI = {
       throw new Error(errorMessage);
     }
   },
-};
-
-// Scheduled Tasks API (需要认证)
-export const scheduledTasksAPI = {
-  create: async (data: any) => {
-    try {
-      const response = await apiClient.post('/api/scheduled-tasks', data);
-      return response.data;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          '创建定时任务失败';
-      throw new Error(errorMessage);
-    }
-  },
-
-  list: async (params: { page?: number; limit?: number } = {}) => {
-    try {
-      const { page = 1, limit = 10 } = params;
-      const response = await apiClient.get(`/api/scheduled-tasks?page=${page}&limit=${limit}`);
-      return response.data;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          '获取定时任务列表失败';
-      throw new Error(errorMessage);
-    }
-  },
-
-  get: async (taskId: number) => {
-    try {
-      const response = await apiClient.get(`/api/scheduled-tasks/${taskId}`);
-      return response.data;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          '获取定时任务详情失败';
-      throw new Error(errorMessage);
-    }
-  },
-
-  update: async (taskId: number, data: any) => {
-    try {
-      const response = await apiClient.patch(`/api/scheduled-tasks/${taskId}`, data);
-      return response.data;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          '更新定时任务失败';
-      throw new Error(errorMessage);
-    }
-  },
-
-  delete: async (taskId: number) => {
-    try {
-      const response = await apiClient.delete(`/api/scheduled-tasks/${taskId}`);
-      return response.data;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          '删除定时任务失败';
-      throw new Error(errorMessage);
-    }
-  },
-
-  // Legacy aliases for backward compatibility
-  createTask: async (data: any) => scheduledTasksAPI.create(data),
-  getTasks: async (page = 1, limit = 10) => scheduledTasksAPI.list({ page, limit }),
-  updateTask: async (taskId: number, data: any) => scheduledTasksAPI.update(taskId, data),
-  deleteTask: async (taskId: number) => scheduledTasksAPI.delete(taskId),
 };
 
 // Intraday Trading API (需要认证)
@@ -672,73 +508,6 @@ export const intradayTradingAPI = {
                           error.response?.data?.message || 
                           error.message || 
                           '撤销订单失败';
-      throw new Error(errorMessage);
-    }
-  },
-};
-
-// User LLM Settings API (需要认证) — 仅管理 provider 元数据（无用户 KEY）
-export const llmSettingsAPI = {
-  getSettings: async (): Promise<UserLLMSettingsResponse> => {
-    try {
-      const response = await apiClient.get<UserLLMSettingsResponse>('/api/user/llm-settings');
-      return response.data;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail ||
-        error.response?.data?.message ||
-        error.message ||
-        '获取 AI 设置失败';
-      throw new Error(errorMessage);
-    }
-  },
-
-  createProvider: async (body: CreateUserLLMProviderRequest): Promise<UserLLMProviderSetting> => {
-    try {
-      const response = await apiClient.post<UserLLMProviderSetting>('/api/user/llm-settings/providers', body);
-      return response.data;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail ||
-        error.response?.data?.message ||
-        error.message ||
-        '创建 provider 失败';
-      throw new Error(errorMessage);
-    }
-  },
-
-  updateProvider: async (id: string, body: UpdateUserLLMProviderRequest): Promise<UserLLMProviderSetting> => {
-    try {
-      const response = await apiClient.patch<UserLLMProviderSetting>(`/api/user/llm-settings/providers/${id}`, body);
-      return response.data;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail ||
-        error.response?.data?.message ||
-        error.message ||
-        '更新 provider 失败';
-      throw new Error(errorMessage);
-    }
-  },
-
-  deleteProvider: async (id: string): Promise<void> => {
-    try {
-      await apiClient.delete(`/api/user/llm-settings/providers/${id}`);
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail ||
-        error.response?.data?.message ||
-        error.message ||
-        '删除 provider 失败';
-      throw new Error(errorMessage);
-    }
-  },
-
-  testProvider: async (id: string, body: TestUserLLMProviderRequest): Promise<TestUserLLMProviderResponse> => {
-    try {
-      const response = await apiClient.post<TestUserLLMProviderResponse>(`/api/user/llm-settings/providers/${id}/test`, body);
-      return response.data;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.detail ||
-        error.response?.data?.message ||
-        error.message ||
-        '测试连接失败';
       throw new Error(errorMessage);
     }
   },

@@ -6,10 +6,6 @@ import { describe, expect, it } from 'vitest';
 // treatment (not the legacy RouteDataState), so it is excluded from this
 // Workflow Desk-era coverage list. The remaining legacy data routes are guarded here.
 const routeFiles = [
-  'src/app/scheduled-tasks/page.tsx',
-  'src/app/profile/ai-settings/page.tsx',
-  'src/app/admin/llm-config/page.tsx',
-  'src/components/admin/system-default-provider/SystemDefaultForm.tsx',
   'src/components/analysis/AnalysisHistory.tsx',
   'src/components/analysis/AnalysisProgress.tsx',
   'src/components/analysis/AnalysisResults.tsx',

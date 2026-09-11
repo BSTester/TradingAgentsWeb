@@ -7,10 +7,6 @@ import { useAuth } from '@/lib/auth';
 
 const NAV = [
   { href: '/admin/users', label: '用户管理', icon: 'fa-users' },
-  { href: '/admin/orders', label: '订单列表', icon: 'fa-receipt' },
-  { href: '/admin/llm-config', label: 'LLM 配置', icon: 'fa-microchip' },
-  { href: '/admin/system-default-provider', label: '系统默认 Provider', icon: 'fa-server' },
-  { href: '/admin/subscription-products', label: '订阅商品管理', icon: 'fa-credit-card' },
   { href: '/admin/public-reports', label: '公开报告管理', icon: 'fa-tower-broadcast' },
 ];
 

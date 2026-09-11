@@ -19,10 +19,10 @@
 
 - 多智能体股票分析（配置 → 实时进度 → 结果 → 导出 PDF/Markdown/JSON/图片）
 - 分析历史、研究报告页、研究排行榜（`/research`）
-- 定时任务（scheduled tasks）、订阅计划与积分（credits）
-- 管理后台：用户管理、LLM Provider 管理、系统默认 Provider
+- 管理后台：用户管理、公开报告治理
 - Agent 提示词模板（prompts）与技能（skills）管理
-- 用户级 LLM 设置（用户可自带 provider/key）、本地密钥保险箱（浏览器 keyVault）
+- LLM 配置完全前端本地化：本地密钥保险箱（浏览器 keyVault）+ 自定义 Base URL/模型（localStorage），
+  分析请求即配置（后端不保存任何全局/用户级 LLM 配置）
 - WebSocket 实时进度/日志（`/ws/{task_id}`）、Turnstile 人机验证（可选）、SMTP 邮件通知（可选）
 
 ---
@@ -45,23 +45,23 @@ TradingAgentsWeb/
 │
 ├── web/
 │   ├── backend/            # FastAPI 应用
-│   │   ├── app.py          # 主入口（lifespan 自动建表、CORS、日志中间件、TaskManager、19 个路由）
-│   │   ├── models.py       # SQLAlchemy ORM 模型（16 张表）
+│   │   ├── app.py          # 主入口（lifespan 自动建表、CORS、日志中间件、TaskManager、15 个路由）
+│   │   ├── models.py       # SQLAlchemy ORM 模型（10 张表）
 │   │   ├── database.py     # 引擎/会话工厂（SQLite WAL + QueuePool）
 │   │   ├── schemas.py      # Pydantic 请求/响应模型
 │   │   ├── auth.py / auth_routes.py  # JWT 工具与认证路由
-│   │   ├── routes/         # 路由模块（19 个 *_routes.py，见下表）
-│   │   ├── services/       # 业务逻辑（analysis_task、llm_config_resolver、report_formatter …）
+│   │   ├── routes/         # 路由模块（15 个 *_routes.py，见下表）
+│   │   ├── services/       # 业务逻辑（analysis_task、llm_config_resolver（请求校验）、report_formatter …）
 │   │   ├── migrations/     # 数据库迁移脚本
 │   │   └── tests/          # 后端 pytest 测试
 │   │
 │   └── frontend/           # Next.js 15 App Router 应用
 │       ├── src/app/        # 页面与路由组（analysis、history、reports、research、
-│       │                   # scheduled-tasks、subscribe、me、profile、admin、login/register …）
+│       │                   # me、profile、settings、admin、login/register …）
 │       ├── src/components/ # React 组件
 │       │   ├── analysis/   # 分析流程组件（巨型组件已拆分子目录：
 │       │   │               # results/ config/ progress/ history/）
-│       │   ├── admin/      # 管理后台组件（用户、LLM Provider、系统默认 Provider）
+│       │   ├── admin/      # 管理后台组件（用户、公开报告）
 │       │   └── …           # auth、common、profile、ui 等
 │       ├── src/hooks/      # 自定义 hooks（useAuth、useWebSocket 等）
 │       ├── src/lib/        # apiClient.ts（规范 API 客户端）、api.ts（兼容门面）、types 等
@@ -161,43 +161,41 @@ make up       # docker-compose up -d
 
 ## 后端架构要点
 
-### 路由（19 个模块，`web/backend/routes/` + `auth_routes.py`）
+### 路由（15 个模块，`web/backend/routes/` + `auth_routes.py`）
 
 | 路由 | 前缀 | 职责 |
 |------|------|------|
 | `auth_routes` | `/api/auth` | 注册/登录/刷新/JWT |
 | `analysis_routes` | `/api` | 发起分析、状态/结果、历史 |
-| `config_routes` | `/api` | 可选项配置（分析师/深度/供应商） |
+| `config_routes` | `/api` | 非 LLM 可选项（分析师/研究深度）与人机验证配置 |
 | `task_routes` | `/api` | 任务管理（停止/状态） |
 | `conversation_routes` | `/api/conversations` | 分析会话消息 |
 | `export_routes` | `/api` | 导出 PDF/Markdown/JSON |
 | `report_routes` | `/api/reports` | 研究报告 |
 | `home_routes` | `/api/home` | 首页聚合 |
 | `user_management_routes` | `/api/admin` | 用户管理 |
-| `scheduled_task_routes` | `/api/scheduled-tasks` | 定时任务 |
 | `skills_routes` | `/api/skills` | 技能管理 |
-| `user_llm_settings_routes` | `/api/user/llm-settings` | 用户级 LLM 设置 |
 | `user_config_routes` | `/api/user` | 个人配置 |
 | `prompt_routes` | `/api/prompts` | Agent 提示词模板 |
 | `websocket_routes` | `/ws/{task_id}` | 实时进度/日志 |
-| `llm_config_routes` | `/api/admin/llm` | LLM Provider 管理 |
-| `subscription_routes` | `/api/subscription` | 订阅计划与积分 |
-| `admin_routes` | `/api/admin` | 管理后台（系统默认 Provider 等） |
+| `admin_routes` | `/api/admin` | 管理后台（用户管理 / 公开报告治理） |
 | `page_routes` | — | 页面/静态资源路由 |
 
-### 数据模型（16 张表，`models.py`）
+### 数据模型（10 张表，`models.py`）
 
-`User`、`UserConfig`、`UserLLMProviderSetting`、`ScheduledTask`、`ConversationSession`、
-`ConversationMessage`、`AnalysisRecord`、`AnalysisLog`、`ExportRecord`、`AgentTool`、
-`AgentPromptTemplate`、`TemplateTools`、`LLMProvider`、`LLMModel`、`SubscriptionPlan`、
-`CreditTransaction`
+`User`、`UserConfig`、`ConversationSession`、`ConversationMessage`、`AnalysisRecord`、
+`AnalysisLog`、`ExportRecord`、`AgentTool`、`AgentPromptTemplate`、`TemplateTools`
+
+> 订阅/积分/订单、后台 LLM 配置（Provider/模型目录、系统默认 Provider、用户级设置）
+> 与定时任务已下线，相关表由迁移 `007_drop_subscription_llm_scheduled.py` 删除。
 
 ### 任务执行
 
 - `TaskManager`（`app.py`）：线程池 `max_workers=50`、用户级排队、全局队列
 - `HeartbeatMonitor`：心跳超时（默认 600s 无日志判定停滞）
 - 运行时 watchdog：`TASK_MAX_RUNTIME_SECONDS` 总时长熔断（`analysis_task.py`）
-- LLM 调用：`LLM_REQUEST_TIMEOUT` 超时 + `LLM_MAX_RETRIES` 重试（`llm_config_resolver`）
+- LLM 配置：请求即配置——`services/llm_config_resolver.py` 只校验请求携带的
+  provider / backend_url / 模型 / api_key（缺失 api_key 返回 400 `REQUEST_API_KEY_REQUIRED`）
 - LLM token 用量：`TokenUsageCollector`（`services/token_usage.py`）注入图 `config["callbacks"]`，
   累计全部 LLM 调用（含并行分析师分支）的输入/输出 token，任务结束后写入一条
   `AnalysisLog`（`agent='usage'`，`step='Token用量'`，token 列同步落库）

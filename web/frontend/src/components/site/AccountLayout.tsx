@@ -26,7 +26,6 @@ export function AccountLayout({ active, title, subtitle, eyebrow, actions, child
 
   const navItems = [
     { k: 'me', href: '/me', label: '我的分析', icon: 'fa-folder-open' },
-    { k: 'billing', href: '/me/billing', label: '订阅明细', icon: 'fa-receipt' },
     { k: 'preferences', href: '/me/preferences', label: '账户偏好', icon: 'fa-sliders' },
   ] as const;
 

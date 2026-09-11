@@ -13,7 +13,6 @@ export function SiteHeader() {
 
   const navLink = [
     { href: '/public', label: '热门研究', icon: 'fa-ranking-star' },
-    { href: '/subscribe', label: '订阅中心', icon: 'fa-credit-card' },
   ];
 
   const isActive = (href: string) =>

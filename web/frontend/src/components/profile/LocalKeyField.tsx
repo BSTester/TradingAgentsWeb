@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useLocalLLMKeys } from '@/hooks/useLocalLLMKeys';
-import { ConfirmDialog } from '@/components/admin/llm-config/ConfirmDialog';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export interface LocalKeyTestResult {
   valid: boolean;
@@ -20,7 +20,7 @@ interface LocalKeyFieldProps {
   providerId?: string;
   /**
    * 实际测试逻辑：传入 apiKey（本地或临时输入），返回成败。
-   * 由父组件注入（调用 llmSettingsAPI.testProvider 或 configAPI.validateAPIKey）。
+   * 由父组件注入（本地校验，例如长度/字符检查；后端已下线密钥验证接口）。
    * 不传则测试按钮禁用并提示「保存后可测试」。
    */
   onTest?: (apiKey: string) => Promise<LocalKeyTestResult>;

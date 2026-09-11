@@ -7,7 +7,6 @@ import { useAuth } from '@/lib/auth';
 
 const NAV = [
   { href: '/me', label: '我的分析', icon: 'fa-file-lines', exact: true },
-  { href: '/me/subscription', label: '订阅明细', icon: 'fa-credit-card' },
   { href: '/me/settings', label: '个人信息', icon: 'fa-user' },
 ];
 
