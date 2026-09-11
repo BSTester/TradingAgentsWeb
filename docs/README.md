@@ -1,57 +1,17 @@
-# TradingAgentsWeb 文档
+# docs/ 说明
 
-## 实时排名功能文档
+本目录当前只保留归档内容：
 
-本目录包含实时排名功能的完整文档。
+- **`archive/`** — 历史一次性修复笔记与旧功能（实时排行榜 LEADERBOARD_* 系列、WebSocket/行情/
+  字体/布局等）的临时文档，共 50+ 篇。这些文档对应的是早期开发阶段的诊断与修复过程，
+  内容已过时，仅作为历史追溯保留，**不作为当前系统的参考**。
 
-### 📚 文档索引
+当前系统的权威文档：
 
-#### 快速开始
-- **[LEADERBOARD_README.md](LEADERBOARD_README.md)** - 文档导航和快速命令
-- **[LEADERBOARD_QUICK_REFERENCE.md](LEADERBOARD_QUICK_REFERENCE.md)** - 快速参考卡片
-- **[LEADERBOARD_QUICKFIX.md](LEADERBOARD_QUICKFIX.md)** - 5分钟快速修复指南
+| 文档 | 内容 |
+|------|------|
+| [README.md](../README.md) | 项目定位、功能总览、安装与运行 |
+| [AGENTS.md](../AGENTS.md) | 架构、目录结构、构建/测试命令、AI 协作约定 |
+| [.env.example](../.env.example) | 全部环境变量及默认值 |
 
-#### 部署指南
-- **[LEADERBOARD_DEPLOYMENT_GUIDE.md](LEADERBOARD_DEPLOYMENT_GUIDE.md)** - 完整部署指南
-
-#### 技术文档
-- **[实时排名功能完成报告.md](实时排名功能完成报告.md)** - 完整工作报告和技术细节
-- **[实时排名功能实现报告.md](实时排名功能实现报告.md)** - 原始实现报告
-- **[实时排名功能查缺补漏报告.md](实时排名功能查缺补漏报告.md)** - 问题分析报告
-- **[实时排名功能修复总结.md](实时排名功能修复总结.md)** - 修复工作总结
-- **[LEADERBOARD_TOGGLE_FIX.md](LEADERBOARD_TOGGLE_FIX.md)** - 排名开关状态同步问题修复
-- **[UI_FIXES_20241117.md](UI_FIXES_20241117.md)** - UI问题修复（开关和密钥显示）
-- **[CLEANUP_SUMMARY.md](CLEANUP_SUMMARY.md)** - 文档整理和清理总结
-
-### 🚀 快速开始
-
-```bash
-# 1. 启动后端
-python web/backend/app.py
-
-# 2. 启动前端（新终端）
-cd web/frontend && npm run dev
-
-# 3. 访问排名页面
-# http://localhost:3000/leaderboard
-```
-
-### 📖 推荐阅读顺序
-
-1. **LEADERBOARD_README.md** - 了解全貌
-2. **LEADERBOARD_QUICK_REFERENCE.md** - 快速参考
-3. **LEADERBOARD_DEPLOYMENT_GUIDE.md** - 详细部署
-4. **实时排名功能完成报告.md** - 技术细节
-
-### ✅ 功能状态
-
-- ✅ 数据库迁移完成
-- ✅ 趋势图完整实现
-- ✅ 持仓价格实时计算
-- ✅ WebSocket实时推送
-- ✅ HTTP轮询降级
-- ✅ 完整文档和工具
-
-### 📞 获取帮助
-
-查看相关文档或访问项目主README。
+新功能或架构变更请直接在根级 README/AGENTS.md 中更新，不要再创建一次性修复笔记。
