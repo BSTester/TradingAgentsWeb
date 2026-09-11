@@ -178,10 +178,7 @@ def get_user_config_from_cache(user_id: int) -> Optional[Dict[str, Any]]:
                 # Convert to dict
                 config_dict = {
                     'user_id': user_config.user_id,
-                    'last_llm_provider': user_config.last_llm_provider,
                     # Analysis config (fallback)
-                    'last_deep_thinker': user_config.last_deep_thinker,
-                    'last_backend_url': user_config.last_backend_url,
                 }
                 
                 # Update cache (only for active users)
@@ -244,10 +241,7 @@ def preload_user_configs() -> int:
             for user_config in user_configs:
                 config_dict = {
                     'user_id': user_config.user_id,
-                    'last_llm_provider': user_config.last_llm_provider,
                     # Analysis config (fallback)
-                    'last_deep_thinker': user_config.last_deep_thinker,
-                    'last_backend_url': user_config.last_backend_url,
                 }
                 cache.set(user_config.user_id, config_dict)
                 count += 1

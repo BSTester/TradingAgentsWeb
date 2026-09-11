@@ -202,8 +202,10 @@ docker-compose up --build -d
   - 页面：分析配置 `/analysis`、实时进度 `/history/progress`、结果 `/history/detail`、
     历史 `/history`、研究报告 `/reports/[id]`、研究排行 `/research`、
     个人中心 `/me`（偏好 / 个人信息）、个人主页 `/profile`、
-    设置 `/settings`（自定义模型与本地密钥）、管理后台 `/admin`（用户 / 公开报告）、登录注册
-  - 能力：WebSocket 实时进度与日志、Markdown 渲染、结果导出（PDF / Markdown / JSON / 图片）
+    设置 `/settings`（接口类型 + Base URL + 快速/深度模型 + 本地密钥）、
+    管理后台 `/admin`（用户 / 公开报告）、登录注册
+  - 能力：WebSocket 实时进度与日志、Markdown 渲染、结果导出（PDF / Markdown / JSON / 图片）、
+    浏览器本地 LLM 配置（发起分析时随请求提交，服务端不保存）
   - 门禁：`npm run lint | typecheck | test:run | build`
 - 后端（web/backend，FastAPI）
   - 应用入口：`app.py`（lifespan 自动建表、env 驱动 CORS、日志中间件、15 个路由模块）

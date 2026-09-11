@@ -94,10 +94,6 @@ async def start_analysis(
     user_config.last_ticker = request.ticker  # 保存股票代码
     user_config.last_analysts = request.analysts
     user_config.last_research_depth = request.research_depth
-    user_config.last_llm_provider = resolved_llm.llm_provider
-    user_config.last_shallow_thinker = resolved_llm.shallow_thinker
-    user_config.last_deep_thinker = resolved_llm.deep_thinker
-    user_config.last_backend_url = resolved_llm.backend_url
     
     await db.commit()
     
@@ -154,7 +150,6 @@ async def start_analysis(
         shallow_thinker=resolved_llm.shallow_thinker,
         deep_thinker=resolved_llm.deep_thinker,
         backend_url=resolved_llm.backend_url,
-        api_key=None,  # User request keys must never be persisted
         is_public=request.is_public,  # Save privacy setting
         email_notification_enabled=request.email_notification,  # Save email notification preference
         status="queued",

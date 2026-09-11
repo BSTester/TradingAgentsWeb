@@ -6,6 +6,13 @@ import { SearchBar } from '@/components/site/SearchBar';
 import { SiteLayout } from '@/components/site/SiteLayout';
 import { useAuth } from '@/lib/auth';
 import { analysisAPI } from '@/lib/apiClient';
+import {
+  LOCAL_LLM_NOT_CONFIGURED_MESSAGE,
+  LOCAL_LLM_SETTINGS_PATH,
+  resolveLocalLlmConfig,
+} from '@/lib/llmRequestConfig';
+
+const DEFAULT_ANALYSTS = ['market', 'social', 'news', 'fundamentals'];
 
 function ResearchInner() {
   const router = useRouter();
@@ -14,6 +21,7 @@ function ResearchInner() {
   const { user } = useAuth();
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState('');
+  const [needConfig, setNeedConfig] = useState(false);
 
   const launch = async () => {
     if (!q) return;
@@ -21,10 +29,25 @@ function ResearchInner() {
       router.push('/auth?next=/research?q=' + encodeURIComponent(q));
       return;
     }
+    // 请求即配置：LLM 配置从浏览器本地解析（后端不保存任何 LLM 配置）
+    const llm = resolveLocalLlmConfig(user.id);
+    if (!llm) {
+      setNeedConfig(true);
+      setError(LOCAL_LLM_NOT_CONFIGURED_MESSAGE);
+      return;
+    }
     setLaunching(true);
     setError('');
+    setNeedConfig(false);
     try {
-      const res = await analysisAPI.startAnalysis({ ticker: q, of_company: q });
+      const res = await analysisAPI.startAnalysis({
+        ticker: q,
+        analysis_date: new Date().toISOString().slice(0, 10),
+        analysts: DEFAULT_ANALYSTS,
+        research_depth: 1,
+        is_public: true,
+        ...llm,
+      });
       const aid = res?.analysis_id || res?.id;
       if (aid) router.push('/me?analysis=' + aid);
       else setError('已提交，请到「我的分析」查看进度。');
@@ -67,7 +90,19 @@ function ResearchInner() {
             <i className="fa-solid fa-circle-info mr-1" />保存分析结果与公开报告需要先登录。
           </p>
         )}
-        {error && <p className="mt-4 text-xs text-verdict-bear">{error}</p>}
+        {error && (
+          <p className="mt-4 text-xs text-verdict-bear">
+            {error}
+            {needConfig && (
+              <>
+                {' '}
+                <a href={LOCAL_LLM_SETTINGS_PATH} className="underline hover:text-text-secondary">
+                  前往设置
+                </a>
+              </>
+            )}
+          </p>
+        )}
 
         <div className="mt-5 flex items-center justify-between">
           <p className="disclaimer-strip">研究建议 · 非下单执行 · 示例 / 延迟数据</p>

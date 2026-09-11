@@ -183,7 +183,6 @@ async def _trigger_analysis(
         shallow_thinker=resolved_llm.shallow_thinker,
         deep_thinker=resolved_llm.deep_thinker,
         backend_url=resolved_llm.backend_url,
-        api_key=resolved_llm.api_key,
         is_public=False,
         status="queued",
         current_step="对话触发分析已入队",

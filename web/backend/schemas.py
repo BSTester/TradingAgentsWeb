@@ -277,10 +277,6 @@ class UserConfigUpdate(BaseModel):
     last_ticker: Optional[str] = None  # 最后分析的股票代码
     last_analysts: Optional[List[str]] = None
     last_research_depth: Optional[int] = None
-    last_llm_provider: Optional[str] = None
-    last_shallow_thinker: Optional[str] = None
-    last_deep_thinker: Optional[str] = None
-    last_backend_url: Optional[str] = None
 
 class UserConfigResponse(BaseModel):
     """Schema for user configuration response - returns all cached settings"""
@@ -288,10 +284,6 @@ class UserConfigResponse(BaseModel):
     last_ticker: Optional[str] = None  # 最后分析的股票代码
     last_analysts: Optional[List[str]] = None
     last_research_depth: Optional[int] = None
-    last_llm_provider: Optional[str] = None
-    last_shallow_thinker: Optional[str] = None
-    last_deep_thinker: Optional[str] = None
-    last_backend_url: Optional[str] = None
     
     class Config:
         from_attributes = True

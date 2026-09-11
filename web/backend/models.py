@@ -49,10 +49,6 @@ class UserConfig(Base):
     last_ticker = Column(String(20), nullable=True)  # Last analyzed stock ticker
     last_analysts = Column(JSON, nullable=True)  # Last selected analysts
     last_research_depth = Column(Integer, nullable=True)  # Last research depth
-    last_llm_provider = Column(String(50), nullable=True)  # Last LLM provider
-    last_shallow_thinker = Column(String(100), nullable=True)  # Last shallow thinker model
-    last_deep_thinker = Column(String(100), nullable=True)  # Last deep thinker model
-    last_backend_url = Column(String(255), nullable=True)  # Last backend URL
     
     
     # Timestamps
@@ -127,7 +123,6 @@ class AnalysisRecord(Base):
     shallow_thinker = Column(String(100), nullable=False)
     deep_thinker = Column(String(100), nullable=False)
     backend_url = Column(String(255), nullable=False)
-    api_key = Column(String(1000), nullable=True)  # LLM API key for this specific task (supports JWT tokens)
     
     # Privacy settings
     is_public = Column(Boolean, default=False, nullable=False, index=True)  # Whether report can be viewed without login

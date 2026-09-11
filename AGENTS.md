@@ -60,7 +60,7 @@ TradingAgentsWeb/
 │       │                   # me、profile、settings、admin、login/register …）
 │       ├── src/components/ # React 组件
 │       │   ├── analysis/   # 分析流程组件（巨型组件已拆分子目录：
-│       │   │               # results/ config/ progress/ history/）
+│       │   │               # results/ progress/ history/）
 │       │   ├── admin/      # 管理后台组件（用户、公开报告）
 │       │   └── …           # auth、common、profile、ui 等
 │       ├── src/hooks/      # 自定义 hooks（useAuth、useWebSocket 等）
@@ -187,7 +187,8 @@ make up       # docker-compose up -d
 `AnalysisLog`、`ExportRecord`、`AgentTool`、`AgentPromptTemplate`、`TemplateTools`
 
 > 订阅/积分/订单、后台 LLM 配置（Provider/模型目录、系统默认 Provider、用户级设置）
-> 与定时任务已下线，相关表由迁移 `007_drop_subscription_llm_scheduled.py` 删除。
+> 与定时任务已下线，相关表由迁移 `007_drop_subscription_llm_scheduled.py` 删除；
+> LLM 偏好列与历史密钥列由 `008_drop_llm_preference_columns.py` 删除。
 
 ### 任务执行
 
@@ -230,10 +231,14 @@ make up       # docker-compose up -d
 - **巨型组件已拆分**（父组件为薄编排层，子组件 props 受控）：
   - `AnalysisResults.tsx` → `components/analysis/results/`（print styles、decision banner、
     phase tabs、report section、actions、export preview modal、types）
-  - `AnalysisConfigForm.tsx` → `components/analysis/config/`
   - `AnalysisProgress.tsx` → `components/analysis/progress/`
   - `AnalysisHistory.tsx` → `components/analysis/history/`
-- **密钥管理**：用户本地密钥存浏览器 keyVault（`src/lib/keyVault.ts`），不落库
+- **LLM 配置（纯前端本地）**：
+  - `/settings` 页配置接口类型（openai / anthropic 兼容）、Base URL、快速/深度模型名与 API Key
+  - `lib/keyVault.ts` 存密钥、`lib/customModelConfig.ts` 存 Base URL 与模型名（localStorage，按用户隔离）
+  - `lib/providers.ts` 提供本地 provider 目录；`lib/llmRequestConfig.ts` 在发起分析时解析
+    `{ llm_provider, backend_url, shallow_thinker, deep_thinker, api_key }`
+  - 启动入口 `/research`（搜索 → 发起分析）必须带上述配置；未配置时提示前往 `/settings`
 
 ---
 

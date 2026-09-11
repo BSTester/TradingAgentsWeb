@@ -37,10 +37,6 @@ async def get_user_config(
         last_ticker=config.last_ticker,  # 返回最后的股票代码
         last_analysts=config.last_analysts,
         last_research_depth=config.last_research_depth,
-        last_llm_provider=config.last_llm_provider,
-        last_shallow_thinker=config.last_shallow_thinker,
-        last_deep_thinker=config.last_deep_thinker,
-        last_backend_url=config.last_backend_url,
     )
 
 
@@ -67,14 +63,6 @@ async def update_user_config(
         config.last_analysts = config_update.last_analysts
     if config_update.last_research_depth is not None:
         config.last_research_depth = config_update.last_research_depth
-    if config_update.last_llm_provider is not None:
-        config.last_llm_provider = config_update.last_llm_provider
-    if config_update.last_shallow_thinker is not None:
-        config.last_shallow_thinker = config_update.last_shallow_thinker
-    if config_update.last_deep_thinker is not None:
-        config.last_deep_thinker = config_update.last_deep_thinker
-    if config_update.last_backend_url is not None:
-        config.last_backend_url = config_update.last_backend_url
     
     await db.commit()
     await db.refresh(config)
@@ -87,8 +75,4 @@ async def update_user_config(
         last_ticker=config.last_ticker,
         last_analysts=config.last_analysts,
         last_research_depth=config.last_research_depth,
-        last_llm_provider=config.last_llm_provider,
-        last_shallow_thinker=config.last_shallow_thinker,
-        last_deep_thinker=config.last_deep_thinker,
-        last_backend_url=config.last_backend_url,
     )
