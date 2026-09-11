@@ -75,7 +75,7 @@ describe('AnalysisProgress — terminal Risk Judge band', () => {
     });
 
     expect(screen.getByText('最终裁决')).toBeInTheDocument();
-    expect(screen.getByText('风险裁决（Risk Judge）输出最终交易建议')).toBeInTheDocument();
+    expect(screen.getByText('风险裁决输出最终交易建议')).toBeInTheDocument();
     expect(screen.getByText('风险裁决')).toBeInTheDocument();
     expect(screen.queryByText('交易执行')).toBeNull();
   });

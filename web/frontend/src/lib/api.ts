@@ -1,171 +1,29 @@
 /**
- * API client for TradingAgents backend
+ * API 客户端兼容层（TradingAgentsWeb）
+ *
+ * HTTP 传输已统一到 `@/lib/apiClient`（axios 单实例 + 鉴权/401 拦截器），
+ * 本文件仅保留两类东西：
+ *   1. 纯 WebSocket 能力 `AnalysisWebSocket`（与 HTTP 无关，保留原实现）
+ *   2. 旧 fetch 版 API 面的兼容签名，全部委托给 canonical 实现
+ *
+ * 现有页面/组件 `import { xxxAPI } from '@/lib/api'` 无需改动；
+ * 新代码请直接 `import { xxxAPI } from '@/lib/apiClient'`。
  */
 
-import { API_BASE_URL, buildApiUrl, buildWebSocketUrl } from '@/utils/api';
+import { buildWebSocketUrl } from '@/utils/api';
+import {
+  adminAPI,
+  analysisAPI as canonicalAnalysisAPI,
+  apiClient,
+  authAPI as canonicalAuthAPI,
+  configAPI,
+  llmAPI,
+  reportsAPI,
+  scheduledTasksAPI as canonicalScheduledTasksAPI,
+  subscriptionAPI,
+} from '@/lib/apiClient';
 
-// Get auth token from localStorage
-const getAuthToken = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('access_token');
-};
-
-// API request wrapper with auth
-async function apiRequest<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const token = getAuthToken();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(buildApiUrl(endpoint), {
-    ...options,
-    headers,
-  });
-
-  if (!response.ok) {
-    // Handle unauthorized: clear auth and redirect to login
-    if (response.status === 401) {
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.removeItem('access_token');
-          // Clear cookie used by middleware
-          document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
-          
-          // Only redirect to login if not on a public page
-          const publicPages = ['/', '/login', '/register', '/auth'];
-          const currentPath = window.location.pathname;
-          if (!publicPages.includes(currentPath) && !currentPath.startsWith('/analysis/')) {
-            // Redirect to login page
-            window.location.href = '/login';
-          }
-        } catch {}
-      }
-      throw new Error('无法验证凭据');
-    }
-
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    throw new Error(error.detail || `HTTP ${response.status}`);
-  }
-
-  return response.json();
-}
-
-// Auth APIs
-export const authAPI = {
-  register: (data: { username: string; email: string; password: string; turnstile_token?: string }) =>
-    apiRequest<{ access_token: string; token_type: string; user: any }>('/api/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  login: (data: { username: string; password: string; turnstile_token?: string }) =>
-    apiRequest<{ access_token: string; token_type: string; user: any }>('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  getCurrentUser: () => apiRequest<any>('/api/auth/me'),
-};
-
-// Analysis APIs
-export const analysisAPI = {
-  // Get configuration options (requires authentication)
-  getConfig: () => apiRequest<any>('/api/config'),
-
-  // Validate API key (requires authentication)
-  validateKey: (data: { provider: string; api_key: string }) =>
-    apiRequest<{ valid: boolean; message: string }>('/api/validate-key', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  // Start new analysis
-  startAnalysis: (data: {
-    ticker: string;
-    analysis_date: string;
-    analysts: string[];
-    research_depth: number;
-    llm_provider: string;
-    backend_url: string;
-    shallow_thinker: string;
-    deep_thinker: string;
-    api_key?: string;
-    openai_api_key?: string;
-    anthropic_api_key?: string;
-    google_api_key?: string;
-    openrouter_api_key?: string;
-  }) =>
-    apiRequest<{ analysis_id: string; status: string }>('/api/analyze', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  // Get analysis status
-  getStatus: (analysisId: string) =>
-    apiRequest<{
-      analysis_id: string;
-      status: string;
-      current_step: string | null;
-      progress_percentage: number;
-      started_at: string | null;
-      updated_at: string | null;
-    }>(`/api/analysis/${analysisId}/status`),
-
-  // Get analysis results
-  getResults: (analysisId: string) =>
-    apiRequest<any>(`/api/analysis/${analysisId}/results`),
-
-  // Get analysis markdown
-  getMarkdown: (analysisId: string) =>
-    apiRequest<{
-      content: string;
-      sections: any;
-      metadata: any;
-    }>(`/api/analysis/${analysisId}/markdown`),
-
-  // List analyses
-  listAnalyses: (params?: {
-    page?: number;
-    limit?: number;
-    status_filter?: string;
-    ticker_filter?: string;
-  }) => {
-    const queryParams = new URLSearchParams();
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
-    if (params?.status_filter) queryParams.append('status_filter', params.status_filter);
-    if (params?.ticker_filter) queryParams.append('ticker_filter', params.ticker_filter);
-
-    return apiRequest<{
-      analyses: any[];
-      total: number;
-      page: number;
-      limit: number;
-      has_next: boolean;
-    }>(`/api/analyses?${queryParams.toString()}`);
-  },
-
-  // Export analysis
-  exportPDF: (analysisId: string, options: any) =>
-    apiRequest<{
-      download_url: string;
-      expires_at: string;
-      file_size: number;
-    }>(`/api/analysis/${analysisId}/export/pdf`, {
-      method: 'POST',
-      body: JSON.stringify(options),
-    }),
-};
-
-// WebSocket connection for real-time logs
+// ===== WebSocket（实时日志/进度推送）=====
 export class AnalysisWebSocket {
   private ws: WebSocket | null = null;
   private analysisId: string;
@@ -271,8 +129,7 @@ export class AnalysisWebSocket {
   }
 }
 
-
-// Scheduled Tasks APIs
+// ===== 定时任务类型（与后端 _task_payload / 列表响应结构对齐）=====
 
 // 单个定期任务，与后端 _task_payload 对齐（/api/scheduled-tasks/ 列表/详情均返回此结构）。
 export interface ScheduledTaskItem {
@@ -312,8 +169,84 @@ export interface ScheduledTaskStats {
   completed: number;
 }
 
+// ===== 兼容 API 面（签名与原 fetch 版一致，实现委托 canonical client）=====
+
+// Auth（旧签名：对象入参；委托 canonical，兼容原 fetch 版调用方）
+export const authAPI = {
+  register: (data: {
+    username: string;
+    email: string;
+    password?: string;
+    turnstile_token?: string;
+  }) =>
+    canonicalAuthAPI.register(
+      data.username,
+      data.email,
+      data.password,
+      undefined,
+      undefined,
+      data.turnstile_token,
+    ),
+
+  login: (data: { username: string; password: string; turnstile_token?: string }) =>
+    canonicalAuthAPI.login(data.username, data.password, undefined, data.turnstile_token),
+
+  getCurrentUser: () => canonicalAuthAPI.getCurrentUser(),
+};
+
+// Analysis（旧方法名映射到 canonical 实现）
+export const analysisAPI = {
+  getConfig: () => configAPI.getConfig(),
+
+  validateKey: (data: { provider: string; api_key: string }) => canonicalAnalysisAPI.validateKey(data),
+
+  startAnalysis: (data: {
+    ticker: string;
+    analysis_date: string;
+    analysts: string[];
+    research_depth: number;
+    llm_provider: string;
+    backend_url: string;
+    shallow_thinker: string;
+    deep_thinker: string;
+    api_key?: string;
+    openai_api_key?: string;
+    anthropic_api_key?: string;
+    google_api_key?: string;
+    openrouter_api_key?: string;
+  }) => canonicalAnalysisAPI.startAnalysis(data),
+
+  getStatus: (analysisId: string) => canonicalAnalysisAPI.getAnalysisStatus(analysisId),
+
+  getResults: (analysisId: string) => canonicalAnalysisAPI.getAnalysisResults(analysisId),
+
+  getMarkdown: (analysisId: string) => canonicalAnalysisAPI.getMarkdownReport(analysisId),
+
+  // 旧签名支持 status_filter / ticker_filter（canonical getAnalysesList 仅支持分页）
+  listAnalyses: (params?: {
+    page?: number;
+    limit?: number;
+    status_filter?: string;
+    ticker_filter?: string;
+  }) => {
+    const q: Record<string, any> = {};
+    if (params?.page) q.page = params.page;
+    if (params?.limit) q.limit = params.limit;
+    if (params?.status_filter) q.status_filter = params.status_filter;
+    if (params?.ticker_filter) q.ticker_filter = params.ticker_filter;
+    return apiClient
+      .get<{ analyses: any[]; total: number; page: number; limit: number; has_next: boolean }>(
+        '/api/analyses',
+        { params: q },
+      )
+      .then((res) => res.data);
+  },
+
+  exportPDF: (analysisId: string, options?: any) => canonicalAnalysisAPI.exportToPDF(analysisId, options),
+};
+
+// Scheduled Tasks（全部委托 canonical 实现；显式返回类型保持类型链条完整）
 export const scheduledTasksAPI = {
-  // Create a new scheduled task
   create: (data: {
     task_name: string;
     ticker: string;
@@ -328,208 +261,43 @@ export const scheduledTasksAPI = {
     execution_time: string;
     interval_days?: number;
     end_date?: string;
-  }) =>
-    apiRequest<{ data: ScheduledTaskItem }>('/api/scheduled-tasks/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+  }): Promise<{ data: ScheduledTaskItem }> =>
+    canonicalScheduledTasksAPI.create(data) as Promise<{ data: ScheduledTaskItem }>,
 
-  // List scheduled tasks
-  list: (params?: { page?: number; limit?: number }) => {
-    const queryParams = new URLSearchParams();
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
+  list: (params?: { page?: number; limit?: number }): Promise<ScheduledTaskListResponse> =>
+    canonicalScheduledTasksAPI.list(params ?? {}) as Promise<ScheduledTaskListResponse>,
 
-    return apiRequest<ScheduledTaskListResponse>(`/api/scheduled-tasks/?${queryParams.toString()}`);
-  },
+  stats: (): Promise<{ data: ScheduledTaskStats }> =>
+    canonicalScheduledTasksAPI.stats() as Promise<{ data: ScheduledTaskStats }>,
 
-  // Full-set statistics across all of the user's tasks
-  stats: () =>
-    apiRequest<{ data: ScheduledTaskStats }>('/api/scheduled-tasks/stats'),
+  get: (taskId: number): Promise<{ data: ScheduledTaskItem }> =>
+    canonicalScheduledTasksAPI.get(taskId) as Promise<{ data: ScheduledTaskItem }>,
 
-  // Get a specific scheduled task
-  get: (taskId: number) =>
-    apiRequest<{ data: ScheduledTaskItem }>(`/api/scheduled-tasks/${taskId}`),
+  update: (
+    taskId: number,
+    data: { is_enabled?: boolean; task_name?: string },
+  ): Promise<{ data: ScheduledTaskItem }> =>
+    canonicalScheduledTasksAPI.update(taskId, data) as Promise<{ data: ScheduledTaskItem }>,
 
-  // Update a scheduled task
-  update: (taskId: number, data: { is_enabled?: boolean; task_name?: string }) =>
-    apiRequest<{ data: ScheduledTaskItem }>(`/api/scheduled-tasks/${taskId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    }),
-
-  // Delete a scheduled task
-  delete: (taskId: number) =>
-    apiRequest<{
+  delete: (
+    taskId: number,
+  ): Promise<{
+    success: boolean;
+    message: string;
+    task_id: number;
+    task_name: string;
+    task_status: string;
+    scheduler_removed: boolean;
+  }> =>
+    canonicalScheduledTasksAPI.delete(taskId) as Promise<{
       success: boolean;
       message: string;
       task_id: number;
       task_name: string;
       task_status: string;
       scheduler_removed: boolean;
-    }>(`/api/scheduled-tasks/${taskId}`, {
-      method: 'DELETE',
-    }),
+    }>,
 };
 
-// ===== TradingAgents Web 重设计 · 报告 / 订阅 / 管理 API（WS-133）=====
-
-// 报告（公开榜单 / 我的分析 / 详情）
-export const reportsAPI = {
-  // 公开榜单（免登录）
-  publicList: (params?: { limit?: number; market?: string; page?: number }) => {
-    const q = new URLSearchParams();
-    if (params?.limit) q.append('limit', params.limit.toString());
-    if (params?.market) q.append('market', params.market);
-    if (params?.page) q.append('page', params.page.toString());
-    return apiRequest<{ data: import('./types').ReportPreview[]; meta: any }>(
-      `/api/reports/public?${q.toString()}`
-    );
-  },
-
-  // 我的分析列表（登录后）
-  listMine: (params?: { page?: number; limit?: number; market?: string; status?: string }) => {
-    const q = new URLSearchParams();
-    if (params?.page) q.append('page', params.page.toString());
-    if (params?.limit) q.append('limit', params.limit.toString());
-    if (params?.market) q.append('market', params.market);
-    if (params?.status) q.append('status', params.status);
-    return apiRequest<{ data: import('./types').ReportPreview[]; meta: any }>(
-      `/api/reports?${q.toString()}`
-    );
-  },
-
-  // 报告详情（含完整角色链）
-  get: (reportId: string) =>
-    apiRequest<{ data: import('./types').ReportDetail }>(`/api/reports/${reportId}`),
-
-  // 一键切换公开状态
-  setPublic: (reportId: string, is_public: boolean) =>
-    apiRequest<{ data: import('./types').ReportPreview }>(`/api/reports/${reportId}/public`, {
-      method: 'POST',
-      body: JSON.stringify({ is_public }),
-    }),
-
-  // 导出 PDF（带封面研报）
-  exportPdf: async (reportId: string) => {
-    const token = getAuthToken();
-    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-    const response = await fetch(buildApiUrl(`/api/reports/${reportId}/export?format=pdf`), { headers });
-    if (!response.ok) throw new Error('导出失败，请稍后重试');
-    return response.blob();
-  },
-};
-
-// 用临时 API Key 获取某提供商的可用模型列表（自定义模型设置页用，Key 不持久化）
-export const llmAPI = {
-  fetchModelsTransient: (data: { base_url: string; api_key: string; provider_type?: string }) =>
-    apiRequest<{ models: string[]; count: number }>('/api/llm/fetch-models', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-};
-
-// 订阅 / 按次
-export const subscriptionAPI = {
-  plans: () =>
-    apiRequest<{ data: import('./types').SubscriptionPlan[] }>('/api/subscription/plans'),
-
-  me: () =>
-    apiRequest<{ data: import('./types').SubscriptionInfo }>('/api/subscription/me'),
-
-  purchase: (planId: number) =>
-    apiRequest<{ data: import('./types').SubscriptionInfo }>('/api/subscription/purchase', {
-      method: 'POST',
-      body: JSON.stringify({ plan_id: planId }),
-    }),
-};
-
-// 管理控制台
-export const adminAPI = {
-  users: (params?: { page?: number; limit?: number; search?: string }) => {
-    const q = new URLSearchParams();
-    if (params?.page) q.append('page', params.page.toString());
-    if (params?.limit) q.append('limit', params.limit.toString());
-    if (params?.search) q.append('search', params.search);
-    return apiRequest<{ data: import('./types').AdminUser[]; meta: any }>(
-      `/api/admin/users?${q.toString()}`
-    );
-  },
-
-  setUserActive: (userId: number, is_active: boolean) =>
-    apiRequest<{ data: import('./types').AdminUser }>(`/api/admin/users/${userId}/active`, {
-      method: 'POST',
-      body: JSON.stringify({ is_active }),
-    }),
-
-  setUserRole: (userId: number, role: 'user' | 'admin') =>
-    apiRequest<{ data: import('./types').AdminUser }>(`/api/admin/users/${userId}/role`, {
-      method: 'POST',
-      body: JSON.stringify({ role }),
-    }),
-
-  subscriptionProducts: () =>
-    apiRequest<{ data: import('./types').AdminSubscriptionPlan[] }>('/api/admin/subscription-products'),
-
-  createSubscriptionProduct: (data: {
-    name: string;
-    credits: number;
-    price: number;
-    description?: string;
-    is_active?: boolean;
-  }) =>
-    apiRequest<{ data: import('./types').AdminSubscriptionPlan }>('/api/admin/subscription-products', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  updateSubscriptionProduct: (
-    planId: number,
-    data: { name?: string; credits?: number; price?: number; description?: string; is_active?: boolean }
-  ) =>
-    apiRequest<{ data: import('./types').AdminSubscriptionPlan }>(
-      `/api/admin/subscription-products/${planId}`,
-      { method: 'PATCH', body: JSON.stringify(data) }
-    ),
-
-  deleteSubscriptionProduct: (planId: number) =>
-    apiRequest<{ data: { id: number; deleted: boolean } }>(
-      `/api/admin/subscription-products/${planId}`,
-      { method: 'DELETE' }
-    ),
-
-  // 公开报告管理（治理 / 可见性）
-  publicReports: (params?: { page?: number; limit?: number; market?: string }) => {
-    const q = new URLSearchParams();
-    if (params?.page) q.append('page', params.page.toString());
-    if (params?.limit) q.append('limit', params.limit.toString());
-    if (params?.market) q.append('market', params.market);
-    return apiRequest<{ data: import('./types').AdminPublicReportItem[]; meta: any }>(
-      `/api/admin/public-reports?${q.toString()}`
-    );
-  },
-
-  setReportPublic: (reportId: string, is_public: boolean) =>
-    apiRequest<{ data: any }>(`/api/admin/reports/${reportId}/public`, {
-      method: 'POST',
-      body: JSON.stringify({ is_public }),
-    }),
-
-  // 获取某个供应商的可用模型列表（调用其 /v1/models）
-  fetchProviderModels: (providerId: number) =>
-    apiRequest<{ provider_id: number; provider_name: string; base_url: string; count: number; models: string[] }>(
-      `/api/admin/llm/providers/${providerId}/fetch-models`,
-      { method: 'POST' }
-    ),
-
-  // 订单列表（所有用户的次数流水）
-  orders: (params?: { page?: number; limit?: number; type?: string }) => {
-    const q = new URLSearchParams();
-    if (params?.page) q.append('page', params.page.toString());
-    if (params?.limit) q.append('limit', params.limit.toString());
-    if (params?.type) q.append('type', params.type);
-    return apiRequest<{ data: import('./types').AdminOrder[]; meta: any }>(
-      `/api/admin/orders?${q.toString()}`
-    );
-  },
-};
+// ===== 以下 API 组签名与 canonical 完全一致，直接透传 =====
+export { reportsAPI, llmAPI, subscriptionAPI, adminAPI };

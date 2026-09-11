@@ -3,106 +3,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { buildApiUrl, buildWebSocketUrl, API_ENDPOINTS } from '../../utils/api';
 import { RouteDataState } from '@/components/ui/RouteDataState';
+import { loadAnalysisProgressConfig } from './progress/analysisStatus';
+import { applyProgressConfig, createAnalysisPhases, phaseIndexForAgent } from './progress/phaseModel';
+import { applyErrorToPhases, applyProgressLog } from './progress/phaseReducer';
+import type { AnalysisPhase, PhaseAgent, WebSocketMessage } from './progress/types';
+import { PhaseTimeline } from './progress/PhaseTimeline';
+import { ProgressActions } from './progress/ProgressActions';
+import { ProgressOverview } from './progress/ProgressOverview';
+
+export { loadAnalysisProgressConfig };
+export { applyProgressConfig, createAnalysisPhases, phaseIndexForAgent };
+export type { PhaseAgent, AnalysisPhase };
 
 interface AnalysisProgressProps {
   analysisId: string;
   onComplete: () => void;
   onBackToConfig: () => void;
   onShowToast: (message: string, type: 'success' | 'error' | 'info' | 'warning') => void;
-}
-
-type StatusFetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Pick<Response, 'ok' | 'status' | 'statusText' | 'json'>>;
-
-/** Load the initial status before opening the progress websocket. Non-2xx is recoverable. */
-export async function loadAnalysisProgressConfig(
-  analysisId: string,
-  token: string | null,
-  fetchStatus: StatusFetcher = fetch,
-): Promise<WebSocketMessage['data']> {
-  const response = await fetchStatus(buildApiUrl(`/api/analysis/${analysisId}/status`), {
-    headers: { 'Authorization': `Bearer ${token || ''}` },
-  });
-
-  if (!response.ok) {
-    const suffix = response.statusText ? ` ${response.statusText}` : '';
-    throw new Error(`无法加载分析状态（${response.status}${suffix}）`);
-  }
-
-  return response.json() as Promise<WebSocketMessage['data']>;
-}
-
-export interface PhaseAgent {
-  name: string;
-  status: 'pending' | 'running' | 'completed' | 'error';
-  logs: string[];
-}
-
-export interface AnalysisPhase {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  agents: PhaseAgent[];
-  status: 'pending' | 'running' | 'completed' | 'error';
-}
-
-const analystNames: Record<string, string> = {
-  market: '市场分析师',
-  social: '社交媒体分析师',
-  news: '新闻分析师',
-  fundamentals: '基本面分析师',
-};
-
-/** The five bands mirror GraphSetup. Risk Judge is always the terminal band. */
-export function createAnalysisPhases(): AnalysisPhase[] {
-  return [
-    { id: 'analysts', name: '分析师团队', description: 'Market → Social → News → Fundamentals 依次研究', icon: 'fa-users', status: 'running', agents: Object.values(analystNames).map(name => ({ name, status: 'pending', logs: [] })) },
-    { id: 'research', name: '研究辩论', description: 'Bull ↔ Bear 多空研究辩论，研究经理裁决', icon: 'fa-comments', status: 'pending', agents: ['多头研究员', '空头研究员', '研究经理'].map(name => ({ name, status: 'pending', logs: [] })) },
-    { id: 'trader', name: '交易计划', description: '交易员生成交易建议（不执行订单）', icon: 'fa-chart-line', status: 'pending', agents: [{ name: '交易员', status: 'pending', logs: [] }] },
-    { id: 'risk-debate', name: '风险审议', description: 'Risky → Safe → Neutral 三方风险审议', icon: 'fa-shield-halved', status: 'pending', agents: ['激进风险分析师', '保守风险分析师', '中性风险分析师'].map(name => ({ name, status: 'pending', logs: [] })) },
-    { id: 'risk-judge', name: '最终裁决', description: '风险裁决输出最终交易建议', icon: 'fa-gavel', status: 'pending', agents: [{ name: '风险裁决', status: 'pending', logs: [] }] },
-  ];
-}
-
-/** Config may select analysts, but cannot remove the terminal Risk Judge band. */
-export function applyProgressConfig(phases: AnalysisPhase[], config: Pick<WebSocketMessage['data'], 'selected_analysts'> & { enable_trading_executor?: boolean }): AnalysisPhase[] {
-  const next = phases.map(phase => ({ ...phase, agents: phase.agents.map(agent => ({ ...agent, logs: [...agent.logs] })) }));
-  const analystPhase = next[0];
-  if (analystPhase && Array.isArray(config.selected_analysts)) {
-    analystPhase.agents = config.selected_analysts
-      .filter(agent => Boolean(analystNames[agent]))
-      .map(agent => ({ name: analystNames[agent]!, status: 'pending', logs: [] }));
-  }
-  return next;
-}
-
-export function phaseIndexForAgent(agent: string, phases: AnalysisPhase[]): number {
-  const phaseId = ({
-    system: 'analysts', market: 'analysts', social: 'analysts', news: 'analysts', fundamentals: 'analysts',
-    researcher: 'research', bull: 'research', bear: 'research', invest_judge: 'research',
-    trader: 'trader', risky: 'risk-debate', neutral: 'risk-debate', safe: 'risk-debate', risk_manager: 'risk-judge',
-  } as Record<string, string>)[agent];
-  return Math.max(0, phases.findIndex(phase => phase.id === phaseId));
-}
-
-interface WebSocketMessage {
-  type: 'log' | 'complete' | 'error' | 'interrupted' | 'config' | 'pong';
-  timestamp: string;
-  analysis_id?: string;
-  data: {
-    level?: string;
-    message?: string;
-    agent?: string;
-    step?: string;
-    progress?: number;
-    phase?: string;
-    status?: string;
-    trading_decision?: string;
-    error?: string;
-    selected_analysts?: string[];
-    research_depth?: number;
-    enable_trading_executor?: boolean;
-  };
 }
 
 export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onShowToast }: AnalysisProgressProps) {
@@ -247,139 +164,11 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
               // 更新阶段和智能体状态
               if (agent && phase) {
                 setPhases(prevPhases => {
-                  const newPhases = [...prevPhases];
-
-                  // 阶段名称到索引的映射（兼容旧格式）
-                  const phaseMap: { [key: string]: number } = {
-                    '准备阶段': 0,  // 准备阶段也显示在第一阶段
-                    '初始化阶段': 0,
-                    '分析阶段': 0,
-                    '分析师团队': 0,
-                    '市场分析': 0,
-                    '情绪分析': 0,
-                    '新闻分析': 0,
-                    '基本面分析': 0,
-                    '投资辩论': 1,
-                    '研究团队': 1,
-                    '交易策略': 2,
-                    '交易团队': 2,
-                    '风险评估': 3,
-                    '风险管理': 3,
-                    '完成阶段': 4,
-                  };
-
-                  // 优先使用智能体映射，其次使用阶段映射
-                  let phaseIdx = phaseIndexForAgent(agent, newPhases);
-                  if (phaseIdx === 0 && agent !== 'system' && !['market', 'social', 'news', 'fundamentals'].includes(agent)) {
-                    phaseIdx = phaseMap[phase] ?? 0;
+                  const result = applyProgressLog(prevPhases, { agent, phase, logMessage: logMsg, step });
+                  if (result.currentPhaseIndex !== null) {
+                    setCurrentPhaseIndex(result.currentPhaseIndex);
                   }
-
-                  // 确保 phaseIdx 在有效范围内
-                  if (phaseIdx < 0) phaseIdx = 0;
-                  if (phaseIdx >= newPhases.length) phaseIdx = newPhases.length - 1;
-
-                  if (phaseIdx >= 0 && phaseIdx < newPhases.length) {
-                    const currentPhase = newPhases[phaseIdx];
-
-                    if (currentPhase) {
-                      // 更新阶段状态
-                      if (currentPhase.status === 'pending') {
-                        currentPhase.status = 'running';
-                        setCurrentPhaseIndex(phaseIdx);
-                      }
-
-                      // 智能体名称映射（英文 -> 中文，与 GraphSetup 节点对齐）
-                      const agentNameMap: { [key: string]: string } = {
-                        'system': '系统',
-                        'market': '市场分析师',
-                        'social': '社交媒体分析师',
-                        'news': '新闻分析师',
-                        'fundamentals': '基本面分析师',
-                        'researcher': '研究分析师',
-                        'bull': '多头研究员',
-                        'bear': '空头研究员',
-                        'trader': '交易员',
-                        'invest_judge': '研究经理',
-                        'risky': '激进风险分析师',
-                        'neutral': '中性风险分析师',
-                        'safe': '保守风险分析师',
-                        'risk_manager': '风险裁决',
-                      };
-
-                      const displayName = agentNameMap[agent] || agent;
-
-                      // 查找或创建智能体
-                      let agentObj = currentPhase.agents.find(a => a.name === displayName);
-                      if (!agentObj) {
-                        agentObj = {
-                          name: displayName,
-                          status: 'running',
-                          logs: []
-                        };
-                        currentPhase.agents.push(agentObj);
-                      }
-
-                      // 特殊处理：当真正的分析师开始工作时，自动标记系统为完成
-                      if (agent !== 'system' && phaseIdx === 0) {
-                        const systemAgent = currentPhase.agents.find(a => a.name === '系统');
-                        if (systemAgent && systemAgent.status === 'running') {
-                          systemAgent.status = 'completed';
-                          console.log('✅ 系统准备完成，分析师开始工作');
-                        }
-                      }
-
-                      // 检查是否是完成消息
-                      const isCompletedStep = step === '完成' || logMsg?.includes('完成分析') || logMsg?.includes('✅');
-
-                      // 更新智能体状态和日志
-                      if (isCompletedStep) {
-                        // 标记智能体为完成
-                        agentObj.status = 'completed';
-
-                        // 检查该阶段的所有智能体是否都完成了
-                        // 注意：排除"系统"智能体，它只是辅助性的，不算作实际的分析智能体
-                        // 应该检查所有非系统的智能体（包括pending的），因为pending表示还没开始，不应该算作完成
-                        console.log(`🔍 检查阶段完成状态 - 阶段: ${currentPhase.name}`);
-                        console.log(`   所有智能体:`, currentPhase.agents.map(a => `${a.name}(${a.status})`));
-
-                        // 获取所有应该参与的智能体（排除系统）
-                        const allAgents = currentPhase.agents.filter(a => a.name !== '系统');
-                        console.log(`   应参与的智能体:`, allAgents.map(a => `${a.name}(${a.status})`));
-
-                        // 只有当所有智能体都完成时，阶段才算完成
-                        const allCompleted = allAgents.length > 0 &&
-                          allAgents.every(a => a.status === 'completed');
-
-                        if (allCompleted) {
-                          currentPhase.status = 'completed';
-                          console.log(`✅ 阶段 "${currentPhase.name}" 完成 (${allAgents.length} 个智能体全部完成)`);
-                        } else {
-                          const completedCount = allAgents.filter(a => a.status === 'completed').length;
-                          console.log(`⏳ 阶段 "${currentPhase.name}" 进行中 (${completedCount}/${allAgents.length} 个智能体完成)`);
-                        }
-                      } else if (agentObj.status === 'pending') {
-                        agentObj.status = 'running';
-                      }
-
-                      if (logMsg) {
-                        const timestamp = new Date().toLocaleTimeString();
-                        const newLog = `${timestamp} - ${logMsg}`;
-
-                        // 去重：检查最后一条日志是否相同
-                        const lastLog = agentObj.logs[agentObj.logs.length - 1];
-                        if (lastLog !== newLog) {
-                          agentObj.logs.push(newLog);
-
-                          // 只保留最近10条日志
-                          if (agentObj.logs.length > 10) {
-                            agentObj.logs = agentObj.logs.slice(-10);
-                          }
-                        }
-                      }
-                    }
-                  }
-
-                  return newPhases;
+                  return result.phases;
                 });
               }
             } else if (message.type === 'complete') {
@@ -463,24 +252,7 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
               onShowToast(`❌ ${displayError}`, 'error');
 
               // 标记当前阶段和正在运行的智能体为错误
-              setPhases(prevPhases => {
-                const newPhases = [...prevPhases];
-                const currentPhase = newPhases[currentPhaseIndex];
-                if (currentPhase) {
-                  currentPhase.status = 'error';
-
-                  // 标记正在运行的智能体为错误
-                  currentPhase.agents.forEach(agent => {
-                    if (agent.status === 'running') {
-                      agent.status = 'error';
-                      // 添加错误日志
-                      const timestamp = new Date().toLocaleTimeString();
-                      agent.logs.push(`${timestamp} - ❌ 执行失败: ${displayError.substring(0, 100)}`);
-                    }
-                  });
-                }
-                return newPhases;
-              });
+              setPhases(prevPhases => applyErrorToPhases(prevPhases, currentPhaseIndex, displayError));
             }
           } catch (error) {
             console.warn('⚠️ Error parsing WebSocket message:', error);
@@ -530,19 +302,6 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
     }
   }, [isCompleted, onComplete]);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'fa-check-circle text-green-500';
-      case 'running':
-        return 'fa-spinner fa-spin text-blue-500';
-      case 'error':
-        return 'fa-times-circle text-red-500';
-      default:
-        return 'fa-circle text-text-muted';
-    }
-  };
-
   return (
     <RouteDataState
       loading={statusState === 'loading'}
@@ -567,127 +326,18 @@ export function AnalysisProgress({ analysisId, onComplete, onBackToConfig, onSho
 
       <div className="space-y-6">
         {/* 总体进度条 */}
-        <div>
-          <div className="flex justify-between text-sm text-text-secondary mb-2">
-            <span>总体进度</span>
-            <span>{Math.round(progress)}%</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
-            <div
-              className="bg-gradient-to-r from-blue-500 to-purple-500 h-3 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-        </div>
+        <ProgressOverview progress={progress} />
 
         {/* 阶段列表 */}
-        <div className="space-y-4">
-          {phases.map((phase, phaseIdx) => (
-            <div
-              key={phase.id}
-              className={`border rounded-lg overflow-hidden transition-all ${phase.status === 'running' ? 'border-blue-500 shadow-md' :
-                  phase.status === 'completed' ? 'border-green-500' :
-                    phase.status === 'error' ? 'border-red-500 shadow-md' :
-                      'border-gray-200'
-                }`}
-            >
-              {/* 阶段头部 */}
-              <div className={`p-4 border-b border-dark-border ${phase.status === 'running' ? 'bg-gradient-to-r from-accent-primary/20 to-accent-primary/10' :
-                  phase.status === 'completed' ? 'bg-gradient-to-r from-success-500/20 to-success-500/10' :
-                    phase.status === 'error' ? 'bg-gradient-to-r from-danger-500/20 to-danger-500/10' :
-                      'bg-dark-tertiary/50'
-                }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${phase.status === 'running' ? 'bg-accent-primary' :
-                        phase.status === 'completed' ? 'bg-success-500' :
-                          phase.status === 'error' ? 'bg-danger-500' :
-                            'bg-text-muted'
-                      }`}>
-                      <i className={`fas ${phase.icon} text-white`} />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-text-primary">{phase.name}</h4>
-                      <p className="text-sm text-text-secondary">{phase.description}</p>
-                    </div>
-                  </div>
-                  <i className={`fas ${getStatusIcon(phase.status)} text-xl`} />
-                </div>
-              </div>
-
-              {/* 智能体列表 */}
-              {(phase.status === 'running' || phase.status === 'completed' || phaseIdx === currentPhaseIndex) && (
-                <div className="p-4 bg-dark-primary space-y-3">
-                  {phase.agents.map((agent, agentIdx) => (
-                    <div key={agentIdx} className="border-l-4 pl-4 py-2" style={{
-                      borderColor: agent.status === 'completed' ? '#10b981' :
-                        agent.status === 'running' ? '#3b82f6' :
-                          agent.status === 'error' ? '#ef4444' :
-                            '#d1d5db'
-                    }}>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center space-x-2">
-                          <i className={`fas ${getStatusIcon(agent.status)}`} />
-                          <span className="font-medium text-text-primary">{agent.name}</span>
-                        </div>
-                        {agent.status === 'running' && (
-                          <span className="text-xs text-accent-primary font-medium">执行中...</span>
-                        )}
-                        {agent.status === 'completed' && (
-                          <span className="text-xs text-green-600 font-medium">已完成</span>
-                        )}
-                        {agent.status === 'error' && (
-                          <span className="text-xs text-red-600 font-medium">执行失败</span>
-                        )}
-                      </div>
-
-                      {/* 智能体日志 */}
-                      {agent.logs.length > 0 && (
-                        <div className="mt-2 max-h-32 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-dark-border scrollbar-track-dark-tertiary">
-                          {agent.logs.slice(-10).map((log, logIdx) => (
-                            <div key={logIdx} className="text-xs text-text-secondary pl-6 break-words">
-                              {log}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+        <PhaseTimeline phases={phases} currentPhaseIndex={currentPhaseIndex} />
 
         {/* 操作按钮 */}
-        <div className="flex justify-end space-x-3 pt-4 border-t">
-          {!isCompleted && (
-            <button
-              onClick={handleStopAnalysis}
-              disabled={isStopping}
-              className="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isStopping ? (
-                <>
-                  <i className="fas fa-spinner fa-spin mr-2" />
-                  中断中...
-                </>
-              ) : (
-                <>
-                  <i className="fas fa-stop mr-2" />
-                  中断分析
-                </>
-              )}
-            </button>
-          )}
-          <button
-            onClick={onBackToConfig}
-            className="px-4 py-2 text-text-primary bg-dark-tertiary rounded-md hover:bg-dark-primary border border-dark-border transition-colors"
-          >
-            <i className="fas fa-arrow-left mr-2" />
-            返回
-          </button>
-        </div>
+        <ProgressActions
+          isCompleted={isCompleted}
+          isStopping={isStopping}
+          onStop={handleStopAnalysis}
+          onBackToConfig={onBackToConfig}
+        />
       </div>
     </div>
     </RouteDataState>

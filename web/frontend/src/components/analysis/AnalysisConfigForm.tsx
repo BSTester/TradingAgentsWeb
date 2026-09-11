@@ -9,6 +9,10 @@ import { useAuth } from '@/lib/auth';
 import { useLocalLLMKeys } from '@/hooks/useLocalLLMKeys';
 import { useUserLLMSettings } from '@/hooks/useUserLLMSettings';
 import { ModelSelector, ModelOption } from './ModelSelector';
+import { TickerDateFields } from './config/TickerDateFields';
+import { AnalystTeamSection, AnalystOption } from './config/AnalystTeamSection';
+import { ResearchDepthSection, ResearchDepthOption } from './config/ResearchDepthSection';
+import { TradingExecutorSection } from './config/TradingExecutorSection';
 
 interface AnalysisConfigFormProps {
   config: any;
@@ -27,18 +31,6 @@ interface FormData {
   deep_thinker: string;
   is_public: boolean;  // Privacy setting for leaderboard
   email_notification: boolean;  // Email notification setting
-}
-
-interface Analyst {
-  value: string;
-  label: string;
-  description: string;
-}
-
-interface ResearchDepth {
-  value: number;
-  label: string;
-  description: string;
 }
 
 interface LLMProvider {
@@ -81,7 +73,6 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiKeyValidated, setApiKeyValidated] = useState(false);
   const [validatingKey, setValidatingKey] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
   const [saveApiKeyToBrowser, setSaveApiKeyToBrowser] = useState(false);
   const [tickerError, setTickerError] = useState<string>('');
   const [showPrivacyDialog, setShowPrivacyDialog] = useState(false);
@@ -240,14 +231,14 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
     }
   }, [userConfig, configLoading, llmSettingsLoading, llmSettings, config, configLoaded, defaultUserProvider, systemDefault, onShowToast]);
 
-  const availableAnalysts: Analyst[] = config?.analysts || [
+  const availableAnalysts: AnalystOption[] = config?.analysts || [
     { value: 'market', label: '市场分析师', description: '分析市场趋势和技术指标' },
     { value: 'social', label: '社交媒体分析师', description: '分析社交情绪和讨论' },
     { value: 'news', label: '新闻分析师', description: '分析新闻情绪和市场影响' },
     { value: 'fundamentals', label: '基本面分析师', description: '分析公司财务和基本面' }
   ];
 
-  const researchDepths: ResearchDepth[] = config?.research_depths || [
+  const researchDepths: ResearchDepthOption[] = config?.research_depths || [
     { value: 1, label: '快速分析', description: '单轮分析，适合快速决策' },
     { value: 2, label: '标准分析', description: '两轮分析，平衡速度和深度' },
     { value: 3, label: '深度分析', description: '三轮分析，全面综合评估' }
@@ -662,145 +653,28 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
       </div>
 
       <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-6 md:space-y-8 pb-20 md:pb-6">
-        {/* 步骤1: 股票代码 */}
-        <div className="space-y-4">
-          <div className="flex items-center space-x-3">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
-              1
-            </div>
-            <h4 className="text-lg font-medium text-text-primary">股票代码</h4>
-          </div>
-          <div className="ml-11">
-            <label htmlFor="ticker" className="block text-sm font-medium text-text-secondary mb-2">
-              输入要分析的股票代码
-            </label>
-            <input
-              type="text"
-              id="ticker"
-              name="ticker"
-              value={formData.ticker}
-              onChange={handleInputChange}
-              className={`w-full px-3 py-2 md:py-2 h-12 md:h-auto text-base md:text-sm bg-dark-tertiary text-white border rounded-md focus:outline-none focus:ring-2 focus:border-transparent transition-all ${tickerError
-                ? 'border-danger-500 focus:ring-danger-500'
-                : 'border-dark-border focus:ring-accent-primary'
-                }`}
-              placeholder="例如：TSLA, 600519, 00700.HK"
-              required
-            />
-            {tickerError && (
-              <div className="mt-2 text-sm text-red-600 whitespace-pre-line">
-                <i className="fas fa-exclamation-circle mr-1" />
-                {tickerError}
-              </div>
-            )}
-            <p className="text-sm text-text-tertiary mt-2">
-              <i className="fas fa-info-circle mr-1" />
-              支持美股（如 AAPL）、A股（如 600519）、港股（如 00700.HK）
-            </p>
-          </div>
-        </div>
-
-        {/* 步骤2: 分析日期 */}
-        <div className="space-y-4">
-          <div className="flex items-center space-x-3">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
-              2
-            </div>
-            <h4 className="text-lg font-medium text-text-primary">分析日期</h4>
-          </div>
-          <div className="ml-11">
-            <label htmlFor="analysis_date" className="block text-sm font-medium text-text-secondary mb-2">
-              选择分析日期
-            </label>
-            <input
-              type="date"
-              id="analysis_date"
-              name="analysis_date"
-              value={formData.analysis_date}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 h-12 md:h-auto text-base md:text-sm bg-dark-tertiary border border-dark-border text-white rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
-              required
-            />
-          </div>
-        </div>
+        {/* 步骤1: 股票代码 / 步骤2: 分析日期 */}
+        <TickerDateFields
+          ticker={formData.ticker}
+          analysisDate={formData.analysis_date}
+          tickerError={tickerError}
+          onFieldChange={handleInputChange}
+        />
 
         {/* 步骤3: 分析师团队 */}
-        <div className="space-y-4">
-          <div className="flex items-center space-x-3">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
-              3
-            </div>
-            <h4 className="text-lg font-medium text-text-primary">分析师团队</h4>
-          </div>
-          <div className="ml-11">
-            <p className="text-sm text-text-secondary mb-4">选择您的LLM分析师智能体进行分析</p>
-            <div className="space-y-3 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
-              {availableAnalysts.map((analyst: Analyst) => (
-                <div
-                  key={analyst.value}
-                  className={`p-4 border rounded-lg cursor-pointer transition-all ${formData.analysts.includes(analyst.value)
-                    ? 'border-accent-primary bg-accent-primary/10 shadow-glow-cyan'
-                    : 'border-dark-border hover:border-accent-primary/50 bg-dark-tertiary'
-                    }`}
-                  onClick={() => handleAnalystToggle(analyst.value)}
-                >
-                  <div className="flex items-start space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={formData.analysts.includes(analyst.value)}
-                      onChange={() => handleAnalystToggle(analyst.value)}
-                      className="mt-1 h-6 w-6 md:h-5 md:w-5 text-accent-primary focus:ring-accent-primary border-dark-border rounded cursor-pointer bg-dark-secondary min-w-touch min-h-touch md:min-w-0 md:min-h-0"
-                    />
-                    <div className="flex-1">
-                      <h5 className="font-medium text-text-primary text-base md:text-sm">{analyst.label}</h5>
-                      <p className="text-sm text-text-secondary">{analyst.description}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <AnalystTeamSection
+          analysts={availableAnalysts}
+          selectedAnalysts={formData.analysts}
+          onToggleAnalyst={handleAnalystToggle}
+        />
 
         {/* 步骤4: 研究深度 */}
-        <div className="space-y-4">
-          <div className="flex items-center space-x-3">
-            <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
-              4
-            </div>
-            <h4 className="text-lg font-medium text-text-primary">研究深度</h4>
-          </div>
-          <div className="ml-11">
-            <p className="text-sm text-text-secondary mb-4">选择您的研究深度级别</p>
-            <div className="space-y-3 md:grid md:grid-cols-3 md:gap-4 md:space-y-0">
-              {researchDepths.map((depth: ResearchDepth) => (
-                <div
-                  key={depth.value}
-                  className={`p-4 border rounded-lg cursor-pointer transition-all ${formData.research_depth === depth.value
-                    ? 'border-accent-primary bg-accent-primary/10 shadow-glow-cyan'
-                    : 'border-dark-border hover:border-accent-primary/50 bg-dark-tertiary'
-                    }`}
-                  onClick={() => setFormData(prev => ({ ...prev, research_depth: depth.value }))}
-                >
-                  <div className="flex items-start space-x-3">
-                    <input
-                      type="radio"
-                      name="research_depth"
-                      value={depth.value}
-                      checked={formData.research_depth === depth.value}
-                      onChange={handleInputChange}
-                      className="mt-1 h-5 w-5 text-accent-primary focus:ring-accent-primary border-dark-border cursor-pointer bg-dark-secondary"
-                    />
-                    <div>
-                      <h5 className="font-medium text-text-primary">{depth.label}</h5>
-                      <p className="text-sm text-text-secondary">{depth.description}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <ResearchDepthSection
+          depths={researchDepths}
+          value={formData.research_depth}
+          onChange={handleInputChange}
+          onSelectDepth={(depthValue: number) => setFormData(prev => ({ ...prev, research_depth: depthValue }))}
+        />
 
         {/* 步骤5: 模型（Workflow Desk — 只展示模型名，Provider/Endpoint/密钥状态不在此暴露） */}
         <div className="space-y-4">
@@ -820,123 +694,17 @@ export function AnalysisConfigForm({ config, onAnalysisStart, onShowToast }: Ana
         </div>
 
         {/* 执行交易配置 */}
-        <div className="bg-dark-tertiary rounded-lg border border-dark-border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h4 className="text-lg font-semibold text-text-primary flex items-center gap-2">
-                <i className="fas fa-robot text-accent-primary"></i>
-                执行交易
-              </h4>
-              <p className="text-sm text-text-secondary mt-1">
-                启用模拟交易执行功能（需要富途 API）。部署模拟交易服务可访问{' '}
-                <a 
-                  href="https://github.com/BSTester/futu-paper-trade-api" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800 underline"
-                >
-                  GitHub
-                </a>
-                {' '}获取代码
-              </p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={enableTradingExecutor}
-                onChange={(e) => setEnableTradingExecutor(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-            </label>
-          </div>
-          
-          {enableTradingExecutor && (
-            <div className="space-y-4 pl-6 border-l-2 border-blue-500">
-              <div>
-                <label htmlFor="futu_api_base_url" className="block text-sm font-medium text-text-secondary mb-2">
-                  富途 API Base URL
-                  <span className="text-danger-500 ml-1">*</span>
-                </label>
-                <input
-                  type="text"
-                  id="futu_api_base_url"
-                  value={futuApiBaseUrl}
-                  onChange={(e) => handleFutuApiBaseUrlChange(e.target.value)}
-                  placeholder="http://localhost:8000"
-                  className="w-full px-4 py-2 bg-dark-secondary border border-dark-border text-white rounded-lg focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
-                  required={enableTradingExecutor}
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="futu_api_key" className="block text-sm font-medium text-text-secondary mb-2">
-                  <i className="fas fa-key mr-1" />
-                  富途 API Key
-                  <span className="text-danger-500 ml-1">*</span>
-                </label>
-                <div className="flex space-x-2">
-                  <div className="relative flex-1">
-                    <input
-                      type={showApiKey ? 'text' : 'password'}
-                      id="futu_api_key"
-                      value={futuApiKey}
-                      onChange={(e) => handleFutuApiKeyChange(e.target.value)}
-                      placeholder="输入富途 API Key"
-                      className="w-full px-3 py-2 bg-dark-secondary border border-dark-border text-white rounded-md focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-accent-primary transition-all"
-                      required={enableTradingExecutor}
-                    />
-                    <button
-                      type="button"
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                    >
-                      <i className={`fas ${showApiKey ? 'fa-eye-slash' : 'fa-eye'} text-text-tertiary hover:text-accent-primary transition-colors`} />
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={validateFutuApi}
-                    disabled={!futuApiBaseUrl || !futuApiKey || validatingFutuApi}
-                    className={`px-4 py-2 rounded-md border font-medium transition-colors ${
-                      futuApiValidated
-                        ? 'bg-success-500/20 border-success-500 text-success-500'
-                        : 'bg-dark-tertiary border-dark-border text-text-secondary hover:bg-dark-secondary'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {validatingFutuApi ? (
-                      <>
-                        <i className="fas fa-spinner fa-spin mr-1" />
-                        验证中
-                      </>
-                    ) : futuApiValidated ? (
-                      <>
-                        <i className="fas fa-check mr-1" />
-                        已验证
-                    </>
-                  ) : (
-                    <>
-                      <i className="fas fa-check mr-1" />
-                      验证
-                    </>
-                  )}
-                  </button>
-                </div>
-                <p className="text-xs text-text-tertiary mt-1">
-                  <i className="fas fa-lock mr-1" />
-                  API Key 将安全地保存在服务器上
-                </p>
-              </div>
-              
-              <div className="bg-accent-primary/10 border border-accent-primary/30 rounded-lg p-3">
-                <p className="text-sm text-text-secondary">
-                  <i className="fas fa-info-circle mr-2 text-accent-primary"></i>
-                  <strong className="text-text-primary">注意：</strong>执行交易将在分析完成后自动执行模拟交易操作，包括投资组合管理、仓位控制和自动止盈止损。
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+        <TradingExecutorSection
+          enabled={enableTradingExecutor}
+          onEnabledChange={setEnableTradingExecutor}
+          baseUrl={futuApiBaseUrl}
+          onBaseUrlChange={handleFutuApiBaseUrlChange}
+          apiKey={futuApiKey}
+          onApiKeyChange={handleFutuApiKeyChange}
+          validated={futuApiValidated}
+          validating={validatingFutuApi}
+          onValidate={validateFutuApi}
+        />
 
         {/* 隐私授权和邮件通知 - 左右排列 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

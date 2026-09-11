@@ -15,12 +15,14 @@ const nextConfig: NextConfig = {
     removeConsole: process.env.NODE_ENV === 'production',
   },
 
-  // Docker 构建时跳过 lint 和类型检查以加快构建速度
+  // 质量门禁：构建期强制执行 ESLint 与 TypeScript 类型检查。
+  // 曾经为加速 Docker 构建而关闭（ignoreDuringBuilds / ignoreBuildErrors），
+  // 导致类型/规范错误被静默放行。现已恢复，CI 中以 `next build` 作为门禁。
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
 };
 

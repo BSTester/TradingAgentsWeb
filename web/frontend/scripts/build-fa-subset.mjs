@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Font Awesome subset generator — see frontend/issues/WS-86 + WS-97.
  *

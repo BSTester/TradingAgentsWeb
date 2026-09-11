@@ -45,7 +45,7 @@ const baseProviders: AdminLLMProvider[] = [
     id: 1,
     provider_name: 'openai',
     display_name: 'OpenAI',
-    api_key: null,
+    api_key: 'sk-test-openai-key',
     base_url: 'https://api.openai.com/v1',
     description: null,
     is_active: true,
@@ -57,7 +57,7 @@ const baseProviders: AdminLLMProvider[] = [
     id: 2,
     provider_name: 'anthropic',
     display_name: 'Anthropic',
-    api_key: null,
+    api_key: 'sk-test-anthropic-key',
     base_url: 'https://api.anthropic.com',
     description: null,
     is_active: true,
@@ -142,8 +142,8 @@ describe('SystemDefaultForm', () => {
 
     await screen.findByText('当前系统默认');
 
-    // 选择一个不同的 active provider
-    await user.selectOptions(screen.getByRole('combobox'), '2');
+    // 选择一个不同的 active provider（按可访问名锁定，避免命中 datalist 输入框）
+    await user.selectOptions(screen.getByRole('combobox', { name: /选择系统默认 Provider/ }), '2');
 
     const saveBtn = screen.getByRole('button', { name: /保存为系统默认/i });
     expect(saveBtn).toBeEnabled();
@@ -154,9 +154,13 @@ describe('SystemDefaultForm', () => {
     expect(adminDefaultProviderAPI.setSystemDefault).not.toHaveBeenCalled();
     expect(await screen.findByText('设为系统默认 Provider')).toBeInTheDocument();
 
-    // 确认后调用后端
+    // 确认后调用后端（mutation 传递 providerId + 浅/深模型对象）
     await user.click(screen.getByRole('button', { name: '确认设置' }));
-    expect(adminDefaultProviderAPI.setSystemDefault).toHaveBeenCalledWith(2);
+    expect(adminDefaultProviderAPI.setSystemDefault).toHaveBeenCalledWith({
+      providerId: 2,
+      shallow_model: '',
+      deep_model: '',
+    });
 
     // 成功后提示
     expect(await screen.findByText('已更新系统默认 Provider')).toBeInTheDocument();
@@ -172,7 +176,7 @@ describe('SystemDefaultForm', () => {
     renderWithQuery(<SystemDefaultForm />);
 
     await screen.findByText('当前系统默认');
-    await user.selectOptions(screen.getByRole('combobox'), '2');
+    await user.selectOptions(screen.getByRole('combobox', { name: /选择系统默认 Provider/ }), '2');
     await user.click(screen.getByRole('button', { name: /保存为系统默认/i }));
     await user.click(await screen.findByRole('button', { name: '确认设置' }));
 

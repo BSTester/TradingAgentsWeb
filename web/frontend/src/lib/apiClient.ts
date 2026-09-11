@@ -3,8 +3,16 @@ import axios from 'axios';
 import { API_BASE_URL } from '@/utils/api';
 import type {
   AdminLLMProvider,
+  AdminOrder,
+  AdminPublicReportItem,
+  AdminSubscriptionPlan,
+  AdminUser,
   AppConfigWithSystemDefault,
   CreateUserLLMProviderRequest,
+  ReportDetail,
+  ReportPreview,
+  SubscriptionInfo,
+  SubscriptionPlan,
   SystemDefaultProviderSummary,
   TestUserLLMProviderRequest,
   TestUserLLMProviderResponse,
@@ -158,7 +166,7 @@ export const authAPI = {
       const response = await apiClient.post('/api/auth/set-password', payload);
       return response.data;
     } catch (error: any) {
-      let errorMessage = error.response?.data?.detail || 
+      const errorMessage = error.response?.data?.detail || 
                          error.response?.data?.message || 
                          error.message || 
                          '设置密码失败，请稍后重试';
@@ -502,6 +510,20 @@ export const scheduledTasksAPI = {
     }
   },
 
+  // 全量统计（覆盖全部任务，不依赖当页数据）
+  stats: async () => {
+    try {
+      const response = await apiClient.get('/api/scheduled-tasks/stats');
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail ||
+                           error.response?.data?.message ||
+                           error.message ||
+                           '获取定时任务统计失败';
+      throw new Error(errorMessage);
+    }
+  },
+
   // Legacy aliases for backward compatibility
   createTask: async (data: any) => scheduledTasksAPI.create(data),
   getTasks: async (page = 1, limit = 10) => scheduledTasksAPI.list({ page, limit }),
@@ -736,6 +758,287 @@ export const llmSettingsAPI = {
         error.message ||
         '测试连接失败';
       throw new Error(errorMessage);
+    }
+  },
+};
+
+// ===== 报告 / 订阅 / 管理 / LLM 模型 API（WS-133，统一自原 api.ts）=====
+
+function errMessage(error: any, fallback: string): string {
+  return (
+    error.response?.data?.detail ||
+    error.response?.data?.message ||
+    error.message ||
+    fallback
+  );
+}
+
+// 报告（公开榜单 / 我的分析 / 详情 / 公开状态 / PDF 导出）
+export const reportsAPI = {
+  // 公开榜单（免登录，走公共客户端）
+  publicList: async (params?: { limit?: number; market?: string; page?: number }) => {
+    try {
+      const q: Record<string, any> = {};
+      if (params?.limit) q.limit = params.limit;
+      if (params?.market) q.market = params.market;
+      if (params?.page) q.page = params.page;
+      const res = await publicApiClient.get<{ data: ReportPreview[]; meta: any }>(
+        '/api/reports/public',
+        { params: q },
+      );
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '获取公开报告列表失败'));
+    }
+  },
+
+  // 我的分析列表（登录后）
+  listMine: async (params?: { page?: number; limit?: number; market?: string; status?: string }) => {
+    try {
+      const q: Record<string, any> = {};
+      if (params?.page) q.page = params.page;
+      if (params?.limit) q.limit = params.limit;
+      if (params?.market) q.market = params.market;
+      if (params?.status) q.status = params.status;
+      const res = await apiClient.get<{ data: ReportPreview[]; meta: any }>('/api/reports', {
+        params: q,
+      });
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '获取我的分析列表失败'));
+    }
+  },
+
+  // 报告详情（含完整角色链）
+  get: async (reportId: string) => {
+    try {
+      const res = await apiClient.get<{ data: ReportDetail }>(`/api/reports/${reportId}`);
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '获取报告详情失败'));
+    }
+  },
+
+  // 一键切换公开状态
+  setPublic: async (reportId: string, is_public: boolean) => {
+    try {
+      const res = await apiClient.post<{ data: ReportPreview }>(`/api/reports/${reportId}/public`, {
+        is_public,
+      });
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '更新公开状态失败'));
+    }
+  },
+
+  // 导出 PDF（带封面研报，返回 Blob）
+  exportPdf: async (reportId: string): Promise<Blob> => {
+    try {
+      const res = await apiClient.get(`/api/reports/${reportId}/export?format=pdf`, {
+        responseType: 'blob',
+      });
+      return res.data as Blob;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '导出失败，请稍后重试'));
+    }
+  },
+};
+
+// 用临时 API Key 获取某提供商的可用模型列表（自定义模型设置页用，Key 不持久化）
+export const llmAPI = {
+  fetchModelsTransient: async (data: { base_url: string; api_key: string; provider_type?: string }) => {
+    try {
+      const res = await apiClient.post<{ models: string[]; count: number }>('/api/llm/fetch-models', data);
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '获取模型列表失败'));
+    }
+  },
+};
+
+// 订阅 / 按次
+export const subscriptionAPI = {
+  plans: async () => {
+    try {
+      const res = await apiClient.get<{ data: SubscriptionPlan[] }>('/api/subscription/plans');
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '获取订阅套餐失败'));
+    }
+  },
+
+  me: async () => {
+    try {
+      const res = await apiClient.get<{ data: SubscriptionInfo }>('/api/subscription/me');
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '获取订阅信息失败'));
+    }
+  },
+
+  purchase: async (planId: number) => {
+    try {
+      const res = await apiClient.post<{ data: SubscriptionInfo }>('/api/subscription/purchase', {
+        plan_id: planId,
+      });
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '购买失败'));
+    }
+  },
+};
+
+// 管理控制台（用户 / 订阅商品 / 公开报告 / 供应商模型 / 订单）
+export const adminAPI = {
+  users: async (params?: { page?: number; limit?: number; search?: string }) => {
+    try {
+      const q: Record<string, any> = {};
+      if (params?.page) q.page = params.page;
+      if (params?.limit) q.limit = params.limit;
+      if (params?.search) q.search = params.search;
+      const res = await apiClient.get<{ data: AdminUser[]; meta: any }>('/api/admin/users', {
+        params: q,
+      });
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '获取用户列表失败'));
+    }
+  },
+
+  setUserActive: async (userId: number, is_active: boolean) => {
+    try {
+      const res = await apiClient.post<{ data: AdminUser }>(`/api/admin/users/${userId}/active`, {
+        is_active,
+      });
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '更新用户状态失败'));
+    }
+  },
+
+  setUserRole: async (userId: number, role: 'user' | 'admin') => {
+    try {
+      const res = await apiClient.post<{ data: AdminUser }>(`/api/admin/users/${userId}/role`, {
+        role,
+      });
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '更新用户角色失败'));
+    }
+  },
+
+  subscriptionProducts: async () => {
+    try {
+      const res = await apiClient.get<{ data: AdminSubscriptionPlan[] }>(
+        '/api/admin/subscription-products',
+      );
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '获取订阅商品失败'));
+    }
+  },
+
+  createSubscriptionProduct: async (data: {
+    name: string;
+    credits: number;
+    price: number;
+    description?: string;
+    is_active?: boolean;
+  }) => {
+    try {
+      const res = await apiClient.post<{ data: AdminSubscriptionPlan }>(
+        '/api/admin/subscription-products',
+        data,
+      );
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '创建订阅商品失败'));
+    }
+  },
+
+  updateSubscriptionProduct: async (
+    planId: number,
+    data: { name?: string; credits?: number; price?: number; description?: string; is_active?: boolean },
+  ) => {
+    try {
+      const res = await apiClient.patch<{ data: AdminSubscriptionPlan }>(
+        `/api/admin/subscription-products/${planId}`,
+        data,
+      );
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '更新订阅商品失败'));
+    }
+  },
+
+  deleteSubscriptionProduct: async (planId: number) => {
+    try {
+      const res = await apiClient.delete<{ data: { id: number; deleted: boolean } }>(
+        `/api/admin/subscription-products/${planId}`,
+      );
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '删除订阅商品失败'));
+    }
+  },
+
+  // 公开报告管理（治理 / 可见性）
+  publicReports: async (params?: { page?: number; limit?: number; market?: string }) => {
+    try {
+      const q: Record<string, any> = {};
+      if (params?.page) q.page = params.page;
+      if (params?.limit) q.limit = params.limit;
+      if (params?.market) q.market = params.market;
+      const res = await apiClient.get<{ data: AdminPublicReportItem[]; meta: any }>(
+        '/api/admin/public-reports',
+        { params: q },
+      );
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '获取公开报告管理列表失败'));
+    }
+  },
+
+  setReportPublic: async (reportId: string, is_public: boolean) => {
+    try {
+      const res = await apiClient.post<{ data: any }>(`/api/admin/reports/${reportId}/public`, {
+        is_public,
+      });
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '更新报告公开状态失败'));
+    }
+  },
+
+  // 获取某个供应商的可用模型列表（调用其 /v1/models）
+  fetchProviderModels: async (providerId: number) => {
+    try {
+      const res = await apiClient.post<{
+        provider_id: number;
+        provider_name: string;
+        base_url: string;
+        count: number;
+        models: string[];
+      }>(`/api/admin/llm/providers/${providerId}/fetch-models`);
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '获取供应商模型失败'));
+    }
+  },
+
+  // 订单列表（所有用户的次数流水）
+  orders: async (params?: { page?: number; limit?: number; type?: string }) => {
+    try {
+      const q: Record<string, any> = {};
+      if (params?.page) q.page = params.page;
+      if (params?.limit) q.limit = params.limit;
+      if (params?.type) q.type = params.type;
+      const res = await apiClient.get<{ data: AdminOrder[]; meta: any }>('/api/admin/orders', {
+        params: q,
+      });
+      return res.data;
+    } catch (error: any) {
+      throw new Error(errMessage(error, '获取订单列表失败'));
     }
   },
 };
