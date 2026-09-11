@@ -513,13 +513,16 @@ def _report_pdf_bytes_raw(record: Any) -> bytes:
 def _pdf_font() -> str:
     """Register and return an embedded TrueType font covering both Latin + CJK.
 
-    Prefers the bundled Noto Sans SC (TrueType outlines -> embeddable, renders
-    Chinese + English correctly everywhere); falls back to the Adobe CID font.
+    Prefers the bundled Noto Sans SC subset (GB2312 + Latin + common symbols,
+    ~3.5 MB instead of the original 17.8 MB variable font; TrueType outlines
+    -> embeddable, renders Chinese + English correctly everywhere); falls back
+    to the Adobe CID font when the subset file is unavailable.
     """
     import os
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
-    bundled = os.path.join(os.path.dirname(__file__), "..", "assets", "fonts", "NotoSansSC-VF.ttf")
+    font_dir = os.path.join(os.path.dirname(__file__), "..", "assets", "fonts")
+    bundled = os.path.join(font_dir, "NotoSansSC-subset.ttf")
     if os.path.exists(bundled):
         try:
             pdfmetrics.registerFont(TTFont("NotoSC", bundled))

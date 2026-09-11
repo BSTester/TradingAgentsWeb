@@ -292,6 +292,10 @@ class AnalysisLog(Base):
     # Additional metadata
     log_metadata = Column(JSON, nullable=True)  # Additional structured data
     
+    # LLM token usage（由 TokenUsageCollector 写入，agent='usage'；可空）
+    input_tokens = Column(Integer, nullable=True)
+    output_tokens = Column(Integer, nullable=True)
+    
     # Relationships
     analysis_record = relationship("AnalysisRecord", back_populates="logs")
     

@@ -1,3 +1,11 @@
+# ============================================
+# 依赖清单说明（重要）
+# - 运行时依赖的单一事实源是 `pyproject.toml` 的 [project].dependencies。
+# - 本文件为「本地开发全量安装」清单：pyproject 的超集 + 可选项，
+#   推荐 `pip install -r requirements.txt` 一次性装齐。
+# - 修改运行时依赖时请同步更新 pyproject.toml，保持一致。
+# ============================================
+
 # Core dependencies
 typing-extensions
 setuptools
@@ -65,10 +73,17 @@ openpyxl>=3.0.0          # Excel file support
 chainlit
 rich
 questionary
+typer>=0.9.0
 tqdm
+grip>=4.6.2
 
 # Development and testing
 pytest>=6.0.0           # Testing framework
 pytest-cov>=2.10.0      # Coverage testing
-ta-lib
+# ta-lib 为可选项：代码内有 try/except 保护（akshare_indicator.py），
+# 未安装时自动回退到纯 Python 指标实现。
+# 它需要预装 TA-Lib C 库才能通过 pip 安装，会阻塞 Linux 环境的
+# `pip install -r requirements.txt`，因此默认注释。
+# 如需启用：先安装 C 库（见 https://ta-lib.com/install/）再取消下行注释。
+# ta-lib
 reportlab>=4.0,<6

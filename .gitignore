@@ -1,5 +1,7 @@
 .venv
-results
+# 仅忽略仓库根目录的产物目录：裸写 `results`/`build` 会误伤任意层级的源码目录
+# （曾导致 web/frontend/src/components/analysis/results/ 被静默排除）
+/results/
 env/
 __pycache__/
 .DS_Store
@@ -15,6 +17,11 @@ eval_data/
 node_modules
 .kiro
 .vscode
-build
+/build/
 tradingagents.db
 web/Futu_OpenD_9.4.5418_Windows
+# 数据层 TTL 缓存（运行时生成，勿提交）
+tradingagents/dataflows/data_cache/
+# 前端构建产物
+.next
+tsconfig.tsbuildinfo

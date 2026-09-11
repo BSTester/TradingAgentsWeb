@@ -276,6 +276,9 @@ def run_analysis_task(
     # 创建新的数据库会话（同步，用于后台任务）
     db = SessionLocal()
     
+    # Token 用量收集器（图构建后注入 LangGraph callbacks；fail-open，可为 None）
+    usage_collector = None
+    
     # 线程本地事件循环（复用以避免频繁创建/销毁）
     _thread_loop = None
     
@@ -536,6 +539,20 @@ def run_analysis_task(
         # 修改 stream_mode 为 "updates" 以获取节点信息
         args["stream_mode"] = "updates"
         
+        # 注入 token 用量收集器：LangGraph 会把它传播给图内每一次 LLM 调用
+        # （含 4 个并行分析师分支），任务结束时把累计值落库。fail-open，失败不影响主流程。
+        try:
+            from web.backend.services.token_usage import TokenUsageCollector
+            usage_collector = TokenUsageCollector()
+            args.setdefault("config", {})
+            _config_kwargs = args["config"]
+            _existing_callbacks = list(_config_kwargs.get("callbacks") or [])
+            _existing_callbacks.append(usage_collector)
+            _config_kwargs["callbacks"] = _existing_callbacks
+        except Exception as e:
+            usage_collector = None
+            print(f"⚠️  初始化 token 用量收集器失败（可忽略）: {e}")
+        
         # 计算进度分配
         # 总进度: 10% -> 90%, 共 80% 的进度空间
         # 估算总智能体数量: 分析师 + 研究员(2-3个) + 投资评审(1个) + 交易员(1个) + 风险分析(3-4个) + 风险管理(1个)
@@ -738,6 +755,36 @@ def run_analysis_task(
             # 等待读取线程结束
             reader_thread.join(timeout=1.0)
         
+        # 任务总时长熔断看门狗：心跳监控只能在“日志停滞”时触发中断，
+        # 若 LLM 持续慢响应（日志仍有输出）心跳不会触发；看门狗提供绝对
+        # 时长上限，超时即置位 stop_event，避免僵尸任务永久占用线程池。
+        # 环境变量 TASK_MAX_RUNTIME_SECONDS 可配置，默认 3600（1 小时）。
+        try:
+            _max_runtime = float(os.getenv("TASK_MAX_RUNTIME_SECONDS", "3600"))
+        except (TypeError, ValueError):
+            _max_runtime = 3600.0
+        if _max_runtime > 0:
+            def _runtime_watchdog():
+                if stop_event.wait(timeout=_max_runtime):
+                    return  # 任务已在熔断前正常结束/被停止
+                print(f"⏰ [{analysis_id}] 任务运行超过 {_max_runtime:.0f}s，触发总时长熔断")
+                try:
+                    send_log(
+                        'warn',
+                        f'⏰ 分析任务超过最大运行时长（{int(_max_runtime // 60)} 分钟），已触发熔断并中止',
+                        'system', '熔断', 99.0, '分析阶段'
+                    )
+                except Exception:
+                    pass
+                stop_event.set()
+
+            watchdog_thread = threading.Thread(
+                target=_runtime_watchdog,
+                daemon=True,
+                name=f"task-runtime-watchdog-{analysis_id}",
+            )
+            watchdog_thread.start()
+
         # 启动心跳监控(传入 stop_event 以支持超时停止)
         heartbeat = HeartbeatMonitor(send_log, analysis_record, stop_event, manager)
         heartbeat.start()
@@ -1218,6 +1265,15 @@ def run_analysis_task(
             except Exception:
                 pass
 
+        # 落库 token 用量累计（独立会话，fail-open）
+        if usage_collector is not None:
+            try:
+                db_usage = SessionLocal()
+                usage_collector.persist(db_usage, analysis_id)
+                db_usage.close()
+            except Exception as e:
+                print(f"⚠️  保存 token 用量失败（可忽略）: {e}")
+
         if conversation_message_id:
             try:
                 from web.backend.models import ConversationMessage
@@ -1476,6 +1532,15 @@ def run_analysis_task(
                 except Exception:
                     pass
         
+        # 尽力落库已消耗的 token 用量（任务失败路径，fail-open）
+        if usage_collector is not None:
+            try:
+                db_usage = SessionLocal()
+                usage_collector.persist(db_usage, analysis_id)
+                db_usage.close()
+            except Exception as e:
+                print(f"⚠️  保存 token 用量失败（可忽略）: {e}")
+
         # 发送错误消息到前端
         print(f"📤 准备发送错误消息到前端: {user_friendly_error}")
         try:

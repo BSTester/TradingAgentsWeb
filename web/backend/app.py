@@ -427,10 +427,33 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+def _resolve_cors_origins() -> list:
+    """解析允许的跨域来源。
+
+    - 生产环境应通过 `CORS_ORIGINS` 环境变量显式指定（逗号分隔），
+      避免 `allow_origins=["*"]` + credentials 的开放跨域风险。
+    - 未配置时回退到开发环境默认值（本地 Next.js dev server / Docker 组合端口）。
+    """
+    raw = os.getenv("CORS_ORIGINS", "").strip()
+    if raw:
+        origins = [o.strip() for o in raw.split(",") if o.strip()]
+        if origins:
+            return origins
+    return [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
+
+
+CORS_ORIGINS = _resolve_cors_origins()
+print(f"🔒 CORS 允许的来源: {CORS_ORIGINS}")
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify actual origins
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
