@@ -12,7 +12,7 @@ from datetime import datetime
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from web.backend.database import engine, SessionLocal
+from web.backend.database import sync_engine, SessionLocal
 from web.backend.models import User, AnalysisRecord, AnalysisLog, ExportRecord
 from sqlalchemy import text, inspect
 import argparse
@@ -21,14 +21,14 @@ def check_table_exists(table_name):
     """
     Check if a table exists in the database
     """
-    inspector = inspect(engine)
+    inspector = inspect(sync_engine)
     return table_name in inspector.get_table_names()
 
 def check_column_exists(table_name, column_name):
     """
     Check if a column exists in a table
     """
-    inspector = inspect(engine)
+    inspector = inspect(sync_engine)
     if not check_table_exists(table_name):
         return False
     
@@ -46,22 +46,22 @@ def migrate_v1_to_v2():
         # Check if users table exists
         if not check_table_exists("users"):
             print("Creating users table...")
-            User.__table__.create(engine, checkfirst=True)
+            User.__table__.create(sync_engine, checkfirst=True)
         
         # Check if analysis_records table exists
         if not check_table_exists("analysis_records"):
             print("Creating analysis_records table...")
-            AnalysisRecord.__table__.create(engine, checkfirst=True)
+            AnalysisRecord.__table__.create(sync_engine, checkfirst=True)
         
         # Check if analysis_logs table exists
         if not check_table_exists("analysis_logs"):
             print("Creating analysis_logs table...")
-            AnalysisLog.__table__.create(engine, checkfirst=True)
+            AnalysisLog.__table__.create(sync_engine, checkfirst=True)
         
         # Check if export_records table exists
         if not check_table_exists("export_records"):
             print("Creating export_records table...")
-            ExportRecord.__table__.create(engine, checkfirst=True)
+            ExportRecord.__table__.create(sync_engine, checkfirst=True)
         
         print("Migration v1 -> v2 completed successfully")
         

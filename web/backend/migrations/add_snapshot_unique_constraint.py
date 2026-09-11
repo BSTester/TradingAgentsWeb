@@ -9,7 +9,7 @@ Date: 2025-11-13
 """
 
 from sqlalchemy import text
-from web.backend.database import SessionLocal, engine
+from web.backend.database import SessionLocal, sync_engine
 import logging
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ def upgrade():
     db = SessionLocal()
     try:
         # Check database type
-        db_url = str(engine.url)
+        db_url = str(sync_engine.url)
         
         if 'mysql' in db_url or 'mariadb' in db_url:
             # MySQL/MariaDB: Create unique index on date part
@@ -137,7 +137,7 @@ def downgrade():
     db = SessionLocal()
     try:
         # Check database type
-        db_url = str(engine.url)
+        db_url = str(sync_engine.url)
         
         if 'mysql' in db_url or 'mariadb' in db_url:
             logger.info("Removing unique constraint for MySQL/MariaDB...")

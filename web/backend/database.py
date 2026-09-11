@@ -120,6 +120,20 @@ else:
     AsyncSessionLocal = None
 
 
+# 同步连接串：由实际同步引擎渲染，避免与上面的分支配置漂移
+_SYNC_DATABASE_URL = sync_engine.url.render_as_string(hide_password=False)
+
+
+def get_database_url() -> str:
+    """返回同步驱动可用的数据库连接串（供迁移脚本 create_engine 使用）。
+
+    历史背景：`web/backend/migrations/add_intraday_llm_config.py` 等脚本一直按
+    此名称导入，但本模块此前并未定义，脚本一执行就 ImportError。迁移脚本请统一
+    使用 `sync_engine` / `get_database_url()`（不要再引用不存在的 `engine`）。
+    """
+    return _SYNC_DATABASE_URL
+
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Async dependency to get database session (for FastAPI routes)

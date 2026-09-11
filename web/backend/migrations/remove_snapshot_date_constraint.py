@@ -19,7 +19,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from sqlalchemy import text
-from web.backend.database import SessionLocal, engine
+from web.backend.database import SessionLocal, sync_engine
 import logging
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ def upgrade():
     db = SessionLocal()
     try:
         # Check database type
-        db_url = str(engine.url)
+        db_url = str(sync_engine.url)
         
         if 'mysql' in db_url or 'mariadb' in db_url:
             logger.info("Removing date-based unique constraint for MySQL/MariaDB...")
@@ -134,7 +134,7 @@ def downgrade():
     db = SessionLocal()
     try:
         # Check database type
-        db_url = str(engine.url)
+        db_url = str(sync_engine.url)
         
         logger.warning("⚠️  Re-adding date-based unique constraint")
         logger.warning("   This will fail if multiple snapshots exist for the same day")

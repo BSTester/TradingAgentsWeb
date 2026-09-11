@@ -67,9 +67,9 @@ def downgrade(connection):
 
 if __name__ == "__main__":
     # For testing migration independently
-    from web.backend.database import engine
+    from web.backend.database import sync_engine
     
     print("Running migration 006: Add account_snapshots table")
-    with engine.connect() as conn:
+    with sync_engine.connect() as conn:
         upgrade(conn)
     print("Migration completed!")
