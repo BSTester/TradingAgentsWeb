@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import type { ReportPreview } from '@/types/report';
-import { VERDICT_PILL } from '@/types/report';
+import { VERDICT_PILL, type ReportPreview } from '@/types/report';
 
 /**
  * 公开研究 / 我的分析列表中复用的研究报告卡片。

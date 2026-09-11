@@ -1,12 +1,11 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
+import { Suspense, useState } from 'react';
 import { SearchBar } from '@/components/site/SearchBar';
 import { SiteLayout } from '@/components/site/SiteLayout';
 import { useAuth } from '@/lib/auth';
 import { analysisAPI } from '@/lib/apiClient';
-import { useState } from 'react';
 
 function ResearchInner() {
   const router = useRouter();

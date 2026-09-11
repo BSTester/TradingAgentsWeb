@@ -1,5 +1,12 @@
-import type { RoleChainReport, AnalystNode, DebateSide } from '@/types/report';
-import { VERDICT_PILL, STANCE_PILL, STANCE_LABEL, RISK_LABEL } from '@/types/report';
+import {
+  VERDICT_PILL,
+  STANCE_PILL,
+  STANCE_LABEL,
+  RISK_LABEL,
+  type RoleChainReport,
+  type AnalystNode,
+  type DebateSide,
+} from '@/types/report';
 
 function VerdictPill({ verdict, label }: { verdict: string; label: string }) {
   const cls = (VERDICT_PILL as Record<string, string>)[verdict] ?? 'verdict-neutral';
