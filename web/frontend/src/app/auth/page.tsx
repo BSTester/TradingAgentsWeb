@@ -7,14 +7,7 @@ import { analysisAPI } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { PageShell } from '@/components/ws133/Shell';
 
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (el: HTMLElement, opts: any) => string;
-      reset: (id: string) => void;
-    };
-  }
-}
+// Window.turnstile 的全局声明统一在 src/types/turnstile.d.ts
 
 export default function AuthPage() {
   const router = useRouter();
@@ -115,7 +108,7 @@ function LoginForm({ siteKey, enabled }: { siteKey: string; enabled: boolean }) 
     setLoading(true);
     setErr('');
     try {
-      await login(username, password, undefined, turnstile);
+      await login(username, password, turnstile);
     } catch (err: any) {
       setErr(err?.message ?? '登录失败');
     } finally {
@@ -154,7 +147,7 @@ function RegisterForm({ siteKey, enabled }: { siteKey: string; enabled: boolean 
     setLoading(true);
     setErr('');
     try {
-      await register(username, email, password, undefined, undefined, turnstile);
+      await register(username, email, password, turnstile);
     } catch (err: any) {
       setErr(err?.message ?? '注册失败');
     } finally {

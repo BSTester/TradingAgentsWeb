@@ -17,15 +17,7 @@ const TEST_SITE_KEY = '1x00000000000000000000AA';
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || TEST_SITE_KEY;
 const SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (el: HTMLElement, opts: any) => string;
-      reset: (id?: string) => void;
-      remove: (id: string) => void;
-    };
-  }
-}
+// Window.turnstile 的全局声明统一在 src/types/turnstile.d.ts
 
 let scriptLoadPromise: Promise<void> | null = null;
 

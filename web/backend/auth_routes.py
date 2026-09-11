@@ -105,6 +105,24 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
         )
     return current_user
 
+# 可选认证：允许匿名访问（不携带 Authorization 头时不报错）
+security_optional = HTTPBearer(auto_error=False)
+
+async def get_optional_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_optional),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    """匿名或已登录都可用的依赖：无 token 或 token 无效时返回 None。
+
+    公开报告（`is_public=True`）等端点用它识别当前用户，游客也能正常访问。
+    """
+    if credentials is None:
+        return None
+    try:
+        return await get_current_user_from_token(credentials.credentials, db)
+    except Exception:
+        return None
+
 @router.post("/register", response_model=AuthResponse)
 async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db), request: Request = None):
     """

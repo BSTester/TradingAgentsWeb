@@ -70,8 +70,11 @@ def test_pdf_uses_standard_cid_font_without_bundled_font_files():
 def test_pdf_encodes_cjk_text_as_utf16be_hex():
     record = _record()
     data = report_formatter.report_pdf_bytes(record)
+    # 行内文本以 UTF-16BE hex 写入内容流（BOM 只在每行开头出现一次，
+    # 故此处比对不含 BOM 的 hex 片段）
     for snippet in ("分析报告", "偏积极", "MACD"):
-        assert report_formatter._pdf_text_hex(snippet).encode("ascii") in data
+        assert snippet.encode("utf-16-be").hex().upper().encode("ascii") in data
+    assert b"FEFF" in data
 
 
 def test_pdf_text_hex_prefixes_bom_and_uses_utf16be():

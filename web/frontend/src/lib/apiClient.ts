@@ -154,7 +154,7 @@ export const authAPI = {
       const response = await apiClient.post('/api/auth/set-password', payload);
       return response.data;
     } catch (error: any) {
-      let errorMessage = error.response?.data?.detail ||
+      const errorMessage = error.response?.data?.detail ||
                          error.response?.data?.message ||
                          error.message ||
                          '设置密码失败，请稍后重试';
@@ -292,12 +292,25 @@ export const adminLLMAPI = {
 };
 
 // 管理员设置系统默认 provider（E7，后端 KEY，脱敏摘要返回）
+//
+// 支持两种调用形式（后端 `SetSystemDefaultProviderRequest` 同时接受
+// provider_id 与可选的 shallow_model / deep_model）：
+//   - setSystemDefault(2)                                   // 仅切换默认 provider
+//   - setSystemDefault({ providerId: 2, shallow_model, deep_model })  // 同时覆盖模型
+export type SetSystemDefaultArg =
+  | number
+  | { providerId: number; shallow_model?: string; deep_model?: string };
+
 export const adminDefaultProviderAPI = {
-  setSystemDefault: async (providerId: number): Promise<SystemDefaultProviderSummary> => {
+  setSystemDefault: async (arg: SetSystemDefaultArg): Promise<SystemDefaultProviderSummary> => {
     try {
-      const response = await apiClient.put('/api/admin/llm/system-default', {
-        provider_id: providerId,
-      });
+      const payload: { provider_id: number; shallow_model?: string; deep_model?: string } =
+        typeof arg === 'number' ? { provider_id: arg } : { provider_id: arg.providerId };
+      if (typeof arg !== 'number') {
+        if (arg.shallow_model !== undefined) payload.shallow_model = arg.shallow_model;
+        if (arg.deep_model !== undefined) payload.deep_model = arg.deep_model;
+      }
+      const response = await apiClient.put('/api/admin/llm/system-default', payload);
       return response.data as SystemDefaultProviderSummary;
     } catch (error: any) {
       // 优先取后端 detail（如 "cannot set inactive provider as system default"）

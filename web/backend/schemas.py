@@ -790,3 +790,84 @@ class LLMConnectionTestResponse(BaseModel):
     success: bool
     message: str
     details: Optional[Dict[str, Any]] = None
+
+
+# ---------------------------------------------------------------------------
+# 订阅/积分与后台管理契约（report_routes / subscription_routes / admin_routes 依赖）
+# 合并远端主干时上游 schemas 未包含这些模型，在此补齐以保证路由可导入。
+# ---------------------------------------------------------------------------
+
+class ReportPublicIn(BaseModel):
+    is_public: bool
+
+
+class SubscriptionPlanOut(BaseModel):
+    model_config = {"from_attributes": True}
+    id: int
+    name: str
+    credits: int
+    price: float
+    description: Optional[str] = None
+    is_active: bool
+    sort_order: int
+
+
+class AdminSubscriptionPlanOut(SubscriptionPlanOut):
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminSubscriptionPlanIn(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    credits: int = Field(..., ge=1)
+    price: float = Field(..., ge=0)
+    description: Optional[str] = Field(None, max_length=500)
+    is_active: bool = True
+    sort_order: int = 0
+
+
+class AdminSubscriptionPlanUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    credits: Optional[int] = Field(None, ge=1)
+    price: Optional[float] = Field(None, ge=0)
+    description: Optional[str] = Field(None, max_length=500)
+    is_active: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+
+class CreditTransactionOut(BaseModel):
+    model_config = {"from_attributes": True}
+    id: int
+    type: str
+    amount: int
+    balance: int
+    status: str
+    description: Optional[str] = None
+    plan_name: Optional[str] = None
+    created_at: datetime
+
+
+class SubscriptionInfoOut(BaseModel):
+    balance: int
+    transactions: List[CreditTransactionOut]
+
+
+class SubscriptionPurchaseIn(BaseModel):
+    plan_id: int = Field(..., ge=1, description="要购买的套餐 ID")
+
+
+class AdminOrderOut(BaseModel):
+    id: int
+    user_id: int
+    username: str
+    type: str
+    amount: int
+    balance: int
+    status: str
+    description: Optional[str] = None
+    plan_name: Optional[str] = None
+    created_at: datetime
+
+
+class UserRoleUpdateIn(BaseModel):
+    role: str = Field(..., pattern="^(user|admin)$")
